@@ -25,3 +25,19 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Mockup Sandbox: Taylr Booking Form
+
+The `artifacts/mockup-sandbox` package hosts the Taylr customer-facing booking form prototype.
+
+- Mockups live under `src/components/mockups/`:
+  - `booking-flow/BookingFlowMobile.tsx`, `BookingFlowDesktop.tsx` — end-to-end wrappers
+  - `booking-pages/` — per-step pages (Unit, Role, Booker, Ac, Access, Pay) in mobile + desktop
+  - `booking-slots/SlotsDesktop.tsx`, `SlotsMobile.tsx`, `SlotsMobileLite.tsx` — Step 6 slot picker
+  - `booking-form/BookingForm.tsx` — original combined form (legacy)
+- Shared session store: `src/state/bookingSession.ts` (sessionStorage-backed, key `taylr.bookingSession.v1`)
+- Derived selectors and helpers: `src/state/bookingDerived.ts`, `src/state/bookingHelpers.ts`
+- Step-5 access-method matrix: `src/state/accessMethodCatalog.ts`
+- Full spec: `docs/replit_logic_v2_*.md`
+- Brand: pink `#ED017F`, selection green `#5FBB97`, font Inter; AU 10% GST baked in; `SYSTEM_PRICE_AUD = 179`, `ADDON_PRICE_AUD = 39`
+- Preview URLs are auto-discovered by `mockupPreviewPlugin.ts` at `/__mockup/preview/<folder>/<ComponentName>`. Files/folders prefixed with `_` are ignored.

@@ -128,8 +128,45 @@ function getPreviewPath(): string | null {
   return match ? match[1] : null;
 }
 
+const FRAME_SIZES: Record<string, { w: number; h: number }> = {
+  mobile: { w: 390, h: 844 },
+  desktop: { w: 1280, h: 900 },
+};
+
+function FramedPreview({ previewPath, frame }: { previewPath: string; frame: string }) {
+  const size = FRAME_SIZES[frame] ?? FRAME_SIZES.desktop;
+  const innerUrl = `${getBasePath()}/preview/${previewPath}`;
+  return (
+    <div
+      className="flex min-h-screen w-full items-start justify-center bg-slate-100 p-6"
+      style={{ fontFamily: "Inter, system-ui, sans-serif" }}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className="text-xs uppercase tracking-wider text-slate-500">
+          {frame} · {size.w}×{size.h} · {previewPath}
+        </div>
+        <div
+          className="overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200"
+          style={{ width: size.w, height: size.h }}
+        >
+          <iframe
+            src={innerUrl}
+            title={previewPath}
+            style={{ width: size.w, height: size.h, border: 0, display: "block" }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const previewPath = getPreviewPath();
+  const frame = new URLSearchParams(window.location.search).get("frame");
+
+  if (previewPath && frame) {
+    return <FramedPreview previewPath={previewPath} frame={frame} />;
+  }
 
   if (previewPath) {
     return (
