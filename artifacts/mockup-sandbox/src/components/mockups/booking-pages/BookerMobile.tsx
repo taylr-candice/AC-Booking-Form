@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Briefcase,
   CalendarCheck,
+  CheckCircle2,
   ChevronDown,
   Gauge,
   MessageSquare,
@@ -84,11 +85,16 @@ export function BookerMobile() {
     mobile: false,
   });
 
-  // Reset agency touched state when role flips off "agent" so re-entering
-  // agent mode doesn't show a leftover error before the user has interacted.
+  const [agencyOpen, setAgencyOpen] = useState(false);
+  const selectedAgency = DEMO_MANAGING_AGENCIES.find((a) => a.id === agencyId);
+
+  // Reset agency-related transient UI state when role flips off "agent" so
+  // re-entering agent mode doesn't show a leftover error or auto-open the
+  // dropdown before the user has interacted.
   useEffect(() => {
     if (!isAgent) {
       setTouched((t) => (t.agency ? { ...t, agency: false } : t));
+      setAgencyOpen(false);
     }
   }, [isAgent]);
 
@@ -155,36 +161,82 @@ export function BookerMobile() {
         {isAgent && (
           <div className="mb-6">
             <label
-              htmlFor="booker-agency-mobile"
+              id="booker-agency-mobile-label"
               className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
             >
               Your agency
             </label>
             <div className="relative">
-              <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500">
-                <Briefcase className="h-4 w-4" />
-              </div>
-              <select
-                id="booker-agency-mobile"
-                value={agencyId || ""}
-                onChange={(e) => bookingActions.setAgency(e.target.value || null)}
+              <button
+                type="button"
+                onClick={() => setAgencyOpen((o) => !o)}
                 onBlur={() => markTouched("agency")}
                 data-testid="select-agency"
+                aria-labelledby="booker-agency-mobile-label"
+                aria-haspopup="listbox"
+                aria-expanded={agencyOpen}
                 aria-invalid={showErr("agency")}
                 aria-describedby={showErr("agency") ? errorIds.agency : undefined}
-                className={`w-full appearance-none rounded-xl border bg-white py-3 pl-14 pr-10 text-[15px] outline-none ${
-                  showErr("agency")
-                    ? ""
-                    : "border-slate-200 focus:border-slate-400"
-                } ${agencyId ? "text-slate-900" : "text-slate-400"}`}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-3.5 text-left shadow-sm transition ${
+                  showErr("agency") ? "" : "border-slate-300 hover:border-slate-400"
+                }`}
                 style={errorStyle(showErr("agency"))}
               >
-                <option value="" disabled>Select your agency…</option>
-                {DEMO_MANAGING_AGENCIES.map((a) => (
-                  <option key={a.id} value={a.id} className="text-slate-900">{a.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <div className="min-w-0 flex-1">
+                  {selectedAgency ? (
+                    <div className="truncate text-[15px] font-semibold text-slate-900">
+                      {selectedAgency.name}
+                    </div>
+                  ) : (
+                    <span className="text-[15px] text-slate-400">Select your agency…</span>
+                  )}
+                </div>
+                <ChevronDown
+                  className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${
+                    agencyOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {agencyOpen && (
+                <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[360px] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                  {DEMO_MANAGING_AGENCIES.map((a) => {
+                    const active = a.id === agencyId;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          bookingActions.setAgency(a.id);
+                          setAgencyOpen(false);
+                          markTouched("agency");
+                        }}
+                        data-testid={`dropdown-agency-${a.id}`}
+                        className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
+                          active ? "bg-pink-50" : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className={`truncate text-[14px] font-semibold ${
+                              active ? "text-pink-700" : "text-slate-900"
+                            }`}
+                          >
+                            {a.name}
+                          </div>
+                        </div>
+                        {active && (
+                          <CheckCircle2
+                            className="mt-0.5 h-5 w-5 shrink-0"
+                            style={{ color: BRAND }}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             {showErr("agency") && <FieldError id={errorIds.agency} message={errors.agency} />}
           </div>
