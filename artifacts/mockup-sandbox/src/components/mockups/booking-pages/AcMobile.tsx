@@ -37,7 +37,6 @@ type Copy = {
   systemsUnitSingular: string;
   systemsUnitPlural: string;
   addonLabel: string;
-  addonHelper: string;
   addonRemoteNote?: string;
   addonNote: string;
   addonUnitSingular: string;
@@ -51,12 +50,10 @@ const COPY: Record<KnownType, Copy> = {
       "Please confirm the number of systems and any extra filters so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
     systemsHelper: "A ducted system is a separate AC setup in your apartment.",
-    systemsIncludes: ["1 system", "1 filter"],
+    systemsIncludes: ["1 filter per system"],
     systemsUnitSingular: "ducted system",
     systemsUnitPlural: "ducted systems",
     addonLabel: "Extra filters",
-    addonHelper:
-      "Each system includes 1 filter. Only add extras if any system has more than one return air grille.",
     addonNote: "Filters sit behind large return air grilles — not small ceiling vents.",
     addonUnitSingular: "extra filter",
     addonUnitPlural: "extra filters",
@@ -67,18 +64,39 @@ const COPY: Record<KnownType, Copy> = {
       "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
     systemsHelper: "A split system usually has an outdoor unit.",
-    systemsIncludes: ["1 indoor unit", "1 outdoor unit"],
+    systemsIncludes: ["1 indoor unit per system", "1 outdoor unit per system"],
     systemsUnitSingular: "split system",
     systemsUnitPlural: "split systems",
     addonLabel: "Extra indoor units",
-    addonHelper:
-      "Each system includes 1 indoor unit. Only add extras if any system has more than one indoor unit.",
     addonRemoteNote: "Each indoor unit usually has its own remote (use this as a guide).",
     addonNote: "Do not count ceiling vents or ducted outlets.",
     addonUnitSingular: "extra indoor unit",
     addonUnitPlural: "extra indoor units",
   },
 };
+
+function formatIncludedTotals(type: KnownType, systems: number): string {
+  const sysNoun = systems === 1 ? "system" : "systems";
+  if (type === "split") {
+    const indoor = systems === 1 ? "indoor unit" : "indoor units";
+    const outdoor = systems === 1 ? "outdoor unit" : "outdoor units";
+    return `${systems} ${sysNoun} = ${systems} ${indoor} + ${systems} ${outdoor} included`;
+  }
+  const filter = systems === 1 ? "filter" : "filters";
+  return `${systems} ${sysNoun} = ${systems} ${filter} included`;
+}
+
+function formatExtrasHelper(type: KnownType, systems: number): string {
+  const noun =
+    type === "split"
+      ? systems === 1
+        ? "indoor unit"
+        : "indoor units"
+      : systems === 1
+        ? "filter"
+        : "filters";
+  return `You have ${systems} ${noun} included. Only add extras if you have more than this.`;
+}
 
 const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number }> = {
   ducted: { systems: 1, additional: 0 },
@@ -291,6 +309,14 @@ export function AcMobile() {
                           </li>
                         ))}
                       </ul>
+                      {knownType && (
+                        <p
+                          className="mt-1.5 text-[11px] font-medium text-slate-700"
+                          data-testid="text-included-totals"
+                        >
+                          {formatIncludedTotals(knownType, displaySystems)}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -382,7 +408,12 @@ export function AcMobile() {
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-              <p className="mt-2 text-[12px] text-slate-500">{copy.addonHelper}</p>
+              <p
+                className="mt-2 text-[12px] text-slate-500"
+                data-testid="text-extras-helper"
+              >
+                {knownType && formatExtrasHelper(knownType, displaySystems)}
+              </p>
               {copy.addonRemoteNote && (
                 <div className="mt-2 flex items-start gap-2 rounded-md bg-slate-50 px-2.5 py-2">
                   <HelpCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
