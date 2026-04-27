@@ -56,7 +56,7 @@ const COPY: Record<KnownType, Copy> = {
     systemsUnitPlural: "ducted systems",
     addonLabel: "Extra filters",
     addonHelper:
-      "Your system includes 1 filter. Only add extras if you have more than one large return air grille.",
+      "Each system includes 1 filter. Only add extras if any system has more than one return air grille.",
     addonNote: "Filters sit behind large return air grilles — not small ceiling vents.",
     addonUnitSingular: "extra filter",
     addonUnitPlural: "extra filters",
@@ -72,7 +72,7 @@ const COPY: Record<KnownType, Copy> = {
     systemsUnitPlural: "split systems",
     addonLabel: "Extra indoor units",
     addonHelper:
-      "Your system includes 1 indoor unit. Only add extras if you have more than one wall-mounted unit connected to the same system.",
+      "Each system includes 1 indoor unit. Only add extras if any system has more than one indoor unit.",
     addonRemoteNote: "Each indoor unit usually has its own remote (use this as a guide).",
     addonNote: "Do not count ceiling vents or ducted outlets.",
     addonUnitSingular: "extra indoor unit",
