@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowRight, Plus, Minus, Info } from "lucide-react";
+import { AirVent, ArrowRight, Fan, Info, Minus, Plus } from "lucide-react";
 
 const BRAND = "#ED017F";
 const SYSTEM_PRICE = 179;
@@ -29,27 +29,49 @@ export function AcDesktop() {
 
             <div className="space-y-6">
               {/* Systems Stepper */}
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 p-6 bg-white shadow-sm">
-                <div className="pr-4">
-                  <h3 className="font-semibold text-slate-900 text-lg">Number of systems</h3>
-                  <p className="text-sm text-slate-500 mt-1">One system = one outdoor unit + one indoor unit.</p>
-                  <p className="text-xs font-medium mt-2" style={{ color: BRAND }}>${SYSTEM_PRICE} per system</p>
+              <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="pr-4">
+                    <h3 className="font-semibold text-slate-900 text-lg">Number of systems</h3>
+                    <p className="text-xs font-medium mt-1" style={{ color: BRAND }}>${SYSTEM_PRICE} per system</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <button
+                      onClick={() => setSystems(Math.max(1, systems - 1))}
+                      disabled={systems <= 1}
+                      className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <div className="w-8 text-center text-xl font-bold text-slate-900">{systems}</div>
+                    <button
+                      onClick={() => setSystems(systems + 1)}
+                      className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => setSystems(Math.max(1, systems - 1))}
-                    disabled={systems <= 1}
-                    className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <div className="w-8 text-center text-xl font-bold text-slate-900">{systems}</div>
-                  <button 
-                    onClick={() => setSystems(systems + 1)}
-                    className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+
+                {/* What counts as 1 system */}
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-3">
+                  <div className="flex items-center justify-center gap-3 text-xs sm:text-sm flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
+                        <AirVent className="h-4 w-4" />
+                      </div>
+                      <span className="font-medium text-slate-700">1 indoor unit</span>
+                    </div>
+                    <span className="text-slate-400 font-semibold">+</span>
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
+                        <Fan className="h-4 w-4" />
+                      </div>
+                      <span className="font-medium text-slate-700">1 outdoor unit</span>
+                    </div>
+                    <span className="text-slate-400 font-semibold">=</span>
+                    <span className="font-semibold text-slate-900">1 system</span>
+                  </div>
                 </div>
               </div>
 

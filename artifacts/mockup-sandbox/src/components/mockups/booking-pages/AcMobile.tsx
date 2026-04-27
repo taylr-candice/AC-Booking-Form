@@ -1,9 +1,11 @@
 import { useState } from "react";
 import {
+  AirVent,
   ArrowLeft,
   ArrowRight,
   Gauge,
   CalendarCheck,
+  Fan,
   MessageSquare,
   User,
   Minus,
@@ -64,7 +66,7 @@ export function AcMobile() {
             <div className="mb-2 flex items-baseline justify-between">
               <div>
                 <h3 className="font-semibold text-slate-900">Number of systems</h3>
-                <p className="text-xs text-slate-500">One outdoor unit paired with one indoor unit.</p>
+                <p className="text-xs font-medium" style={{ color: BRAND }}>${SYSTEM_PRICE} per system</p>
               </div>
             </div>
             <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
@@ -86,6 +88,27 @@ export function AcMobile() {
               >
                 <Plus className="h-4 w-4" />
               </button>
+            </div>
+
+            {/* What counts as 1 system */}
+            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+              <div className="flex items-center justify-center gap-2 text-[11px] flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <div className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
+                    <AirVent className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="font-medium text-slate-700">1 indoor</span>
+                </div>
+                <span className="text-slate-400 font-semibold">+</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
+                    <Fan className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="font-medium text-slate-700">1 outdoor</span>
+                </div>
+                <span className="text-slate-400 font-semibold">=</span>
+                <span className="font-semibold text-slate-900">1 system</span>
+              </div>
             </div>
           </div>
 
