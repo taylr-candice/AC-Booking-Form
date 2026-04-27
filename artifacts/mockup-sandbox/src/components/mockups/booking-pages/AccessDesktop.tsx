@@ -1,45 +1,7 @@
 import React from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Wind,
-  CalendarDays,
-  Home as HomeIcon,
-  CreditCard,
-  Pencil,
-  Users,
-  Briefcase,
-  KeyRound,
-  Info,
-  Trash2,
-  Plus,
-  Hand,
-  HousePlus,
-  Package,
-  PackageOpen,
-  CheckCircle2,
-} from "lucide-react";
-import {
-  bookingActions,
-  useBookingSelector,
-  type AccessMethod,
-  type PrimaryResidence,
-} from "../../../state/bookingSession";
-import {
-  DEMO_MANAGING_AGENCIES,
-  getAccessOptions,
-  infoNoteFor,
-  isAgentTenantOption,
-  isCollectReturnMethod,
-  isLeaveKeyMethod,
-  isManagingAgentMethod,
-  isParcelLockerMethod,
-  isStep5Valid,
-  isTenantMethod,
-  signatureVariantFor,
-  useTenants,
-  type AccessOption,
-} from "../../../state/accessMethodCatalog";
+import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
+import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isParcelLockerMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -50,187 +12,107 @@ export function AccessDesktop() {
   const residence = session.primary_residence;
   const access = session.access_method;
   const opts = getAccessOptions(role, residence);
-
   const tenantsApi = useTenants(isTenantMethod(access));
-
   const valid = isStep5Valid(session);
   const note = infoNoteFor(access);
   const sig = signatureVariantFor(access);
 
   const roleLabel = role === "owner" ? "Owner" : role === "agent" ? "Agent" : "—";
-  const residenceLabel =
-    residence === "live_in"
-      ? "Live in"
-      : residence === "leased_out"
-        ? "Leased out"
-        : residence === "vacant"
-          ? "Vacant"
-          : "—";
+  const residenceLabel = residence === "live_in" ? "Live in" : residence === "leased_out" ? "Leased out" : residence === "vacant" ? "Vacant" : "—";
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['Inter']">
-      <aside className="hidden w-[68px] shrink-0 flex-col items-center gap-2 bg-slate-900 py-5 text-white lg:flex">
-        <div className="grid h-10 w-10 place-items-center rounded-lg" style={{ backgroundColor: BRAND }}>
-          <Wind className="h-5 w-5" />
-        </div>
-        <div className="text-[11px] font-bold tracking-tight">
-          tay<span style={{ color: "#ff3b6e" }}>lr</span>
-          <span className="text-[#ff3b6e]">.</span>
-        </div>
-        <div className="mt-4 flex flex-col items-center gap-1.5 text-slate-400">
-          <button className="rounded-md p-2 hover:bg-slate-800"><HomeIcon className="h-4 w-4" /></button>
-          <button className="rounded-md bg-slate-800 p-2 text-white"><CalendarDays className="h-4 w-4" /></button>
-          <button className="rounded-md p-2 hover:bg-slate-800"><CreditCard className="h-4 w-4" /></button>
-        </div>
-      </aside>
+    <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
+      <div className="w-full max-w-2xl">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
+          
+          <div className="mb-8">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 5 of 7</div>
+            <h1 className="text-2xl font-semibold text-slate-900">How will the technician access the property?</h1>
+          </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-7 py-4">
-          <div className="flex items-center gap-3">
+          <div className="flex-1">
+            {!role && <RoleMissingBanner />}
+
+            {role && (
+              <div className="mb-8">
+                <p className="text-sm text-slate-500">
+                  You are an <span className="font-medium text-slate-700">{roleLabel}</span>
+                  {role === "owner" && residence && (
+                    <> and the property is <span className="font-medium text-slate-700">{residenceLabel.toLowerCase()}</span></>
+                  )}
+                  .
+                </p>
+              </div>
+            )}
+
+            {role === "owner" && (
+              <PrimaryResidenceSection
+                residence={residence}
+                onPick={(r) => bookingActions.setPrimaryResidence(r)}
+              />
+            )}
+
+            {(role === "agent" || (role === "owner" && residence)) && (
+              <>
+                <div className="space-y-3 mb-8">
+                  {opts.map((o) => {
+                    const isAgentTenantCard = role === "agent" && o.key === "agent_tenant_pending";
+                    const selected = isAgentTenantCard ? isAgentTenantOption(access) : access === o.key;
+                    return (
+                      <AccessOptionCard
+                        key={o.key}
+                        option={o}
+                        selected={selected}
+                        onClick={() => {
+                          if (isAgentTenantCard && isAgentTenantOption(access)) return;
+                          bookingActions.setAccessMethod(o.key);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+
+                {role === "agent" && isAgentTenantOption(access) && (
+                  <AgentTenantCoordinationSection access={access} />
+                )}
+
+                {note && <InfoBanner title={note.title} body={note.body} />}
+                {isLeaveKeyMethod(access) && <KeyHolderSection />}
+                {isParcelLockerMethod(access) && <ParcelLockerHint />}
+                {isCollectReturnMethod(access) && <CollectReturnSection />}
+                {isManagingAgentMethod(access) && <ManagingAgencySection />}
+                {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
+                {sig && <SignatureSection title={sig.title} body={sig.body} />}
+                <NotesSection />
+              </>
+            )}
+          </div>
+
+          <div className="mt-12 pt-6 border-t border-slate-100 flex items-center justify-between">
             <button
               type="button"
-              aria-label="Back"
-              className="grid h-9 w-9 place-items-center rounded-full border-2 transition hover:bg-pink-50"
-              style={{ borderColor: BRAND, color: BRAND }}
+              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
               data-testid="button-back-desktop"
             >
-              <ArrowLeft className="h-4 w-4" />
+              ← Back
             </button>
-            <div>
-              <div className="text-xs uppercase tracking-wide text-slate-500">Step 5</div>
-              <h1 className="text-2xl font-semibold text-slate-900">How will the technician access the property to perform the service?</h1>
-            </div>
+            <button
+              type="button"
+              disabled={!valid}
+              data-testid="button-continue"
+              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
+              style={{ backgroundColor: BRAND }}
+            >
+              Continue
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
-        </header>
 
-        <div className="flex flex-1 overflow-hidden">
-          <section className="flex flex-1 flex-col overflow-auto bg-white px-7 py-10">
-            <div className="mx-auto w-full max-w-xl">
-              {!role && <RoleMissingBanner />}
-
-              {role && (
-                <div className="mb-8">
-                  <h2 className="text-xl font-semibold mb-1" style={{ color: BRAND }}>Access method</h2>
-                  <p className="text-sm text-slate-500">
-                    You are an <span className="font-medium text-slate-700">{roleLabel}</span>
-                    {role === "owner" && residence && (
-                      <> and the property is <span className="font-medium text-slate-700">{residenceLabel.toLowerCase()}</span></>
-                    )}
-                    .
-                  </p>
-                </div>
-              )}
-
-              {role === "owner" && (
-                <PrimaryResidenceSection
-                  residence={residence}
-                  onPick={(r) => bookingActions.setPrimaryResidence(r)}
-                />
-              )}
-
-              {(role === "agent" || (role === "owner" && residence)) && (
-                <>
-                  <div className="space-y-3 mb-8">
-                    {opts.map((o) => {
-                      // Agent's "Tenants will provide access" card covers
-                      // all three sub-states — `agent_tenant_pending` (no
-                      // sub-choice yet), `agent_tenant_self`, and
-                      // `agent_tenant_taylr`. Keep the card visually selected
-                      // for any of them and let the sub-question resolve the
-                      // coordination mode.
-                      const isAgentTenantCard =
-                        role === "agent" && o.key === "agent_tenant_pending";
-                      const selected = isAgentTenantCard
-                        ? isAgentTenantOption(access)
-                        : access === o.key;
-                      return (
-                        <AccessOptionCard
-                          key={o.key}
-                          option={o}
-                          selected={selected}
-                          onClick={() => {
-                            if (
-                              isAgentTenantCard &&
-                              isAgentTenantOption(access)
-                            ) {
-                              return; // already in the pair — sub-question handles it
-                            }
-                            bookingActions.setAccessMethod(o.key);
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {role === "agent" && isAgentTenantOption(access) && (
-                    <AgentTenantCoordinationSection access={access} />
-                  )}
-
-                  {note && <InfoBanner title={note.title} body={note.body} />}
-
-                  {isLeaveKeyMethod(access) && <KeyHolderSection />}
-                  {isParcelLockerMethod(access) && <ParcelLockerHint />}
-                  {isCollectReturnMethod(access) && <CollectReturnSection />}
-                  {isManagingAgentMethod(access) && <ManagingAgencySection />}
-                  {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
-                  {sig && <SignatureSection title={sig.title} body={sig.body} />}
-                  <NotesSection />
-                </>
-              )}
-            </div>
-          </section>
-
-          {/* Booking summary rail */}
-          <aside className="flex w-[340px] shrink-0 flex-col border-l border-slate-200 bg-slate-50">
-            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
-              <h3 className="text-sm font-semibold" style={{ color: BRAND }}>Booking summary</h3>
-              <button type="button" aria-label="Edit" className="rounded p-1 text-slate-500 hover:text-slate-900">
-                <Pencil className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-5 text-sm">
-              <SummaryRow label="Unit" value={
-                <>G01 / 335 Aspen Village<div className="text-xs text-slate-500">Lot 3 · Anketell Street</div></>
-              } />
-              <SummaryRow label="Booker" value={<span className="capitalize">{roleLabel}</span>} />
-              <SummaryRow label="AC" value={<span className="text-slate-400">Pending</span>} />
-              <SummaryRow label="Access" value={
-                access ? <span className="text-slate-900">{labelForMethod(access)}</span> : <span className="text-slate-400">Pending</span>
-              } />
-              <div className="rounded-xl border border-slate-200 bg-white p-3 opacity-50 grayscale">
-                <div className="text-[11px] uppercase tracking-wide text-slate-500">Selected slot</div>
-                <div className="mt-1.5 text-xs text-slate-400">No slot picked yet</div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-3 opacity-50 grayscale">
-                <div className="flex items-baseline justify-between">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500">Total</div>
-                    <div className="text-[11px] text-slate-500">incl. GST</div>
-                  </div>
-                  <div className="text-2xl font-bold text-slate-900">$0</div>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-slate-200 bg-white px-5 py-4">
-              <button
-                type="button"
-                disabled={!valid}
-                data-testid="button-continue"
-                className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50 hover:opacity-90"
-                style={{ backgroundColor: BRAND }}
-              >
-                Continue
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-          </aside>
         </div>
       </div>
     </div>
   );
 }
-
-// ─── Sub-sections (desktop variants reuse most of the mobile structure) ────
 
 function RoleMissingBanner() {
   return (
@@ -241,13 +123,7 @@ function RoleMissingBanner() {
   );
 }
 
-function PrimaryResidenceSection({
-  residence,
-  onPick,
-}: {
-  residence: PrimaryResidence | null;
-  onPick: (r: PrimaryResidence) => void;
-}) {
+function PrimaryResidenceSection({ residence, onPick }: { residence: PrimaryResidence | null; onPick: (r: PrimaryResidence) => void; }) {
   return (
     <div className="mb-8">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 mb-3">
@@ -283,16 +159,7 @@ function PrimaryResidenceSection({
   );
 }
 
-function ResidenceCard({
-  selected, onClick, icon, title, subtitle, id,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  id: string;
-}) {
+function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selected: boolean; onClick: () => void; icon: React.ReactNode; title: string; subtitle: string; id: string; }) {
   return (
     <button
       type="button"
@@ -301,14 +168,7 @@ function ResidenceCard({
       className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-5 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
-      style={
-        selected
-          ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
-            }
-          : undefined
-      }
+      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
     >
       <span
         className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
@@ -317,23 +177,15 @@ function ResidenceCard({
         {icon}
       </span>
       <div>
-        <div className="text-[15px] font-semibold text-slate-900">{title}</div>
-        <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>
+        <div className="text-[14px] font-semibold text-slate-900">{title}</div>
+        <div className="mt-1 text-[11px] text-slate-500">{subtitle}</div>
       </div>
-      {selected && (
-        <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_GREEN }} />
-      )}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_GREEN }} />}
     </button>
   );
 }
 
-function AccessOptionCard({
-  selected, onClick, option,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  option: AccessOption;
-}) {
+function AccessOptionCard({ selected, onClick, option }: { selected: boolean; onClick: () => void; option: AccessOption; }) {
   return (
     <button
       type="button"
@@ -342,14 +194,7 @@ function AccessOptionCard({
       className={`flex h-full w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
-      style={
-        selected
-          ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
-            }
-          : undefined
-      }
+      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
     >
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
@@ -361,91 +206,25 @@ function AccessOptionCard({
         <span className="text-[15px] font-semibold text-slate-900">{option.label}</span>
         <span className="mt-0.5 text-[13px] text-slate-500">{option.subtitle}</span>
       </span>
-      {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_GREEN }} />
-      )}
+      {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_GREEN }} />}
     </button>
   );
 }
 
 function iconForMethod(m: AccessMethod) {
-  if (
-    m === "owner_live_at_unit" ||
-    m === "owner_leased_be_there" ||
-    m === "owner_vacant_be_there" ||
-    m === "agent_be_there"
-  ) {
-    return <DoorWithPersonIcon className="h-5 w-5" />;
-  }
-  if (
-    m === "owner_live_leave_key" ||
-    m === "owner_leased_leave_key" ||
-    m === "owner_vacant_leave_key"
-  ) {
-    return <KeyRound className="h-5 w-5" />;
-  }
-  if (
-    m === "owner_live_parcel_locker" ||
-    m === "owner_leased_parcel_locker" ||
-    m === "owner_vacant_parcel_locker"
-  ) {
-    return <Package className="h-5 w-5" />;
-  }
-  if (
-    m === "owner_live_collect" ||
-    m === "owner_vacant_collect" ||
-    m === "agent_trade_key"
-  ) {
-    return <Hand className="h-5 w-5" />;
-  }
-  if (
-    m === "owner_leased_tenant" ||
-    m === "agent_tenant_self" ||
-    m === "agent_tenant_taylr" ||
-    m === "agent_tenant_pending"
-  ) {
-    return <Users className="h-5 w-5" />;
-  }
+  if (m === "owner_live_at_unit" || m === "owner_leased_be_there" || m === "owner_vacant_be_there" || m === "agent_be_there") return <HomeIcon className="h-5 w-5" />;
+  if (m === "owner_live_leave_key" || m === "owner_leased_leave_key" || m === "owner_vacant_leave_key") return <KeyRound className="h-5 w-5" />;
+  if (m === "owner_live_parcel_locker" || m === "owner_leased_parcel_locker" || m === "owner_vacant_parcel_locker") return <Package className="h-5 w-5" />;
+  if (m === "owner_live_collect" || m === "owner_vacant_collect" || m === "agent_trade_key") return <Hand className="h-5 w-5" />;
+  if (m === "owner_leased_tenant" || m === "agent_tenant_self" || m === "agent_tenant_taylr" || m === "agent_tenant_pending") return <Users className="h-5 w-5" />;
   return <Briefcase className="h-5 w-5" />;
 }
 
-function labelForMethod(m: AccessMethod): string {
-  // Short labels for the summary rail.
-  switch (m) {
-    case "owner_live_at_unit":         return "I'll be at the unit";
-    case "owner_live_leave_key":       return "Leaving a key";
-    case "owner_live_parcel_locker":   return "Key in parcel locker";
-    case "owner_live_collect":         return "Collect & return";
-    case "owner_leased_be_there":      return "I'll be there";
-    case "owner_leased_tenant":        return "Coordinated with tenant";
-    case "owner_leased_agent":         return "Coordinated with agent";
-    case "owner_leased_leave_key":     return "Leaving a key";
-    case "owner_leased_parcel_locker": return "Key in parcel locker";
-    case "owner_vacant_be_there":      return "I'll be there (vacant)";
-    case "owner_vacant_leave_key":     return "Leaving a key (vacant)";
-    case "owner_vacant_parcel_locker": return "Key in parcel locker";
-    case "owner_vacant_collect":       return "Collect & return (vacant)";
-    case "agent_be_there":              return "I'll be there";
-    case "agent_tenant_self":          return "Tenant access (you arrange)";
-    case "agent_tenant_taylr":         return "Tenant access (Taylr arranges)";
-    case "agent_tenant_pending":       return "Tenant access (choose option)";
-    case "agent_trade_key":            return "Collect & return trade key";
-  }
-}
-
-function AgentTenantCoordinationSection({
-  access,
-}: {
-  access: AccessMethod | null;
-}) {
+function AgentTenantCoordinationSection({ access }: { access: AccessMethod | null }) {
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
-      <h2 className="text-[15px] font-semibold mb-1" style={{ color: BRAND }}>
-        Who will arrange the appointment with the tenant?
-      </h2>
-      <p className="text-xs text-slate-500 mb-4">
-        Choose who contacts the tenant to confirm the service window.
-      </p>
+    <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50/60 p-6">
+      <h2 className="text-[15px] font-semibold mb-1" style={{ color: BRAND }}>Who will arrange the appointment with the tenant?</h2>
+      <p className="text-xs text-slate-500 mb-4">Choose who contacts the tenant to confirm the service window.</p>
       <div className="grid grid-cols-2 gap-3">
         <CoordinationChoiceCard
           selected={access === "agent_tenant_self"}
@@ -466,46 +245,17 @@ function AgentTenantCoordinationSection({
   );
 }
 
-function CoordinationChoiceCard({
-  selected,
-  onClick,
-  title,
-  subtitle,
-  id,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  title: string;
-  subtitle: string;
-  id: string;
-}) {
+function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { selected: boolean; onClick: () => void; title: string; subtitle: string; id: string; }) {
   return (
     <button
       type="button"
       onClick={onClick}
       data-testid={`card-tenant-coord-${id}`}
-      className={`flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${
-        selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
-      }`}
-      style={
-        selected
-          ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
-            }
-          : undefined
-      }
+      className={`flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
+      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
     >
-      <span
-        className="grid h-5 w-5 place-items-center rounded-full border-2"
-        style={{ borderColor: selected ? SELECTED_GREEN : "#CBD5E1" }}
-      >
-        {selected && (
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: SELECTED_GREEN }}
-          />
-        )}
+      <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? SELECTED_GREEN : "#CBD5E1" }}>
+        {selected && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SELECTED_GREEN }} />}
       </span>
       <div className="text-[14px] font-semibold text-slate-900">{title}</div>
       <div className="text-[12px] text-slate-500">{subtitle}</div>
@@ -515,17 +265,16 @@ function CoordinationChoiceCard({
 
 function ParcelLockerHint() {
   return (
-    <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[12.5px] text-slate-600">
-      No further details needed here — we'll send the parcel-locker drop code
-      by email before your service window.
+    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+      No further details needed here — we'll send the parcel-locker drop code by email before your service window.
     </div>
   );
 }
 
 function InfoBanner({ title, body }: { title: string; body: string }) {
   return (
-    <div className="mb-6 flex gap-3 rounded-xl border border-pink-200 bg-pink-50/50 p-4">
-      <Info className="mt-0.5 h-5 w-5 shrink-0" style={{ color: BRAND }} />
+    <div className="mb-8 flex gap-4 rounded-xl border border-pink-200 bg-pink-50/50 p-5">
+      <Info className="h-5 w-5 shrink-0" style={{ color: BRAND }} />
       <div className="text-sm text-slate-700">
         <div className="font-semibold mb-1" style={{ color: BRAND }}>{title}</div>
         {body}
@@ -538,16 +287,16 @@ function KeyHolderSection() {
   const name = useBookingSelector((s) => s.key_holder_name);
   const phone = useBookingSelector((s) => s.key_holder_phone);
   return (
-    <div className="mb-6">
-      <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>Key holder details</h2>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="mb-8">
+      <h2 className="text-base font-semibold mb-4" style={{ color: BRAND }}>Key holder details</h2>
+      <div className="grid grid-cols-2 gap-4">
         <input
           type="text"
           value={name}
           onChange={(e) => bookingActions.setKeyHolder({ key_holder_name: e.target.value })}
           placeholder="Key holder full name"
           data-testid="input-key-holder-name"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
         />
         <input
           type="tel"
@@ -555,7 +304,7 @@ function KeyHolderSection() {
           onChange={(e) => bookingActions.setKeyHolder({ key_holder_phone: e.target.value })}
           placeholder="Key holder mobile"
           data-testid="input-key-holder-phone"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
         />
       </div>
     </div>
@@ -566,20 +315,20 @@ function CollectReturnSection() {
   const location = useBookingSelector((s) => s.key_collection_location);
   const returnMethod = useBookingSelector((s) => s.return_method);
   return (
-    <div className="mb-6 space-y-5">
+    <div className="mb-8 space-y-6">
       <div>
-        <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>Where do we collect the key?</h2>
+        <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>Where do we collect the key?</h2>
         <textarea
           value={location}
           onChange={(e) => bookingActions.setKeyCollectionLocation(e.target.value)}
           placeholder="e.g. Concierge desk at 335 Aspen Village, ask for Sam"
           data-testid="input-collection-location"
-          className="w-full min-h-[88px] rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400 resize-none"
+          className="w-full min-h-[100px] rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition resize-none"
         />
       </div>
       <div>
-        <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>How would you like the key returned?</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>How would you like the key returned?</h2>
+        <div className="grid grid-cols-2 gap-4">
           <ReturnMethodCard
             selected={returnMethod === "locker"}
             onClick={() => bookingActions.setReturnMethod("locker")}
@@ -602,62 +351,39 @@ function CollectReturnSection() {
   );
 }
 
-function ReturnMethodCard({
-  selected, onClick, icon, title, subtitle, id,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  id: string;
-}) {
+function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { selected: boolean; onClick: () => void; icon: React.ReactNode; title: string; subtitle: string; id: string; }) {
   return (
     <button
       type="button"
       onClick={onClick}
       data-testid={`card-return-${id}`}
-      className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-4 text-left transition ${
-        selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
-      }`}
-      style={
-        selected
-          ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
-            }
-          : undefined
-      }
+      className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
+      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
     >
-      <span
-        className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
-      >
+      <span className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`} style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}>
         {icon}
       </span>
       <div>
         <div className="text-[14px] font-semibold text-slate-900">{title}</div>
         <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>
       </div>
-      {selected && (
-        <CheckCircle2 className="absolute right-3 top-3 h-4 w-4" style={{ color: SELECTED_GREEN }} />
-      )}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_GREEN }} />}
     </button>
   );
 }
 
 function ManagingAgencySection() {
-  const value = useBookingSelector((s) => s.managing_agency_id);
+  const agencyId = useBookingSelector((s) => s.managing_agency_id);
   return (
-    <div className="mb-6">
-      <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>Managing agency</h2>
+    <div className="mb-8">
+      <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>Who manages the property?</h2>
       <select
-        value={value ?? ""}
-        onChange={(e) => bookingActions.setManagingAgency(e.target.value || null)}
+        value={agencyId || ""}
+        onChange={(e) => bookingActions.setManagingAgency(e.target.value)}
         data-testid="select-managing-agency"
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
       >
-        <option value="">Select an agency…</option>
+        <option value="" disabled>Select an agency...</option>
         {DEMO_MANAGING_AGENCIES.map((a) => (
           <option key={a.id} value={a.id}>{a.name}</option>
         ))}
@@ -666,157 +392,107 @@ function ManagingAgencySection() {
   );
 }
 
-function TenantsSection({
-  api,
-}: {
-  api: ReturnType<typeof useTenants>;
-}) {
-  const { tenants, update, remove, add } = api;
+function TenantsSection({ api }: { api: ReturnType<typeof useTenants> }) {
   return (
-    <div className="mb-6 space-y-4">
-      <div>
-        <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>Tenant details</h2>
-        <p className="text-xs text-slate-500 mt-1">We'll contact each tenant to arrange a suitable window.</p>
-      </div>
-      {tenants.map((t, idx) => (
-        <div key={t.id} className="relative rounded-xl border border-slate-200 bg-slate-50 p-4">
-          {tenants.length > 1 && (
-            <button
-              type="button"
-              aria-label={`Remove tenant ${idx + 1}`}
-              onClick={() => remove(idx)}
-              className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-              data-testid={`button-remove-tenant-${idx}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
-          <div className="mb-3 text-sm font-medium text-slate-700">Tenant {idx + 1}</div>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              placeholder="First name"
-              value={t.first}
-              onChange={(e) => update(idx, { first: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-              data-testid={`input-tenant-first-${idx}`}
-            />
-            <input
-              placeholder="Last name"
-              value={t.last}
-              onChange={(e) => update(idx, { last: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-              data-testid={`input-tenant-last-${idx}`}
-            />
-            <input
-              placeholder="Email"
-              type="email"
-              value={t.email}
-              onChange={(e) => update(idx, { email: e.target.value })}
-              className="col-span-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-              data-testid={`input-tenant-email-${idx}`}
-            />
-            <input
-              placeholder="Mobile"
-              type="tel"
-              value={t.phone}
-              onChange={(e) => update(idx, { phone: e.target.value })}
-              className="col-span-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-              data-testid={`input-tenant-phone-${idx}`}
-            />
+    <div className="mb-8">
+      <h2 className="text-base font-semibold mb-4" style={{ color: BRAND }}>Tenant details</h2>
+      <div className="space-y-4">
+        {api.tenants.map((t, idx) => (
+          <div key={t.id} className="relative rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Tenant {idx + 1}</h3>
+              {api.tenants.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => api.remove(idx)}
+                  className="text-slate-400 hover:text-red-500 transition"
+                  aria-label="Remove tenant"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">First Name</label>
+                <input type="text" value={t.first} onChange={(e) => api.update(idx, { first: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Last Name</label>
+                <input type="text" value={t.last} onChange={(e) => api.update(idx, { last: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Email</label>
+                <input type="email" value={t.email} onChange={(e) => api.update(idx, { email: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Mobile</label>
+                <input type="tel" value={t.phone} onChange={(e) => api.update(idx, { phone: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition" />
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={add}
-        className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-        data-testid="button-add-tenant"
-      >
-        <Plus className="h-4 w-4" /> Add another tenant
-      </button>
+        ))}
+        <button type="button" onClick={api.add} className="flex items-center gap-2 text-sm font-medium hover:underline" style={{ color: BRAND }}>
+          <Plus className="h-4 w-4" /> Add another tenant
+        </button>
+      </div>
     </div>
   );
 }
 
 function SignatureSection({ title, body }: { title: string; body: string }) {
-  const agreed = useBookingSelector((s) => s.signature_acknowledged);
+  const ack = useBookingSelector((s) => s.signature_acknowledged);
   const name = useBookingSelector((s) => s.signature_name);
+  const today = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  
   return (
-    <div className="mb-6 space-y-3">
-      <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>{title}</h2>
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[12px] leading-relaxed text-slate-600">
-        {body}
-      </div>
-      <label className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => bookingActions.setSignature({ signature_acknowledged: e.target.checked })}
-          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#ED017F] focus:ring-pink-600"
-          data-testid="checkbox-signature"
-        />
-        <span className="text-sm text-slate-700">I have read and agree to the above</span>
-      </label>
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-slate-700">Your full name (typed signature)</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
-          placeholder="e.g. Candice Miller"
-          data-testid="input-signature-name"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
-        />
-      </div>
-      <div className="text-xs text-slate-500">
-        Date: {new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+    <div className="mb-8">
+      <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>{title}</h2>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-6 rounded-lg bg-slate-50 p-4 text-[13px] leading-relaxed text-slate-600">
+          {body}
+        </div>
+        <label className="flex cursor-pointer items-start gap-3 mb-6">
+          <input
+            type="checkbox"
+            checked={ack}
+            onChange={(e) => bookingActions.setSignature({ signature_acknowledged: e.target.checked })}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
+            style={ack ? { accentColor: SELECTED_GREEN } : undefined}
+          />
+          <span className="text-sm text-slate-700">I have read and agree to the above.</span>
+        </label>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Your full name (typed signature)</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date</label>
+            <div className="flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">{today}</div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 function NotesSection() {
-  const value = useBookingSelector((s) => s.access_notes);
+  const notes = useBookingSelector((s) => s.access_notes);
   return (
-    <div className="mt-6 space-y-2">
-      <label className="text-sm font-medium text-slate-700">Additional access notes (optional)</label>
+    <div className="mb-8">
+      <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>Additional access notes (optional)</h2>
       <textarea
-        value={value}
+        value={notes}
         onChange={(e) => bookingActions.setAccessNotes(e.target.value)}
-        placeholder="Any extra instructions for the technician…"
-        data-testid="input-access-notes"
-        className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-slate-400 min-h-[100px] resize-none"
+        placeholder="e.g. Park in visitor spot 12, gate code is 4529#"
+        className="w-full min-h-[100px] rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition resize-none"
       />
     </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-2.5 last:border-b-0 last:pb-0">
-      <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="flex-1 text-right text-sm text-slate-900">{value}</div>
-    </div>
-  );
-}
-
-function DoorWithPersonIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" />
-      <line x1="3" y1="21" x2="21" y2="21" />
-      <circle cx="12" cy="9.5" r="1.6" />
-      <path d="M9 16v-1.2a3 3 0 0 1 6 0V16" />
-    </svg>
   );
 }
