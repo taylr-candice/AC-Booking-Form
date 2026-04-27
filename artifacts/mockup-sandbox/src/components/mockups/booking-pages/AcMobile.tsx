@@ -49,7 +49,7 @@ const COPY: Record<KnownType, Copy> = {
   ducted: {
     heading: "Confirm your ducted AC setup",
     intro:
-      "Most apartments have 1 ducted AC system. Please confirm the number of systems and any additional filters so we can price your service correctly.",
+      "Please confirm the number of systems and any additional filters so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
     systemsHelper:
       "Count 1 system for each separate ducted AC setup. A system usually has its own outdoor unit and large return air grille.",
