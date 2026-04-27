@@ -27,7 +27,6 @@ type Copy = {
   heading: string;
   intro: string;
   systemsLabel: string;
-  systemsHelper: string;
   systemsUnitSingular: string;
   systemsUnitPlural: string;
   addonLabel: string;
@@ -43,7 +42,6 @@ const COPY: Record<KnownType, Copy> = {
     intro:
       "Please confirm the number of systems and any extra filters so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
-    systemsHelper: "A ducted system is a separate AC setup in your apartment.",
     systemsUnitSingular: "ducted system",
     systemsUnitPlural: "ducted systems",
     addonLabel: "Extra filters",
@@ -56,7 +54,6 @@ const COPY: Record<KnownType, Copy> = {
     intro:
       "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
-    systemsHelper: "A split system usually has an outdoor unit.",
     systemsUnitSingular: "split system",
     systemsUnitPlural: "split systems",
     addonLabel: "Extra indoor units",
@@ -326,8 +323,6 @@ export function AcDesktop() {
                       </button>
                     </div>
                   </div>
-
-                  <p className="mt-3 text-sm text-slate-500">{copy.systemsHelper}</p>
 
                   {/* "Not sure?" shortcut — only when AC type is unknown or user has signaled uncertainty */}
                   {(acTypeFromUnit === "unknown" || hasOverride || overridePanelOpen) && (

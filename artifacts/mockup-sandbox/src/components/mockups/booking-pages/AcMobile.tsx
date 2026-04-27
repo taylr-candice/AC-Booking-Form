@@ -32,7 +32,6 @@ type Copy = {
   heading: string;
   intro: string;
   systemsLabel: string;
-  systemsHelper: string;
   systemsUnitSingular: string;
   systemsUnitPlural: string;
   addonLabel: string;
@@ -48,7 +47,6 @@ const COPY: Record<KnownType, Copy> = {
     intro:
       "Please confirm the number of systems and any extra filters so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
-    systemsHelper: "A ducted system is a separate AC setup in your apartment.",
     systemsUnitSingular: "ducted system",
     systemsUnitPlural: "ducted systems",
     addonLabel: "Extra filters",
@@ -61,7 +59,6 @@ const COPY: Record<KnownType, Copy> = {
     intro:
       "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
-    systemsHelper: "A split system usually has an outdoor unit.",
     systemsUnitSingular: "split system",
     systemsUnitPlural: "split systems",
     addonLabel: "Extra indoor units",
@@ -327,8 +324,6 @@ export function AcMobile() {
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-
-              <p className="mt-2 text-[12px] text-slate-500 leading-relaxed">{copy.systemsHelper}</p>
 
               {(acTypeFromUnit === "unknown" || hasOverride || overridePanelOpen) && (
                 <div className="mt-2 flex justify-end">
