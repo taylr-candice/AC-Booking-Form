@@ -3,7 +3,7 @@ import { ArrowRight, CheckCircle2, User, Briefcase } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#1F7A57";
+const SELECTED_GREEN = "#5FBB97";
 
 export function RoleDesktop() {
   const role = useBookingSelector((s) => s.role);
@@ -32,8 +32,8 @@ export function RoleDesktop() {
                 style={
                   role === "owner"
                     ? {
-                        borderColor: "#1F7A57",
-                        backgroundColor: "#1F7A57",
+                        borderColor: "#5FBB97",
+                        backgroundColor: "#5FBB97",
                       }
                     : {}
                 }
@@ -66,8 +66,8 @@ export function RoleDesktop() {
                 style={
                   role === "agent"
                     ? {
-                        borderColor: "#1F7A57",
-                        backgroundColor: "#1F7A57",
+                        borderColor: "#5FBB97",
+                        backgroundColor: "#5FBB97",
                       }
                     : {}
                 }

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { ArrowRight, Lock, CreditCard as CreditCardIcon, Apple, Info, Clock, CheckCircle2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { ArrowRight, Lock, CreditCard as CreditCardIcon, Apple, Info, Clock, CheckCircle2, FileText } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import { isCoordinationFlow } from "../../../state/bookingDerived";
 import {
@@ -16,13 +16,19 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#1F7A57";
+const SELECTED_GREEN = "#5FBB97";
 
-type PayMethod = "card" | "apple";
+type PayMethod = "card" | "apple" | "invoice";
 
 export function PayDesktop() {
   const [method, setMethod] = useState<PayMethod>("card");
   const session = useBookingSelector((s) => s);
+  const isAgent = session.role === "agent";
+
+  // If role changes away from agent while invoice is selected, fall back to card.
+  useEffect(() => {
+    if (!isAgent && method === "invoice") setMethod("card");
+  }, [isAgent, method]);
 
   const total = computeBookingTotal(session);
   const isCoordination = isCoordinationFlow(session);
@@ -47,7 +53,7 @@ export function PayDesktop() {
             {isCoordination && (
               <div
                 className="flex items-start gap-3 rounded-xl p-5 text-sm leading-relaxed text-white"
-                style={{ backgroundColor: "#1F7A57" }}
+                style={{ backgroundColor: "#5FBB97" }}
                 data-testid="banner-coordination"
               >
                 <Info className="h-5 w-5 shrink-0 mt-0.5 text-white" />
@@ -92,31 +98,68 @@ export function PayDesktop() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className={`grid ${isAgent ? "grid-cols-3" : "grid-cols-2"} gap-3 mb-6`}>
+                {/* Credit Card */}
                 <button
                   type="button"
                   onClick={() => setMethod("card")}
                   data-testid="card-method-card"
-                  className={`flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
-                    method === "card" ? "" : "border-slate-200 bg-white hover:border-slate-300"
+                  className={`relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
+                    method === "card"
+                      ? "border-2 bg-white shadow-sm"
+                      : "border-slate-200 bg-white hover:border-slate-300"
                   }`}
-                  style={method === "card" ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : {}}
+                  style={method === "card" ? { borderColor: SELECTED_GREEN } : {}}
                 >
-                  <CreditCardIcon className={`h-6 w-6 ${method === "card" ? "text-white" : "text-slate-600"}`} />
-                  <span className={`text-sm font-semibold ${method === "card" ? "text-white" : "text-slate-900"}`}>Credit Card</span>
+                  <CreditCardIcon className="h-6 w-6 text-slate-700" />
+                  <span className="text-sm font-semibold text-slate-900">Credit Card</span>
+                  {method === "card" && (
+                    <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
+                  )}
                 </button>
+
+                {/* Apple Pay — branded button (always black with white apple) */}
                 <button
                   type="button"
                   onClick={() => setMethod("apple")}
                   data-testid="card-method-apple"
-                  className={`flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
-                    method === "apple" ? "" : "border-slate-200 bg-white hover:border-slate-300"
+                  aria-label="Apple Pay"
+                  className={`relative flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border bg-black p-4 text-white transition hover:bg-black/90 ${
+                    method === "apple" ? "border-2" : "border-black"
                   }`}
-                  style={method === "apple" ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : {}}
+                  style={method === "apple" ? { borderColor: SELECTED_GREEN } : {}}
                 >
-                  <Apple className={`h-6 w-6 ${method === "apple" ? "text-white" : "text-slate-600"}`} />
-                  <span className={`text-sm font-semibold ${method === "apple" ? "text-white" : "text-slate-900"}`}>Apple Pay</span>
+                  <div className="flex items-center gap-1.5">
+                    <Apple className="h-5 w-5 -mt-0.5 fill-white text-white" />
+                    <span className="text-base font-semibold tracking-tight">Pay</span>
+                  </div>
+                  <span className="text-[11px] font-medium text-white/70">Apple Pay</span>
+                  {method === "apple" && (
+                    <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
+                  )}
                 </button>
+
+                {/* Invoice — agents only */}
+                {isAgent && (
+                  <button
+                    type="button"
+                    onClick={() => setMethod("invoice")}
+                    data-testid="card-method-invoice"
+                    className={`relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
+                      method === "invoice"
+                        ? "border-2 bg-white shadow-sm"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                    style={method === "invoice" ? { borderColor: SELECTED_GREEN } : {}}
+                  >
+                    <FileText className="h-6 w-6 text-slate-700" />
+                    <span className="text-sm font-semibold text-slate-900">Invoice me</span>
+                    <span className="text-[11px] font-medium text-slate-500">Pay later</span>
+                    {method === "invoice" && (
+                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
+                    )}
+                  </button>
+                )}
               </div>
 
               {method === "card" && (
@@ -145,8 +188,34 @@ export function PayDesktop() {
               )}
               {method === "apple" && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center animate-in fade-in duration-300">
-                  <Apple className="h-10 w-10 text-slate-900 mx-auto mb-4" />
-                  <p className="text-sm text-slate-600 mb-4">You will be prompted to authenticate with Apple Pay when you click Pay.</p>
+                  <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-white">
+                    <Apple className="h-5 w-5 fill-white text-white" />
+                    <span className="text-base font-semibold tracking-tight">Pay</span>
+                  </div>
+                  <p className="text-sm text-slate-600">You will be prompted to authenticate with Apple Pay when you click Pay.</p>
+                </div>
+              )}
+              {method === "invoice" && isAgent && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 animate-in fade-in duration-300">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-white border border-slate-200 text-slate-700">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900 mb-1">Invoice will be sent after the service</div>
+                      <p className="text-sm text-slate-600 leading-relaxed">We'll email a tax invoice to your agency once the technician completes the job. Standard agency net-14 terms apply.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">Billing email</label>
+                      <input type="email" placeholder="accounts@youragency.com.au" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">Purchase order / reference (optional)</label>
+                      <input type="text" placeholder="e.g. PO-12345" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition" />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -159,7 +228,7 @@ export function PayDesktop() {
                   <p key={i}>{p}</p>
                 ))}
               </div>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-white p-4 transition" style={ack ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : { borderColor: "#E2E8F0" }}>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-white p-4 transition" style={ack ? { borderColor: "#5FBB97", backgroundColor: "#5FBB97" } : { borderColor: "#E2E8F0" }}>
                 <input
                   type="checkbox"
                   checked={ack}

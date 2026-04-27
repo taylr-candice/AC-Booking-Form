@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ArrowRight, Building2, MapPin, ChevronDown, Plus, CheckCircle2 } from "lucide-react";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#1F7A57";
+const SELECTED_GREEN = "#5FBB97";
 
 const UNITS = [
   { id: "u1", address: "G01 / 335 Aspen Village", lot: "Lot 3", building: "Aspen Village", suburb: "Greenway ACT 2900" },

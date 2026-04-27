@@ -4,7 +4,7 @@ import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResi
 import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isParcelLockerMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#1F7A57";
+const SELECTED_GREEN = "#5FBB97";
 
 export function AccessDesktop() {
   const session = useBookingSelector((s) => s);
@@ -168,7 +168,7 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
       className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-5 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
-      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
+      style={selected ? { borderColor: "#5FBB97", backgroundColor: "#5FBB97" } : undefined}
     >
       <span
         className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
@@ -193,7 +193,7 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       className={`flex h-full w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
-      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
+      style={selected ? { borderColor: "#5FBB97", backgroundColor: "#5FBB97" } : undefined}
     >
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
@@ -250,7 +250,7 @@ function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { se
       onClick={onClick}
       data-testid={`card-tenant-coord-${id}`}
       className={`flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
-      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
+      style={selected ? { borderColor: "#5FBB97", backgroundColor: "#5FBB97" } : undefined}
     >
       <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? "#FFFFFF" : "#CBD5E1" }}>
         {selected && <span className="h-2 w-2 rounded-full bg-white" />}
@@ -356,7 +356,7 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
       onClick={onClick}
       data-testid={`card-return-${id}`}
       className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
-      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
+      style={selected ? { borderColor: "#5FBB97", backgroundColor: "#5FBB97" } : undefined}
     >
       <span className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>
         {icon}

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowRight, Sun, Moon, ChevronLeft, ChevronRight, CheckCircle2, Clock } from "lucide-react";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#1F7A57";
+const SELECTED_GREEN = "#5FBB97";
 
 type Slot = { id: string; window: "morning" | "afternoon"; remaining: number };
 type Day = { date: string; weekday: string; day: number; month: string; morning: Slot; afternoon: Slot };
@@ -126,7 +126,7 @@ export function SlotsDesktop() {
             </div>
 
             {selectedSlot && selectedDay && (
-              <div className="rounded-xl p-4 flex items-center justify-between" style={{ backgroundColor: "#1F7A57" }}>
+              <div className="rounded-xl p-4 flex items-center justify-between" style={{ backgroundColor: "#5FBB97" }}>
                 <div className="flex items-center gap-3">
                   <div className="grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white">
                     <CheckCircle2 className="h-5 w-5" />
@@ -183,7 +183,7 @@ function DesktopSlotCard({ slot, icon, label, hint, selected, onClick }: { slot:
             ? "text-white"
             : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-sm"
       }`}
-      style={selected && !full ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
+      style={selected && !full ? { borderColor: "#5FBB97", backgroundColor: "#5FBB97" } : undefined}
     >
       <div className="flex w-full items-center justify-between">
         <div className={full ? "text-slate-400" : selected ? "text-white" : "text-slate-500"}>
