@@ -6,6 +6,12 @@ uri = "file://attached_assets/generated_images/generated_image.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "i4o-AgAnRzUVu7nBWsVzC"
+uri = "file://artifacts/mockup-sandbox/public/examples/small-ceiling-vents.png"
+type = "image"
+title = "small ceiling vents"
+
 [[outputs]]
 id = "kwRN2o1lVqyPr5qVU1JU2"
 uri = "file://attached_assets/stock_images/split-indoor-unit.jpg"

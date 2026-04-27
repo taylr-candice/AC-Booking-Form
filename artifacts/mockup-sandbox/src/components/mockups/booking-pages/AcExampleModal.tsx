@@ -5,13 +5,19 @@ const BRAND = "#ED017F";
 
 export type ExampleVariant = "split-indoor" | "ducted-filter";
 
-type Variant = {
-  title: string;
+type Section = {
+  label?: string;
   imageSrc: string;
   imageAlt: string;
+  description?: string;
+};
+
+type Variant = {
+  title: string;
+  sections: Section[];
   unitSingular: string;
   unitPlural: string;
-  footnote: string;
+  footnote?: string;
 };
 
 const ASSET_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -19,19 +25,36 @@ const ASSET_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const VARIANTS: Record<ExampleVariant, Variant> = {
   "split-indoor": {
     title: "What counts as an extra indoor unit?",
-    imageSrc: `${ASSET_BASE}/examples/split-indoor-unit.jpg`,
-    imageAlt: "A white wall-mounted split AC indoor unit installed high on a living-room wall.",
+    sections: [
+      {
+        imageSrc: `${ASSET_BASE}/examples/split-indoor-unit.jpg`,
+        imageAlt:
+          "A white wall-mounted split AC indoor unit installed high on a living-room wall.",
+      },
+    ],
     unitSingular: "indoor unit",
     unitPlural: "indoor units",
     footnote: "Each wall-mounted unit counts as one.",
   },
   "ducted-filter": {
     title: "What counts as an extra filter?",
-    imageSrc: `${ASSET_BASE}/examples/ducted-return-grille.jpg`,
-    imageAlt: "A large white ceiling return-air grille, typical of a ducted AC system.",
+    sections: [
+      {
+        label: "Counts as an extra filter",
+        imageSrc: `${ASSET_BASE}/examples/ducted-return-grille.jpg`,
+        imageAlt: "A large white ceiling return-air grille, typical of a ducted AC system.",
+        description: "The filter sits behind this large return-air grille.",
+      },
+      {
+        label: "Do NOT count these",
+        imageSrc: `${ASSET_BASE}/examples/small-ceiling-vents.png`,
+        imageAlt: "Two small ceiling supply-air vents in a white plaster ceiling.",
+        description:
+          "These are checked as part of every service — you do not need to add anything for these.",
+      },
+    ],
     unitSingular: "filter",
     unitPlural: "filters",
-    footnote: "Do not count small vents.",
   },
 };
 
@@ -87,7 +110,7 @@ export function AcExampleModal({
         data-testid="modal-backdrop"
       />
       <div
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 pt-4 pb-3">
@@ -105,18 +128,32 @@ export function AcExampleModal({
           </button>
         </div>
 
-        <div className="px-5 pt-4 pb-5">
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-            <img
-              src={v.imageSrc}
-              alt={v.imageAlt}
-              className="aspect-[4/3] w-full object-cover"
-              loading="lazy"
-            />
-          </div>
+        <div className="flex-1 overflow-y-auto px-5 pt-4 pb-5">
+          {v.sections.map((section, i) => (
+            <div key={i} className={i === 0 ? "" : "mt-5"} data-testid={`section-${i}`}>
+              {section.label && (
+                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+                  {section.label}
+                </p>
+              )}
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                <img
+                  src={section.imageSrc}
+                  alt={section.imageAlt}
+                  className="aspect-[4/3] w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              {section.description && (
+                <p className="mt-2 text-[13px] text-slate-700 leading-relaxed">
+                  {section.description}
+                </p>
+              )}
+            </div>
+          ))}
 
           <p
-            className="mt-3 text-sm font-medium text-slate-900"
+            className="mt-5 text-sm font-medium text-slate-900"
             data-testid="text-modal-intro"
           >
             {intro}
@@ -142,7 +179,7 @@ export function AcExampleModal({
             ))}
           </ul>
 
-          <p className="mt-4 text-[12px] text-slate-500">{v.footnote}</p>
+          {v.footnote && <p className="mt-4 text-[12px] text-slate-500">{v.footnote}</p>}
 
           <button
             type="button"
