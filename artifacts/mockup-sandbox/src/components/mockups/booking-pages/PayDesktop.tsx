@@ -125,21 +125,24 @@ export function PayDesktop() {
                   )}
                 </button>
 
-                {/* Apple Pay — branded button (always black with white apple) */}
+                {/* Apple Pay */}
                 <button
                   type="button"
                   onClick={() => setMethod("apple")}
                   data-testid="card-method-apple"
                   aria-pressed={method === "apple"}
-                  aria-label="Apple Pay"
-                  className="relative flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border bg-black p-4 text-white transition hover:bg-black/90"
-                  style={method === "apple" ? { borderColor: SELECTED_GREEN, borderWidth: 2 } : { borderColor: "#000000" }}
+                  className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition"
+                  style={
+                    method === "apple"
+                      ? {
+                          borderColor: "rgba(95,187,151,0.45)",
+                          backgroundColor: "rgba(95,187,151,0.08)",
+                        }
+                      : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
+                  }
                 >
-                  <div className="flex items-center gap-1.5">
-                    <Apple className="h-5 w-5 -mt-0.5 fill-white text-white" />
-                    <span className="text-base font-semibold tracking-tight">Pay</span>
-                  </div>
-                  <span className="text-[11px] font-medium text-white/70">Apple Pay</span>
+                  <Apple className="h-6 w-6 text-slate-700" />
+                  <span className="text-sm font-semibold text-slate-900">Apple Pay</span>
                   {method === "apple" && (
                     <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
                   )}
@@ -198,11 +201,8 @@ export function PayDesktop() {
               )}
               {method === "apple" && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center animate-in fade-in duration-300">
-                  <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-lg bg-black px-4 py-2 text-white">
-                    <Apple className="h-5 w-5 fill-white text-white" />
-                    <span className="text-base font-semibold tracking-tight">Pay</span>
-                  </div>
-                  <p className="text-sm text-slate-600">You will be prompted to authenticate with Apple Pay when you click Pay.</p>
+                  <Apple className="mx-auto mb-3 h-8 w-8 text-slate-900" />
+                  <p className="text-sm text-slate-600">You'll be prompted to authenticate with Apple Pay when you click Pay below.</p>
                 </div>
               )}
               {method === "invoice" && isAgent && (
