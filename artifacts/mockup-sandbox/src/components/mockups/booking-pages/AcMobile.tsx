@@ -9,7 +9,6 @@ import {
   Eye,
   Gauge,
   Grid3x3,
-  HelpCircle,
   Info,
   MessageSquare,
   Minus,
@@ -35,8 +34,7 @@ type Copy = {
   systemsUnitSingular: string;
   systemsUnitPlural: string;
   addonLabel: string;
-  addonRemoteNote?: string;
-  addonNote: string;
+  addonHelper: string[];
   addonUnitSingular: string;
   addonUnitPlural: string;
 };
@@ -47,10 +45,14 @@ const COPY: Record<KnownType, Copy> = {
     intro:
       "Please confirm the number of systems and any extra filters so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
-    systemsUnitSingular: "ducted system",
-    systemsUnitPlural: "ducted systems",
+    systemsUnitSingular: "ducted service",
+    systemsUnitPlural: "ducted services",
     addonLabel: "Extra filters",
-    addonNote: "Filters sit behind large return air grilles — not small ceiling vents.",
+    addonHelper: [
+      "Each service includes 1 filter clean.",
+      "If the apartment has more large return-air grilles than shown above, add the extras here.",
+      "Filters sit behind large return-air grilles — not small air vents or outlets.",
+    ],
     addonUnitSingular: "extra filter",
     addonUnitPlural: "extra filters",
   },
@@ -59,11 +61,14 @@ const COPY: Record<KnownType, Copy> = {
     intro:
       "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
-    systemsUnitSingular: "split system",
-    systemsUnitPlural: "split systems",
+    systemsUnitSingular: "split service",
+    systemsUnitPlural: "split services",
     addonLabel: "Extra indoor units",
-    addonRemoteNote: "Each indoor unit usually has its own remote (use this as a guide).",
-    addonNote: "Do not count ceiling vents or ducted outlets.",
+    addonHelper: [
+      "Each service includes 1 indoor unit head.",
+      "If your apartment has more indoor unit heads than shown above, add the extras here.",
+      "Example: If 2 indoor unit heads are included above, only add extras if the apartment has 3 or more indoor unit heads.",
+    ],
     addonUnitSingular: "extra indoor unit",
     addonUnitPlural: "extra indoor units",
   },
@@ -72,19 +77,12 @@ const COPY: Record<KnownType, Copy> = {
 function formatSystemsIncludes(type: KnownType, systems: number): string[] {
   if (type === "split") {
     const outdoor = systems === 1 ? "outdoor unit" : "outdoor units";
-    const indoor = systems === 1 ? "indoor unit" : "indoor units";
+    const indoor = systems === 1 ? "indoor unit head" : "indoor unit heads";
     return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
   }
   const service = systems === 1 ? "system service" : "system services";
   const clean = systems === 1 ? "filter clean" : "filter cleans";
   return [`${systems} ${service}`, `${systems} ${clean}`];
-}
-
-function formatExtrasHelper(type: KnownType): string {
-  if (type === "split") {
-    return "Only add extra indoor units if you have more indoor units than shown above.";
-  }
-  return "Only add extra filters if you have more filters than shown above.";
 }
 
 const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number }> = {
@@ -387,19 +385,14 @@ export function AcMobile() {
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-              <p
-                className="mt-2 text-[12px] text-slate-500"
+              <div
+                className="mt-2 space-y-1.5 text-[12px] text-slate-500"
                 data-testid="text-extras-helper"
               >
-                {knownType && formatExtrasHelper(knownType)}
-              </p>
-              {copy.addonRemoteNote && (
-                <div className="mt-2 flex items-start gap-2 rounded-md bg-slate-50 px-2.5 py-2">
-                  <HelpCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
-                  <p className="text-[11px] text-slate-600 leading-relaxed">{copy.addonRemoteNote}</p>
-                </div>
-              )}
-              <p className="mt-1 text-[11px] text-slate-400">{copy.addonNote}</p>
+                {copy.addonHelper.map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -551,7 +544,6 @@ export function AcMobile() {
       {exampleModal && (
         <AcExampleModal
           variant={exampleModal}
-          systems={displaySystems}
           onClose={() => setExampleModal(null)}
         />
       )}
