@@ -95,7 +95,7 @@ export type BookingState = {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = "taylr.bookingSession.v1";
+const STORAGE_KEY = "taylr.bookingSession.v2";
 
 /** Access methods that skip Step 6 (Schedule).
  *
