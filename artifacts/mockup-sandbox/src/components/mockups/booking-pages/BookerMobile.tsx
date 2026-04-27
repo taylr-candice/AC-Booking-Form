@@ -2,21 +2,30 @@ import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Gauge,
+  Briefcase,
   CalendarCheck,
+  ChevronDown,
+  Gauge,
   MessageSquare,
   User,
 } from "lucide-react";
+import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
+import { DEMO_MANAGING_AGENCIES } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 
 export function BookerMobile() {
-  const [firstName, setFirstName] = useState("Candice");
-  const [lastName, setLastName] = useState("Miller");
-  const [email, setEmail] = useState("candice@taylr.com.au");
-  const [mobile, setMobile] = useState("0410 615 362");
+  const role = useBookingSelector((s) => s.role);
+  const agencyId = useBookingSelector((s) => s.agency_id);
+  const isAgent = role === "agent";
 
-  const isValid = firstName && lastName && email && mobile;
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
+
+  const isValid =
+    firstName && lastName && email && mobile && (!isAgent || !!agencyId);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -49,8 +58,47 @@ export function BookerMobile() {
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         <p className="mb-6 text-[15px] leading-relaxed text-slate-600">
-          We'll use these details to send your booking confirmation and tax invoice.
+          {isAgent
+            ? "Pick your agency, then enter your contact details so we can reach you."
+            : "We'll use these details to send your booking confirmation and tax invoice."}
         </p>
+
+        {isAgent && (
+          <div className="mb-6">
+            <label
+              htmlFor="booker-agency-mobile"
+              className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+            >
+              Your agency
+            </label>
+            <div className="relative">
+              <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                <Briefcase className="h-4 w-4" />
+              </div>
+              <select
+                id="booker-agency-mobile"
+                value={agencyId || ""}
+                onChange={(e) => bookingActions.setAgency(e.target.value || null)}
+                data-testid="select-agency"
+                className={`w-full appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-14 pr-10 text-[15px] outline-none focus:border-slate-400 ${
+                  agencyId ? "text-slate-900" : "text-slate-400"
+                }`}
+              >
+                <option value="" disabled>Select your agency…</option>
+                {DEMO_MANAGING_AGENCIES.map((a) => (
+                  <option key={a.id} value={a.id} className="text-slate-900">{a.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            </div>
+          </div>
+        )}
+
+        {isAgent && (
+          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Your contact details
+          </div>
+        )}
 
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
@@ -96,12 +144,6 @@ export function BookerMobile() {
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none focus:border-slate-400"
               data-testid="input-mobile"
             />
-          </div>
-          
-          <div className="pt-2">
-            <p className="text-[11px] text-slate-400">
-              * If you had selected "Agent", an Agency dropdown would appear at the top of this form.
-            </p>
           </div>
         </div>
       </div>
