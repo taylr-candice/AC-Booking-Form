@@ -1,0 +1,173 @@
+Refine Step 4 copy and logic.
+
+Do NOT redesign the page. Keep the current card layout, modal style and pricing panel.
+
+--------------------------------------------------
+1. SPLIT SYSTEM CARD — INCLUDED ITEMS
+--------------------------------------------------
+
+For split AC, the system card should show what is included based on the number of systems selected.
+
+If systems = 1:
+
+INCLUDES
+✔ 1 outdoor unit
+✔ 1 indoor unit head
+
+If systems = 2:
+
+INCLUDES
+✔ 2 outdoor units
+✔ 2 indoor unit heads
+
+If systems = 3:
+
+INCLUDES
+✔ 3 outdoor units
+✔ 3 indoor unit heads
+
+Continue dynamically.
+
+Do not add a separate explanation line underneath. The dynamic INCLUDES list should be the only place this is shown.
+
+--------------------------------------------------
+2. SPLIT EXTRA INDOOR UNITS — SIMPLIFY COPY
+--------------------------------------------------
+
+Heading:
+Extra indoor units
+
+Helper text:
+
+Each service includes 1 indoor unit head.
+
+If your apartment has more indoor unit heads than shown above, add the extras here.
+
+Example:
+If 2 indoor unit heads are included above, only add extras if the apartment has 3 or more indoor unit heads.
+
+Keep default:
+Extra indoor units = 0
+
+--------------------------------------------------
+3. SPLIT SEE EXAMPLE MODAL — SIMPLIFY
+--------------------------------------------------
+
+Remove the guide table entirely.
+
+The modal should only explain what an indoor unit head looks like and what to count.
+
+Title:
+What counts as an extra indoor unit?
+
+Copy:
+
+Each wall-mounted indoor unit head counts as one indoor unit.
+
+Your service already includes the indoor unit heads shown in the “Includes” section.
+
+Only add extras if the apartment has more indoor unit heads than shown there.
+
+Keep the image of a wall-mounted split indoor unit.
+
+Do not show:
+- 1 unit → add 0
+- 2 units → add 1
+- 3 units → add 2
+- any calculation table
+
+--------------------------------------------------
+4. DUCTED SYSTEM CARD — INCLUDED ITEMS
+--------------------------------------------------
+
+For ducted AC, the system card should show what is included based on the number of systems selected.
+
+If systems = 1:
+
+INCLUDES
+✔ 1 system service
+✔ 1 filter clean
+
+If systems = 2:
+
+INCLUDES
+✔ 2 system services
+✔ 2 filter cleans
+
+If systems = 3:
+
+INCLUDES
+✔ 3 system services
+✔ 3 filter cleans
+
+Continue dynamically.
+
+--------------------------------------------------
+5. DUCTED EXTRA FILTERS — SIMPLIFY COPY
+--------------------------------------------------
+
+Heading:
+Extra filters
+
+Helper text:
+
+Each service includes 1 filter clean.
+
+If the apartment has more large return-air grilles than shown above, add the extras here.
+
+Filters sit behind large return-air grilles — not small air vents or outlets.
+
+Keep default:
+Extra filters = 0
+
+--------------------------------------------------
+6. DUCTED SEE EXAMPLE MODAL — SIMPLIFY
+--------------------------------------------------
+
+Keep the “counts” and “do not count” images.
+
+Remove the guide table entirely.
+
+Title:
+What counts as an extra filter?
+
+Copy under return-air grille image:
+
+Filters sit behind large return-air grilles.
+
+Your service already includes the filter cleans shown in the “Includes” section.
+
+Only add extras if the apartment has more large return-air grilles than shown there.
+
+Copy under “Do not count these” image:
+
+Do not count small air vents or outlets on walls or ceilings.
+
+These may be assessed as part of the visit, but no extra filter charge is required for them.
+
+Do not imply small vents are cleaned or serviced.
+
+--------------------------------------------------
+7. SERVICE ESTIMATE
+--------------------------------------------------
+
+Show:
+
+[systems] × [AC type] service
+
+If extra indoor units > 0:
+[extraIndoorUnits] × extra indoor unit
+
+If extra filters > 0:
+[extraFilters] × extra filter
+
+Do not show extra line items when the extra quantity is 0.
+
+--------------------------------------------------
+MAIN GOAL
+--------------------------------------------------
+
+- Make it clear that each service includes 1 indoor unit head / 1 filter clean
+- Make users compare extras against the “Includes” section
+- Remove complex guide tables from modals
+- Keep the booking flow simple and accurate
