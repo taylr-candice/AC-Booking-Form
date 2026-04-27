@@ -1,0 +1,87 @@
+Refine Step 4 UI to remove conflicting system logic and improve clarity.
+
+Do NOT redesign layout. Keep structure and styling.
+
+--------------------------------------------------
+1. REMOVE SYSTEM EQUATION BLOCKS (CRITICAL)
+--------------------------------------------------
+
+Delete the following from BOTH split and ducted:
+
+Split:
+“1 outdoor unit = 1 system (where visible)”
+
+Ducted:
+“1 return air grille = 1 system (if known)”
+
+Do NOT replace with another equation.
+
+Reason:
+These create confusion and cause users to double count.
+
+--------------------------------------------------
+2. RELY ONLY ON “INCLUDES” SECTION
+--------------------------------------------------
+
+Ensure the system card clearly shows:
+
+Split:
+INCLUDES
+✔ 1 indoor unit
+✔ 1 outdoor unit
+
+Ducted:
+INCLUDES
+✔ 1 system
+✔ 1 filter
+
+This is the ONLY place that defines what a system includes.
+
+--------------------------------------------------
+3. KEEP SYSTEM HELPER TEXT SIMPLE
+--------------------------------------------------
+
+Split:
+“A split system usually has an outdoor unit.”
+
+Ducted:
+“A ducted system is a separate AC setup in your apartment.”
+
+Do NOT introduce counting logic here.
+
+--------------------------------------------------
+4. CONDITIONALLY SHOW “NOT SURE”
+--------------------------------------------------
+
+Only show:
+“Not sure? We can confirm this on-site”
+
+IF:
+- AC type is unknown
+OR
+- user has clicked “This isn’t correct”
+
+Do NOT show this for pre-filled known setups.
+
+--------------------------------------------------
+5. MAINTAIN EXTRAS LOGIC
+--------------------------------------------------
+
+Ensure:
+
+Split:
+Extra indoor units = 0 default
+
+Ducted:
+Extra filters = 0 default
+
+Extras must always represent items beyond what is included.
+
+--------------------------------------------------
+MAIN GOAL
+--------------------------------------------------
+
+- Remove conflicting visual logic
+- Prevent users from double counting system components
+- Reinforce “included vs extra” model
+- Only show uncertainty tools when needed

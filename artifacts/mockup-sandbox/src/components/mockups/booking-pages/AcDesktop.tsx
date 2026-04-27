@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Check,
   Eye,
-  Fan,
   Grid3x3,
   HelpCircle,
   Info,
@@ -320,32 +319,8 @@ export function AcDesktop() {
 
                   <p className="mt-3 text-sm text-slate-500">{copy.systemsHelper}</p>
 
-                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-3">
-                    <div className="flex items-center justify-center gap-3 text-xs sm:text-sm flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <div className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
-                          {effectiveType === "split" ? (
-                            <Fan className="h-4 w-4" />
-                          ) : (
-                            <Grid3x3 className="h-4 w-4" />
-                          )}
-                        </div>
-                        <span className="font-medium text-slate-700">
-                          {effectiveType === "split" ? "1 outdoor unit" : "1 ducted system"}
-                        </span>
-                      </div>
-                      <span className="text-slate-400 font-semibold">=</span>
-                      <span className="font-semibold text-slate-900">
-                        {effectiveType === "split" ? "1 system" : "1 return air grille"}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        {effectiveType === "split" ? "(where visible)" : "(if known)"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* "Not sure?" shortcut — split only */}
-                  {effectiveType === "split" && (
+                  {/* "Not sure?" shortcut — only when AC type is unknown or user has signaled uncertainty */}
+                  {(acTypeFromUnit === "unknown" || hasOverride || overridePanelOpen) && (
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"

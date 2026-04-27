@@ -7,7 +7,6 @@ import {
   CalendarCheck,
   Check,
   Eye,
-  Fan,
   Gauge,
   Grid3x3,
   HelpCircle,
@@ -321,31 +320,7 @@ export function AcMobile() {
 
               <p className="mt-2 text-[12px] text-slate-500 leading-relaxed">{copy.systemsHelper}</p>
 
-              <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
-                <div className="flex items-center justify-center gap-2 text-[11px] flex-wrap">
-                  <div className="flex items-center gap-1.5">
-                    <div className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
-                      {effectiveType === "split" ? (
-                        <Fan className="h-3.5 w-3.5" />
-                      ) : (
-                        <Grid3x3 className="h-3.5 w-3.5" />
-                      )}
-                    </div>
-                    <span className="font-medium text-slate-700">
-                      {effectiveType === "split" ? "1 outdoor unit" : "1 ducted system"}
-                    </span>
-                  </div>
-                  <span className="text-slate-400 font-semibold">=</span>
-                  <span className="font-semibold text-slate-900">
-                    {effectiveType === "split" ? "1 system" : "1 return air grille"}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    {effectiveType === "split" ? "(where visible)" : "(if known)"}
-                  </span>
-                </div>
-              </div>
-
-              {effectiveType === "split" && (
+              {(acTypeFromUnit === "unknown" || hasOverride || overridePanelOpen) && (
                 <div className="mt-2 flex justify-end">
                   <button
                     type="button"
