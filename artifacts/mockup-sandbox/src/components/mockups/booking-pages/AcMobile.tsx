@@ -33,7 +33,6 @@ type Copy = {
   intro: string;
   systemsLabel: string;
   systemsHelper: string;
-  systemsIncludes?: string[];
   systemsUnitSingular: string;
   systemsUnitPlural: string;
   addonLabel: string;
@@ -50,7 +49,6 @@ const COPY: Record<KnownType, Copy> = {
       "Please confirm the number of systems and any extra filters so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
     systemsHelper: "A ducted system is a separate AC setup in your apartment.",
-    systemsIncludes: ["1 filter per system"],
     systemsUnitSingular: "ducted system",
     systemsUnitPlural: "ducted systems",
     addonLabel: "Extra filters",
@@ -64,7 +62,6 @@ const COPY: Record<KnownType, Copy> = {
       "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
     systemsHelper: "A split system usually has an outdoor unit.",
-    systemsIncludes: ["1 indoor unit per system", "1 outdoor unit per system"],
     systemsUnitSingular: "split system",
     systemsUnitPlural: "split systems",
     addonLabel: "Extra indoor units",
@@ -75,27 +72,22 @@ const COPY: Record<KnownType, Copy> = {
   },
 };
 
-function formatIncludedTotals(type: KnownType, systems: number): string {
-  const sysNoun = systems === 1 ? "system" : "systems";
+function formatSystemsIncludes(type: KnownType, systems: number): string[] {
   if (type === "split") {
-    const indoor = systems === 1 ? "indoor unit" : "indoor units";
     const outdoor = systems === 1 ? "outdoor unit" : "outdoor units";
-    return `${systems} ${sysNoun} = ${systems} ${indoor} + ${systems} ${outdoor} included`;
+    const indoor = systems === 1 ? "indoor unit" : "indoor units";
+    return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
   }
-  const filter = systems === 1 ? "filter" : "filters";
-  return `${systems} ${sysNoun} = ${systems} ${filter} included`;
+  const service = systems === 1 ? "system service" : "system services";
+  const clean = systems === 1 ? "filter clean" : "filter cleans";
+  return [`${systems} ${service}`, `${systems} ${clean}`];
 }
 
-function formatExtrasHelper(type: KnownType, systems: number): string {
-  const noun =
-    type === "split"
-      ? systems === 1
-        ? "indoor unit"
-        : "indoor units"
-      : systems === 1
-        ? "filter"
-        : "filters";
-  return `You have ${systems} ${noun} included. Only add extras if you have more than this.`;
+function formatExtrasHelper(type: KnownType): string {
+  if (type === "split") {
+    return "Only add extra indoor units if you have more indoor units than shown above.";
+  }
+  return "Only add extra filters if you have more filters than shown above.";
 }
 
 const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number }> = {
@@ -293,13 +285,13 @@ export function AcMobile() {
                   <p className="text-xs font-medium" style={{ color: BRAND }}>
                     ${SYSTEM_PRICE} per system
                   </p>
-                  {copy.systemsIncludes && (
-                    <div className="mt-1.5">
+                  {knownType && (
+                    <div className="mt-1.5" data-testid="block-includes">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                         Includes
                       </p>
                       <ul className="mt-0.5 space-y-0.5">
-                        {copy.systemsIncludes.map((b) => (
+                        {formatSystemsIncludes(knownType, displaySystems).map((b) => (
                           <li
                             key={b}
                             className="flex items-center gap-1.5 text-[11px] text-slate-600"
@@ -309,14 +301,6 @@ export function AcMobile() {
                           </li>
                         ))}
                       </ul>
-                      {knownType && (
-                        <p
-                          className="mt-1.5 text-[11px] font-medium text-slate-700"
-                          data-testid="text-included-totals"
-                        >
-                          {formatIncludedTotals(knownType, displaySystems)}
-                        </p>
-                      )}
                     </div>
                   )}
                 </div>
@@ -412,7 +396,7 @@ export function AcMobile() {
                 className="mt-2 text-[12px] text-slate-500"
                 data-testid="text-extras-helper"
               >
-                {knownType && formatExtrasHelper(knownType, displaySystems)}
+                {knownType && formatExtrasHelper(knownType)}
               </p>
               {copy.addonRemoteNote && (
                 <div className="mt-2 flex items-start gap-2 rounded-md bg-slate-50 px-2.5 py-2">
