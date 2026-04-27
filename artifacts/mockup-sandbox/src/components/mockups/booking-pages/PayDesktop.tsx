@@ -16,7 +16,7 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
+const SELECTED_GREEN = "#1F7A57";
 
 type PayMethod = "card" | "apple";
 
@@ -46,15 +46,11 @@ export function PayDesktop() {
 
             {isCoordination && (
               <div
-                className="flex items-start gap-3 rounded-xl border p-5 text-sm leading-relaxed"
-                style={{
-                  borderColor: "rgba(95,187,151,0.45)",
-                  backgroundColor: "rgba(95,187,151,0.08)",
-                  color: "#0F172A",
-                }}
+                className="flex items-start gap-3 rounded-xl p-5 text-sm leading-relaxed text-white"
+                style={{ backgroundColor: "#1F7A57" }}
                 data-testid="banner-coordination"
               >
-                <Info className="h-5 w-5 shrink-0 mt-0.5" style={{ color: SELECTED_GREEN }} />
+                <Info className="h-5 w-5 shrink-0 mt-0.5 text-white" />
                 <span>{COORDINATION_NOTE}</span>
               </div>
             )}
@@ -104,10 +100,10 @@ export function PayDesktop() {
                   className={`flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
                     method === "card" ? "" : "border-slate-200 bg-white hover:border-slate-300"
                   }`}
-                  style={method === "card" ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : {}}
+                  style={method === "card" ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : {}}
                 >
-                  <CreditCardIcon className="h-6 w-6" style={{ color: method === "card" ? SELECTED_GREEN : "#475569" }} />
-                  <span className="text-sm font-semibold text-slate-900">Credit Card</span>
+                  <CreditCardIcon className={`h-6 w-6 ${method === "card" ? "text-white" : "text-slate-600"}`} />
+                  <span className={`text-sm font-semibold ${method === "card" ? "text-white" : "text-slate-900"}`}>Credit Card</span>
                 </button>
                 <button
                   type="button"
@@ -116,10 +112,10 @@ export function PayDesktop() {
                   className={`flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
                     method === "apple" ? "" : "border-slate-200 bg-white hover:border-slate-300"
                   }`}
-                  style={method === "apple" ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : {}}
+                  style={method === "apple" ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : {}}
                 >
-                  <Apple className="h-6 w-6" style={{ color: method === "apple" ? SELECTED_GREEN : "#475569" }} />
-                  <span className="text-sm font-semibold text-slate-900">Apple Pay</span>
+                  <Apple className={`h-6 w-6 ${method === "apple" ? "text-white" : "text-slate-600"}`} />
+                  <span className={`text-sm font-semibold ${method === "apple" ? "text-white" : "text-slate-900"}`}>Apple Pay</span>
                 </button>
               </div>
 
@@ -163,16 +159,16 @@ export function PayDesktop() {
                   <p key={i}>{p}</p>
                 ))}
               </div>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-white p-4 transition" style={ack ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : { borderColor: "#E2E8F0" }}>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-white p-4 transition" style={ack ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : { borderColor: "#E2E8F0" }}>
                 <input
                   type="checkbox"
                   checked={ack}
                   onChange={(e) => bookingActions.setCancellationAcknowledged(e.target.checked)}
                   data-testid="checkbox-cancellation-ack"
                   className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300"
-                  style={ack ? { accentColor: SELECTED_GREEN } : undefined}
+                  style={ack ? { accentColor: "#FFFFFF" } : undefined}
                 />
-                <span className="text-sm font-medium text-slate-700">{CANCELLATION_ACK_LABEL}</span>
+                <span className={`text-sm font-medium ${ack ? "text-white" : "text-slate-700"}`}>{CANCELLATION_ACK_LABEL}</span>
               </label>
             </div>
 

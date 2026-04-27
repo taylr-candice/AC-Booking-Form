@@ -4,7 +4,7 @@ import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResi
 import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isParcelLockerMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
+const SELECTED_GREEN = "#1F7A57";
 
 export function AccessDesktop() {
   const session = useBookingSelector((s) => s);
@@ -168,19 +168,18 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
       className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-5 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
-      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
+      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
     >
       <span
-        className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+        className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
       >
         {icon}
       </span>
       <div>
-        <div className="text-[14px] font-semibold text-slate-900">{title}</div>
-        <div className="mt-1 text-[11px] text-slate-500">{subtitle}</div>
+        <div className={`text-[14px] font-semibold ${selected ? "text-white" : "text-slate-900"}`}>{title}</div>
+        <div className={`mt-1 text-[11px] ${selected ? "text-white/85" : "text-slate-500"}`}>{subtitle}</div>
       </div>
-      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_GREEN }} />}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5 text-white" />}
     </button>
   );
 }
@@ -194,19 +193,18 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       className={`flex h-full w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
-      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
+      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
     >
       <span
-        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
       >
         {iconForMethod(option.key)}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-semibold text-slate-900">{option.label}</span>
-        <span className="mt-0.5 text-[13px] text-slate-500">{option.subtitle}</span>
+        <span className={`text-[15px] font-semibold ${selected ? "text-white" : "text-slate-900"}`}>{option.label}</span>
+        <span className={`mt-0.5 text-[13px] ${selected ? "text-white/85" : "text-slate-500"}`}>{option.subtitle}</span>
       </span>
-      {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_GREEN }} />}
+      {selected && <CheckCircle2 className="h-5 w-5 shrink-0 text-white" />}
     </button>
   );
 }
@@ -252,13 +250,13 @@ function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { se
       onClick={onClick}
       data-testid={`card-tenant-coord-${id}`}
       className={`flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
-      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
+      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
     >
-      <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? SELECTED_GREEN : "#CBD5E1" }}>
-        {selected && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SELECTED_GREEN }} />}
+      <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? "#FFFFFF" : "#CBD5E1" }}>
+        {selected && <span className="h-2 w-2 rounded-full bg-white" />}
       </span>
-      <div className="text-[14px] font-semibold text-slate-900">{title}</div>
-      <div className="text-[12px] text-slate-500">{subtitle}</div>
+      <div className={`text-[14px] font-semibold ${selected ? "text-white" : "text-slate-900"}`}>{title}</div>
+      <div className={`text-[12px] ${selected ? "text-white/85" : "text-slate-500"}`}>{subtitle}</div>
     </button>
   );
 }
@@ -358,16 +356,16 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
       onClick={onClick}
       data-testid={`card-return-${id}`}
       className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
-      style={selected ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
+      style={selected ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
     >
-      <span className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`} style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}>
+      <span className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}>
         {icon}
       </span>
       <div>
-        <div className="text-[14px] font-semibold text-slate-900">{title}</div>
-        <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>
+        <div className={`text-[14px] font-semibold ${selected ? "text-white" : "text-slate-900"}`}>{title}</div>
+        <div className={`mt-0.5 text-xs ${selected ? "text-white/85" : "text-slate-500"}`}>{subtitle}</div>
       </div>
-      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_GREEN }} />}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5 text-white" />}
     </button>
   );
 }

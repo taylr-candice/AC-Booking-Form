@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowRight, Sun, Moon, ChevronLeft, ChevronRight, CheckCircle2, Clock } from "lucide-react";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
+const SELECTED_GREEN = "#1F7A57";
 
 type Slot = { id: string; window: "morning" | "afternoon"; remaining: number };
 type Day = { date: string; weekday: string; day: number; month: string; morning: Slot; afternoon: Slot };
@@ -126,14 +126,14 @@ export function SlotsDesktop() {
             </div>
 
             {selectedSlot && selectedDay && (
-              <div className="rounded-xl border p-4 flex items-center justify-between" style={{ borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }}>
+              <div className="rounded-xl p-4 flex items-center justify-between" style={{ backgroundColor: "#1F7A57" }}>
                 <div className="flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-full text-white" style={{ backgroundColor: SELECTED_GREEN }}>
+                  <div className="grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white">
                     <CheckCircle2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-0.5">Selected slot</div>
-                    <div className="text-sm font-semibold text-slate-900">
+                    <div className="text-[11px] uppercase tracking-wide text-white/80 font-semibold mb-0.5">Selected slot</div>
+                    <div className="text-sm font-semibold text-white">
                       {selectedDay.weekday} {selectedDay.day} {selectedDay.month} · <span className="capitalize">{selectedSlot.window} window</span>
                     </div>
                   </div>
@@ -180,20 +180,20 @@ function DesktopSlotCard({ slot, icon, label, hint, selected, onClick }: { slot:
         full
           ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
           : selected
-            ? "text-slate-900"
+            ? "text-white"
             : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-sm"
       }`}
-      style={selected && !full ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" } : undefined}
+      style={selected && !full ? { borderColor: "#1F7A57", backgroundColor: "#1F7A57" } : undefined}
     >
       <div className="flex w-full items-center justify-between">
-        <div className={full ? "text-slate-400" : "text-slate-500"} style={selected && !full ? { color: SELECTED_GREEN } : undefined}>
+        <div className={full ? "text-slate-400" : selected ? "text-white" : "text-slate-500"}>
           {icon}
         </div>
-        {selected && !full && <CheckCircle2 className="h-4 w-4" style={{ color: SELECTED_GREEN }} />}
+        {selected && !full && <CheckCircle2 className="h-4 w-4 text-white" />}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
-      <div className={`text-[10px] ${full ? "text-slate-400" : "text-slate-500"}`}>{hint}</div>
-      <div className={`text-[10px] font-medium ${full ? "text-slate-400" : "text-slate-500"}`}>
+      <div className={`text-[10px] ${full ? "text-slate-400" : selected ? "text-white/85" : "text-slate-500"}`}>{hint}</div>
+      <div className={`text-[10px] font-medium ${full ? "text-slate-400" : selected ? "text-white/85" : "text-slate-500"}`}>
         {full ? "Full" : `${slot.remaining} left`}
       </div>
     </button>

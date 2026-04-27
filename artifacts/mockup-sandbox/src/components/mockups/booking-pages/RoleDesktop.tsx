@@ -3,7 +3,7 @@ import { ArrowRight, CheckCircle2, User, Briefcase } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
+const SELECTED_GREEN = "#1F7A57";
 
 export function RoleDesktop() {
   const role = useBookingSelector((s) => s.role);
@@ -32,25 +32,24 @@ export function RoleDesktop() {
                 style={
                   role === "owner"
                     ? {
-                        borderColor: "rgba(95,187,151,0.45)",
-                        backgroundColor: "rgba(95,187,151,0.08)",
+                        borderColor: "#1F7A57",
+                        backgroundColor: "#1F7A57",
                       }
                     : {}
                 }
               >
                 <div
-                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${role === "owner" ? "text-white" : "bg-slate-100 text-slate-700"}`}
-                  style={role === "owner" ? { backgroundColor: SELECTED_GREEN } : undefined}
+                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${role === "owner" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
                 >
                   <User className="h-8 w-8" />
                 </div>
-                <h3 className="text-lg font-bold mb-2 text-slate-900">Owner</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className={`text-lg font-bold mb-2 ${role === "owner" ? "text-white" : "text-slate-900"}`}>Owner</h3>
+                <p className={`text-sm ${role === "owner" ? "text-white/85" : "text-slate-500"}`}>
                   I own this apartment, whether I live in it or lease it out.
                 </p>
                 {role === "owner" && (
                   <div className="absolute top-4 right-4">
-                    <CheckCircle2 className="h-6 w-6" style={{ color: SELECTED_GREEN }} />
+                    <CheckCircle2 className="h-6 w-6 text-white" />
                   </div>
                 )}
               </button>
@@ -67,25 +66,24 @@ export function RoleDesktop() {
                 style={
                   role === "agent"
                     ? {
-                        borderColor: "rgba(95,187,151,0.45)",
-                        backgroundColor: "rgba(95,187,151,0.08)",
+                        borderColor: "#1F7A57",
+                        backgroundColor: "#1F7A57",
                       }
                     : {}
                 }
               >
                 <div
-                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${role === "agent" ? "text-white" : "bg-slate-100 text-slate-700"}`}
-                  style={role === "agent" ? { backgroundColor: SELECTED_GREEN } : undefined}
+                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${role === "agent" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
                 >
                   <Briefcase className="h-8 w-8" />
                 </div>
-                <h3 className="text-lg font-bold mb-2 text-slate-900">Agent · Property Manager</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className={`text-lg font-bold mb-2 ${role === "agent" ? "text-white" : "text-slate-900"}`}>Agent · Property Manager</h3>
+                <p className={`text-sm ${role === "agent" ? "text-white/85" : "text-slate-500"}`}>
                   I manage this apartment on behalf of the owner.
                 </p>
                 {role === "agent" && (
                   <div className="absolute top-4 right-4">
-                    <CheckCircle2 className="h-6 w-6" style={{ color: SELECTED_GREEN }} />
+                    <CheckCircle2 className="h-6 w-6 text-white" />
                   </div>
                 )}
               </button>
