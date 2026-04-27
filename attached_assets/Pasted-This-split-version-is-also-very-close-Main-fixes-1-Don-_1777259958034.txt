@@ -1,0 +1,152 @@
+This split version is also very close. Main fixes:
+	1.	Don’t rely too heavily on outdoor units being visible.
+	2.	Add “This isn’t correct” so they can change from split to ducted.
+	3.	Add a “Not sure” path.
+	4.	Clarify that remotes help count indoor units, not systems.
+
+Refine the existing split AC Step 4 UI.
+
+Do NOT redesign the layout. Keep the current structure, cards, spacing, pricing panel and styling.
+
+Make the following targeted improvements.
+
+--------------------------------------------------
+1. UPDATE INTRO COPY
+--------------------------------------------------
+
+Replace the intro text under the heading with:
+
+Please confirm the number of split systems and any additional indoor units so we can price your service correctly.
+
+--------------------------------------------------
+2. ADD “THIS ISN’T CORRECT” SYSTEM TYPE OVERRIDE
+--------------------------------------------------
+
+Under the pink pre-filled box, add a small text link:
+
+This isn’t correct
+
+When clicked, reveal:
+
+Question:
+Has your AC system type changed?
+
+Options:
+- No, keep split system
+- Yes, it is now ducted
+- I’m not sure — technician to confirm on-site
+
+If user selects:
+“No, keep split system”
+→ Keep the split flow visible
+
+If user selects:
+“Yes, it is now ducted”
+→ Switch UI to the ducted flow
+→ Show:
+Updated AC type: Ducted
+
+If user selects:
+“I’m not sure — technician to confirm on-site”
+→ Collapse detailed inputs
+→ Show message:
+No problem — our technician will confirm your AC setup on-site.
+→ Default to:
+1 system, 0 additional components
+
+--------------------------------------------------
+3. SOFTEN OUTDOOR UNIT LANGUAGE
+--------------------------------------------------
+
+In the “Number of split systems” helper text, replace:
+
+Count 1 system for each outdoor condenser unit, usually located on a balcony, courtyard or external wall.
+
+With:
+
+A split system usually has an outdoor condenser unit. Where visible, count 1 system for each outdoor unit. In some strata buildings, outdoor units may be on the rooftop or in plant areas, so if you’re unsure, select 1 and our technician will confirm on-site.
+
+--------------------------------------------------
+4. UPDATE SYSTEM EXPLANATION BOX
+--------------------------------------------------
+
+Keep the current visual explanation box, but update the wording to:
+
+1 outdoor unit = 1 split system
+
+Do not imply the user must be able to visually access the outdoor unit.
+
+--------------------------------------------------
+5. IMPROVE ADDITIONAL INDOOR UNIT EXPLANATION
+--------------------------------------------------
+
+Replace the “Additional indoor units” helper text with:
+
+Your first indoor unit is included with each split system.
+
+Add any extra wall-mounted indoor units connected to the same outdoor unit.
+
+Helpful note:
+Each wall-mounted indoor unit usually has its own remote. Count remotes only as a guide to indoor units — not as separate systems.
+
+Keep the warning:
+Do not count ceiling vents or ducted air outlets as indoor units.
+
+--------------------------------------------------
+6. ADD “NOT SURE” SHORTCUT
+--------------------------------------------------
+
+Below the “Number of split systems” selector, add a subtle link:
+
+Not sure? We can confirm this on-site
+
+If clicked:
+- Lock system count to 1
+- Set additional indoor units to 0
+- Disable inputs
+- Show message:
+Our technician will confirm your setup during the service.
+
+--------------------------------------------------
+7. KEEP PRICING LOGIC
+--------------------------------------------------
+
+Do not change pricing.
+
+Split pricing remains:
+- $179 per split system
+- $39 per additional indoor unit
+
+Service estimate should show:
+[number] × split system ($179 ea.)
+[number] × additional indoor unit ($39 ea.), if applicable
+
+--------------------------------------------------
+8. KEEP CHECKBOX, BUT SLIGHTLY UPDATE WORDING
+--------------------------------------------------
+
+Replace the checkbox label with:
+
+I understand the final price may be adjusted after the technician confirms the AC setup on-site.
+
+Helper text:
+
+If fewer systems, indoor units or filters are required, Taylr will credit or refund the difference. If additional systems, indoor units or filters are identified during the service, Taylr may invoice the difference after the service is completed.
+
+Validation:
+The user cannot continue unless the checkbox is ticked.
+
+Error message:
+Please confirm you understand the final price may be adjusted after the technician checks the AC setup on-site.
+
+--------------------------------------------------
+MAIN GOAL
+--------------------------------------------------
+
+- Keep the split flow simple
+- Do not rely on outdoor units being visible
+- Make it clear that outdoor units determine split system count where visible
+- Make it clear that remotes help identify indoor units, not systems
+- Allow users to tell us the recorded AC type is wrong
+- Give agents and remote bookers a safe “not sure” path
+- Keep the existing design direction
