@@ -82,11 +82,40 @@ export function labelForAccessMethod(m: AccessMethod | null): string {
  */
 const DEMO_UNIT_LABELS: Readonly<Record<string, { line1: string; line2?: string }>> = {
   "unit-g01-335-aspen": { line1: "G01 / 335 Aspen Village", line2: "Lot 3 · Anketell Street" },
+  u1: { line1: "G01 / 335 Aspen Village", line2: "Lot 3 · Greenway ACT 2900" },
+  u2: { line1: "12 / 88 Marine Parade", line2: "Lot 12 · Coogee NSW 2034" },
+  u3: { line1: "3 / 4 Example Street", line2: "Lot 3 · Bondi NSW 2026" },
+  u4: { line1: "705 / 21 Bourke Street", line2: "Lot 705 · Surry Hills NSW 2010" },
+  u5: { line1: "18 / 142 Anzac Parade", line2: "Lot 18 · Kensington NSW 2033" },
 };
 
 export function unitLabel(unit_id: string | null): { line1: string; line2?: string } {
   if (!unit_id) return { line1: "—" };
   return DEMO_UNIT_LABELS[unit_id] ?? { line1: unit_id };
+}
+
+// ─── AC type assignment (demo) ─────────────────────────────────────────────
+
+/**
+ * In production, AC type (split vs ducted) is assigned to a unit in the
+ * Taylr backend — never selected by the booker. For the prototype we
+ * hardcode the mapping per demo unit so Step 4 can render the correct
+ * variant. Falls back to "split" for any unrecognised id.
+ */
+export type AcType = "split" | "ducted";
+
+const UNIT_AC_TYPE: Readonly<Record<string, AcType>> = {
+  u1: "ducted", // G01 / 335 Aspen Village
+  "unit-g01-335-aspen": "ducted",
+  u2: "split",  // 12 / 88 Marine Parade
+  u3: "ducted", // 3 / 4 Example Street
+  u4: "split",  // 705 / 21 Bourke Street
+  u5: "ducted", // 18 / 142 Anzac Parade
+};
+
+export function getAcType(unit_id: string | null): AcType {
+  if (!unit_id) return "split";
+  return UNIT_AC_TYPE[unit_id] ?? "split";
 }
 
 /** Compact AC summary, e.g. "2 systems + 1 add." */

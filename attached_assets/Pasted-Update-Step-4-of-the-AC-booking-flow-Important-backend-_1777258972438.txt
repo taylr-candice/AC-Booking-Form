@@ -1,0 +1,139 @@
+Update Step 4 of the AC booking flow.
+
+Important backend logic:
+In the real Taylr system, the AC type will be assigned to the unit in the backend. The user should not be asked to choose whether they have split or ducted AC.
+
+For demo prototype UI/design/flow purposes only, hardcode the following:
+- Unit G01 / 335A = ducted AC
+- Unit 12 / 88 = split AC
+
+When the user is booking for Unit G01 / 335A, show the ducted AC version.
+When the user is booking for Unit 12 / 88, show the split AC version.
+
+Do not show a split/ducted toggle to the user.
+
+DUCTED AC VERSION
+
+Heading:
+Confirm your ducted AC setup
+
+Intro/helper text:
+Most apartments have 1 ducted AC system. Please confirm the number of systems and any additional filters so we can price your service correctly.
+
+System selector label:
+Number of ducted systems
+
+System helper text:
+Count 1 system for each separate ducted AC setup. A system usually has its own outdoor unit and large return air grille.
+
+Add a help box titled:
+How to check
+
+Help box content:
+• Look outside for outdoor AC units — more than one may mean more than one system
+• Look inside for large return air grilles, usually in the ceiling or hallway
+• Do not count small ceiling vents or air outlets — these are not systems
+• If you’re unsure, select 1 and our technician will confirm on-site
+
+Additional filter selector label:
+Additional filters
+
+Additional filter helper text:
+Your first filter is included with each ducted system. Add any extra filters beyond the first filter included with each system.
+
+Small note:
+Filters are usually located behind large return air grilles. Do not count small ceiling vents or air outlets.
+
+Pricing estimate for ducted:
+Show:
+[number] × ducted system ($179 ea.)
+[number] × additional filter ($39 ea.), if applicable
+
+
+SPLIT AC VERSION
+
+Heading:
+Confirm your split AC setup
+
+Intro/helper text:
+Please confirm the number of outdoor units and any additional indoor units so we can price your service correctly.
+
+System selector label:
+Number of split systems
+
+System helper text:
+Count 1 system for each outdoor condenser unit, usually located on a balcony, courtyard or external wall.
+
+Additional indoor unit selector label:
+Additional indoor units
+
+Additional indoor unit helper text:
+Your first indoor unit is included with each split system. Add any extra wall-mounted indoor units connected to the same outdoor unit.
+
+Small note:
+Do not count ceiling vents or ducted air outlets as indoor units.
+
+Pricing estimate for split:
+Show:
+[number] × split system ($179 ea.)
+[number] × additional indoor unit ($39 ea.), if applicable
+
+
+REQUIRED CONFIRMATION CHECKBOX
+
+Add this above the Continue button for both split and ducted versions.
+
+Checkbox label:
+I understand the final price may be adjusted if the AC setup is different when assessed on-site.
+
+Helper text:
+If fewer systems, indoor units or filters are required than booked, Taylr will credit or refund the difference. If additional systems, indoor units or filters are identified during the service, Taylr may invoice the difference after the service is completed.
+
+Validation:
+The user cannot continue unless the checkbox is ticked.
+
+Error message:
+Please confirm you understand the final price may be adjusted after the technician checks the AC setup on-site.
+
+
+PRE-FILLED DETAILS
+
+If details are pre-filled from the last service, make the message type-specific.
+
+Ducted example:
+Pre-filled from your last service. Our records show 1 ducted system with 1 additional filter — adjust if anything has changed.
+
+Split example:
+Pre-filled from your last service. Our records show 2 split systems with 1 additional indoor unit — adjust if anything has changed.
+
+
+DESIGN REQUIREMENTS
+
+Keep the existing card layout, pink helper box, service estimate panel and step styling.
+
+Do not redesign the full page.
+
+Only update:
+- demo unit-based AC type assignment
+- conditional display logic
+- copy
+- labels
+- pricing logic
+- required confirmation checkbox
+
+Main goal:
+For ducted AC, users confirm:
+1. Number of ducted systems
+2. Additional filters
+
+For split AC, users confirm:
+1. Number of split systems
+2. Additional indoor units
+
+Make it clear that:
+- The AC type comes from Taylr’s unit record, not from user selection
+- Split systems are counted by outdoor condenser units
+- Ducted systems are usually checked by outdoor units and large return air grilles
+- Additional filters apply to ducted systems
+- Additional indoor units apply to split systems
+- Small ceiling vents and air outlets should not be counted

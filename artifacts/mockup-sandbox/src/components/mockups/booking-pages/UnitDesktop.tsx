@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowRight, Building2, MapPin, ChevronDown, Plus, CheckCircle2 } from "lucide-react";
+import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -13,10 +14,23 @@ const UNITS = [
 ];
 
 export function UnitDesktop() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const sessionUnitId = useBookingSelector((s) => s.unit_id);
+  const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
 
+  // Keep local state in sync if session changes elsewhere (e.g. on Back).
+  useEffect(() => {
+    if (sessionUnitId !== selectedId) setSelectedId(sessionUnitId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUnitId]);
+
   const selected = UNITS.find((u) => u.id === selectedId);
+
+  const selectUnit = (id: string) => {
+    setSelectedId(id);
+    bookingActions.setUnit(id);
+    setOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
@@ -74,10 +88,7 @@ export function UnitDesktop() {
                       <button
                         key={u.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedId(u.id);
-                          setOpen(false);
-                        }}
+                        onClick={() => selectUnit(u.id)}
                         data-testid={`dropdown-unit-${u.id}`}
                         className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
                           active ? "bg-pink-50" : "hover:bg-slate-50"

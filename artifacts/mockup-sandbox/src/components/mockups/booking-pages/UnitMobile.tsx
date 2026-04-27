@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Plus,
 } from "lucide-react";
+import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -23,44 +24,33 @@ type Unit = {
   building: string;
 };
 
+// Mirror UnitDesktop so the demo's per-unit AC type assignment
+// (u1 → ducted, u2 → split) works consistently on both surfaces.
 const UNITS: Unit[] = [
-  {
-    id: "u1",
-    address: "G01 / 335 Aspen Village",
-    lot: "Lot 3",
-    building: "Aspen Village · Anketell St, Greenway ACT",
-  },
-  {
-    id: "u2",
-    address: "402 / 121 Marcus Clarke Street",
-    lot: "Lot 44",
-    building: "The ApARTments · Canberra ACT",
-  },
-  {
-    id: "u3",
-    address: "14 / 88 Marine Parade",
-    lot: "Lot 14",
-    building: "Ocean View · Coogee NSW",
-  },
-  {
-    id: "u4",
-    address: "3 / 4 Example Street",
-    lot: "Lot 3",
-    building: "Bondi Breakers · Bondi NSW",
-  },
-  {
-    id: "u5",
-    address: "705 / 21 Bourke Street",
-    lot: "Lot 705",
-    building: "Surry Central · Surry Hills NSW",
-  },
+  { id: "u1", address: "G01 / 335 Aspen Village",   lot: "Lot 3",   building: "Aspen Village · Greenway ACT 2900" },
+  { id: "u2", address: "12 / 88 Marine Parade",     lot: "Lot 12",  building: "Oceanview · Coogee NSW 2034" },
+  { id: "u3", address: "3 / 4 Example Street",      lot: "Lot 3",   building: "The Example · Bondi NSW 2026" },
+  { id: "u4", address: "705 / 21 Bourke Street",    lot: "Lot 705", building: "Bourke Tower · Surry Hills NSW 2010" },
+  { id: "u5", address: "18 / 142 Anzac Parade",     lot: "Lot 18",  building: "Anzac Gardens · Kensington NSW 2033" },
 ];
 
 export function UnitMobile() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const sessionUnitId = useBookingSelector((s) => s.unit_id);
+  const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (sessionUnitId !== selectedId) setSelectedId(sessionUnitId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUnitId]);
+
   const selected = UNITS.find((u) => u.id === selectedId);
+
+  const selectUnit = (id: string) => {
+    setSelectedId(id);
+    bookingActions.setUnit(id);
+    setOpen(false);
+  };
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -132,10 +122,7 @@ export function UnitMobile() {
                   <button
                     key={u.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedId(u.id);
-                      setOpen(false);
-                    }}
+                    onClick={() => selectUnit(u.id)}
                     data-testid={`dropdown-unit-${u.id}`}
                     className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
                       active ? "bg-pink-50" : "hover:bg-slate-50"
