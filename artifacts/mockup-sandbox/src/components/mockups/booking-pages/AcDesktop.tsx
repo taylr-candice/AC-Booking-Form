@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
+  Eye,
   Fan,
   Filter,
   HelpCircle,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { useBookingSelector } from "../../../state/bookingSession";
 import { getAcType, type AcType } from "../../../state/bookingHelpers";
+import { AcExampleModal, type ExampleVariant } from "./AcExampleModal";
 
 const BRAND = "#ED017F";
 const ERROR_PURPLE = "#9747FF";
@@ -115,6 +117,7 @@ export function AcDesktop() {
   const [additional, setAdditional] = useState(defaults.additional);
   const [confirmed, setConfirmed] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [exampleModal, setExampleModal] = useState<ExampleVariant | null>(null);
 
   // Re-seed when the chosen flow changes (unit pick or type override).
   useEffect(() => {
@@ -364,16 +367,31 @@ export function AcDesktop() {
                 {/* Additional Units Stepper */}
                 <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="pr-4">
+                    <div className="pr-4 min-w-0">
                       <div className="flex items-center gap-2">
-                        <div className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
                           <AddonIcon className="h-4 w-4" />
                         </div>
                         <h3 className="font-semibold text-slate-900 text-lg">{copy.addonLabel}</h3>
                       </div>
-                      <p className="text-xs font-medium mt-2" style={{ color: BRAND }}>
-                        ${ADDON_PRICE} per extra {effectiveType === "ducted" ? "filter" : "unit"}
-                      </p>
+                      <div className="mt-2 flex items-center gap-3 flex-wrap">
+                        <p className="text-xs font-medium" style={{ color: BRAND }}>
+                          ${ADDON_PRICE} per extra {effectiveType === "ducted" ? "filter" : "unit"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExampleModal(
+                              effectiveType === "ducted" ? "ducted-filter" : "split-indoor",
+                            )
+                          }
+                          data-testid="button-see-example"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          See example
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0">
                       <button
@@ -557,6 +575,10 @@ export function AcDesktop() {
 
         </div>
       </div>
+
+      {exampleModal && (
+        <AcExampleModal variant={exampleModal} onClose={() => setExampleModal(null)} />
+      )}
     </div>
   );
 }

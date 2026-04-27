@@ -1,0 +1,25 @@
+uploads = []
+
+[[generated]]
+id = "Yz85tI3kMOJgLCMFDgNeK"
+uri = "file://attached_assets/generated_images/generated_image.png"
+type = "image"
+title = "generated_image"
+
+[[outputs]]
+id = "kwRN2o1lVqyPr5qVU1JU2"
+uri = "file://attached_assets/stock_images/split-indoor-unit.jpg"
+type = "image"
+title = "wall-mounted white split air conditioner indoor unit on apartment interior wall"
+
+[[outputs]]
+id = "nSOIpOi4I8eKOKyuUPvBQ"
+uri = "file://attached_assets/stock_images/ducted-return-grille.jpg"
+type = "image"
+title = "large white ceiling return air vent grille in residential apartment hallway"
+
+[[outputs]]
+id = "mNNM6rbWTfubKal5L5GVr"
+uri = "file://attached_assets/stock_images/stock_image.jpg"
+type = "image"
+title = "white rectangular ceiling air vent grille indoor home interior shot from below looking up"

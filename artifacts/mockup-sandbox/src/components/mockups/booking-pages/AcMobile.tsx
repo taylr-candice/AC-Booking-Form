@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CalendarCheck,
   Check,
+  Eye,
   Fan,
   Filter,
   Gauge,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { useBookingSelector } from "../../../state/bookingSession";
 import { getAcType, type AcType } from "../../../state/bookingHelpers";
+import { AcExampleModal, type ExampleVariant } from "./AcExampleModal";
 
 const BRAND = "#ED017F";
 const ERROR_PURPLE = "#9747FF";
@@ -119,6 +121,7 @@ export function AcMobile() {
   const [additional, setAdditional] = useState(defaults.additional);
   const [confirmed, setConfirmed] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [exampleModal, setExampleModal] = useState<ExampleVariant | null>(null);
 
   useEffect(() => {
     setSystems(defaults.systems);
@@ -363,14 +366,27 @@ export function AcMobile() {
 
             {/* Additional units / filters */}
             <div>
-              <div className="mb-2 flex items-baseline justify-between">
-                <div className="flex items-center gap-2">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <div className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
                     <AddonIcon className="h-3.5 w-3.5" />
                   </div>
                   <h3 className="font-semibold text-slate-900">{copy.addonLabel}</h3>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExampleModal(
+                        effectiveType === "ducted" ? "ducted-filter" : "split-indoor",
+                      )
+                    }
+                    data-testid="button-see-example"
+                    className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                  >
+                    <Eye className="h-3 w-3" />
+                    See example
+                  </button>
                 </div>
-                <p className="text-xs font-medium" style={{ color: BRAND }}>
+                <p className="text-xs font-medium shrink-0" style={{ color: BRAND }}>
                   ${ADDON_PRICE} ea.
                 </p>
               </div>
@@ -551,6 +567,10 @@ export function AcMobile() {
         <NavIcon icon={<MessageSquare className="h-5 w-5" />} label="Chat" />
         <NavIcon icon={<User className="h-5 w-5" />} label="Me" />
       </nav>
+
+      {exampleModal && (
+        <AcExampleModal variant={exampleModal} onClose={() => setExampleModal(null)} />
+      )}
     </div>
   );
 }
