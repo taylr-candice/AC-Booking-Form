@@ -115,10 +115,13 @@ export function AcMobile() {
           {/* Additional units */}
           <div>
             <div className="mb-2 flex items-baseline justify-between">
-              <div>
+              <div className="flex items-center gap-2">
+                <div className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
+                  <AirVent className="h-3.5 w-3.5" />
+                </div>
                 <h3 className="font-semibold text-slate-900">Additional indoor units</h3>
-                <p className="text-xs text-slate-500">Extra wall units sharing the same outdoor unit (multi-split).</p>
               </div>
+              <p className="text-xs font-medium" style={{ color: BRAND }}>${ADDON_PRICE} ea.</p>
             </div>
             <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
               <button
@@ -140,7 +143,10 @@ export function AcMobile() {
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-2 text-[11px] text-slate-400">
+            <p className="mt-2 text-[12px] text-slate-500">
+              Indoor units beyond the 1 already included with each system.
+            </p>
+            <p className="mt-1 text-[11px] text-slate-400">
               Tip: Unsure? Just count the number of remote controls you have.
             </p>
           </div>

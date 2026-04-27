@@ -76,33 +76,43 @@ export function AcDesktop() {
               </div>
 
               {/* Additional Units Stepper */}
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 p-6 bg-white shadow-sm">
-                <div className="pr-4">
-                  <h3 className="font-semibold text-slate-900 text-lg">Additional indoor units</h3>
-                  <p className="text-sm text-slate-500 mt-1">Extra indoor units running off the same outdoor unit (multi-split).</p>
-                  <p className="text-xs font-medium mt-2" style={{ color: BRAND }}>${ADDON_PRICE} per extra unit</p>
+              <div className="rounded-xl border border-slate-200 p-6 bg-white shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="pr-4">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
+                        <AirVent className="h-4 w-4" />
+                      </div>
+                      <h3 className="font-semibold text-slate-900 text-lg">Additional indoor units</h3>
+                    </div>
+                    <p className="text-xs font-medium mt-2" style={{ color: BRAND }}>${ADDON_PRICE} per extra unit</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <button
+                      onClick={() => setAdditional(Math.max(0, additional - 1))}
+                      disabled={additional <= 0}
+                      className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <div className="w-8 text-center text-xl font-bold text-slate-900">{additional}</div>
+                    <button
+                      onClick={() => setAdditional(additional + 1)}
+                      className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => setAdditional(Math.max(0, additional - 1))}
-                    disabled={additional <= 0}
-                    className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <div className="w-8 text-center text-xl font-bold text-slate-900">{additional}</div>
-                  <button 
-                    onClick={() => setAdditional(additional + 1)}
-                    className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
+
+                <p className="mt-3 text-sm text-slate-500">
+                  Indoor units beyond the 1 already included with each system.
+                </p>
               </div>
 
               {/* Tip */}
               <div className="rounded-xl bg-slate-100 p-5 text-sm text-slate-600 flex gap-3 mt-4">
-                <span className="font-bold">Tip:</span> 
+                <span className="font-bold">Tip:</span>
                 <span>Not sure how many indoor units you have? Just count the remote controls — there is one for every indoor unit.</span>
               </div>
             </div>
