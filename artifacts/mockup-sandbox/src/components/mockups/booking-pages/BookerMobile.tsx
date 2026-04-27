@@ -1,5 +1,6 @@
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Briefcase,
@@ -13,6 +14,57 @@ import { bookingActions, useBookingSelector } from "../../../state/bookingSessio
 import { DEMO_MANAGING_AGENCIES } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
+const ERROR_PURPLE = "#9747FF";
+
+function validateEmail(v: string): string | null {
+  const t = v.trim();
+  if (!t) return "Email is required";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return "Please enter a valid email";
+  return null;
+}
+
+function validatePhone(v: string): string | null {
+  const digits = v.replace(/\D/g, "");
+  if (!digits) return "Mobile is required";
+  if (digits.length < 10) return "Mobile must be at least 10 digits";
+  return null;
+}
+
+function validateRequired(v: string, label: string): string | null {
+  if (!v.trim()) return `${label} is required`;
+  return null;
+}
+
+function FieldError({ id, message }: { id: string; message: string | null }) {
+  if (!message) return null;
+  return (
+    <div
+      id={id}
+      role="alert"
+      aria-live="polite"
+      className="mt-1.5 flex items-start gap-1.5 text-[12px] font-medium"
+      style={{ color: ERROR_PURPLE }}
+    >
+      <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" aria-hidden="true" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+const baseInputClass =
+  "w-full rounded-xl border bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none";
+
+function inputClassFor(hasError: boolean) {
+  return `${baseInputClass} ${
+    hasError ? "" : "border-slate-200 focus:border-slate-400"
+  }`;
+}
+
+function errorStyle(hasError: boolean): React.CSSProperties | undefined {
+  return hasError
+    ? { borderColor: ERROR_PURPLE, boxShadow: `0 0 0 1px ${ERROR_PURPLE}` }
+    : undefined;
+}
 
 export function BookerMobile() {
   const role = useBookingSelector((s) => s.role);
@@ -24,8 +76,45 @@ export function BookerMobile() {
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
 
-  const isValid =
-    firstName && lastName && email && mobile && (!isAgent || !!agencyId);
+  const [touched, setTouched] = useState({
+    agency: false,
+    firstName: false,
+    lastName: false,
+    email: false,
+    mobile: false,
+  });
+
+  // Reset agency touched state when role flips off "agent" so re-entering
+  // agent mode doesn't show a leftover error before the user has interacted.
+  useEffect(() => {
+    if (!isAgent) {
+      setTouched((t) => (t.agency ? { ...t, agency: false } : t));
+    }
+  }, [isAgent]);
+
+  const errors = {
+    agency: isAgent && !agencyId ? "Please select your agency" : null,
+    firstName: validateRequired(firstName, "First name"),
+    lastName: validateRequired(lastName, "Last name"),
+    email: validateEmail(email),
+    mobile: validatePhone(mobile),
+  };
+
+  const showErr = (field: keyof typeof touched) =>
+    touched[field] && !!errors[field];
+
+  const isValid = Object.values(errors).every((e) => !e);
+
+  const markTouched = (field: keyof typeof touched) =>
+    setTouched((t) => ({ ...t, [field]: true }));
+
+  const errorIds = {
+    agency: "booker-agency-mobile-error",
+    firstName: "booker-first-mobile-error",
+    lastName: "booker-last-mobile-error",
+    email: "booker-email-mobile-error",
+    mobile: "booker-mobile-mobile-error",
+  } as const;
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -79,10 +168,16 @@ export function BookerMobile() {
                 id="booker-agency-mobile"
                 value={agencyId || ""}
                 onChange={(e) => bookingActions.setAgency(e.target.value || null)}
+                onBlur={() => markTouched("agency")}
                 data-testid="select-agency"
-                className={`w-full appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-14 pr-10 text-[15px] outline-none focus:border-slate-400 ${
-                  agencyId ? "text-slate-900" : "text-slate-400"
-                }`}
+                aria-invalid={showErr("agency")}
+                aria-describedby={showErr("agency") ? errorIds.agency : undefined}
+                className={`w-full appearance-none rounded-xl border bg-white py-3 pl-14 pr-10 text-[15px] outline-none ${
+                  showErr("agency")
+                    ? ""
+                    : "border-slate-200 focus:border-slate-400"
+                } ${agencyId ? "text-slate-900" : "text-slate-400"}`}
+                style={errorStyle(showErr("agency"))}
               >
                 <option value="" disabled>Select your agency…</option>
                 {DEMO_MANAGING_AGENCIES.map((a) => (
@@ -91,6 +186,7 @@ export function BookerMobile() {
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             </div>
+            {showErr("agency") && <FieldError id={errorIds.agency} message={errors.agency} />}
           </div>
         )}
 
@@ -103,47 +199,75 @@ export function BookerMobile() {
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">First name</label>
+              <label htmlFor="booker-first-mobile" className="text-sm font-medium text-slate-700">First name</label>
               <input
+                id="booker-first-mobile"
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none focus:border-slate-400"
+                onBlur={() => markTouched("firstName")}
+                aria-invalid={showErr("firstName")}
+                aria-describedby={showErr("firstName") ? errorIds.firstName : undefined}
+                className={inputClassFor(showErr("firstName"))}
+                style={errorStyle(showErr("firstName"))}
                 data-testid="input-firstname"
               />
+              {showErr("firstName") && <FieldError id={errorIds.firstName} message={errors.firstName} />}
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Last name</label>
+              <label htmlFor="booker-last-mobile" className="text-sm font-medium text-slate-700">Last name</label>
               <input
+                id="booker-last-mobile"
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none focus:border-slate-400"
+                onBlur={() => markTouched("lastName")}
+                aria-invalid={showErr("lastName")}
+                aria-describedby={showErr("lastName") ? errorIds.lastName : undefined}
+                className={inputClassFor(showErr("lastName"))}
+                style={errorStyle(showErr("lastName"))}
                 data-testid="input-lastname"
               />
+              {showErr("lastName") && <FieldError id={errorIds.lastName} message={errors.lastName} />}
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Email</label>
+            <label htmlFor="booker-email-mobile" className="text-sm font-medium text-slate-700">Email</label>
             <input
+              id="booker-email-mobile"
               type="email"
+              inputMode="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none focus:border-slate-400"
+              onBlur={() => markTouched("email")}
+              aria-invalid={showErr("email")}
+              aria-describedby={showErr("email") ? errorIds.email : undefined}
+              className={inputClassFor(showErr("email"))}
+              style={errorStyle(showErr("email"))}
               data-testid="input-email"
             />
+            {showErr("email") && <FieldError id={errorIds.email} message={errors.email} />}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-700">Mobile</label>
+            <label htmlFor="booker-mobile-mobile" className="text-sm font-medium text-slate-700">Mobile</label>
             <input
+              id="booker-mobile-mobile"
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
               value={mobile}
               onChange={(e) => setMobile(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none focus:border-slate-400"
+              onBlur={() => markTouched("mobile")}
+              aria-invalid={showErr("mobile")}
+              aria-describedby={showErr("mobile") ? errorIds.mobile : undefined}
+              className={inputClassFor(showErr("mobile"))}
+              style={errorStyle(showErr("mobile"))}
               data-testid="input-mobile"
             />
+            {showErr("mobile") && <FieldError id={errorIds.mobile} message={errors.mobile} />}
           </div>
         </div>
       </div>
