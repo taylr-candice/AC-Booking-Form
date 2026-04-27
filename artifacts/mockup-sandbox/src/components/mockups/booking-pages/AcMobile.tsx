@@ -91,11 +91,15 @@ const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number 
 };
 
 const ACK_LABEL =
-  "I understand the final price may be adjusted after the technician confirms the AC setup on-site.";
-const ACK_HELPER =
-  "If fewer systems, indoor units or filters are required, Taylr will credit or refund the difference. If additional systems, indoor units or filters are identified during the service, Taylr may invoice the difference after the service is completed.";
+  "I understand the final price may be adjusted if the number of systems, indoor unit heads or filters on-site is different from what I booked.";
+const ACK_HELPER_INTRO =
+  "This only applies when the booking selection doesn't match what's actually on-site. Taylr will not perform any work beyond the preventative maintenance service shown above.";
+const ACK_HELPER_BULLETS = [
+  "If there are more systems, indoor unit heads or filters on the day, Taylr will service all of them and invoice the unpaid difference afterward.",
+  "If there are fewer, Taylr will credit or refund the difference.",
+];
 const ACK_ERROR =
-  "Please confirm you understand the final price may be adjusted after the technician checks the AC setup on-site.";
+  "Please confirm you understand the price may be adjusted if the booked number of systems, indoor unit heads or filters doesn't match what's on-site.";
 
 type Override = null | "split" | "ducted" | "unsure";
 
@@ -488,12 +492,17 @@ export function AcMobile() {
               </span>
               <div className="flex-1">
                 <p className="text-[13px] font-medium text-slate-900 leading-snug">{ACK_LABEL}</p>
-                <p
+                <div
                   id="ac-ack-helper-mobile"
                   className="mt-2 text-[11px] text-slate-500 leading-relaxed"
                 >
-                  {ACK_HELPER}
-                </p>
+                  <p>{ACK_HELPER_INTRO}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-4">
+                    {ACK_HELPER_BULLETS.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </label>
             {showAckError && (
