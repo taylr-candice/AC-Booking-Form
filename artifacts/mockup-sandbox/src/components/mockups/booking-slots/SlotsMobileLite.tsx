@@ -38,7 +38,7 @@ const DAYS: Day[] = [
 ];
 
 export function SlotsMobileLite() {
-  const [selected, setSelected] = useState<string | null>("20260506-pm");
+  const [selected, setSelected] = useState<string | null>(null);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">

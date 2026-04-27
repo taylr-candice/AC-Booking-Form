@@ -57,7 +57,7 @@ const UNITS: Unit[] = [
 ];
 
 export function UnitMobile() {
-  const [selectedId, setSelectedId] = useState<string>("u1");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
   const selected = UNITS.find((u) => u.id === selectedId);

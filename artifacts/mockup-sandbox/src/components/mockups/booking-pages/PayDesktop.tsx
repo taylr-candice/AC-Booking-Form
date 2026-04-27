@@ -21,13 +21,13 @@ const SELECTED_GREEN = "#5FBB97";
 type PayMethod = "card" | "apple" | "invoice";
 
 export function PayDesktop() {
-  const [method, setMethod] = useState<PayMethod>("card");
+  const [method, setMethod] = useState<PayMethod | null>(null);
   const session = useBookingSelector((s) => s);
   const isAgent = session.role === "agent";
 
-  // If role changes away from agent while invoice is selected, fall back to card.
+  // If role changes away from agent while invoice is selected, clear the selection.
   useEffect(() => {
-    if (!isAgent && method === "invoice") setMethod("card");
+    if (!isAgent && method === "invoice") setMethod(null);
   }, [isAgent, method]);
 
   const total = computeBookingTotal(session);
@@ -52,11 +52,14 @@ export function PayDesktop() {
 
             {isCoordination && (
               <div
-                className="flex items-start gap-3 rounded-xl p-5 text-sm leading-relaxed text-white"
-                style={{ backgroundColor: "#5FBB97" }}
+                className="flex items-start gap-3 rounded-xl border p-5 text-sm leading-relaxed text-slate-700"
+                style={{
+                  borderColor: "rgba(95,187,151,0.45)",
+                  backgroundColor: "rgba(95,187,151,0.08)",
+                }}
                 data-testid="banner-coordination"
               >
-                <Info className="h-5 w-5 shrink-0 mt-0.5 text-white" />
+                <Info className="h-5 w-5 shrink-0 mt-0.5" style={{ color: SELECTED_GREEN }} />
                 <span>{COORDINATION_NOTE}</span>
               </div>
             )}
@@ -104,12 +107,16 @@ export function PayDesktop() {
                   type="button"
                   onClick={() => setMethod("card")}
                   data-testid="card-method-card"
-                  className={`relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
+                  aria-pressed={method === "card"}
+                  className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition"
+                  style={
                     method === "card"
-                      ? "border-2 bg-white shadow-sm"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                  style={method === "card" ? { borderColor: SELECTED_GREEN } : {}}
+                      ? {
+                          borderColor: "rgba(95,187,151,0.45)",
+                          backgroundColor: "rgba(95,187,151,0.08)",
+                        }
+                      : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
+                  }
                 >
                   <CreditCardIcon className="h-6 w-6 text-slate-700" />
                   <span className="text-sm font-semibold text-slate-900">Credit Card</span>
@@ -123,11 +130,10 @@ export function PayDesktop() {
                   type="button"
                   onClick={() => setMethod("apple")}
                   data-testid="card-method-apple"
+                  aria-pressed={method === "apple"}
                   aria-label="Apple Pay"
-                  className={`relative flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border bg-black p-4 text-white transition hover:bg-black/90 ${
-                    method === "apple" ? "border-2" : "border-black"
-                  }`}
-                  style={method === "apple" ? { borderColor: SELECTED_GREEN } : {}}
+                  className="relative flex h-full flex-col items-center justify-center gap-1.5 rounded-xl border bg-black p-4 text-white transition hover:bg-black/90"
+                  style={method === "apple" ? { borderColor: SELECTED_GREEN, borderWidth: 2 } : { borderColor: "#000000" }}
                 >
                   <div className="flex items-center gap-1.5">
                     <Apple className="h-5 w-5 -mt-0.5 fill-white text-white" />
@@ -145,12 +151,16 @@ export function PayDesktop() {
                     type="button"
                     onClick={() => setMethod("invoice")}
                     data-testid="card-method-invoice"
-                    className={`relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition ${
+                    aria-pressed={method === "invoice"}
+                    className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition"
+                    style={
                       method === "invoice"
-                        ? "border-2 bg-white shadow-sm"
-                        : "border-slate-200 bg-white hover:border-slate-300"
-                    }`}
-                    style={method === "invoice" ? { borderColor: SELECTED_GREEN } : {}}
+                        ? {
+                            borderColor: "rgba(95,187,151,0.45)",
+                            backgroundColor: "rgba(95,187,151,0.08)",
+                          }
+                        : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
+                    }
                   >
                     <FileText className="h-6 w-6 text-slate-700" />
                     <span className="text-sm font-semibold text-slate-900">Invoice me</span>
@@ -228,16 +238,23 @@ export function PayDesktop() {
                   <p key={i}>{p}</p>
                 ))}
               </div>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border bg-white p-4 transition" style={ack ? { borderColor: "#5FBB97", backgroundColor: "#5FBB97" } : { borderColor: "#E2E8F0" }}>
+              <label
+                className="flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition"
+                style={
+                  ack
+                    ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }
+                    : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
+                }
+              >
                 <input
                   type="checkbox"
                   checked={ack}
                   onChange={(e) => bookingActions.setCancellationAcknowledged(e.target.checked)}
                   data-testid="checkbox-cancellation-ack"
                   className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300"
-                  style={ack ? { accentColor: "#FFFFFF" } : undefined}
+                  style={{ accentColor: SELECTED_GREEN }}
                 />
-                <span className={`text-sm font-medium ${ack ? "text-white" : "text-slate-700"}`}>{CANCELLATION_ACK_LABEL}</span>
+                <span className="text-sm font-medium text-slate-700">{CANCELLATION_ACK_LABEL}</span>
               </label>
             </div>
 

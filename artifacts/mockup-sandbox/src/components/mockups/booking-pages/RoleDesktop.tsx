@@ -24,32 +24,34 @@ export function RoleDesktop() {
                 type="button"
                 onClick={() => bookingActions.setRole("owner")}
                 data-testid="card-role-owner"
+                aria-pressed={role === "owner"}
                 className={`relative flex flex-col items-center text-center rounded-2xl border p-8 transition-all ${
-                  role === "owner"
-                    ? "shadow-sm"
-                    : "border-slate-200 bg-white hover:border-slate-300"
+                  role === "owner" ? "" : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
                 style={
                   role === "owner"
                     ? {
-                        borderColor: "#5FBB97",
-                        backgroundColor: "#5FBB97",
+                        borderColor: "rgba(95,187,151,0.45)",
+                        backgroundColor: "rgba(95,187,151,0.08)",
                       }
                     : {}
                 }
               >
                 <div
-                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${role === "owner" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
+                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${
+                    role === "owner" ? "text-white" : "bg-slate-100 text-slate-700"
+                  }`}
+                  style={role === "owner" ? { backgroundColor: SELECTED_GREEN } : undefined}
                 >
                   <User className="h-8 w-8" />
                 </div>
-                <h3 className={`text-lg font-bold mb-2 ${role === "owner" ? "text-white" : "text-slate-900"}`}>Owner</h3>
-                <p className={`text-sm ${role === "owner" ? "text-white/85" : "text-slate-500"}`}>
+                <h3 className="text-lg font-bold mb-2 text-slate-900">Owner</h3>
+                <p className="text-sm text-slate-500">
                   I own this apartment, whether I live in it or lease it out.
                 </p>
                 {role === "owner" && (
                   <div className="absolute top-4 right-4">
-                    <CheckCircle2 className="h-6 w-6 text-white" />
+                    <CheckCircle2 className="h-6 w-6" style={{ color: SELECTED_GREEN }} />
                   </div>
                 )}
               </button>
@@ -58,32 +60,34 @@ export function RoleDesktop() {
                 type="button"
                 onClick={() => bookingActions.setRole("agent")}
                 data-testid="card-role-agent"
+                aria-pressed={role === "agent"}
                 className={`relative flex flex-col items-center text-center rounded-2xl border p-8 transition-all ${
-                  role === "agent"
-                    ? "shadow-sm"
-                    : "border-slate-200 bg-white hover:border-slate-300"
+                  role === "agent" ? "" : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
                 style={
                   role === "agent"
                     ? {
-                        borderColor: "#5FBB97",
-                        backgroundColor: "#5FBB97",
+                        borderColor: "rgba(95,187,151,0.45)",
+                        backgroundColor: "rgba(95,187,151,0.08)",
                       }
                     : {}
                 }
               >
                 <div
-                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${role === "agent" ? "bg-white/15 text-white" : "bg-slate-100 text-slate-700"}`}
+                  className={`mb-4 grid h-16 w-16 place-items-center rounded-2xl ${
+                    role === "agent" ? "text-white" : "bg-slate-100 text-slate-700"
+                  }`}
+                  style={role === "agent" ? { backgroundColor: SELECTED_GREEN } : undefined}
                 >
                   <Briefcase className="h-8 w-8" />
                 </div>
-                <h3 className={`text-lg font-bold mb-2 ${role === "agent" ? "text-white" : "text-slate-900"}`}>Agent · Property Manager</h3>
-                <p className={`text-sm ${role === "agent" ? "text-white/85" : "text-slate-500"}`}>
+                <h3 className="text-lg font-bold mb-2 text-slate-900">Agent · Property Manager</h3>
+                <p className="text-sm text-slate-500">
                   I manage this apartment on behalf of the owner.
                 </p>
                 {role === "agent" && (
                   <div className="absolute top-4 right-4">
-                    <CheckCircle2 className="h-6 w-6 text-white" />
+                    <CheckCircle2 className="h-6 w-6" style={{ color: SELECTED_GREEN }} />
                   </div>
                 )}
               </button>

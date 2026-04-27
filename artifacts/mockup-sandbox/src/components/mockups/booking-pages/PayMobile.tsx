@@ -38,7 +38,7 @@ const SELECTED_GREEN = "#5FBB97";
 type PayMethod = "card" | "apple";
 
 export function PayMobile() {
-  const [method, setMethod] = useState<PayMethod>("card");
+  const [method, setMethod] = useState<PayMethod | null>(null);
   const session = useBookingSelector((s) => s);
 
   const total = computeBookingTotal(session);
