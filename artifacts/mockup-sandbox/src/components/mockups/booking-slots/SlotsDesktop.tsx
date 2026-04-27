@@ -179,38 +179,36 @@ export function SlotsDesktop() {
 
 function DesktopSlotCard({ slot, icon, label, hint, selected, onClick }: { slot: Slot; icon: React.ReactNode; label: string; hint: string; selected: boolean; onClick: () => void }) {
   const full = slot.remaining <= 0;
+  const isSelected = selected && !full;
   return (
     <button
       type="button"
       disabled={full}
       onClick={onClick}
       data-testid={`desktop-slot-${slot.id}`}
-      aria-pressed={selected && !full}
+      aria-pressed={isSelected}
       className={`relative flex flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition ${
         full
           ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-          : selected
-            ? "text-slate-900"
+          : isSelected
+            ? "text-white shadow-sm"
             : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-sm"
       }`}
       style={
-        selected && !full
-          ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }
+        isSelected
+          ? { borderColor: SELECTED_GREEN, backgroundColor: SELECTED_GREEN }
           : undefined
       }
     >
       <div className="flex w-full items-center justify-between">
-        <div
-          className={full ? "text-slate-400" : "text-slate-500"}
-          style={selected && !full ? { color: SELECTED_GREEN } : undefined}
-        >
+        <div className={full ? "text-slate-400" : isSelected ? "text-white" : "text-slate-500"}>
           {icon}
         </div>
-        {selected && !full && <CheckCircle2 className="h-4 w-4" style={{ color: SELECTED_GREEN }} />}
+        {isSelected && <CheckCircle2 className="h-4 w-4 text-white" />}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
-      <div className={`text-[10px] ${full ? "text-slate-400" : "text-slate-500"}`}>{hint}</div>
-      <div className={`text-[10px] font-medium ${full ? "text-slate-400" : "text-slate-500"}`}>
+      <div className={`text-[10px] ${full ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>{hint}</div>
+      <div className={`text-[10px] font-medium ${full ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>
         {full ? "Full" : `${slot.remaining} left`}
       </div>
     </button>
