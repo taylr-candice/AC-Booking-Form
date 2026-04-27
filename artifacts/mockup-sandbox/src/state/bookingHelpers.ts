@@ -102,15 +102,15 @@ export function unitLabel(unit_id: string | null): { line1: string; line2?: stri
  * hardcode the mapping per demo unit so Step 4 can render the correct
  * variant. Falls back to "split" for any unrecognised id.
  */
-export type AcType = "split" | "ducted";
+export type AcType = "split" | "ducted" | "unknown";
 
 const UNIT_AC_TYPE: Readonly<Record<string, AcType>> = {
-  u1: "ducted", // G01 / 335 Aspen Village
+  u1: "ducted",  // G01 / 335 Aspen Village
   "unit-g01-335-aspen": "ducted",
-  u2: "split",  // 12 / 88 Marine Parade
-  u3: "ducted", // 3 / 4 Example Street
-  u4: "split",  // 705 / 21 Bourke Street
-  u5: "ducted", // 18 / 142 Anzac Parade
+  u2: "split",   // 12 / 88 Marine Parade
+  u3: "unknown", // 3 / 4 Example Street — no records on file
+  u4: "unknown", // 705 / 21 Bourke Street — no records on file
+  u5: "ducted",  // 18 / 142 Anzac Parade
 };
 
 export function getAcType(unit_id: string | null): AcType {

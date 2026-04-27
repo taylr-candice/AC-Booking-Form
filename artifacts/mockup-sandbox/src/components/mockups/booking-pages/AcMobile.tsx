@@ -25,11 +25,14 @@ const ERROR_PURPLE = "#9747FF";
 const SYSTEM_PRICE = 179;
 const ADDON_PRICE = 39;
 
+type KnownType = "split" | "ducted";
+
 type Copy = {
   heading: string;
   intro: string;
   systemsLabel: string;
   systemsHelper: string;
+  systemsIncludes?: string[];
   systemsUnitSingular: string;
   systemsUnitPlural: string;
   addonLabel: string;
@@ -38,10 +41,9 @@ type Copy = {
   addonNote: string;
   addonUnitSingular: string;
   addonUnitPlural: string;
-  prefilledRest: string;
 };
 
-const COPY: Record<AcType, Copy> = {
+const COPY: Record<KnownType, Copy> = {
   ducted: {
     heading: "Confirm your ducted AC setup",
     intro:
@@ -53,39 +55,34 @@ const COPY: Record<AcType, Copy> = {
     systemsUnitPlural: "ducted systems",
     addonLabel: "Additional filters",
     addonHelper:
-      "Your first filter is included with each ducted system. Add any extra filters beyond the first filter included with each system.",
+      "Add any extra filters beyond the first filter included with each system.",
     addonNote:
       "Filters are usually located behind large return air grilles. Do not count small ceiling vents or air outlets.",
     addonUnitSingular: "additional filter",
     addonUnitPlural: "additional filters",
-    prefilledRest:
-      "Our records show 1 ducted system with 1 additional filter — adjust if anything has changed.",
   },
   split: {
     heading: "Confirm your split AC setup",
     intro:
       "Please confirm the number of split systems and any additional indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
-    systemsHelper:
-      "A split system usually has an outdoor condenser unit. Where visible, count 1 system for each outdoor unit. In some strata buildings, outdoor units may be on the rooftop or in plant areas, so if you’re unsure, select 1 and our technician will confirm on-site.",
+    systemsHelper: "A split system usually has an outdoor unit.",
+    systemsIncludes: ["1 indoor unit", "1 outdoor unit"],
     systemsUnitSingular: "split system",
     systemsUnitPlural: "split systems",
     addonLabel: "Additional indoor units",
     addonHelper:
-      "Your first indoor unit is included with each split system. Add any extra wall-mounted indoor units connected to the same outdoor unit.",
-    addonRemoteNote:
-      "Each wall-mounted indoor unit usually has its own remote. Count remotes only as a guide to indoor units — not as separate systems.",
-    addonNote: "Do not count ceiling vents or ducted air outlets as indoor units.",
+      "Your system includes 1 indoor unit. Add extra indoor units only if you have more than one connected to the same system.",
+    addonRemoteNote: "Each indoor unit usually has its own remote.",
+    addonNote: "Do not count ceiling vents or ducted outlets.",
     addonUnitSingular: "additional indoor unit",
     addonUnitPlural: "additional indoor units",
-    prefilledRest:
-      "Our records show 2 split systems with 1 additional indoor unit — adjust if anything has changed.",
   },
 };
 
-const PREFILL_DEFAULTS: Record<AcType, { systems: number; additional: number }> = {
+const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number }> = {
   ducted: { systems: 1, additional: 1 },
-  split: { systems: 2, additional: 1 },
+  split: { systems: 2, additional: 0 },
 };
 
 const ACK_LABEL =
@@ -95,7 +92,7 @@ const ACK_HELPER =
 const ACK_ERROR =
   "Please confirm you understand the final price may be adjusted after the technician checks the AC setup on-site.";
 
-type Override = null | "ducted" | "unsure";
+type Override = null | "split" | "ducted" | "unsure";
 
 export function AcMobile() {
   const unitId = useBookingSelector((s) => s.unit_id);
@@ -105,12 +102,18 @@ export function AcMobile() {
   const [overridePanelOpen, setOverridePanelOpen] = useState(false);
   const [notSureCount, setNotSureCount] = useState(false);
 
-  const effectiveType: AcType = override === "ducted" ? "ducted" : acTypeFromUnit;
+  const effectiveType: AcType =
+    override === "split" || override === "ducted" ? override : acTypeFromUnit;
+
+  const knownType: KnownType | null =
+    effectiveType === "split" || effectiveType === "ducted" ? effectiveType : null;
+
+  const needsTypePick = acTypeFromUnit === "unknown" && override === null;
   const isUnsureMode = override === "unsure" || notSureCount;
   const hasOverride = override !== null;
 
-  const copy = COPY[effectiveType];
-  const defaults = PREFILL_DEFAULTS[effectiveType];
+  const copy = knownType ? COPY[knownType] : null;
+  const defaults = knownType ? PREFILL_DEFAULTS[knownType] : { systems: 1, additional: 0 };
 
   const [systems, setSystems] = useState(defaults.systems);
   const [additional, setAdditional] = useState(defaults.additional);
@@ -129,6 +132,7 @@ export function AcMobile() {
   useEffect(() => {
     setOverride(null);
     setOverridePanelOpen(false);
+    setNotSureCount(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acTypeFromUnit]);
 
@@ -144,6 +148,16 @@ export function AcMobile() {
     setNotSureCount(false);
   };
 
+  const heading = needsTypePick ? "Tell us about your AC setup" : copy?.heading ?? "Tell us about your AC setup";
+  const intro = needsTypePick
+    ? "We don’t yet have AC details for this unit."
+    : copy?.intro ?? "Our technician will confirm your AC setup on-site.";
+
+  const estimateUnitSingular = copy?.systemsUnitSingular ?? "AC system";
+  const estimateUnitPlural = copy?.systemsUnitPlural ?? "AC systems";
+  const estimateAddonSingular = copy?.addonUnitSingular ?? "additional component";
+  const estimateAddonPlural = copy?.addonUnitPlural ?? "additional components";
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
       <div className="border-b border-slate-100 bg-slate-50/70 px-5 pb-1 pt-2 text-[11px] text-slate-400">
@@ -152,9 +166,7 @@ export function AcMobile() {
 
       <div className="flex items-start justify-between px-5 pb-3 pt-5">
         <div className="pr-3">
-          <h1 className="text-[22px] font-semibold leading-tight text-slate-900">
-            {copy.heading}
-          </h1>
+          <h1 className="text-[22px] font-semibold leading-tight text-slate-900">{heading}</h1>
           <div className="mt-0.5 text-[11px] font-semibold tracking-wide uppercase text-slate-500">
             Step 4 of 7
           </div>
@@ -171,18 +183,21 @@ export function AcMobile() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
-        <p className="mb-4 text-sm text-slate-500">{copy.intro}</p>
+        <p className="mb-4 text-sm text-slate-500">{intro}</p>
 
-        {!hasOverride && (
+        {knownType && !hasOverride && acTypeFromUnit !== "unknown" && (
           <div className="mb-2 rounded-lg border border-pink-200 bg-pink-50 p-3 text-sm text-pink-900 flex gap-2.5 items-start">
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-pink-600" />
-            <p>
-              <strong>Pre-filled from your last service.</strong> {copy.prefilledRest}
-            </p>
+            <div>
+              <p className="font-semibold">Pre-filled based on our records.</p>
+              <p className="mt-0.5 text-[11px] text-pink-900/80 leading-relaxed">
+                This may come from prior services or building data — adjust if anything has changed.
+              </p>
+            </div>
           </div>
         )}
 
-        {effectiveType === "split" && !hasOverride && (
+        {knownType && !hasOverride && acTypeFromUnit !== "unknown" && (
           <div className="mb-5">
             {!overridePanelOpen ? (
               <button
@@ -194,11 +209,27 @@ export function AcMobile() {
                 This isn’t correct
               </button>
             ) : (
-              <OverridePanel
+              <ChoicePanel
+                eyebrow="Update AC type"
+                title="Has your AC system type changed?"
+                options={
+                  acTypeFromUnit === "split"
+                    ? [
+                        { value: "keep-split", label: "No, keep split system" },
+                        { value: "ducted", label: "Yes, it is now ducted" },
+                        { value: "unsure", label: "I’m not sure — technician to confirm on-site" },
+                      ]
+                    : [
+                        { value: "keep-ducted", label: "No, keep ducted system" },
+                        { value: "split", label: "Yes, it is now a split system" },
+                        { value: "unsure", label: "I’m not sure — technician to confirm on-site" },
+                      ]
+                }
                 onSelect={(choice) => {
-                  if (choice === "keep") setOverride(null);
+                  if (choice === "keep-split" || choice === "keep-ducted") setOverride(null);
                   else if (choice === "ducted") setOverride("ducted");
-                  else setOverride("unsure");
+                  else if (choice === "split") setOverride("split");
+                  else if (choice === "unsure") setOverride("unsure");
                   setOverridePanelOpen(false);
                 }}
                 onClose={() => setOverridePanelOpen(false)}
@@ -207,29 +238,33 @@ export function AcMobile() {
           </div>
         )}
 
-        {override === "ducted" && (
-          <OverrideBanner
-            title="Updated AC type: Ducted"
-            detail="Showing ducted setup. Adjust systems and filters below."
-            onReset={resetOverride}
-          />
-        )}
-        {override === "unsure" && (
-          <OverrideBanner
-            title="No problem — our technician will confirm your AC setup on-site."
-            detail="We’ll book a default of 1 system with 0 additional components and your technician will confirm the setup during the service."
-            onReset={resetOverride}
+        {needsTypePick && (
+          <ChoicePanel
+            eyebrow="AC type"
+            title="What type of AC does the apartment have?"
+            options={[
+              { value: "ducted", label: "Ducted (ceiling vents)" },
+              { value: "split", label: "Split system (wall units)" },
+              { value: "unsure", label: "Not sure — technician to confirm on-site" },
+            ]}
+            onSelect={(choice) => {
+              if (choice === "ducted") setOverride("ducted");
+              else if (choice === "split") setOverride("split");
+              else setOverride("unsure");
+            }}
           />
         )}
 
-        {isUnsureMode ? (
-          <UnsureCard
-            acTypeLabel={effectiveType === "ducted" ? "ducted system" : "split system"}
-            onUndo={
-              notSureCount && override !== "unsure" ? () => setNotSureCount(false) : undefined
-            }
+        {hasOverride && (
+          <OverrideBanner
+            title={overrideBannerTitle(acTypeFromUnit, override)}
+            detail={overrideBannerDetail(override)}
+            onReset={resetOverride}
+            resetLabel={acTypeFromUnit === "unknown" ? "Change" : "Reset"}
           />
-        ) : (
+        )}
+
+        {knownType && !isUnsureMode && copy && (
           <div className="space-y-6">
             {/* Number of systems */}
             <div>
@@ -239,6 +274,24 @@ export function AcMobile() {
                   <p className="text-xs font-medium" style={{ color: BRAND }}>
                     ${SYSTEM_PRICE} per system
                   </p>
+                  {copy.systemsIncludes && (
+                    <div className="mt-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Includes
+                      </p>
+                      <ul className="mt-0.5 space-y-0.5">
+                        {copy.systemsIncludes.map((b) => (
+                          <li
+                            key={b}
+                            className="flex items-center gap-1.5 text-[11px] text-slate-600"
+                          >
+                            <Check className="h-3 w-3 text-slate-400" strokeWidth={3} />
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
@@ -276,7 +329,8 @@ export function AcMobile() {
                       <span className="font-medium text-slate-700">1 outdoor unit</span>
                     </div>
                     <span className="text-slate-400 font-semibold">=</span>
-                    <span className="font-semibold text-slate-900">1 split system</span>
+                    <span className="font-semibold text-slate-900">1 system</span>
+                    <span className="text-[10px] text-slate-400">(where visible)</span>
                   </div>
                 </div>
               ) : (
@@ -354,117 +408,129 @@ export function AcMobile() {
           </div>
         )}
 
+        {isUnsureMode && (
+          <UnsureCard
+            onUndo={
+              notSureCount && override !== "unsure" ? () => setNotSureCount(false) : undefined
+            }
+          />
+        )}
+
         {/* Live Service Estimate */}
-        <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="mb-3 border-b border-slate-200 pb-3">
-            <h2 className="text-[13px] font-semibold tracking-wide uppercase text-slate-500">
-              Service estimate
-            </h2>
-          </div>
-          <div className="space-y-2 text-sm text-slate-600">
-            <div className="flex justify-between">
-              <span>
-                {displaySystems} ×{" "}
-                {displaySystems === 1 ? copy.systemsUnitSingular : copy.systemsUnitPlural}
-              </span>
-              <span className="tabular-nums text-slate-900 font-medium">
-                ${displaySystems * SYSTEM_PRICE}
-              </span>
+        {!needsTypePick && (
+          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3 border-b border-slate-200 pb-3">
+              <h2 className="text-[13px] font-semibold tracking-wide uppercase text-slate-500">
+                Service estimate
+              </h2>
             </div>
-            {displayAdditional > 0 && (
+            <div className="space-y-2 text-sm text-slate-600">
               <div className="flex justify-between">
                 <span>
-                  {displayAdditional} ×{" "}
-                  {displayAdditional === 1 ? copy.addonUnitSingular : copy.addonUnitPlural}
+                  {displaySystems} ×{" "}
+                  {displaySystems === 1 ? estimateUnitSingular : estimateUnitPlural}
                 </span>
                 <span className="tabular-nums text-slate-900 font-medium">
-                  ${displayAdditional * ADDON_PRICE}
+                  ${displaySystems * SYSTEM_PRICE}
                 </span>
+              </div>
+              {displayAdditional > 0 && (
+                <div className="flex justify-between">
+                  <span>
+                    {displayAdditional} ×{" "}
+                    {displayAdditional === 1 ? estimateAddonSingular : estimateAddonPlural}
+                  </span>
+                  <span className="tabular-nums text-slate-900 font-medium">
+                    ${displayAdditional * ADDON_PRICE}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex items-end justify-between border-t border-slate-200 pt-4">
+              <span className="font-medium text-slate-900">Total (incl. GST)</span>
+              <span className="text-xl font-bold tabular-nums" style={{ color: BRAND }}>
+                ${total}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Required acknowledgement */}
+        {!needsTypePick && (
+          <div
+            className={`mt-4 rounded-xl border p-4 transition ${
+              showAckError ? "" : "border-slate-200 bg-white"
+            }`}
+            style={
+              showAckError
+                ? { borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }
+                : undefined
+            }
+          >
+            <label className="flex items-start gap-3 cursor-pointer">
+              <span className="relative mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={(e) => {
+                    setConfirmed(e.target.checked);
+                    setTouched(true);
+                  }}
+                  onBlur={() => setTouched(true)}
+                  data-testid="checkbox-ac-ack"
+                  aria-invalid={showAckError}
+                  aria-describedby={
+                    showAckError ? "ac-ack-error-mobile" : "ac-ack-helper-mobile"
+                  }
+                  className="sr-only"
+                />
+                <span
+                  className="grid h-5 w-5 place-items-center rounded-md border-2 transition"
+                  style={
+                    confirmed
+                      ? { backgroundColor: BRAND, borderColor: BRAND }
+                      : showAckError
+                      ? { borderColor: ERROR_PURPLE, backgroundColor: "#fff" }
+                      : { borderColor: "#cbd5e1", backgroundColor: "#fff" }
+                  }
+                >
+                  {confirmed && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
+                </span>
+              </span>
+              <div className="flex-1">
+                <p className="text-[13px] font-medium text-slate-900 leading-snug">{ACK_LABEL}</p>
+                <p
+                  id="ac-ack-helper-mobile"
+                  className="mt-2 text-[11px] text-slate-500 leading-relaxed"
+                >
+                  {ACK_HELPER}
+                </p>
+              </div>
+            </label>
+            {showAckError && (
+              <div
+                id="ac-ack-error-mobile"
+                role="alert"
+                className="mt-3 flex items-start gap-2 text-[11px] font-medium"
+                style={{ color: ERROR_PURPLE }}
+              >
+                <AlertCircle className="h-4 w-4 mt-px shrink-0" />
+                <span>{ACK_ERROR}</span>
               </div>
             )}
           </div>
-          <div className="mt-4 flex items-end justify-between border-t border-slate-200 pt-4">
-            <span className="font-medium text-slate-900">Total (incl. GST)</span>
-            <span className="text-xl font-bold tabular-nums" style={{ color: BRAND }}>
-              ${total}
-            </span>
-          </div>
-        </div>
-
-        {/* Required acknowledgement */}
-        <div
-          className={`mt-4 rounded-xl border p-4 transition ${
-            showAckError ? "" : "border-slate-200 bg-white"
-          }`}
-          style={
-            showAckError
-              ? { borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }
-              : undefined
-          }
-        >
-          <label className="flex items-start gap-3 cursor-pointer">
-            <span className="relative mt-0.5">
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => {
-                  setConfirmed(e.target.checked);
-                  setTouched(true);
-                }}
-                onBlur={() => setTouched(true)}
-                data-testid="checkbox-ac-ack"
-                aria-invalid={showAckError}
-                aria-describedby={
-                  showAckError ? "ac-ack-error-mobile" : "ac-ack-helper-mobile"
-                }
-                className="sr-only"
-              />
-              <span
-                className="grid h-5 w-5 place-items-center rounded-md border-2 transition"
-                style={
-                  confirmed
-                    ? { backgroundColor: BRAND, borderColor: BRAND }
-                    : showAckError
-                    ? { borderColor: ERROR_PURPLE, backgroundColor: "#fff" }
-                    : { borderColor: "#cbd5e1", backgroundColor: "#fff" }
-                }
-              >
-                {confirmed && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
-              </span>
-            </span>
-            <div className="flex-1">
-              <p className="text-[13px] font-medium text-slate-900 leading-snug">{ACK_LABEL}</p>
-              <p
-                id="ac-ack-helper-mobile"
-                className="mt-2 text-[11px] text-slate-500 leading-relaxed"
-              >
-                {ACK_HELPER}
-              </p>
-            </div>
-          </label>
-          {showAckError && (
-            <div
-              id="ac-ack-error-mobile"
-              role="alert"
-              className="mt-3 flex items-start gap-2 text-[11px] font-medium"
-              style={{ color: ERROR_PURPLE }}
-            >
-              <AlertCircle className="h-4 w-4 mt-px shrink-0" />
-              <span>{ACK_ERROR}</span>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="border-t border-slate-100 bg-white px-5 py-3">
         <span
           onMouseDown={() => {
-            if (!confirmed) setTouched(true);
+            if (!confirmed && !needsTypePick) setTouched(true);
           }}
         >
           <button
             type="button"
-            disabled={!confirmed}
+            disabled={needsTypePick || !confirmed}
             data-testid="button-continue"
             className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
             style={{ backgroundColor: BRAND }}
@@ -491,47 +557,62 @@ export function AcMobile() {
 
 /* --------------------------------- helpers --------------------------------- */
 
-type OverrideChoice = "keep" | "ducted" | "unsure";
+function overrideBannerTitle(acTypeFromUnit: AcType, override: Override): string {
+  const originUnknown = acTypeFromUnit === "unknown";
+  if (override === "ducted") return originUnknown ? "AC type: Ducted" : "Updated AC type: Ducted";
+  if (override === "split") return originUnknown ? "AC type: Split system" : "Updated AC type: Split system";
+  if (override === "unsure") return "No problem — our technician will confirm your AC setup on-site.";
+  return "";
+}
 
-function OverridePanel({
+function overrideBannerDetail(override: Override): string {
+  if (override === "ducted") return "Showing ducted setup. Adjust systems and filters below.";
+  if (override === "split") return "Showing split setup. Adjust systems and indoor units below.";
+  if (override === "unsure")
+    return "We’ll book a default of 1 system with 0 additional components and confirm on-site.";
+  return "";
+}
+
+function ChoicePanel({
+  eyebrow,
+  title,
+  options,
   onSelect,
   onClose,
 }: {
-  onSelect: (choice: OverrideChoice) => void;
-  onClose: () => void;
+  eyebrow: string;
+  title: string;
+  options: { value: string; label: string }[];
+  onSelect: (value: string) => void;
+  onClose?: () => void;
 }) {
-  const opts: { value: OverrideChoice; label: string }[] = [
-    { value: "keep", label: "No, keep split system" },
-    { value: "ducted", label: "Yes, it is now ducted" },
-    { value: "unsure", label: "I’m not sure — technician to confirm on-site" },
-  ];
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            Update AC type
+            {eyebrow}
           </p>
-          <p className="mt-1 text-[13px] font-medium text-slate-900">
-            Has your AC system type changed?
-          </p>
+          <p className="mt-1 text-[13px] font-medium text-slate-900">{title}</p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="text-[11px] font-medium text-slate-400 hover:text-slate-700"
-        >
-          Cancel
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-[11px] font-medium text-slate-400 hover:text-slate-700"
+          >
+            Cancel
+          </button>
+        )}
       </div>
       <div className="mt-3 space-y-2">
-        {opts.map((o) => (
+        {options.map((o) => (
           <button
             key={o.value}
             type="button"
             onClick={() => onSelect(o.value)}
-            data-testid={`override-${o.value}`}
+            data-testid={`choice-${o.value}`}
             className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-left text-[13px] text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-colors"
           >
             <span>{o.label}</span>
@@ -547,10 +628,12 @@ function OverrideBanner({
   title,
   detail,
   onReset,
+  resetLabel,
 }: {
   title: string;
   detail: string;
   onReset: () => void;
+  resetLabel: string;
 }) {
   return (
     <div
@@ -569,19 +652,13 @@ function OverrideBanner({
         className="self-start text-[11px] font-medium underline underline-offset-2 hover:opacity-80"
         style={{ color: BRAND }}
       >
-        Reset
+        {resetLabel}
       </button>
     </div>
   );
 }
 
-function UnsureCard({
-  acTypeLabel,
-  onUndo,
-}: {
-  acTypeLabel: string;
-  onUndo?: () => void;
-}) {
+function UnsureCard({ onUndo }: { onUndo?: () => void }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
@@ -590,12 +667,8 @@ function UnsureCard({
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-slate-900 text-[15px]">
-            We’ll confirm your setup on-site
+            We’ll confirm your setup during the service
           </h3>
-          <p className="mt-1 text-[12px] text-slate-500 leading-relaxed">
-            Our technician will confirm your setup during the service. We’ll book a default of
-            1 {acTypeLabel} with 0 additional components and adjust if needed.
-          </p>
           {onUndo && (
             <button
               type="button"

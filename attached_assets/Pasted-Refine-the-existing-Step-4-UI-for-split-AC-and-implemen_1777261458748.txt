@@ -1,0 +1,149 @@
+Refine the existing Step 4 UI for split AC and implement missing unknown AC state.
+
+Do NOT redesign layout. Keep structure, cards, spacing and pricing panel.
+
+--------------------------------------------------
+1. FIX “WHAT’S INCLUDED” (CRITICAL)
+--------------------------------------------------
+
+Under “$179 per system”, add:
+
+Includes:
+• 1 indoor unit
+• 1 outdoor unit
+
+This must be clearly visible and not buried in text.
+
+--------------------------------------------------
+2. FIX ADDITIONAL INDOOR DEFAULT
+--------------------------------------------------
+
+Change “Additional indoor units”:
+
+- Default value = 0 (not 1)
+- Represents ONLY extra units beyond the included 1
+
+Update helper text to:
+
+Your system includes 1 indoor unit.
+Add extra indoor units only if you have more than one connected to the same system.
+
+--------------------------------------------------
+3. SIMPLIFY SYSTEM EXPLANATION
+--------------------------------------------------
+
+Replace long paragraph with:
+
+A split system usually has an outdoor unit.
+
+Keep the visual box but update label:
+
+1 outdoor unit = 1 system (where visible)
+
+Do NOT rely on outdoor visibility in main explanation.
+
+--------------------------------------------------
+4. REDUCE TEXT IN HELPER
+--------------------------------------------------
+
+Shorten indoor unit explanation:
+
+Add extra wall-mounted indoor units connected to the same system.
+
+Keep:
+
+Each indoor unit usually has its own remote
+
+Do not count ceiling vents or ducted outlets
+
+--------------------------------------------------
+5. FIX PRE-FILLED COPY (BOTH FLOWS)
+--------------------------------------------------
+
+Replace:
+
+Pre-filled from your last service
+
+With:
+
+Pre-filled based on our records
+
+Add smaller line:
+
+This may come from prior services or building data — adjust if anything has changed.
+
+--------------------------------------------------
+6. ALIGN “NOT SURE” BEHAVIOUR
+--------------------------------------------------
+
+Keep link:
+
+Not sure? We can confirm this on-site
+
+On click:
+- Set systems = 1
+- Set additional indoor units = 0
+- Disable inputs
+- Show:
+We’ll confirm your setup during the service
+
+--------------------------------------------------
+7. IMPLEMENT UNKNOWN AC TYPE (UNIT 3 / 4)
+--------------------------------------------------
+
+If unit = 3 / 4:
+
+Show new state BEFORE split/ducted UI:
+
+Heading:
+Tell us about your AC setup
+
+Helper text:
+We don’t yet have AC details for this unit.
+
+Question:
+What type of AC does the apartment have?
+
+Options:
+- Ducted (ceiling vents)
+- Split system (wall units)
+- Not sure — technician to confirm on-site
+
+--------------------------------------------------
+
+If user selects DUCTED:
+→ Load ducted UI
+
+If user selects SPLIT:
+→ Load split UI
+
+If user selects NOT SURE:
+→ Hide all inputs
+→ Show:
+No problem — our technician will confirm your AC setup on-site
+
+→ Default:
+1 system
+0 additional components
+
+→ Show estimate:
+1 × AC system ($179)
+
+--------------------------------------------------
+8. KEEP “THIS ISN’T CORRECT”
+--------------------------------------------------
+
+Ensure this works for split as well:
+- Allow switching to ducted
+- Allow “not sure” fallback
+
+--------------------------------------------------
+MAIN GOAL
+--------------------------------------------------
+
+- Make it crystal clear what is included in system pricing
+- Ensure additional units represent ONLY extras
+- Reduce reliance on outdoor visibility
+- Align split and ducted experiences
+- Support unknown units cleanly
+- Remove incorrect assumptions from UI
