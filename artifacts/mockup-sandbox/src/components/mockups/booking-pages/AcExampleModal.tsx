@@ -1,46 +1,50 @@
 import { useEffect } from "react";
-import { Check, X } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 
 const BRAND = "#ED017F";
 
 export type ExampleVariant = "split-indoor" | "ducted-filter";
 
-type Bullet = { kind: "do" | "dont"; text: string };
+type GuideRow = { left: string; right: string };
 
 type Content = {
   title: string;
   imageSrc: string;
   imageAlt: string;
-  caption: string;
-  bullets: Bullet[];
+  intro: string;
+  guideTitle: string;
+  guide: GuideRow[];
+  footnote: string;
 };
 
 const ASSET_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const CONTENT: Record<ExampleVariant, Content> = {
   "split-indoor": {
-    title: "What counts as an indoor unit",
+    title: "What counts as an extra indoor unit?",
     imageSrc: `${ASSET_BASE}/examples/split-indoor-unit.jpg`,
     imageAlt: "A white wall-mounted split AC indoor unit installed high on a living-room wall.",
-    caption:
-      "Indoor units are wall-mounted boxes that blow air directly into the room. Each one usually has its own remote.",
-    bullets: [
-      { kind: "do", text: "Count each wall-mounted indoor unit in the apartment" },
-      { kind: "do", text: "The first indoor unit is included with your system — count only extras" },
-      { kind: "dont", text: "Do not count ceiling vents or ducted air outlets" },
+    intro: "Your first indoor unit is already included.",
+    guideTitle: "Use this guide:",
+    guide: [
+      { left: "1 indoor unit", right: "add 0 extra units" },
+      { left: "2 indoor units", right: "add 1 extra unit" },
+      { left: "3 indoor units", right: "add 2 extra units" },
     ],
+    footnote: "Each wall-mounted unit counts as one.",
   },
   "ducted-filter": {
-    title: "What counts as a filter",
+    title: "What counts as an extra filter?",
     imageSrc: `${ASSET_BASE}/examples/ducted-return-grille.jpg`,
     imageAlt: "A large white ceiling return-air grille, typical of a ducted AC system.",
-    caption:
-      "Filters sit behind the large return-air grilles in the ceiling or hallway — not behind the small ceiling vents that blow air out.",
-    bullets: [
-      { kind: "do", text: "Count each large return-air grille (the filter is behind it)" },
-      { kind: "do", text: "The first filter is included with your system — count only extras" },
-      { kind: "dont", text: "Do not count small ceiling vents or air outlets" },
+    intro: "Your first filter is already included.",
+    guideTitle: "Use this guide:",
+    guide: [
+      { left: "1 return air grille", right: "add 0 extra filters" },
+      { left: "2 return air grilles", right: "add 1 extra filter" },
+      { left: "3 return air grilles", right: "add 2 extra filters" },
     ],
+    footnote: "Do not count small vents.",
   },
 };
 
@@ -109,31 +113,30 @@ export function AcExampleModal({
               loading="lazy"
             />
           </div>
-          <p className="mt-3 text-[12px] text-slate-500 leading-relaxed">{content.caption}</p>
 
-          <ul className="mt-4 space-y-2">
-            {content.bullets.map((b, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-[13px] text-slate-700">
-                {b.kind === "do" ? (
-                  <span
-                    className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-white"
-                    style={{ backgroundColor: BRAND }}
-                    aria-hidden="true"
-                  >
-                    <Check className="h-3 w-3" strokeWidth={3} />
-                  </span>
-                ) : (
-                  <span
-                    className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-200 text-slate-500"
-                    aria-hidden="true"
-                  >
-                    <X className="h-3 w-3" strokeWidth={3} />
-                  </span>
-                )}
-                <span className="leading-snug">{b.text}</span>
+          <p className="mt-3 text-sm font-medium text-slate-900">{content.intro}</p>
+
+          <p className="mt-3 text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+            {content.guideTitle}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {content.guide.map((row, i) => (
+              <li
+                key={i}
+                className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-[13px]"
+              >
+                <span className="font-medium text-slate-900 min-w-0 flex-1">{row.left}</span>
+                <ArrowRight
+                  className="h-3.5 w-3.5 shrink-0"
+                  style={{ color: BRAND }}
+                  aria-hidden="true"
+                />
+                <span className="text-slate-700 text-right min-w-0 flex-1">{row.right}</span>
               </li>
             ))}
           </ul>
+
+          <p className="mt-4 text-[12px] text-slate-500">{content.footnote}</p>
 
           <button
             type="button"

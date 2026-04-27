@@ -8,8 +8,8 @@ import {
   Check,
   Eye,
   Fan,
-  Filter,
   Gauge,
+  Grid3x3,
   HelpCircle,
   Info,
   MessageSquare,
@@ -49,41 +49,40 @@ const COPY: Record<KnownType, Copy> = {
   ducted: {
     heading: "Confirm your ducted AC setup",
     intro:
-      "Please confirm the number of systems and any additional filters so we can price your service correctly.",
+      "Please confirm the number of systems and any extra filters so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
-    systemsHelper:
-      "Count 1 system for each separate ducted AC setup. A system usually has its own outdoor unit and large return air grille.",
+    systemsHelper: "A ducted system is a separate AC setup in your apartment.",
+    systemsIncludes: ["1 system", "1 filter"],
     systemsUnitSingular: "ducted system",
     systemsUnitPlural: "ducted systems",
-    addonLabel: "Additional filters",
+    addonLabel: "Extra filters",
     addonHelper:
-      "Add any extra filters beyond the first filter included with each system.",
-    addonNote:
-      "Filters are usually located behind large return air grilles. Do not count small ceiling vents or air outlets.",
-    addonUnitSingular: "additional filter",
-    addonUnitPlural: "additional filters",
+      "Your system includes 1 filter. Only add extras if you have more than one large return air grille.",
+    addonNote: "Filters sit behind large return air grilles — not small ceiling vents.",
+    addonUnitSingular: "extra filter",
+    addonUnitPlural: "extra filters",
   },
   split: {
     heading: "Confirm your split AC setup",
     intro:
-      "Please confirm the number of split systems and any additional indoor units so we can price your service correctly.",
+      "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
     systemsHelper: "A split system usually has an outdoor unit.",
     systemsIncludes: ["1 indoor unit", "1 outdoor unit"],
     systemsUnitSingular: "split system",
     systemsUnitPlural: "split systems",
-    addonLabel: "Additional indoor units",
+    addonLabel: "Extra indoor units",
     addonHelper:
-      "Your system includes 1 indoor unit. Add extra indoor units only if you have more than one connected to the same system.",
-    addonRemoteNote: "Each indoor unit usually has its own remote.",
+      "Your system includes 1 indoor unit. Only add extras if you have more than one wall-mounted unit connected to the same system.",
+    addonRemoteNote: "Each indoor unit usually has its own remote (use this as a guide).",
     addonNote: "Do not count ceiling vents or ducted outlets.",
-    addonUnitSingular: "additional indoor unit",
-    addonUnitPlural: "additional indoor units",
+    addonUnitSingular: "extra indoor unit",
+    addonUnitPlural: "extra indoor units",
   },
 };
 
 const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number }> = {
-  ducted: { systems: 1, additional: 1 },
+  ducted: { systems: 1, additional: 0 },
   split: { systems: 2, additional: 0 },
 };
 
@@ -143,7 +142,7 @@ export function AcMobile() {
   const displayAdditional = isUnsureMode ? 0 : additional;
   const total = displaySystems * SYSTEM_PRICE + displayAdditional * ADDON_PRICE;
   const showAckError = touched && !confirmed;
-  const AddonIcon = effectiveType === "ducted" ? Filter : AirVent;
+  const AddonIcon = effectiveType === "ducted" ? Grid3x3 : AirVent;
 
   const resetOverride = () => {
     setOverride(null);
@@ -322,33 +321,29 @@ export function AcMobile() {
 
               <p className="mt-2 text-[12px] text-slate-500 leading-relaxed">{copy.systemsHelper}</p>
 
-              {effectiveType === "split" ? (
-                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
-                  <div className="flex items-center justify-center gap-2 text-[11px] flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <div className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
+              <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+                <div className="flex items-center justify-center gap-2 text-[11px] flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <div className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 bg-white text-slate-600">
+                      {effectiveType === "split" ? (
                         <Fan className="h-3.5 w-3.5" />
-                      </div>
-                      <span className="font-medium text-slate-700">1 outdoor unit</span>
+                      ) : (
+                        <Grid3x3 className="h-3.5 w-3.5" />
+                      )}
                     </div>
-                    <span className="text-slate-400 font-semibold">=</span>
-                    <span className="font-semibold text-slate-900">1 system</span>
-                    <span className="text-[10px] text-slate-400">(where visible)</span>
+                    <span className="font-medium text-slate-700">
+                      {effectiveType === "split" ? "1 outdoor unit" : "1 ducted system"}
+                    </span>
                   </div>
+                  <span className="text-slate-400 font-semibold">=</span>
+                  <span className="font-semibold text-slate-900">
+                    {effectiveType === "split" ? "1 system" : "1 return air grille"}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {effectiveType === "split" ? "(where visible)" : "(if known)"}
+                  </span>
                 </div>
-              ) : (
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                    How to check
-                  </div>
-                  <ul className="space-y-1 text-[12px] text-slate-600 list-disc pl-4 marker:text-slate-400">
-                    <li>Look outside for outdoor AC units — more than one may mean more than one system</li>
-                    <li>Look inside for large return air grilles, usually in the ceiling or hallway</li>
-                    <li>Do not count small ceiling vents or air outlets — these are not systems</li>
-                    <li>If you’re unsure, select 1 and our technician will confirm on-site</li>
-                  </ul>
-                </div>
-              )}
+              </div>
 
               {effectiveType === "split" && (
                 <div className="mt-2 flex justify-end">

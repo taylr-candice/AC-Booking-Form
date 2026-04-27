@@ -1,0 +1,193 @@
+Refine Step 4 for BOTH ducted and split AC so they follow the same structure and mental model.
+
+Do NOT redesign layout. Keep cards, styling and pricing panel.
+
+--------------------------------------------------
+CORE PRINCIPLE (APPLIES TO BOTH)
+--------------------------------------------------
+
+Users must understand:
+
+- Each system price already includes the base components
+- They only add EXTRAS beyond what is included
+- Default for extras must be 0
+
+--------------------------------------------------
+1. STANDARDISE “INCLUDES” SECTION
+--------------------------------------------------
+
+SPLIT:
+
+Under $179 per system, show:
+
+INCLUDES
+✔ 1 indoor unit
+✔ 1 outdoor unit
+
+--------------------------------------------------
+
+DUCTED:
+
+Under $179 per system, show:
+
+INCLUDES
+✔ 1 system
+✔ 1 filter
+
+--------------------------------------------------
+2. FIX SYSTEM SECTION (DUCTED MUST MATCH SPLIT STYLE)
+--------------------------------------------------
+
+Replace ducted system helper text with:
+
+A ducted system is a separate AC setup in your apartment.
+
+Add a simple visual rule (same style as split):
+
+1 ducted system = 1 return air grille (if known)
+
+Remove:
+- all outdoor unit references
+- long instructional text
+
+--------------------------------------------------
+3. STANDARDISE “EXTRAS” TERMINOLOGY
+--------------------------------------------------
+
+SPLIT:
+
+Rename:
+Additional indoor units → Extra indoor units
+
+--------------------------------------------------
+
+DUCTED:
+
+Rename:
+Additional filters → Extra filters
+
+--------------------------------------------------
+4. SET DEFAULT VALUES
+--------------------------------------------------
+
+For BOTH:
+
+- Extra indoor units = 0
+- Extra filters = 0
+
+These represent ONLY items beyond the included base.
+
+--------------------------------------------------
+5. UPDATE HELPER TEXT (SPLIT)
+--------------------------------------------------
+
+Replace with:
+
+Your system includes 1 indoor unit.
+
+Only add extras if you have more than one wall-mounted unit connected to the same system.
+
+Each indoor unit usually has its own remote (use this as a guide).
+
+Do not count ceiling vents or ducted outlets.
+
+--------------------------------------------------
+6. UPDATE HELPER TEXT (DUCTED)
+--------------------------------------------------
+
+Replace with:
+
+Your system includes 1 filter.
+
+Only add extras if you have more than one large return air grille.
+
+Filters sit behind large return air grilles — not small ceiling vents.
+
+--------------------------------------------------
+7. FIX “SEE EXAMPLE” MODALS (CRITICAL)
+--------------------------------------------------
+
+DUCTED MODAL:
+
+Title:
+What counts as an extra filter?
+
+Content:
+
+Your first filter is already included.
+
+Use this guide:
+
+• 1 return air grille → add 0 extra filters
+• 2 return air grilles → add 1 extra filter
+• 3 return air grilles → add 2 extra filters
+
+Do not count small vents.
+
+--------------------------------------------------
+
+SPLIT MODAL:
+
+Title:
+What counts as an extra indoor unit?
+
+Content:
+
+Your first indoor unit is already included.
+
+Use this guide:
+
+• 1 indoor unit → add 0 extra units
+• 2 indoor units → add 1 extra unit
+• 3 indoor units → add 2 extra units
+
+Each wall-mounted unit counts as one.
+
+--------------------------------------------------
+8. CLEAN UP ICONS
+--------------------------------------------------
+
+Replace misleading icons:
+
+- Remove funnel icon for filters
+- Use:
+  - grille/vent icon for ducted filters
+  - wall unit icon for indoor units
+
+If no suitable icon:
+REMOVE icon entirely.
+
+--------------------------------------------------
+9. SERVICE ESTIMATE CLEANUP
+--------------------------------------------------
+
+If extras = 0:
+Do NOT show extra line item
+
+If extras > 0:
+Show:
+
+[number] × extra indoor unit ($39 ea.)
+[number] × extra filter ($39 ea.)
+
+--------------------------------------------------
+10. KEEP CONSISTENT UX PATTERN
+--------------------------------------------------
+
+Both flows must feel identical:
+
+System card
+→ Includes section
+→ Extras card (default 0)
+→ Optional “See example”
+→ Pricing updates
+
+--------------------------------------------------
+MAIN GOAL
+--------------------------------------------------
+
+- Make “included vs extra” obvious everywhere
+- Prevent users from adding items when they only have one
+- Align ducted and split to the same mental model
+- Reduce cognitive load
+- Improve pricing accuracy
