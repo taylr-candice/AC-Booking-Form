@@ -557,7 +557,11 @@ export function AcDesktop() {
       </div>
 
       {exampleModal && (
-        <AcExampleModal variant={exampleModal} onClose={() => setExampleModal(null)} />
+        <AcExampleModal
+          variant={exampleModal}
+          systems={displaySystems}
+          onClose={() => setExampleModal(null)}
+        />
       )}
     </div>
   );

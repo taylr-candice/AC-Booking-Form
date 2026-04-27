@@ -5,57 +5,58 @@ const BRAND = "#ED017F";
 
 export type ExampleVariant = "split-indoor" | "ducted-filter";
 
-type GuideRow = { left: string; right: string };
-
-type Content = {
+type Variant = {
   title: string;
   imageSrc: string;
   imageAlt: string;
-  intro: string;
-  guideTitle: string;
-  guide: GuideRow[];
+  unitSingular: string;
+  unitPlural: string;
   footnote: string;
 };
 
 const ASSET_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const CONTENT: Record<ExampleVariant, Content> = {
+const VARIANTS: Record<ExampleVariant, Variant> = {
   "split-indoor": {
     title: "What counts as an extra indoor unit?",
     imageSrc: `${ASSET_BASE}/examples/split-indoor-unit.jpg`,
     imageAlt: "A white wall-mounted split AC indoor unit installed high on a living-room wall.",
-    intro: "Your first indoor unit is already included.",
-    guideTitle: "Use this guide:",
-    guide: [
-      { left: "1 indoor unit", right: "add 0 extra units" },
-      { left: "2 indoor units", right: "add 1 extra unit" },
-      { left: "3 indoor units", right: "add 2 extra units" },
-    ],
+    unitSingular: "indoor unit",
+    unitPlural: "indoor units",
     footnote: "Each wall-mounted unit counts as one.",
   },
   "ducted-filter": {
     title: "What counts as an extra filter?",
     imageSrc: `${ASSET_BASE}/examples/ducted-return-grille.jpg`,
     imageAlt: "A large white ceiling return-air grille, typical of a ducted AC system.",
-    intro: "Your first filter is already included.",
-    guideTitle: "Use this guide:",
-    guide: [
-      { left: "1 return air grille", right: "add 0 extra filters" },
-      { left: "2 return air grilles", right: "add 1 extra filter" },
-      { left: "3 return air grilles", right: "add 2 extra filters" },
-    ],
+    unitSingular: "filter",
+    unitPlural: "filters",
     footnote: "Do not count small vents.",
   },
 };
 
+function noun(count: number, singular: string, plural: string): string {
+  return count === 1 ? singular : plural;
+}
+
 export function AcExampleModal({
   variant,
+  systems,
   onClose,
 }: {
   variant: ExampleVariant;
+  systems: number;
   onClose: () => void;
 }) {
-  const content = CONTENT[variant];
+  const v = VARIANTS[variant];
+  const intro = `You already have ${systems} ${noun(systems, v.unitSingular, v.unitPlural)} included.`;
+  const guide = [0, 1, 2].map((extra) => {
+    const total = systems + extra;
+    return {
+      left: `${total} ${noun(total, v.unitSingular, v.unitPlural)}`,
+      right: `add ${extra}`,
+    };
+  });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -91,7 +92,7 @@ export function AcExampleModal({
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 pt-4 pb-3">
           <h2 id="ac-example-title" className="text-base font-semibold text-slate-900">
-            {content.title}
+            {v.title}
           </h2>
           <button
             type="button"
@@ -107,20 +108,25 @@ export function AcExampleModal({
         <div className="px-5 pt-4 pb-5">
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
             <img
-              src={content.imageSrc}
-              alt={content.imageAlt}
+              src={v.imageSrc}
+              alt={v.imageAlt}
               className="aspect-[4/3] w-full object-cover"
               loading="lazy"
             />
           </div>
 
-          <p className="mt-3 text-sm font-medium text-slate-900">{content.intro}</p>
+          <p
+            className="mt-3 text-sm font-medium text-slate-900"
+            data-testid="text-modal-intro"
+          >
+            {intro}
+          </p>
 
           <p className="mt-3 text-[12px] font-semibold uppercase tracking-wide text-slate-500">
-            {content.guideTitle}
+            Use this guide:
           </p>
-          <ul className="mt-2 space-y-1.5">
-            {content.guide.map((row, i) => (
+          <ul className="mt-2 space-y-1.5" data-testid="list-modal-guide">
+            {guide.map((row, i) => (
               <li
                 key={i}
                 className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-[13px]"
@@ -136,7 +142,7 @@ export function AcExampleModal({
             ))}
           </ul>
 
-          <p className="mt-4 text-[12px] text-slate-500">{content.footnote}</p>
+          <p className="mt-4 text-[12px] text-slate-500">{v.footnote}</p>
 
           <button
             type="button"
