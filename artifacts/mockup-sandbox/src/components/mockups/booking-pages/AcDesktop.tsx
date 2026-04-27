@@ -9,6 +9,10 @@ export function AcDesktop() {
   const [systems, setSystems] = useState(2);
   const [additional, setAdditional] = useState(1);
 
+  const systemsCost = systems * SYSTEM_PRICE;
+  const addonsCost = additional * ADDON_PRICE;
+  const total = systemsCost + addonsCost;
+
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
       <div className="w-full max-w-xl">
@@ -110,8 +114,34 @@ export function AcDesktop() {
                 </p>
               </div>
 
+              {/* Live Service Estimate */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
+                <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+                  <h2 className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+                    Service estimate
+                  </h2>
+                  <span className="text-[11px] text-slate-400">Updates as you adjust</span>
+                </div>
+                <div className="space-y-2 text-sm text-slate-600">
+                  <div className="flex justify-between">
+                    <span>{systems} × standard system <span className="text-slate-400">(${SYSTEM_PRICE} ea.)</span></span>
+                    <span className="tabular-nums text-slate-900 font-medium">${systemsCost}</span>
+                  </div>
+                  {additional > 0 && (
+                    <div className="flex justify-between">
+                      <span>{additional} × additional indoor unit <span className="text-slate-400">(${ADDON_PRICE} ea.)</span></span>
+                      <span className="tabular-nums text-slate-900 font-medium">${addonsCost}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 flex items-baseline justify-between border-t border-slate-200 pt-4">
+                  <span className="text-sm font-semibold text-slate-900">Total <span className="text-xs font-normal text-slate-400">(incl. GST)</span></span>
+                  <span className="text-2xl font-bold tabular-nums" style={{ color: BRAND }}>${total}</span>
+                </div>
+              </div>
+
               {/* Tip */}
-              <div className="rounded-xl bg-slate-100 p-5 text-sm text-slate-600 flex gap-3 mt-4">
+              <div className="rounded-xl bg-slate-100 p-5 text-sm text-slate-600 flex gap-3">
                 <span className="font-bold">Tip:</span>
                 <span>Not sure how many indoor units you have? Just count the remote controls — there is one for every indoor unit.</span>
               </div>
