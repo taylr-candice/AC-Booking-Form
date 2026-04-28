@@ -172,10 +172,21 @@ export type BookingState = {
   // Stripe rejects) the checkout flow. Spec §9 row "Payment cancelled":
   // the customer is shown a dedicated screen with a "Try again" CTA
   // that returns them to Step 6 (Review & pay) with their answers
-  // intact. `submitted` and `payment_cancelled` are mutually exclusive
-  // — at most one terminal flag is true at any time. Both are wiped by
-  // `bookAnother()` and by `reset()`.
+  // intact. `submitted`, `payment_cancelled` and `unit_unavailable`
+  // are mutually exclusive — at most one terminal flag is true at any
+  // time. All three are wiped by `bookAnother()` and by `reset()`.
   payment_cancelled: boolean;
+
+  // Terminal — set by `markUnitUnavailable()` when the server-side
+  // uniqueness check rejects the submission because another customer
+  // already booked the same unit (a race condition between two
+  // checkouts). Spec §9 row "Unit unavailable": the customer is shown
+  // a dedicated screen explaining the unit is no longer available with
+  // a "Pick another unit" CTA that returns them to Step 1 with the
+  // unit selection wiped (everything else preserved so they don't
+  // have to re-enter their identity, AC details, etc.). Mutually
+  // exclusive with `submitted` and `payment_cancelled`.
+  unit_unavailable: boolean;
 };
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -226,6 +237,7 @@ const INITIAL_STATE: BookingState = {
   reference: null,
   return_to: null,
   payment_cancelled: false,
+  unit_unavailable: false,
 };
 
 // ─── Persisted store ────────────────────────────────────────────────────────
@@ -658,12 +670,14 @@ export const bookingActions = {
    *  on the iframed Pay button doesn't change the reference the
    *  customer is already reading).
    *
-   *  No-op when `payment_cancelled === true` so a stale Pay button
-   *  click can't promote a cancelled booking to confirmed. The user
-   *  must explicitly "Try again" first, which clears the flag. */
+   *  No-op when any other terminal flag is already set
+   *  (`payment_cancelled` or `unit_unavailable`) so a stale Pay button
+   *  click can't promote a terminal booking to confirmed. The user
+   *  must explicitly recover (Try again / Pick another unit) first,
+   *  which clears the flag. */
   submitBooking() {
     setState((s) => {
-      if (s.submitted || s.payment_cancelled) return s;
+      if (s.submitted || s.payment_cancelled || s.unit_unavailable) return s;
       return { ...s, submitted: true, reference: genBookingReference() };
     });
   },
@@ -674,12 +688,13 @@ export const bookingActions = {
    *  are preserved so the customer can hit "Try again" and land back
    *  on Step 6 with their selections intact.
    *
-   *  No-op when the booking is already submitted — once a real
-   *  payment has gone through, a stray cancel signal must not flip
-   *  the customer to a "cancelled" terminal screen. */
+   *  No-op when any other terminal flag is set — once a real payment
+   *  has gone through, or the unit was already taken, a stray cancel
+   *  signal must not flip the customer to a "cancelled" terminal
+   *  screen. */
   cancelPayment() {
     setState((s) => {
-      if (s.submitted || s.payment_cancelled) return s;
+      if (s.submitted || s.payment_cancelled || s.unit_unavailable) return s;
       return { ...s, payment_cancelled: true };
     });
   },
@@ -692,6 +707,45 @@ export const bookingActions = {
     setState((s) =>
       s.payment_cancelled
         ? { ...s, payment_cancelled: false, current_step: 6 }
+        : s,
+    );
+  },
+
+  /** Spec §9 row "Unit unavailable": flag the booking as rejected
+   *  because the server-side uniqueness check found another customer
+   *  already booked the same unit. The wrapper renders the dedicated
+   *  unit-unavailable screen whenever `unit_unavailable === true`.
+   *
+   *  No-op when any other terminal flag is set — a stale signal must
+   *  not flip a confirmed or already-cancelled booking onto the
+   *  unit-unavailable screen. The customer recovers via
+   *  {@link pickAnotherUnit}, which clears the flag and returns them
+   *  to Step 1. */
+  markUnitUnavailable() {
+    setState((s) => {
+      if (s.submitted || s.payment_cancelled || s.unit_unavailable) return s;
+      return { ...s, unit_unavailable: true };
+    });
+  },
+
+  /** Spec §9 row "Unit unavailable": the "Pick another unit" CTA on
+   *  the unit-unavailable screen returns the customer to Step 1 with
+   *  the unit selection wiped, mirroring what `setUnit(null)` would
+   *  do (also clears `ac_discrepancy`, which is computed against the
+   *  previous unit's record and would be misleading otherwise). All
+   *  other answers are preserved so the customer doesn't have to
+   *  re-enter their identity, AC counts, access method, etc. just
+   *  because someone else won the race for their first-choice unit. */
+  pickAnotherUnit() {
+    setState((s) =>
+      s.unit_unavailable
+        ? {
+            ...s,
+            unit_unavailable: false,
+            unit_id: null,
+            ac_discrepancy: null,
+            current_step: 1,
+          }
         : s,
     );
   },

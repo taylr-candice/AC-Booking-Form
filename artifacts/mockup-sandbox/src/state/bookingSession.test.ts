@@ -908,3 +908,155 @@ describe("return_to — short-circuit hint for the booking flow wrapper", () => 
     expect(getBookingSession().return_to).toBeNull();
   });
 });
+
+// ─── E. Unit-unavailable terminal state (spec §9 row "Unit unavailable") ──
+
+/**
+ * Pins the new fourth terminal flag (`unit_unavailable`) plus its two
+ * actions (`markUnitUnavailable`, `pickAnotherUnit`). The terminal-state
+ * exclusivity tests at the bottom guard against future regressions where
+ * a stale signal flips an already-terminal booking onto the wrong
+ * terminal screen — the kind of race that is otherwise easy to introduce
+ * silently and only surfaces under very specific user behaviour.
+ */
+describe("unit-unavailable terminal state", () => {
+  beforeEach(() => bookingActions.reset());
+
+  /** Drive the store into a fully-populated mid-flow state so we can
+   *  prove `pickAnotherUnit` preserves everything except the unit
+   *  selection (and the unit-derived discrepancy snapshot). Mirrors
+   *  the seeding pattern used by `bookingSession.bookAnother.test.ts`. */
+  function seedFullSessionOnStep6() {
+    bookingActions.setUnit("unit-123");
+    bookingActions.setRole("owner");
+    bookingActions.setAgency("agency-1");
+    bookingActions.setContact({
+      contact_first_name: "Sam",
+      contact_last_name: "Lee",
+      contact_email: "sam@example.com",
+      contact_phone: "+15551234567",
+    });
+    bookingActions.setSystems(2);
+    bookingActions.setAdditionalIndoor(3);
+    bookingActions.setAcDiscrepancy({
+      recorded: { type: "split", systems: 1, additional: 0 },
+      customer: { type: "split", systems: 2, additional: 3 },
+    });
+    bookingActions.setPrimaryResidence("live_in");
+    bookingActions.setAccessMethod("owner_live_at_unit");
+    bookingActions.setSchedule("2026-05-10", "morning");
+    bookingActions.setCancellationAcknowledged(true);
+    bookingActions.goToStep(6);
+  }
+
+  it("markUnitUnavailable flips the flag from a fresh session", () => {
+    expect(getBookingSession().unit_unavailable).toBe(false);
+    bookingActions.markUnitUnavailable();
+    expect(getBookingSession().unit_unavailable).toBe(true);
+  });
+
+  it("markUnitUnavailable is idempotent", () => {
+    bookingActions.markUnitUnavailable();
+    const first = getBookingSession();
+    bookingActions.markUnitUnavailable();
+    // Same reference — no spurious re-render churn.
+    expect(getBookingSession()).toBe(first);
+  });
+
+  it("pickAnotherUnit clears the flag, wipes unit_id + ac_discrepancy, returns to Step 1, and preserves everything else", () => {
+    seedFullSessionOnStep6();
+    bookingActions.markUnitUnavailable();
+
+    const before = getBookingSession();
+    expect(before.unit_unavailable).toBe(true);
+    expect(before.unit_id).toBe("unit-123");
+    expect(before.ac_discrepancy).not.toBeNull();
+    expect(before.current_step).toBe(6);
+
+    bookingActions.pickAnotherUnit();
+
+    const after = getBookingSession();
+    // Flag cleared, unit + discrepancy wiped, back to Step 1.
+    expect(after.unit_unavailable).toBe(false);
+    expect(after.unit_id).toBeNull();
+    expect(after.ac_discrepancy).toBeNull();
+    expect(after.current_step).toBe(1);
+    // Identity, AC counts, access method and slot all survive — the
+    // whole point of pickAnotherUnit vs bookAnother is that the
+    // customer doesn't have to redo the entire flow.
+    expect(after.role).toBe("owner");
+    expect(after.agency_id).toBe("agency-1");
+    expect(after.contact_first_name).toBe("Sam");
+    expect(after.contact_last_name).toBe("Lee");
+    expect(after.contact_email).toBe("sam@example.com");
+    expect(after.contact_phone).toBe("+15551234567");
+    expect(after.num_systems).toBe(2);
+    expect(after.num_additional_indoor).toBe(3);
+    expect(after.primary_residence).toBe("live_in");
+    expect(after.access_method).toBe("owner_live_at_unit");
+    expect(after.service_date).toBe("2026-05-10");
+    expect(after.service_slot).toBe("morning");
+    expect(after.cancellation_acknowledged).toBe(true);
+  });
+
+  it("pickAnotherUnit is a no-op when the flag is not set", () => {
+    seedFullSessionOnStep6();
+    const before = getBookingSession();
+    bookingActions.pickAnotherUnit();
+    // Same reference — store skipped the write entirely.
+    expect(getBookingSession()).toBe(before);
+  });
+
+  it("bookAnother wipes the unit_unavailable flag", () => {
+    bookingActions.markUnitUnavailable();
+    bookingActions.bookAnother();
+    expect(getBookingSession().unit_unavailable).toBe(false);
+  });
+
+  it("reset wipes the unit_unavailable flag", () => {
+    bookingActions.markUnitUnavailable();
+    bookingActions.reset();
+    expect(getBookingSession().unit_unavailable).toBe(false);
+  });
+
+  // Terminal-state exclusivity — at most one terminal flag is true at
+  // any time. The store enforces this by no-op'ing every "set terminal"
+  // action when any other terminal flag is already set, so a stale
+  // signal can never flip a confirmed booking to cancelled, a
+  // cancelled booking to unavailable, etc. These tests pin every pair
+  // of (already set, attempting to set) combinations.
+  describe("terminal-state exclusivity", () => {
+    it("submitBooking is a no-op when unit_unavailable is set", () => {
+      bookingActions.markUnitUnavailable();
+      bookingActions.submitBooking();
+      const s = getBookingSession();
+      expect(s.unit_unavailable).toBe(true);
+      expect(s.submitted).toBe(false);
+      expect(s.reference).toBeNull();
+    });
+
+    it("cancelPayment is a no-op when unit_unavailable is set", () => {
+      bookingActions.markUnitUnavailable();
+      bookingActions.cancelPayment();
+      const s = getBookingSession();
+      expect(s.unit_unavailable).toBe(true);
+      expect(s.payment_cancelled).toBe(false);
+    });
+
+    it("markUnitUnavailable is a no-op when submitted is set", () => {
+      bookingActions.submitBooking();
+      bookingActions.markUnitUnavailable();
+      const s = getBookingSession();
+      expect(s.submitted).toBe(true);
+      expect(s.unit_unavailable).toBe(false);
+    });
+
+    it("markUnitUnavailable is a no-op when payment_cancelled is set", () => {
+      bookingActions.cancelPayment();
+      bookingActions.markUnitUnavailable();
+      const s = getBookingSession();
+      expect(s.payment_cancelled).toBe(true);
+      expect(s.unit_unavailable).toBe(false);
+    });
+  });
+});

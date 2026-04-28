@@ -379,6 +379,20 @@ export function PayMobile() {
         >
           Simulate cancelled payment (mockup only)
         </button>
+        {/* Mockup-only affordance for the unit-unavailable terminal state
+            (spec §9 row "Unit unavailable"). In production, the booking
+            service rejects the submission when its uniqueness check finds
+            another customer already booked the same unit; this button
+            stands in for that path so designers and testers can reach
+            the screen. */}
+        <button
+          type="button"
+          onClick={() => bookingActions.markUnitUnavailable()}
+          data-testid="button-simulate-unit-unavailable"
+          className="mt-1 w-full text-center text-[11px] text-slate-400 underline-offset-2 hover:underline"
+        >
+          Simulate unit unavailable (mockup only)
+        </button>
       </div>
     </div>
   );
