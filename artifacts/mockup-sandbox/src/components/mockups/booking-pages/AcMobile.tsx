@@ -89,16 +89,24 @@ const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number 
   split: { systems: 2, additional: 0 },
 };
 
-const ACK_LABEL =
-  "I understand the final price may be adjusted if the number of systems or indoor units on-site is different from what I booked.";
 const ACK_HELPER_INTRO =
   "This only applies when the booking selection doesn't match what's actually on-site. Taylr will not perform any work beyond the preventative maintenance service shown above.";
-const ACK_HELPER_BULLETS = [
-  "If there are more systems or indoor units on the day, Taylr will service all of them and invoice the unpaid difference afterward.",
-  "If there are fewer, Taylr will credit or refund the difference.",
-];
-const ACK_ERROR =
-  "Please confirm you understand the price may be adjusted if the booked number of systems or indoor units doesn't match what's on-site.";
+
+// Acknowledgment copy adapts to the customer's effective AC type so the
+// wording explicitly mirrors what they're counting on the page above.
+// Ducted -> "return-air grilles"; split -> "indoor units"; unknown
+// (unsure / unknown picker) -> the generic "indoor units" fallback.
+function buildAck(type: AcType) {
+  const noun = type === "ducted" ? "return-air grilles" : "indoor units";
+  return {
+    label: `I understand the final price may be adjusted if the number of systems or ${noun} on-site is different from what I booked.`,
+    bullets: [
+      `If there are more systems or ${noun} on the day, Taylr will service all of them and invoice the unpaid difference afterward.`,
+      "If there are fewer, Taylr will credit or refund the difference.",
+    ],
+    error: `Please confirm you understand the price may be adjusted if the booked number of systems or ${noun} doesn't match what's on-site.`,
+  };
+}
 
 type Override = null | "split" | "ducted" | "unsure";
 
@@ -150,6 +158,7 @@ export function AcMobile() {
   const total = displaySystems * SYSTEM_PRICE + displayAdditional * ADDON_PRICE;
   const showAckError = touched && !confirmed;
   const AddonIcon = effectiveType === "ducted" ? Grid3x3 : AirVent;
+  const ack = buildAck(effectiveType);
 
   const resetOverride = () => {
     setOverride(null);
@@ -510,14 +519,14 @@ export function AcMobile() {
                 </span>
               </span>
               <div className="flex-1">
-                <p className="text-[13px] font-medium text-slate-900 leading-snug">{ACK_LABEL}</p>
+                <p className="text-[13px] font-medium text-slate-900 leading-snug">{ack.label}</p>
                 <div
                   id="ac-ack-helper-mobile"
                   className="mt-2 text-[11px] text-slate-500 leading-relaxed"
                 >
                   <p>{ACK_HELPER_INTRO}</p>
                   <ul className="mt-2 list-disc space-y-1 pl-4">
-                    {ACK_HELPER_BULLETS.map((b, i) => (
+                    {ack.bullets.map((b, i) => (
                       <li key={i}>{b}</li>
                     ))}
                   </ul>
@@ -532,7 +541,7 @@ export function AcMobile() {
                 style={{ color: ERROR_PURPLE }}
               >
                 <AlertCircle className="h-4 w-4 mt-px shrink-0" />
-                <span>{ACK_ERROR}</span>
+                <span>{ack.error}</span>
               </div>
             )}
           </div>
