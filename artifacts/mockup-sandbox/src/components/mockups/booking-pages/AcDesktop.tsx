@@ -76,11 +76,11 @@ function formatSystemsIncludes(type: KnownType, systems: number): string[] {
     const indoor = systems === 1 ? "indoor unit head" : "indoor unit heads";
     return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
   }
-  // Ducted: each system = 1 outdoor + 1 indoor distribution unit (which gets
-  // the filter clean). Showing "indoor units / filter cleans" gives bookers
-  // a clearer physical picture than the old "system services / filter cleans".
+  // Ducted: each system = 1 outdoor + 1 indoor distribution unit (the filter
+  // sits behind the return-air grille). Showing "indoor units / return-air
+  // grilles" gives bookers a clearer physical picture than just "system services".
   const outdoor = systems === 1 ? "outdoor unit" : "outdoor units";
-  const indoor = systems === 1 ? "indoor unit / filter clean" : "indoor units / filter cleans";
+  const indoor = systems === 1 ? "indoor unit / return-air grille" : "indoor units / return-air grilles";
   return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
 }
 
