@@ -61,6 +61,7 @@ export function BookingFlowMobile() {
   const active = useBookingSelector((s) => s.current_step);
   const accessMethod = useBookingSelector((s) => s.access_method);
   const submitted = useBookingSelector((s) => s.submitted);
+  const paymentCancelled = useBookingSelector((s) => s.payment_cancelled);
   const visible = visibleSteps({ access_method: accessMethod });
 
   const current = STEPS.find((s) => s.id === active) ?? STEPS[0];
@@ -121,11 +122,13 @@ export function BookingFlowMobile() {
     };
   }, []);
 
-  // Submitted bookings get a dedicated confirmation that owns the full
-  // viewport — same UX as the legacy BookingForm `Terminal` screen.
-  // The step bar is suppressed because the user is no longer
-  // navigating between steps.
-  if (submitted) {
+  // Terminal states (submitted OR payment_cancelled) get a dedicated
+  // confirmation that owns the full viewport — same UX as the legacy
+  // BookingForm `Terminal` screen. The step bar is suppressed because
+  // the user is no longer navigating between steps. The confirmation
+  // component picks the right variant from the session (confirmed /
+  // coordination / cancelled).
+  if (submitted || paymentCancelled) {
     return (
       <div className="h-screen w-screen overflow-hidden bg-slate-50 font-['Inter']">
         <BookingFlowConfirmation />

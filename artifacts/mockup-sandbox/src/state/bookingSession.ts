@@ -151,6 +151,15 @@ export type BookingState = {
    *  forward navigation later in the flow.
    */
   return_to: StepId | null;
+
+  // Terminal — set by `cancelPayment()` when the customer cancels (or
+  // Stripe rejects) the checkout flow. Spec §9 row "Payment cancelled":
+  // the customer is shown a dedicated screen with a "Try again" CTA
+  // that returns them to Step 6 (Review & pay) with their answers
+  // intact. `submitted` and `payment_cancelled` are mutually exclusive
+  // — at most one terminal flag is true at any time. Both are wiped by
+  // `bookAnother()` and by `reset()`.
+  payment_cancelled: boolean;
 };
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -199,6 +208,7 @@ const INITIAL_STATE: BookingState = {
   submitted: false,
   reference: null,
   return_to: null,
+  payment_cancelled: false,
 };
 
 // ─── Persisted store ────────────────────────────────────────────────────────
@@ -581,10 +591,43 @@ export const bookingActions = {
    *  screen whenever `submitted === true`. Idempotent — once submitted,
    *  re-submitting keeps the same reference (so a stray double-click
    *  on the iframed Pay button doesn't change the reference the
-   *  customer is already reading). */
+   *  customer is already reading).
+   *
+   *  No-op when `payment_cancelled === true` so a stale Pay button
+   *  click can't promote a cancelled booking to confirmed. The user
+   *  must explicitly "Try again" first, which clears the flag. */
   submitBooking() {
+    setState((s) => {
+      if (s.submitted || s.payment_cancelled) return s;
+      return { ...s, submitted: true, reference: genBookingReference() };
+    });
+  },
+
+  /** Spec §9 row "Payment cancelled": flag the booking as cancelled at
+   *  checkout. The wrapper renders the dedicated cancellation screen
+   *  whenever `payment_cancelled === true`. All non-terminal answers
+   *  are preserved so the customer can hit "Try again" and land back
+   *  on Step 6 with their selections intact.
+   *
+   *  No-op when the booking is already submitted — once a real
+   *  payment has gone through, a stray cancel signal must not flip
+   *  the customer to a "cancelled" terminal screen. */
+  cancelPayment() {
+    setState((s) => {
+      if (s.submitted || s.payment_cancelled) return s;
+      return { ...s, payment_cancelled: true };
+    });
+  },
+
+  /** Spec §9 row "Payment cancelled": the "Try again" CTA on the
+   *  cancellation screen returns the customer to Step 6 (Review &
+   *  pay). Clears the terminal flag without touching any of the
+   *  customer's answers. */
+  tryAgainAfterCancel() {
     setState((s) =>
-      s.submitted ? s : { ...s, submitted: true, reference: genBookingReference() },
+      s.payment_cancelled
+        ? { ...s, payment_cancelled: false, current_step: 6 }
+        : s,
     );
   },
 

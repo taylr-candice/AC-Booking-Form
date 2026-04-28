@@ -367,6 +367,18 @@ export function PayMobile() {
           {ctaLabel}
           <ArrowRight className="h-4 w-4" />
         </button>
+        {/* Mockup-only affordance for the cancelled-checkout terminal state
+            (spec §9). Real Stripe integration would fire `cancelPayment()`
+            on the redirect callback; this button stands in for that path
+            so designers and testers can reach the screen. */}
+        <button
+          type="button"
+          onClick={() => bookingActions.cancelPayment()}
+          data-testid="button-cancel-payment"
+          className="mt-2 w-full text-center text-[11px] text-slate-400 underline-offset-2 hover:underline"
+        >
+          Simulate cancelled payment (mockup only)
+        </button>
       </div>
     </div>
   );

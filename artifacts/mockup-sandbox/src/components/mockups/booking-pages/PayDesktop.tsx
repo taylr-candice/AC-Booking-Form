@@ -310,6 +310,19 @@ export function PayDesktop() {
             </button>
           </div>
 
+          {/* Mockup-only affordance for the cancelled-checkout terminal state
+              (spec §9). Real Stripe integration would fire `cancelPayment()`
+              on the redirect callback; this button stands in for that path
+              so designers and testers can reach the screen. */}
+          <button
+            type="button"
+            onClick={() => bookingActions.cancelPayment()}
+            data-testid="button-cancel-payment"
+            className="mt-4 w-full text-center text-xs text-slate-400 underline-offset-2 hover:underline"
+          >
+            Simulate cancelled payment (mockup only)
+          </button>
+
         </div>
       </div>
     </div>

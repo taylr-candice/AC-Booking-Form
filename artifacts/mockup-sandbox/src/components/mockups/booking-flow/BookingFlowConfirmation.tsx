@@ -3,24 +3,33 @@
  * successful submission (spec §9). Replaces the step iframe whenever
  * `submitted === true` in the booking session.
  *
- * Two variants, mirroring the older standalone `BookingForm` terminal
+ * Three variants, mirroring the standalone `BookingForm` terminal
  * screens:
  *   - Scheduled: "Booking confirmed" — shows the chosen slot.
  *   - Coordination: "Payment received" — explains who Taylr will
  *     contact next (tenant / managing agent) instead of a slot.
+ *   - Cancelled: "Payment cancelled" — confirms no payment was taken
+ *     and offers a "Try again" CTA back to Step 6 (spec §9 row
+ *     "Payment cancelled").
  *
- * Both variants surface the booking reference and a single "Book
- * another" button that calls `bookingActions.bookAnother()`. The store
- * action wipes the per-booking fields, keeps the booker's identity,
- * and resets `current_step` to 1 — so the wrapper re-mounts the unit
- * step iframe automatically once `submitted` flips back to false.
+ * The two success variants surface the booking reference and a single
+ * "Book another" button that calls `bookingActions.bookAnother()`. The
+ * store action wipes the per-booking fields, keeps the booker's
+ * identity, and resets `current_step` to 1 — so the wrapper re-mounts
+ * the unit step iframe automatically once `submitted` flips back to
+ * false.
+ *
+ * The cancelled variant has no reference (no booking exists yet) and
+ * its CTA calls `bookingActions.tryAgainAfterCancel()` which clears
+ * the cancelled flag and points the wrapper at Step 6 with all of the
+ * customer's answers intact.
  *
  * Shared between BookingFlowDesktop and BookingFlowMobile because the
  * design is intentionally device-agnostic (centred card on slate
  * background) — same as the legacy `TerminalShell` in `BookingForm`.
  */
 
-import { CheckCircle2, Wind } from "lucide-react";
+import { CheckCircle2, Wind, XCircle } from "lucide-react";
 import { Button } from "../../ui/button";
 import {
   bookingActions,
@@ -33,7 +42,8 @@ const BRAND = "#ED017F";
 
 export function BookingFlowConfirmation() {
   const session = useBookingSelector((s) => s);
-  const isCoordination = isCoordinationFlow(session);
+  const isCancelled = session.payment_cancelled;
+  const isCoordination = !isCancelled && isCoordinationFlow(session);
   const unit = unitLabel(session.unit_id);
   const schedule = scheduleDisplay(session);
   const email = session.contact_email || "your email";
@@ -59,19 +69,32 @@ export function BookingFlowConfirmation() {
       <main className="mx-auto max-w-xl px-5 py-12">
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-slate-50">
-            <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+            {isCancelled ? (
+              <XCircle className="h-7 w-7 text-rose-500" />
+            ) : (
+              <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+            )}
           </div>
           <h1
             className="mt-4 text-xl font-semibold text-slate-900"
             data-testid="text-terminal-title"
           >
-            {isCoordination ? "Payment received" : "Booking confirmed"}
+            {isCancelled
+              ? "Payment cancelled"
+              : isCoordination
+                ? "Payment received"
+                : "Booking confirmed"}
           </h1>
           <div
             className="mt-2 text-sm text-slate-600"
             data-testid="text-terminal-body"
           >
-            {isCoordination ? (
+            {isCancelled ? (
+              <>
+                Your booking hasn&apos;t been confirmed. No payment has been
+                taken. You can try again whenever you&apos;re ready.
+              </>
+            ) : isCoordination ? (
               <>
                 Thanks! We&apos;ll now contact{" "}
                 {session.access_method === "owner_leased_agent"
@@ -101,7 +124,7 @@ export function BookingFlowConfirmation() {
               </>
             )}
           </div>
-          {session.reference && (
+          {!isCancelled && session.reference && (
             <div className="mt-5 inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
               <span>Reference</span>
               <span
@@ -113,17 +136,28 @@ export function BookingFlowConfirmation() {
             </div>
           )}
           <div className="mt-6 flex justify-center">
-            <Button
-              variant="outline"
-              onClick={() => bookingActions.bookAnother()}
-              data-testid={
-                isCoordination
-                  ? "button-book-another-coord"
-                  : "button-book-another"
-              }
-            >
-              Book another
-            </Button>
+            {isCancelled ? (
+              <Button
+                onClick={() => bookingActions.tryAgainAfterCancel()}
+                className="text-white hover:opacity-90"
+                style={{ backgroundColor: BRAND }}
+                data-testid="button-try-again"
+              >
+                Try again
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => bookingActions.bookAnother()}
+                data-testid={
+                  isCoordination
+                    ? "button-book-another-coord"
+                    : "button-book-another"
+                }
+              >
+                Book another
+              </Button>
+            )}
           </div>
         </div>
       </main>
