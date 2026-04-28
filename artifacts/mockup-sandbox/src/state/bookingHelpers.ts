@@ -225,10 +225,17 @@ export const COORDINATION_NOTE =
  * tickbox. Spec §8.2 + §10.
  */
 export const CANCELLATION_POLICY_PARAGRAPHS: readonly string[] = [
-  "If you need to cancel or reschedule, please give us at least 48 hours notice before your booked service window — we'll move you free of charge.",
+  "If you need to cancel or reschedule, please give us at least 48 hours notice before your booked service window — we'll move you (subject to availability at the time) free of charge.",
   "Cancellations or reschedules within 48 hours of your booked window may incur a $125 fee per unit, which covers the technician's allocated time.",
   "Refunds for paid bookings are processed within 5 business days back to the original payment method.",
 ];
+
+/**
+ * Contact address shown below the cancellation paragraphs so customers know
+ * where to send a change/cancellation request. Rendered as a `mailto:` link
+ * by both Pay pages.
+ */
+export const CANCELLATION_CONTACT_EMAIL = "support@taylr.com.au";
 
 /** Required tickbox label. Spec §8.2. */
 export const CANCELLATION_ACK_LABEL =

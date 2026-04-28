@@ -5,6 +5,7 @@ import { isCoordinationFlow } from "../../../state/bookingDerived";
 import {
   acSummary,
   CANCELLATION_ACK_LABEL,
+  CANCELLATION_CONTACT_EMAIL,
   CANCELLATION_POLICY_PARAGRAPHS,
   computeBookingTotal,
   COORDINATION_NOTE,
@@ -236,6 +237,17 @@ export function PayDesktop() {
                 {CANCELLATION_POLICY_PARAGRAPHS.map((p, i) => (
                   <p key={i}>{p}</p>
                 ))}
+                <p data-testid="cancellation-contact-desktop">
+                  To request a change or cancellation, email us at{" "}
+                  <a
+                    href={`mailto:${CANCELLATION_CONTACT_EMAIL}`}
+                    className="font-medium underline underline-offset-2"
+                    style={{ color: "#A30058" }}
+                  >
+                    {CANCELLATION_CONTACT_EMAIL}
+                  </a>
+                  .
+                </p>
               </div>
               <label
                 className="flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition"
