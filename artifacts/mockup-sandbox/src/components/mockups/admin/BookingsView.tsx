@@ -7,15 +7,48 @@
 
 import { Search, TriangleAlert } from "lucide-react";
 
-import type {
-  AdminBooking,
-  AdminUnit,
-  PaymentStatus,
-  ServiceStatus,
+import {
+  bookerAgencyName,
+  type AdminBooking,
+  type AdminUnit,
+  type PaymentStatus,
+  type ServiceStatus,
 } from "@/state/adminMockData";
 
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+
+/**
+ * Customer column cell.
+ *
+ * Owners are listed by their own name (they are the customer); agents
+ * are listed by their agency, with the contact name shown beneath, so
+ * an admin can scan the table by company and still know who to call.
+ * If an agent booking has no agency captured we fall back to the
+ * contact name to avoid showing "—".
+ */
+function CustomerCell({ booking }: { booking: AdminBooking }) {
+  if (booking.bookerRole === "agent") {
+    const agency = bookerAgencyName(booking);
+    return (
+      <>
+        <div className="font-medium text-slate-900">
+          {agency ?? booking.customerName}
+        </div>
+        <div className="text-[11px] text-slate-500">
+          {agency ? `${booking.customerName} · ` : ""}
+          {booking.customerEmail}
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className="font-medium text-slate-900">{booking.customerName}</div>
+      <div className="text-[11px] text-slate-500">{booking.customerEmail}</div>
+    </>
+  );
+}
 
 export function BookingsView({
   bookings,
@@ -65,10 +98,17 @@ export function BookingsView({
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
       const unit = units.find((u) => u.id === b.unitId);
+      // Include the resolved agency name + the raw "Other / not listed"
+      // free-text so admins can search by company in the same field
+      // they see in the Customer column. (Without this, agent rows whose
+      // visible label is the agency name would silently fail a search.)
+      const agency = bookerAgencyName(b);
       const haystack = [
         b.id,
         b.customerName,
         b.customerEmail,
+        agency ?? "",
+        b.bookerAgencyOtherName,
         unit?.addressLine1 ?? "",
         unit?.addressLine2 ?? "",
       ]
@@ -172,8 +212,7 @@ export function BookingsView({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{b.customerName}</div>
-                      <div className="text-[11px] text-slate-500">{b.customerEmail}</div>
+                      <CustomerCell booking={b} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">

@@ -17,12 +17,22 @@
  */
 
 import {
+  DEMO_MANAGING_AGENCIES,
+  isTenantMethod,
+  OTHER_AGENCY_ID,
+} from "./accessMethodCatalog";
+import {
   getBookingDurationMinutes,
   MINUTES_PER_ADDITIONAL_INDOOR,
   MINUTES_PER_SYSTEM,
   UNSURE_FALLBACK_MINUTES,
 } from "./bookingDerived";
-import type { AcDiscrepancy, BookingState } from "./bookingSession";
+import type {
+  AccessMethod,
+  AcDiscrepancy,
+  BookingState,
+  Tenant,
+} from "./bookingSession";
 import { getBookingSession } from "./bookingSession";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -71,13 +81,32 @@ export type TimelineEntry = {
 export type AdminBooking = {
   id: string;
   unitId: string;
-  /** Human-readable customer name. For the "live" booking we synthesise
-   *  this from the session contact fields. */
+  /** Human-readable name of the human who placed the booking. For the
+   *  "live" booking we synthesise this from the session contact fields.
+   *  When `bookerRole === "agent"` this is the individual at the agency
+   *  (e.g. "Eloise Tran"), and the agency itself is carried separately
+   *  in `bookerAgencyId` / `bookerAgencyOtherName`. */
   customerName: string;
   customerEmail: string;
   customerPhone: string;
-  /** "owner" or "agent" — drives the Customer column tag. */
+  /** "owner" or "agent" — drives the booker display + the Customer
+   *  column tag. */
   bookerRole: "owner" | "agent";
+  /** When the booker is an agent, the id of the agency they selected
+   *  on Step 2 (matches one of `DEMO_MANAGING_AGENCIES`). `null` for
+   *  owners (and for agents who haven't picked one yet). */
+  bookerAgencyId: string | null;
+  /** When `bookerAgencyId === OTHER_AGENCY_ID` the agent typed a
+   *  free-text company name; we surface it instead of the literal
+   *  "Other / not listed" label. Empty string otherwise. */
+  bookerAgencyOtherName: string;
+  /** The access method chosen on Step 4. Carried so the admin booking
+   *  detail can decide whether to show the tenant-coordination card.
+   *  `null` for legacy seeded rows where the method isn't surfaced. */
+  accessMethod: AccessMethod | null;
+  /** Tenants captured for tenant-coordinated access methods (see
+   *  {@link isTenantMethod}). Empty for every other access method. */
+  tenants: ReadonlyArray<Tenant>;
   /** Customer-chosen AC config. */
   systems: number;
   additional: number;
@@ -197,6 +226,10 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     customerEmail: "henrik.o@example.com",
     customerPhone: "0411 222 901",
     bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_at_unit",
+    tenants: [],
     systems: 1,
     additional: 1,
     acType: "ducted",
@@ -222,6 +255,10 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     customerEmail: "amal.k@example.com",
     customerPhone: "0422 014 778",
     bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_at_unit",
+    tenants: [],
     systems: 3,
     additional: 0,
     acType: "split",
@@ -246,10 +283,14 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
   {
     id: "bk-1040",
     unitId: "u5",
-    customerName: "Eloise Tran (Capital Realty)",
+    customerName: "Eloise Tran",
     customerEmail: "eloise.tran@capitalrealty.com.au",
     customerPhone: "0455 802 614",
     bookerRole: "agent",
+    bookerAgencyId: "agency-003",
+    bookerAgencyOtherName: "",
+    accessMethod: "agent_trade_key",
+    tenants: [],
     systems: 2,
     additional: 0,
     acType: "ducted",
@@ -276,6 +317,10 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     customerEmail: "sophie.c@example.com",
     customerPhone: "0466 332 010",
     bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_at_unit",
+    tenants: [],
     systems: 1,
     additional: 0,
     acType: "split",
@@ -297,10 +342,18 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
   {
     id: "bk-1038",
     unitId: "u6",
-    customerName: "Marcus Holloway (City Edge)",
+    customerName: "Marcus Holloway",
     customerEmail: "marcus.h@cityedgeproperty.com.au",
     customerPhone: "0438 117 220",
     bookerRole: "agent",
+    bookerAgencyId: "agency-002",
+    bookerAgencyOtherName: "",
+    accessMethod: "agent_tenant_taylr",
+    tenants: [
+      { first: "Liam", last: "Carter", email: "liam.c@example.com", phone: "0411 022 045" },
+      { first: "Sienna", last: "Wong", email: "sienna.w@example.com", phone: "0419 887 142" },
+      { first: "Noah", last: "Patel", email: "noah.p@example.com", phone: "0466 305 998" },
+    ],
     systems: 3,
     additional: 1,
     acType: "split",
@@ -325,6 +378,12 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     customerEmail: "ravi.p@example.com",
     customerPhone: "0477 660 113",
     bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_leased_tenant",
+    tenants: [
+      { first: "Hannah", last: "Singh", email: "hannah.s@example.com", phone: "0422 776 014" },
+    ],
     systems: 1,
     additional: 0,
     acType: "unsure",
@@ -350,6 +409,10 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     customerEmail: "jin.p@example.com",
     customerPhone: "0488 200 410",
     bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_leave_key",
+    tenants: [],
     systems: 2,
     additional: 0,
     acType: "split",
@@ -377,6 +440,10 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     customerEmail: "alana.r@example.com",
     customerPhone: "0499 010 887",
     bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_at_unit",
+    tenants: [],
     systems: 1,
     additional: 0,
     acType: "split",
@@ -719,6 +786,13 @@ export function liveBookingFromSession(
     customerEmail: session.contact_email || "—",
     customerPhone: session.contact_phone || "—",
     bookerRole: session.role === "agent" ? "agent" : "owner",
+    bookerAgencyId: session.role === "agent" ? session.agency_id : null,
+    bookerAgencyOtherName:
+      session.role === "agent" && session.agency_id === OTHER_AGENCY_ID
+        ? session.agency_other_name
+        : "",
+    accessMethod: session.access_method,
+    tenants: isTenantMethod(session.access_method) ? session.tenants : [],
     systems: session.num_systems,
     additional: session.num_additional_indoor,
     acType,
@@ -782,6 +856,40 @@ export function getUnitById(id: string | null): AdminUnit | null {
 export function getAgentById(id: string | null): AdminAgent | null {
   if (!id) return null;
   return SEEDED_AGENTS.find((a) => a.id === id) ?? null;
+}
+
+/**
+ * Resolve the company name to display for the booker on an admin booking
+ * row. Returns:
+ *   - the free-text "Other / not listed" name when the agent picked
+ *     "Other" and typed something in;
+ *   - the canonical agency display name when they picked a known agency;
+ *   - `null` for owners and for agent rows missing an agency selection
+ *     (so the caller can decide what to show as a fallback).
+ *
+ * Pure / data-only — safe to import anywhere, no DOM access.
+ */
+export function bookerAgencyName(b: AdminBooking): string | null {
+  if (b.bookerRole !== "agent") return null;
+  if (!b.bookerAgencyId) return null;
+  if (b.bookerAgencyId === OTHER_AGENCY_ID) {
+    const trimmed = b.bookerAgencyOtherName.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  const match = DEMO_MANAGING_AGENCIES.find((a) => a.id === b.bookerAgencyId);
+  return match ? match.name : null;
+}
+
+/**
+ * True when the booking's access method requires Taylr to coordinate
+ * scheduling with the unit's tenants — so the admin booking detail
+ * should surface the captured tenant list.
+ *
+ * Wraps {@link isTenantMethod} so call-sites don't have to import the
+ * access-method catalog directly.
+ */
+export function requiresTenantCoordination(b: AdminBooking): boolean {
+  return isTenantMethod(b.accessMethod);
 }
 
 export function bookingDurationMinutes(b: AdminBooking): number {

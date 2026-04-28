@@ -11,6 +11,8 @@ import { ChevronLeft, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
+  bookerAgencyName,
+  requiresTenantCoordination,
   SERVICE_STATUS_FLOW,
   type AdminAgent,
   type AdminBooking,
@@ -142,11 +144,18 @@ export function BookingDetail({
                 value={booking.bookerRole === "agent" ? "Agent" : "Owner"}
               />
               <Field label="Total" value={`$${booking.totalAud.toFixed(2)}`} />
-              <Field label="Customer" value={booking.customerName} />
-              <Field label="Email" value={booking.customerEmail} />
-              <Field label="Phone" value={booking.customerPhone} />
             </div>
+            <BookerBlock booking={booking} />
           </Card>
+
+          {requiresTenantCoordination(booking) && (
+            <Card
+              title="Tenant details"
+              subtitle="Taylr will coordinate scheduling with these tenants"
+            >
+              <TenantList tenants={booking.tenants} />
+            </Card>
+          )}
 
           <Card title="Unit">
             {unit ? (
@@ -222,6 +231,83 @@ export function BookingDetail({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Booker block — sits in the booking-summary card under the
+ * Booking ID / Booker / Total trio.
+ *
+ * Owner bookings show the contact details directly. Agent bookings
+ * lead with the agency name (the company on the hook for the booking)
+ * and fall back to the contact name if no agency was captured. The
+ * contact at the agency is shown beneath, so the admin always knows
+ * who to call.
+ */
+function BookerBlock({ booking }: { booking: AdminBooking }) {
+  if (booking.bookerRole === "agent") {
+    const agency = bookerAgencyName(booking);
+    return (
+      <div className="mt-4 grid grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+        {agency ? (
+          <Field label="Agency" value={agency} />
+        ) : (
+          <Field label="Agency" value="Not provided" />
+        )}
+        <Field label="Agent contact" value={booking.customerName} />
+        <span aria-hidden />
+        <Field label="Email" value={booking.customerEmail} />
+        <Field label="Phone" value={booking.customerPhone} />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-4 grid grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+      <Field label="Owner" value={booking.customerName} />
+      <Field label="Email" value={booking.customerEmail} />
+      <Field label="Phone" value={booking.customerPhone} />
+    </div>
+  );
+}
+
+/**
+ * Tenants list shown only for tenant-coordinated access methods.
+ * Renders a small contact card per tenant; falls back to a placeholder
+ * if the booking somehow has no captured tenants (live demo can hit
+ * this path mid-flow before Step 5 is filled in).
+ */
+function TenantList({
+  tenants,
+}: {
+  tenants: AdminBooking["tenants"];
+}) {
+  if (tenants.length === 0) {
+    return (
+      <div className="text-[13px] text-slate-500">
+        No tenants captured yet — Taylr will follow up with the booker.
+      </div>
+    );
+  }
+  return (
+    <ol className="flex flex-col gap-3">
+      {tenants.map((t, i) => {
+        const fullName = `${t.first} ${t.last}`.trim() || `Tenant ${i + 1}`;
+        return (
+          <li
+            key={`${t.email}-${i}`}
+            className="rounded-lg bg-slate-50 p-3 text-[12px] text-slate-700"
+          >
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+              Tenant {i + 1}
+            </div>
+            <div className="mt-0.5 font-medium text-slate-900">{fullName}</div>
+            <div className="text-slate-500">
+              {t.email || "—"} · {t.phone || "—"}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
