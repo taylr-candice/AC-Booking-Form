@@ -8,6 +8,7 @@ export const modules: ModuleMap = {
   "./components/mockups/booking-flow/BookingFlowDesktop.tsx": () => import("../components/mockups/booking-flow/BookingFlowDesktop.tsx"),
   "./components/mockups/booking-flow/BookingFlowMobile.tsx": () => import("../components/mockups/booking-flow/BookingFlowMobile.tsx"),
   "./components/mockups/booking-form/BookingForm.bookAnother.test.tsx": () => import("../components/mockups/booking-form/BookingForm.bookAnother.test.tsx"),
+  "./components/mockups/booking-form/BookingForm.tryAgain.test.tsx": () => import("../components/mockups/booking-form/BookingForm.tryAgain.test.tsx"),
   "./components/mockups/booking-form/BookingForm.tsx": () => import("../components/mockups/booking-form/BookingForm.tsx"),
   "./components/mockups/booking-pages/AcDesktop.tsx": () => import("../components/mockups/booking-pages/AcDesktop.tsx"),
   "./components/mockups/booking-pages/AcExampleModal.tsx": () => import("../components/mockups/booking-pages/AcExampleModal.tsx"),
