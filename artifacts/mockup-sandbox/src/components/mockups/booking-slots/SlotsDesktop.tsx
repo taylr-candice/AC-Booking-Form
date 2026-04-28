@@ -14,7 +14,6 @@ import {
 import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
-  attendedPartyFor,
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
@@ -93,36 +92,40 @@ export function SlotsDesktop() {
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
-  // Slot-picker banner branches on the customer's access method:
-  //   - Unattended (parcel locker, collect & return, agency trade key)
-  //     → swap the "be available for the entire window" warning for the
-  //       lighter "you're authorising us to access the unit" framing.
-  //   - Attended (be-there, leave-key, agent_tenant_self) → keep the
-  //     "be available for the entire window" message and reference the
-  //     correct party (you / your key holder / your tenant).
-  // Falls back to the historical "you" copy if no method is set yet
-  // (defensive — slot picker should never be reachable without one).
+  // Slot-picker banner branches on the customer's access method into
+  // three modes — the "Heads up: be available the entire window"
+  // warning is reserved for customers who personally committed to
+  // meeting the technician, since they're the only ones who'd be
+  // surprised by a non-fixed arrival time:
+  //   - "unattended"     → parcel locker / collect & return / agency
+  //                        trade key. Swap the warning for the lighter
+  //                        "you're authorising us" framing — no one
+  //                        needs to be there.
+  //   - "self-attended"  → be-there options. Keep the "Heads up: please
+  //                        make sure you are available for the entire
+  //                        window" copy — these customers are the only
+  //                        ones the heads-up is aimed at.
+  //   - "coordinated"    → leave-key / agent_tenant_self / no method
+  //                        set yet. The customer themselves isn't
+  //                        attending, so we drop the "Heads up" framing
+  //                        and just state the scheduling model: the
+  //                        service happens sometime within the window,
+  //                        not at a set time.
   const accessMethod = session.access_method;
   const unattended = isUnattendedAccessMethod(accessMethod);
-  const attendedParty = attendedPartyFor(accessMethod);
-  const partyLabel =
-    attendedParty === "key_holder"
-      ? "your key holder"
-      : attendedParty === "tenant"
-        ? "your tenant"
-        : "you";
-  // Subject-verb agreement: "you are", "your key holder is",
-  // "your tenant is". Defensive fallback (no method set yet) uses
-  // "you" → "are" so the banner reads naturally even before the
-  // customer has reached this step through the normal flow.
-  const partyVerb = partyLabel === "you" ? "are" : "is";
+  const selfAttended = isBeThereMethod(accessMethod);
+  const accessMode = unattended
+    ? "unattended"
+    : selfAttended
+      ? "self-attended"
+      : "coordinated";
   // The "Change access method" nudge is only shown to "I'll be there"
   // customers — the alternative options (parcel locker, collect &
   // return, agency trade key) let them skip waiting around for the
   // entire window. The button reuses the same edit-jump pattern as the
   // AC-step button (handled by the booking-flow wrapper via the
   // `button-change-access` data-testid).
-  const showChangeAccess = isBeThereMethod(accessMethod);
+  const showChangeAccess = selfAttended;
   // Role-conditional accountability nudge inside the "Not sure" callout.
   // Owners and managing agents have very different burdens when a second
   // visit is needed — owners have to physically open up again, agents
@@ -217,7 +220,7 @@ export function SlotsDesktop() {
             className="mb-6 rounded-xl border px-4 py-3 text-sm leading-relaxed"
             style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
             data-testid="banner-access-commitment-desktop"
-            data-access-mode={unattended ? "unattended" : "attended"}
+            data-access-mode={accessMode}
           >
             <div className="flex items-start gap-2.5">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -227,14 +230,19 @@ export function SlotsDesktop() {
                   to access the unit during the window you pick to carry out
                   the service — no one needs to be there.
                 </div>
-              ) : (
+              ) : selfAttended ? (
                 <div>
                   <span className="font-semibold">Heads up:</span> we can't
                   guarantee an exact arrival or finish time within the window
                   you pick, so please make sure{" "}
-                  <span className="font-semibold">{partyLabel}</span>{" "}
-                  {partyVerb} available for the{" "}
-                  <span className="font-semibold">entire window</span>.
+                  <span className="font-semibold">you are</span> available for
+                  the <span className="font-semibold">entire window</span>.
+                </div>
+              ) : (
+                <div>
+                  The service will be carried out{" "}
+                  <span className="font-semibold">sometime within the window</span>{" "}
+                  you pick — there's no set arrival time.
                 </div>
               )}
             </div>

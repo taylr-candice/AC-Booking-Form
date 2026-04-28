@@ -14,7 +14,6 @@ import { getBookingDurationMinutes, slotFitStatus } from "../../../state/booking
 import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
-  attendedPartyFor,
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
@@ -79,21 +78,18 @@ export function SlotsMobile() {
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
-  // Slot-picker banner branches on the customer's access method.
-  // See SlotsDesktop for the full rationale — same logic, mobile copy.
+  // Slot-picker banner branches on the customer's access method into
+  // three modes (unattended / self-attended / coordinated). See
+  // SlotsDesktop for the full rationale — same logic, mobile copy.
   const accessMethod = session.access_method;
   const unattended = isUnattendedAccessMethod(accessMethod);
-  const attendedParty = attendedPartyFor(accessMethod);
-  const partyLabel =
-    attendedParty === "key_holder"
-      ? "your key holder"
-      : attendedParty === "tenant"
-        ? "your tenant"
-        : "you";
-  // Subject-verb agreement: "you are" vs "your key holder is" /
-  // "your tenant is". Mirrors SlotsDesktop.
-  const partyVerb = partyLabel === "you" ? "are" : "is";
-  const showChangeAccess = isBeThereMethod(accessMethod);
+  const selfAttended = isBeThereMethod(accessMethod);
+  const accessMode = unattended
+    ? "unattended"
+    : selfAttended
+      ? "self-attended"
+      : "coordinated";
+  const showChangeAccess = selfAttended;
   // Role-conditional accountability nudge inside the "Not sure" callout.
   // Owners and managing agents have very different burdens when a second
   // visit is needed — owners have to physically open up again, agents
@@ -177,7 +173,7 @@ export function SlotsMobile() {
           className="mb-4 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed"
           style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
           data-testid="banner-access-commitment-mobile"
-          data-access-mode={unattended ? "unattended" : "attended"}
+          data-access-mode={accessMode}
         >
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
@@ -187,14 +183,19 @@ export function SlotsMobile() {
                 to access the unit during the window you pick to carry out
                 the service — no one needs to be there.
               </div>
-            ) : (
+            ) : selfAttended ? (
               <div>
                 <span className="font-semibold">Heads up:</span> we can't
                 guarantee an exact arrival or finish time within the window
                 you pick, so please make sure{" "}
-                <span className="font-semibold">{partyLabel}</span>{" "}
-                {partyVerb} available for the{" "}
-                <span className="font-semibold">entire window</span>.
+                <span className="font-semibold">you are</span> available for
+                the <span className="font-semibold">entire window</span>.
+              </div>
+            ) : (
+              <div>
+                The service will be carried out{" "}
+                <span className="font-semibold">sometime within the window</span>{" "}
+                you pick — there's no set arrival time.
               </div>
             )}
           </div>

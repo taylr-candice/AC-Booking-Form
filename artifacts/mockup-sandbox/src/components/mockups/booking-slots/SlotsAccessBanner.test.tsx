@@ -1,31 +1,35 @@
 // @vitest-environment happy-dom
 
 /**
- * Pins down the slot-picker access-commitment banner branching added by
- * Task #55:
+ * Pins down the slot-picker access-commitment banner, which now
+ * branches into THREE access modes — the "Heads up: be available
+ * the entire window" warning is reserved for customers who
+ * personally committed to meeting the technician:
  *
- *   - Be-there access methods (owner_live_at_unit, owner_leased_be_there,
- *     owner_vacant_be_there, agent_be_there) → `data-access-mode="attended"`,
- *     copy says "you ... are available for the entire window", and the
- *     "Change access method" affordance (`button-change-access`) is visible.
+ *   - "self-attended" (be-there: owner_live_at_unit,
+ *     owner_leased_be_there, owner_vacant_be_there, agent_be_there)
+ *     → the only mode that gets the "Heads up" framing. Copy says
+ *     "you are available for the entire window" and the
+ *     "Change access method" affordance (`button-change-access`)
+ *     is visible.
  *
- *   - Leave-key (key_holder) → `attended`, copy says "your key holder ... is
- *     available", and `button-change-access` is hidden (only be-there gets
- *     the nudge).
+ *   - "coordinated" (leave-key, agent_tenant_self, defensive
+ *     fallback when no method is set) → drops the "Heads up"
+ *     framing and the per-party "be available" warning. Replaces
+ *     it with a softer informational note that the service will
+ *     be carried out sometime within the chosen window with no
+ *     set arrival time. `button-change-access` is hidden.
  *
- *   - Tenant-self coordination (`agent_tenant_self`) → `attended`, copy
- *     says "your tenant ... is available", and `button-change-access` is
- *     hidden.
- *
- *   - Unattended methods (parcel locker, collect & return, agency trade
- *     key) → `data-access-mode="unattended"`, copy uses the "authorising
- *     us" framing and never says "available for the entire window", and
+ *   - "unattended" (parcel locker, collect & return, agency trade
+ *     key) → uses the "authorising us" framing. Never says
+ *     "available for the entire window" or "Heads up".
  *     `button-change-access` is hidden.
  *
- *   - `button-edit-ac` is always visible, regardless of access method.
+ *   - `button-edit-ac` is always visible, regardless of access
+ *     method.
  *
- * Both desktop and mobile slot pickers are exercised so the two copies
- * stay in lockstep.
+ * Both desktop and mobile slot pickers are exercised so the two
+ * copies stay in lockstep.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -73,37 +77,43 @@ afterEach(() => {
 
 describe.each(VARIANTS)("$name access-commitment banner", ({ Component, bannerTestid }) => {
   describe("defensive fallback (no access method set)", () => {
-    it("renders the attended banner with grammatically-correct 'you are' copy", () => {
+    it("renders the coordinated banner with the informational copy and no Heads up", () => {
       // No setAccessMethod → reset already cleared it.
       const { getByTestId, queryByTestId } = render(<Component />);
 
       const banner = getByTestId(bannerTestid);
-      expect(banner.getAttribute("data-access-mode")).toBe("attended");
+      expect(banner.getAttribute("data-access-mode")).toBe("coordinated");
 
       const text = banner.textContent ?? "";
-      expect(text).toContain("you are available for the entire window");
-      // Must NOT produce "you is" — that would be the broken grammar
-      // path the partyVerb fix avoids.
-      expect(text).not.toMatch(/\byou is\b/);
-
+      // Informational scheduling-model explanation must be present.
+      expect(text).toContain("sometime within the window");
+      expect(text).toContain("no set arrival time");
+      // The heavy "Heads up" framing and per-party "be available"
+      // warning must NOT show — those are reserved for self-attended.
+      expect(text).not.toContain("Heads up");
+      expect(text).not.toContain("available for the entire window");
       // No method → can't be a be-there option, so the change-access
       // nudge stays hidden.
       expect(queryByTestId("button-change-access")).toBeNull();
     });
   });
 
-  describe("attended (be-there) methods", () => {
+  describe("self-attended (be-there) methods", () => {
     for (const method of BE_THERE) {
-      it(`shows the attended banner with the change-access nudge for ${method}`, () => {
+      it(`shows the Heads up banner with the change-access nudge for ${method}`, () => {
         bookingActions.setAccessMethod(method);
         const { getByTestId, queryByTestId } = render(<Component />);
 
         const banner = getByTestId(bannerTestid);
-        expect(banner.getAttribute("data-access-mode")).toBe("attended");
+        expect(banner.getAttribute("data-access-mode")).toBe("self-attended");
 
         const text = banner.textContent ?? "";
-        expect(text).toContain("available for the entire window");
-        // Be-there → references the customer themselves (never key holder / tenant).
+        // Be-there is the ONLY mode that gets "Heads up" + "be
+        // available the entire window" copy, and it always
+        // references the customer themselves ("you are").
+        expect(text).toContain("Heads up");
+        expect(text).toContain("you are available for the entire window");
+        // Be-there → never references key holder / tenant.
         expect(text).not.toContain("your key holder");
         expect(text).not.toContain("your tenant");
         // Authorisation framing belongs to the unattended branch only.
@@ -115,34 +125,43 @@ describe.each(VARIANTS)("$name access-commitment banner", ({ Component, bannerTe
     }
   });
 
-  describe("attended leave-key methods reference the key holder", () => {
-    it("uses 'your key holder' copy and hides the change-access nudge", () => {
+  describe("coordinated leave-key methods (key holder attends)", () => {
+    it("uses the informational copy without Heads up or per-party warning", () => {
       bookingActions.setAccessMethod("owner_leased_leave_key");
       const { getByTestId, queryByTestId } = render(<Component />);
 
       const banner = getByTestId(bannerTestid);
-      expect(banner.getAttribute("data-access-mode")).toBe("attended");
+      expect(banner.getAttribute("data-access-mode")).toBe("coordinated");
 
       const text = banner.textContent ?? "";
-      expect(text).toContain("your key holder");
-      expect(text).toContain("available for the entire window");
+      // Coordinated copy explains the scheduling model.
+      expect(text).toContain("sometime within the window");
+      expect(text).toContain("no set arrival time");
+      // The customer themselves isn't attending, so the heavy
+      // warning + per-party "be available" copy must NOT show.
+      expect(text).not.toContain("Heads up");
+      expect(text).not.toContain("your key holder");
+      expect(text).not.toContain("available for the entire window");
 
       expect(queryByTestId("button-change-access")).toBeNull();
       expect(queryByTestId("button-edit-ac")).not.toBeNull();
     });
   });
 
-  describe("agent_tenant_self references the tenant", () => {
-    it("uses 'your tenant' copy and hides the change-access nudge", () => {
+  describe("coordinated agent_tenant_self (tenant attends)", () => {
+    it("uses the informational copy without Heads up or per-party warning", () => {
       bookingActions.setAccessMethod("agent_tenant_self");
       const { getByTestId, queryByTestId } = render(<Component />);
 
       const banner = getByTestId(bannerTestid);
-      expect(banner.getAttribute("data-access-mode")).toBe("attended");
+      expect(banner.getAttribute("data-access-mode")).toBe("coordinated");
 
       const text = banner.textContent ?? "";
-      expect(text).toContain("your tenant");
-      expect(text).toContain("available for the entire window");
+      expect(text).toContain("sometime within the window");
+      expect(text).toContain("no set arrival time");
+      expect(text).not.toContain("Heads up");
+      expect(text).not.toContain("your tenant");
+      expect(text).not.toContain("available for the entire window");
 
       expect(queryByTestId("button-change-access")).toBeNull();
       expect(queryByTestId("button-edit-ac")).not.toBeNull();
@@ -161,9 +180,10 @@ describe.each(VARIANTS)("$name access-commitment banner", ({ Component, bannerTe
         const text = banner.textContent ?? "";
         expect(text).toContain("authorising us");
         expect(text).toContain("no one needs to be there");
-        // The "available for the entire window" warning is the attended
-        // branch — it must NOT leak into unattended copy.
+        // The "available for the entire window" warning is the
+        // self-attended branch — it must NOT leak into unattended.
         expect(text).not.toContain("available for the entire window");
+        expect(text).not.toContain("Heads up");
 
         expect(queryByTestId("button-change-access")).toBeNull();
         expect(queryByTestId("button-edit-ac")).not.toBeNull();

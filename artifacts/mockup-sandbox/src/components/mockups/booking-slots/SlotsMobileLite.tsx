@@ -13,6 +13,10 @@ import {
 import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
 import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
+import {
+  isBeThereMethod,
+  isUnattendedAccessMethod,
+} from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -63,6 +67,17 @@ export function SlotsMobileLite() {
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
+  // Slot-picker banner branches on the customer's access method into
+  // three modes (unattended / self-attended / coordinated). See
+  // SlotsDesktop for the full rationale — same logic, lite copy.
+  const accessMethod = session.access_method;
+  const unattended = isUnattendedAccessMethod(accessMethod);
+  const selfAttended = isBeThereMethod(accessMethod);
+  const accessMode = unattended
+    ? "unattended"
+    : selfAttended
+      ? "self-attended"
+      : "coordinated";
   // Role-conditional accountability nudge inside the "Not sure" callout.
   // Owners and managing agents have very different burdens when a second
   // visit is needed — owners have to physically open up again, agents
@@ -135,30 +150,46 @@ export function SlotsMobileLite() {
           </button>
         </div>
 
-        {/* Access-window commitment — prominent, always shown. */}
+        {/* Access-window commitment — prominent, always shown.
+            Copy branches on the customer's access method (see the
+            `accessMode` derivation above). */}
         <div
           className="mb-4 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed"
           style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
           data-testid="banner-access-commitment-mobile"
+          data-access-mode={accessMode}
         >
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <span className="font-semibold">Heads up:</span> we can't guarantee an
-              exact arrival or finish time within the window you pick, so please make
-              sure we have access to the unit for the{" "}
-              <span className="font-semibold">entire window</span>.
-              {" "}
-              <span>
-                Don't want to wait around? Pick an access option that doesn't need you on-site —
-                leave a key, use a parcel locker, or coordinate with a tenant.
-              </span>
-            </div>
+            {unattended ? (
+              <div>
+                <span className="font-semibold">You're authorising us</span>{" "}
+                to access the unit during the window you pick to carry out
+                the service — no one needs to be there.
+              </div>
+            ) : selfAttended ? (
+              <div>
+                <span className="font-semibold">Heads up:</span> we can't
+                guarantee an exact arrival or finish time within the window
+                you pick, so please make sure{" "}
+                <span className="font-semibold">you are</span> available for
+                the <span className="font-semibold">entire window</span>.
+                {" "}
+                <span>
+                  Don't want to wait around? Pick an access option that doesn't need you on-site —
+                  leave a key, use a parcel locker, or coordinate with a tenant.
+                </span>
+              </div>
+            ) : (
+              <div>
+                The service will be carried out{" "}
+                <span className="font-semibold">sometime within the window</span>{" "}
+                you pick — there's no set arrival time.
+              </div>
+            )}
           </div>
           {/* Quieter, always-available shortcut — opens Step 4 so the
-              customer can swap to a hands-off access option (parcel
-              locker, leave a key, coordinate with tenant) and not have
-              to be home for the whole window. */}
+              customer can swap to a different access option. */}
           <div className="mt-2 flex justify-end">
             <button
               type="button"
