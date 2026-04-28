@@ -1,23 +1,38 @@
 /**
- * Regression checks for the saved-session migration in `bookingSession.ts`.
+ * Regression checks for the booking session store.
  *
- * The booking flow shrunk from 7 steps to 6 steps, and `readFromStorage`
- * silently rewrites any persisted `current_step` so returning users land
- * on the right page instead of being thrown back to Step 1. If this ever
- * regresses, every returning user with a stored session breaks — and the
- * symptom is invisible in dev (sessionStorage is per-tab).
+ * Two independent concerns are pinned here:
  *
- * The migration is exposed as a pure helper (`migratePersistedSession`)
- * so we can drive it directly here without spinning up a DOM.
+ *   A. `migratePersistedSession` — the booking flow shrunk from 7 steps
+ *      to 6 steps. `readFromStorage` silently rewrites any persisted
+ *      `current_step` so returning users land on the right page instead
+ *      of being thrown back to Step 1. Exposed as a pure helper so we
+ *      can drive it without spinning up a DOM.
+ *
+ *   B. Step 5 cascade-clearing — switching access method or primary
+ *      residence MUST wipe stale follow-up fields (key holder, return
+ *      method, managing agency, tenants, signature) so we don't ship
+ *      wrong data downstream. Picking a coordination method while sitting
+ *      on Step 5 must also auto-advance the wrapper to Step 6 so the
+ *      user never lingers on a now-hidden step.
+ *
+ * The store is a module-level singleton, so each cascade-clear test
+ * starts with `bookingActions.reset()` to avoid order coupling.
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  bookingActions,
+  COORDINATION_ACCESS_METHODS,
+  getBookingSession,
   migratePersistedSession,
+  type AccessMethod,
   type BookingState,
   type StepId,
 } from "./bookingSession";
+
+// ─── A. migratePersistedSession ────────────────────────────────────────────
 
 /** Helper: serialize a partial persisted blob the way sessionStorage would. */
 function persisted(blob: Record<string, unknown>): string {
@@ -164,5 +179,240 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
     expect(out.tenants).toEqual([]);
     expect(out.cancellation_acknowledged).toBe(false);
     expect(out.access_notes).toBe("");
+  });
+});
+
+// ─── B. Step 5 cascade-clearing in bookingActions ──────────────────────────
+
+describe("Step 5 cascade clears (bookingActions)", () => {
+  beforeEach(() => {
+    bookingActions.reset();
+  });
+
+  describe("setAccessMethod — cascade clears per-method follow-ups", () => {
+    it("clears key-holder fields when switching away from a leave-key method", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("live_in");
+      bookingActions.setAccessMethod("owner_live_leave_key");
+      bookingActions.setKeyHolder({
+        key_holder_name: "Alex Smith",
+        key_holder_phone: "0400 000 000",
+      });
+
+      bookingActions.setAccessMethod("owner_live_at_unit");
+
+      const s = getBookingSession();
+      expect(s.access_method).toBe("owner_live_at_unit");
+      expect(s.key_holder_name).toBe("");
+      expect(s.key_holder_phone).toBe("");
+    });
+
+    it("clears collect-and-return follow-ups when switching away from a collect method", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("live_in");
+      bookingActions.setAccessMethod("owner_live_collect");
+      bookingActions.setKeyCollectionLocation("Concierge desk, Lvl 1");
+      bookingActions.setReturnMethod("locker");
+      bookingActions.setSignature({
+        signature_acknowledged: true,
+        signature_name: "Alex Smith",
+      });
+
+      bookingActions.setAccessMethod("owner_live_leave_key");
+
+      const s = getBookingSession();
+      expect(s.access_method).toBe("owner_live_leave_key");
+      expect(s.key_collection_location).toBe("");
+      expect(s.return_method).toBeNull();
+      expect(s.signature_acknowledged).toBe(false);
+      expect(s.signature_name).toBe("");
+    });
+
+    it("clears managing-agency selection when switching away from owner_leased_agent", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("leased_out");
+      bookingActions.setAccessMethod("owner_leased_agent");
+      bookingActions.setManagingAgency("agency-001");
+
+      bookingActions.setAccessMethod("owner_leased_be_there");
+
+      const s = getBookingSession();
+      expect(s.access_method).toBe("owner_leased_be_there");
+      expect(s.managing_agency_id).toBeNull();
+    });
+
+    it("clears tenants and signature when switching away from a tenant method", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("leased_out");
+      bookingActions.setAccessMethod("owner_leased_tenant");
+      bookingActions.setTenants([
+        { first: "Sam", last: "Tenant", email: "sam@example.com", phone: "0411 111 111" },
+      ]);
+      bookingActions.setSignature({
+        signature_acknowledged: true,
+        signature_name: "Alex Smith",
+      });
+
+      bookingActions.setAccessMethod("owner_leased_be_there");
+
+      const s = getBookingSession();
+      expect(s.access_method).toBe("owner_leased_be_there");
+      expect(s.tenants).toEqual([]);
+      expect(s.signature_acknowledged).toBe(false);
+      expect(s.signature_name).toBe("");
+    });
+
+    it("preserves access_notes across method switches (notes are always available, not method-specific)", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("live_in");
+      bookingActions.setAccessMethod("owner_live_leave_key");
+      bookingActions.setKeyHolder({
+        key_holder_name: "Alex Smith",
+        key_holder_phone: "0400 000 000",
+      });
+      bookingActions.setAccessNotes("Buzzer is broken — call on arrival.");
+
+      bookingActions.setAccessMethod("owner_live_at_unit");
+
+      const s = getBookingSession();
+      expect(s.key_holder_name).toBe("");
+      expect(s.access_notes).toBe("Buzzer is broken — call on arrival.");
+    });
+
+    it("clears every follow-up field at once when switching to a method with no follow-ups", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("leased_out");
+      // Load up follow-ups from several different shapes.
+      bookingActions.setAccessMethod("owner_leased_leave_key");
+      bookingActions.setKeyHolder({
+        key_holder_name: "Alex Smith",
+        key_holder_phone: "0400 000 000",
+      });
+      bookingActions.setKeyCollectionLocation("Concierge desk, Lvl 1");
+      bookingActions.setReturnMethod("hand_delivery");
+      bookingActions.setManagingAgency("agency-001");
+      bookingActions.setTenants([
+        { first: "Sam", last: "Tenant", email: "sam@example.com", phone: "0411 111 111" },
+      ]);
+      bookingActions.setSignature({
+        signature_acknowledged: true,
+        signature_name: "Alex Smith",
+      });
+
+      bookingActions.setAccessMethod("owner_leased_be_there");
+
+      const s = getBookingSession();
+      expect(s.key_holder_name).toBe("");
+      expect(s.key_holder_phone).toBe("");
+      expect(s.key_collection_location).toBe("");
+      expect(s.return_method).toBeNull();
+      expect(s.managing_agency_id).toBeNull();
+      expect(s.tenants).toEqual([]);
+      expect(s.signature_acknowledged).toBe(false);
+      expect(s.signature_name).toBe("");
+    });
+  });
+
+  describe("setPrimaryResidence — cascade clears access method and follow-ups", () => {
+    it("wipes the chosen access method and follow-ups when residence changes", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("live_in");
+      bookingActions.setAccessMethod("owner_live_leave_key");
+      bookingActions.setKeyHolder({
+        key_holder_name: "Alex Smith",
+        key_holder_phone: "0400 000 000",
+      });
+      bookingActions.setAccessNotes("Reach me on the buzzer.");
+
+      bookingActions.setPrimaryResidence("leased_out");
+
+      const s = getBookingSession();
+      expect(s.primary_residence).toBe("leased_out");
+      expect(s.access_method).toBeNull();
+      expect(s.key_holder_name).toBe("");
+      expect(s.key_holder_phone).toBe("");
+      // access_notes is independent and survives the cascade.
+      expect(s.access_notes).toBe("Reach me on the buzzer.");
+    });
+
+    it("wipes any previously chosen schedule slot when residence changes", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("live_in");
+      bookingActions.setAccessMethod("owner_live_at_unit");
+      bookingActions.setSchedule("2026-05-01", "morning");
+
+      bookingActions.setPrimaryResidence("vacant");
+
+      const s = getBookingSession();
+      expect(s.service_date).toBeNull();
+      expect(s.service_slot).toBeNull();
+    });
+
+    it("is a no-op when the residence is set to the same value", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("live_in");
+      bookingActions.setAccessMethod("owner_live_leave_key");
+      bookingActions.setKeyHolder({
+        key_holder_name: "Alex Smith",
+        key_holder_phone: "0400 000 000",
+      });
+
+      bookingActions.setPrimaryResidence("live_in");
+
+      const s = getBookingSession();
+      // Same residence => no cascade, follow-ups preserved.
+      expect(s.access_method).toBe("owner_live_leave_key");
+      expect(s.key_holder_name).toBe("Alex Smith");
+      expect(s.key_holder_phone).toBe("0400 000 000");
+    });
+  });
+
+  describe("setAccessMethod — auto-advances away from a now-hidden Step 5", () => {
+    it("advances current_step from 5 → 6 when switching INTO any coordination method while on Step 5", () => {
+      const coordinationMethods: AccessMethod[] = Array.from(
+        COORDINATION_ACCESS_METHODS,
+      );
+      expect(coordinationMethods.length).toBeGreaterThan(0);
+
+      for (const method of coordinationMethods) {
+        bookingActions.reset();
+        bookingActions.setRole(method.startsWith("agent") ? "agent" : "owner");
+        if (!method.startsWith("agent")) {
+          bookingActions.setPrimaryResidence("leased_out");
+        }
+        bookingActions.goToStep(5);
+        expect(getBookingSession().current_step).toBe(5);
+
+        bookingActions.setAccessMethod(method);
+
+        const s = getBookingSession();
+        expect(s.access_method).toBe(method);
+        expect(s.current_step).toBe(6);
+      }
+    });
+
+    it("does NOT advance when switching to a non-coordination method while on Step 5", () => {
+      bookingActions.setRole("owner");
+      bookingActions.setPrimaryResidence("live_in");
+      bookingActions.goToStep(5);
+
+      bookingActions.setAccessMethod("owner_live_at_unit");
+
+      const s = getBookingSession();
+      expect(s.access_method).toBe("owner_live_at_unit");
+      expect(s.current_step).toBe(5);
+    });
+
+    it("does NOT change current_step when switching INTO a coordination method while NOT on Step 5", () => {
+      bookingActions.setRole("agent");
+      bookingActions.goToStep(4);
+
+      bookingActions.setAccessMethod("agent_tenant_taylr");
+
+      const s = getBookingSession();
+      expect(s.access_method).toBe("agent_tenant_taylr");
+      // Auto-advance only protects users who would otherwise linger on Step 5.
+      expect(s.current_step).toBe(4);
+    });
   });
 });

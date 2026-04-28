@@ -15,6 +15,7 @@ export const modules: ModuleMap = {
   "./components/mockups/booking-pages/PayMobile.tsx": () => import("../components/mockups/booking-pages/PayMobile.tsx"),
   "./components/mockups/booking-pages/UnitDesktop.tsx": () => import("../components/mockups/booking-pages/UnitDesktop.tsx"),
   "./components/mockups/booking-pages/UnitMobile.tsx": () => import("../components/mockups/booking-pages/UnitMobile.tsx"),
+  "./components/mockups/booking-form/BookingForm.tsx": () => import("../components/mockups/booking-form/BookingForm.tsx"),
   "./components/mockups/booking-slots/SlotsDesktop.tsx": () => import("../components/mockups/booking-slots/SlotsDesktop.tsx"),
   "./components/mockups/booking-slots/SlotsMobile.tsx": () => import("../components/mockups/booking-slots/SlotsMobile.tsx"),
   "./components/mockups/booking-slots/SlotsMobileLite.tsx": () => import("../components/mockups/booking-slots/SlotsMobileLite.tsx")
