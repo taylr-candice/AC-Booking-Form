@@ -140,26 +140,46 @@ const INITIAL_STATE: BookingState = {
 
 const isBrowser = typeof window !== "undefined";
 
-function readFromStorage(): BookingState {
-  if (!isBrowser) return INITIAL_STATE;
+/**
+ * Migrate a raw persisted session blob (as stored in sessionStorage under
+ * `STORAGE_KEY`) into the canonical {@link BookingState}.
+ *
+ * Pure function — no DOM access — so unit tests can drive it directly
+ * without spinning up a browser environment.
+ *
+ * Migrates legacy persisted state from the 7-step flow:
+ *  - Old Step 2 (standalone "Your role") → new Step 1 (role lives on Unit page)
+ *  - Old Steps 3..7 shift down by one to new Steps 2..6
+ * Anything outside the new 1..6 range gets clamped to a safe value (Step 1).
+ *
+ * Invalid / missing input always returns {@link INITIAL_STATE}.
+ *
+ * @internal — exported for tests.
+ */
+export function migratePersistedSession(raw: string | null): BookingState {
+  if (!raw) return INITIAL_STATE;
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return INITIAL_STATE;
     const parsed = JSON.parse(raw) as Partial<BookingState> & {
-      current_step?: number;
+      current_step?: unknown;
     };
-    // Migrate legacy persisted state from the 7-step flow:
-    //  - Old Step 2 (standalone "Your role") → new Step 1 (role lives on Unit page)
-    //  - Old Steps 3..7 shift down by one to new Steps 2..6
-    // Anything outside the new 1..6 range gets clamped to a safe value.
     const rawStep = parsed.current_step;
     let step: StepId = 1;
-    if (typeof rawStep === "number") {
+    if (typeof rawStep === "number" && Number.isInteger(rawStep)) {
       const migrated = rawStep === 2 ? 1 : rawStep > 2 ? rawStep - 1 : rawStep;
       if (migrated >= 1 && migrated <= 6) step = migrated as StepId;
     }
     return { ...INITIAL_STATE, ...parsed, current_step: step };
   } catch {
+    return INITIAL_STATE;
+  }
+}
+
+function readFromStorage(): BookingState {
+  if (!isBrowser) return INITIAL_STATE;
+  try {
+    return migratePersistedSession(window.sessionStorage.getItem(STORAGE_KEY));
+  } catch {
+    // sessionStorage access can throw in some sandboxed contexts.
     return INITIAL_STATE;
   }
 }
