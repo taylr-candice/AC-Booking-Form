@@ -8,7 +8,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
-import { useStepLabel } from "../../../state/bookingDerived";
 import {
   DEMO_MANAGING_AGENCIES,
   isOtherAgency,
@@ -148,9 +147,6 @@ export function BookerMobile() {
           <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
             Your details
           </h1>
-          <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
-            {useStepLabel(2)}
-          </div>
         </div>
         <button
           type="button"

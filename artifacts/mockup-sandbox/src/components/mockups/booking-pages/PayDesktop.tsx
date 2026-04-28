@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ArrowRight, Lock, CreditCard as CreditCardIcon, Apple, Info, Clock, CheckCircle2, FileText } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
-import { isCoordinationFlow, useStepLabel } from "../../../state/bookingDerived";
+import { isCoordinationFlow } from "../../../state/bookingDerived";
 import {
   acSummary,
   CANCELLATION_ACK_LABEL,
@@ -44,7 +44,6 @@ export function PayDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">{useStepLabel(6)}</div>
             <h1 className="text-2xl font-semibold text-slate-900">Review & pay</h1>
           </div>
 

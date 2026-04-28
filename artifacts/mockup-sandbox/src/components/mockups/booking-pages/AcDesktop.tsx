@@ -12,7 +12,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useBookingSelector } from "../../../state/bookingSession";
-import { useStepLabel } from "../../../state/bookingDerived";
 import { getAcType, type AcType } from "../../../state/bookingHelpers";
 import { AcExampleModal, type ExampleVariant } from "./AcExampleModal";
 
@@ -182,9 +181,6 @@ export function AcDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
 
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-              {useStepLabel(3)}
-            </div>
             <h1 className="text-2xl font-semibold text-slate-900">{heading}</h1>
             <p className="mt-2 text-sm text-slate-500">{intro}</p>
           </div>

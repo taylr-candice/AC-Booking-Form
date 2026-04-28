@@ -8,7 +8,6 @@
 
 import {
   COORDINATION_ACCESS_METHODS,
-  useBookingSelector,
   type AccessMethod,
   type BookingState,
   type StepId,
@@ -96,18 +95,6 @@ export function canContinueStep1(
   s: Pick<BookingState, "unit_id" | "role">,
 ): boolean {
   return !!s.unit_id && !!s.role;
-}
-
-/**
- * Reactive helper: returns the per-page eyebrow text "Step X of Y" for the
- * given canonical `stepId`, where Y reflects the current visible-step total
- * (6 in normal flows, 5 in coordination flows).
- */
-export function useStepLabel(stepId: StepId): string {
-  const accessMethod = useBookingSelector((s) => s.access_method);
-  const idx = visibleIndex({ access_method: accessMethod }, stepId);
-  const total = totalSteps({ access_method: accessMethod });
-  return `Step ${idx} of ${total}`;
 }
 
 export type { AccessMethod };

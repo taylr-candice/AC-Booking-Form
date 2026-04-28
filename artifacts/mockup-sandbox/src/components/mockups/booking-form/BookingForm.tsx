@@ -441,9 +441,6 @@ export function BookingForm() {
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Back
               </Button>
-              <div className="text-xs text-slate-500">
-                Step {displayStep} of {totalSteps}
-              </div>
               <Button
                 onClick={goNext}
                 disabled={!stepValid}
