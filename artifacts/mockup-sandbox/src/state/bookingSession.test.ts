@@ -753,6 +753,94 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       expect(out.ac_discrepancy).toEqual(snap);
     });
   });
+
+  // ─── E. AC step origin hint ─────────────────────────────────────────────
+  // The AC step's "you came back to confirm AC details" banner reads
+  // `ac_step_origin === "slot_picker"`. The origin is set by the slot
+  // picker's "Update/Edit AC info" affordance via `editAcFromSlotPicker`,
+  // and cleared by every other entry path into Step 3 (NAV_FORWARD,
+  // NAV_BACK, step-dot click — all of which funnel through `goToStep`).
+  // It can also be cleared manually by the banner's dismiss button.
+  describe("E. AC step origin hint", () => {
+    beforeEach(() => {
+      bookingActions.reset();
+    });
+
+    it("starts null on a fresh session", () => {
+      expect(getBookingSession().ac_step_origin).toBeNull();
+    });
+
+    it("editAcFromSlotPicker atomically jumps to Step 3 and records the origin", () => {
+      // Pretend the customer is on Step 5 (Schedule) about to tap Edit AC.
+      bookingActions.goToStep(5);
+      expect(getBookingSession().ac_step_origin).toBeNull();
+
+      bookingActions.editAcFromSlotPicker();
+      const s = getBookingSession();
+      expect(s.current_step).toBe(3);
+      expect(s.ac_step_origin).toBe("slot_picker");
+    });
+
+    it("goToStep clears the origin — every non-affordance entry path", () => {
+      bookingActions.editAcFromSlotPicker();
+      expect(getBookingSession().ac_step_origin).toBe("slot_picker");
+
+      // Forward (continue) past Step 3 — origin must clear so a later
+      // back-then-forward arrival doesn't re-show the banner.
+      bookingActions.goToStep(4);
+      expect(getBookingSession().ac_step_origin).toBeNull();
+
+      // Re-set, then prove a step-dot click TO Step 3 also clears it.
+      bookingActions.editAcFromSlotPicker();
+      expect(getBookingSession().ac_step_origin).toBe("slot_picker");
+      bookingActions.goToStep(3);
+      expect(getBookingSession().ac_step_origin).toBeNull();
+    });
+
+    it("setAcStepOrigin(null) clears the hint without changing the step", () => {
+      bookingActions.editAcFromSlotPicker();
+      const before = getBookingSession();
+      expect(before.current_step).toBe(3);
+      expect(before.ac_step_origin).toBe("slot_picker");
+
+      bookingActions.setAcStepOrigin(null);
+      const after = getBookingSession();
+      expect(after.current_step).toBe(3);
+      expect(after.ac_step_origin).toBeNull();
+    });
+
+    it("editAcFromSlotPicker is a no-op when already on Step 3 with the origin set", () => {
+      bookingActions.editAcFromSlotPicker();
+      const ref = getBookingSession();
+      bookingActions.editAcFromSlotPicker();
+      expect(getBookingSession()).toBe(ref);
+    });
+
+    it("setAcStepOrigin is a no-op on equal writes", () => {
+      const ref = getBookingSession();
+      bookingActions.setAcStepOrigin(null);
+      expect(getBookingSession()).toBe(ref);
+    });
+
+    it("reset and bookAnother both wipe the origin hint", () => {
+      bookingActions.editAcFromSlotPicker();
+      expect(getBookingSession().ac_step_origin).toBe("slot_picker");
+
+      bookingActions.bookAnother();
+      expect(getBookingSession().ac_step_origin).toBeNull();
+
+      bookingActions.editAcFromSlotPicker();
+      bookingActions.reset();
+      expect(getBookingSession().ac_step_origin).toBeNull();
+    });
+
+    it("migratePersistedSession defaults ac_step_origin to null when missing", () => {
+      const out = migratePersistedSession(
+        JSON.stringify({ unit_id: "u1", current_step: 4 }),
+      );
+      expect(out.ac_step_origin).toBeNull();
+    });
+  });
 });
 
 // ─── D. return_to short-circuit hint ───────────────────────────────────────

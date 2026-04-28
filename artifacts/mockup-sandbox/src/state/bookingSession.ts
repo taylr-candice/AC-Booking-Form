@@ -84,9 +84,25 @@ export type AcDiscrepancy = {
 /** Step ids in canonical order — Step 5 may be skipped at runtime. */
 export type StepId = 1 | 2 | 3 | 4 | 5 | 6;
 
+/**
+ * How the customer landed on Step 3 (AC). Today the only non-default
+ * origin is `"slot_picker"`, set when they tap the "Update/Edit AC info"
+ * affordance on the slot picker. The AC step reads this hint to decide
+ * whether to show a contextual "you came back to confirm AC details"
+ * banner; without the hint they're either entering Step 3 for the first
+ * time or arriving via normal forward/back navigation, neither of which
+ * needs the extra framing. Cleared by every other path into Step 3
+ * (forward, back, step-dot click) via `goToStep`, so the banner can
+ * never linger past the visit it was set for.
+ */
+export type AcStepOrigin = "slot_picker" | null;
+
 export type BookingState = {
   /** Wrapper navigation. */
   current_step: StepId;
+  /** Origin hint for the most recent entry into Step 3. See
+   *  {@link AcStepOrigin}. */
+  ac_step_origin: AcStepOrigin;
 
   // Step 1
   unit_id: string | null;
@@ -180,6 +196,7 @@ export const COORDINATION_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set([
 
 const INITIAL_STATE: BookingState = {
   current_step: 1,
+  ac_step_origin: null,
   unit_id: null,
   role: null,
   agency_id: null,
@@ -413,6 +430,12 @@ function genBookingReference(): string {
 // ─── Public actions ─────────────────────────────────────────────────────────
 
 export const bookingActions = {
+  /** Navigate to a specific step. Always clears `ac_step_origin` because
+   *  every entry path other than the slot picker's "Update/Edit AC info"
+   *  affordance funnels through here (NAV_FORWARD, NAV_BACK, step-dot
+   *  click). The slot-picker affordance uses the dedicated atomic
+   *  {@link editAcFromSlotPicker} action, which sets the origin and the
+   *  step in a single write so this clear can never race it. */
   goToStep(step: StepId) {
     setState((s) => {
       // The wrapper sets `return_to` when the customer jumps back to
@@ -423,8 +446,26 @@ export const bookingActions = {
       // on a subsequent pass through the flow.
       const nextReturnTo =
         s.return_to !== null && step === s.return_to ? null : s.return_to;
-      if (s.current_step === step && s.return_to === nextReturnTo) return s;
-      return { ...s, current_step: step, return_to: nextReturnTo };
+      // `ac_step_origin` is always cleared by `goToStep` because every
+      // entry path into Step 3 other than the slot picker's dedicated
+      // affordance funnels through here (NAV_FORWARD, NAV_BACK,
+      // step-dot click). The slot-picker affordance bypasses
+      // `goToStep` and uses {@link editAcFromSlotPicker}, which sets
+      // current_step and ac_step_origin in a single write so this
+      // clear can never race it.
+      if (
+        s.current_step === step &&
+        s.return_to === nextReturnTo &&
+        s.ac_step_origin === null
+      ) {
+        return s;
+      }
+      return {
+        ...s,
+        current_step: step,
+        return_to: nextReturnTo,
+        ac_step_origin: null,
+      };
     });
   },
 
@@ -433,6 +474,30 @@ export const bookingActions = {
    *  to clear an existing hint. */
   setReturnTo(step: StepId | null) {
     setState((s) => (s.return_to === step ? s : { ...s, return_to: step }));
+  },
+
+  /** Atomic action for the slot picker's "Update/Edit AC info" affordance.
+   *  Jumps to Step 3 AND records that the customer arrived from the slot
+   *  picker, so the AC step can render its contextual "you came back to
+   *  confirm AC details" banner. Atomic so the banner can't briefly flicker
+   *  on/off if a render reads state between two separate writes. Leaves
+   *  `return_to` alone so the wrapper's separate "stash where the
+   *  customer came from" hint (set by the same handler) survives the
+   *  navigation. */
+  editAcFromSlotPicker() {
+    setState((s) =>
+      s.current_step === 3 && s.ac_step_origin === "slot_picker"
+        ? s
+        : { ...s, current_step: 3, ac_step_origin: "slot_picker" },
+    );
+  },
+
+  /** Manually clear the AC-step origin hint — used by the AC step's
+   *  dismiss button on the slot-picker callout. */
+  setAcStepOrigin(origin: AcStepOrigin) {
+    setState((s) =>
+      s.ac_step_origin === origin ? s : { ...s, ac_step_origin: origin },
+    );
   },
 
   // Step 1

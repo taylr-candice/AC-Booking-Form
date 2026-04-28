@@ -27,19 +27,23 @@ const NAV_BACK = new Set([
   "button-back-mobile",
   "button-back-desktop",
 ]);
-// Direct jumps to a specific step. Each entry maps a data-testid the
-// inner iframe might emit to the StepId we should jump to. Today only
-// the slot picker uses this — its "Update/Edit AC info" affordances
-// take the customer straight back to the AC step (id 3) instead of
-// making them tap "Back" twice.
-const NAV_GOTO: Record<string, StepId> = {
-  "button-edit-ac": 3,
-};
+// data-testid emitted by the slot picker's "Update/Edit AC info"
+// affordance. Handled separately from NAV_FORWARD/NAV_BACK because
+// we need to do two extra things atomically with the navigation:
+//   1. Stash a `return_to` hint so the next "Continue" on the AC step
+//      flings the customer straight back to where they came from
+//      instead of walking them through the intermediate steps.
+//   2. Record the origin (so the AC step can render its contextual
+//      "you came back to confirm AC details" banner) — the
+//      `editAcFromSlotPicker` action does the navigation + origin
+//      writes atomically.
+const TESTID_EDIT_AC = "button-edit-ac";
 // Step ids the wrapper should remember as "where the customer came
-// from" when a NAV_GOTO jump fires from that step. Used to short-circuit
-// the next "Continue" tap on the destination step so the customer is
-// flung straight back instead of walked through the steps in between.
-// Today only the slot picker (Step 5) uses this affordance.
+// from" when the edit-AC affordance fires from that step. Used to
+// short-circuit the next "Continue" tap on the AC step so the
+// customer is flung straight back instead of walked through the
+// steps in between. Today only the slot picker (Step 5) uses this
+// affordance.
 const NAV_GOTO_RETURN_FROM: ReadonlySet<StepId> = new Set<StepId>([5]);
 
 type Step = {
@@ -98,13 +102,12 @@ export function BookingFlowDesktop() {
         const fresh = getBookingSession();
         const prev = prevStepId({ access_method: fresh.access_method }, fresh.current_step);
         bookingActions.goToStep(prev);
-      } else if (id in NAV_GOTO) {
-        const target = NAV_GOTO[id];
+      } else if (id === TESTID_EDIT_AC) {
         const fresh = getBookingSession();
         if (NAV_GOTO_RETURN_FROM.has(fresh.current_step)) {
           bookingActions.setReturnTo(fresh.current_step);
         }
-        bookingActions.goToStep(target);
+        bookingActions.editAcFromSlotPicker();
       }
     };
     doc.addEventListener("click", handler);

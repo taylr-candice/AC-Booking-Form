@@ -10,6 +10,7 @@ import {
   Minus,
   Plus,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
@@ -121,6 +122,13 @@ export function AcDesktop() {
   const unitId = useBookingSelector((s) => s.unit_id);
   const acTypeFromUnit = getAcType(unitId);
   const recorded = getAcRecord(unitId);
+  // Surface the contextual "you came back from the slot picker" banner
+  // only when the customer arrived via the slot picker's Update/Edit AC
+  // affordance. Cleared by `goToStep` (every other entry path), and by
+  // the dismiss button on the banner itself.
+  const cameFromSlotPicker = useBookingSelector(
+    (s) => s.ac_step_origin === "slot_picker",
+  );
 
   const [override, setOverride] = useState<Override>(null);
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
@@ -271,6 +279,30 @@ export function AcDesktop() {
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
       <div className="w-full max-w-xl">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
+
+          {cameFromSlotPicker && (
+            <div
+              className="mb-6 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed"
+              style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
+              data-testid="callout-from-slot-picker-desktop"
+            >
+              <Info className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="flex-1">
+                <span className="font-semibold">You came back to confirm your AC details.</span>{" "}
+                Updating these now means we're more likely to finish your service in one visit.
+              </div>
+              <button
+                type="button"
+                onClick={() => bookingActions.setAcStepOrigin(null)}
+                aria-label="Dismiss"
+                data-testid="button-dismiss-from-slot-picker-desktop"
+                className="-m-1 rounded p-1 transition hover:opacity-70"
+                style={{ color: "#9D174D" }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           <div className="mb-8">
             <h1 className="text-2xl font-semibold text-slate-900">{heading}</h1>
