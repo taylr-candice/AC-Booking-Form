@@ -18,6 +18,7 @@ import {
   formatRolloutDateRange,
   getBuildingBookings,
   getBuildingUnits,
+  latestBookingByUnit,
   summarizeBuildingRollout,
   type AdminBooking,
   type AdminBuilding,
@@ -218,12 +219,11 @@ function UnitsPanel({
       </div>
     );
   }
-  // Pick the most recent booking for each unit (last in the seeded list
-  // is the freshest one). Falling back to "no booking" otherwise.
-  const latestByUnit = new Map<string, AdminBooking>();
-  for (const b of bookings) {
-    latestByUnit.set(b.unitId, b);
-  }
+  // Pick the most recent booking for each unit so the status chip
+  // always reflects the unit's *current* booking — not whatever
+  // happened to come last in the array. Shared with the rollout
+  // summary so completion counts and unit chips can't disagree.
+  const latestByUnit = latestBookingByUnit(bookings);
   return (
     <ol className="flex flex-col gap-2">
       {units.map((unit) => {

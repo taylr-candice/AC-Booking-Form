@@ -1142,6 +1142,30 @@ export function getBuildingBookings(
 }
 
 /**
+ * Build a `unitId → latest booking` map from a list of bookings.
+ *
+ * "Latest" here is the booking with the highest `id` per unit — the
+ * seeded ids are monotonic (e.g. `bk-1042` is newer than `bk-1041`)
+ * and the live row sorts above the seeded ones (`bk-live` > `bk-…`),
+ * which is the precedence we want everywhere a unit's "current" booking
+ * is shown. Centralised here so the rollout summary and the building
+ * detail units panel can't disagree about which booking represents the
+ * unit right now.
+ */
+export function latestBookingByUnit(
+  bookings: readonly AdminBooking[],
+): Map<string, AdminBooking> {
+  const map = new Map<string, AdminBooking>();
+  for (const b of bookings) {
+    const existing = map.get(b.unitId);
+    if (!existing || b.id > existing.id) {
+      map.set(b.unitId, b);
+    }
+  }
+  return map;
+}
+
+/**
  * Per-building rollout summary used by the Buildings list and the
  * building detail header. All counts are derived — no caching, no
  * stored state — so the summary always agrees with `units` /
@@ -1191,20 +1215,13 @@ export function summarizeBuildingRollout(
 
   const bookedUnitIds = new Set(buildingBookings.map((b) => b.unitId));
 
-  // Per-unit "latest" booking is the one with the highest booking id
-  // (seed ids are monotonic — `bk-1042` is newer than `bk-1041`). A
-  // unit only counts as completed when *its latest* booking has reached
-  // a completion status, so an old `complete` booking superseded by a
-  // newer active re-booking no longer counts.
-  const latestBookingByUnit = new Map<string, AdminBooking>();
-  for (const b of buildingBookings) {
-    const existing = latestBookingByUnit.get(b.unitId);
-    if (!existing || b.id > existing.id) {
-      latestBookingByUnit.set(b.unitId, b);
-    }
-  }
+  // A unit only counts as completed when *its latest* booking has
+  // reached a completion status — so an old `complete` booking that
+  // was superseded by a newer active re-booking no longer counts.
+  // Uses the shared {@link latestBookingByUnit} helper so this matches
+  // the per-unit status shown in the building detail panel.
   const completedUnitIds = new Set(
-    Array.from(latestBookingByUnit.values())
+    Array.from(latestBookingByUnit(buildingBookings).values())
       .filter(
         (b) =>
           b.serviceStatus === "complete" ||
