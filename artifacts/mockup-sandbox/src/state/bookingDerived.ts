@@ -85,6 +85,20 @@ export function prevStepId(
 }
 
 /**
+ * Step 1 gate: the "Continue" button stays disabled until the user has
+ * picked BOTH a property (`unit_id`) and a role.
+ *
+ * Kept as a pure selector so it can be unit-tested without mounting the
+ * Step 1 page, and so the mobile and desktop variants share one source
+ * of truth for the rule.
+ */
+export function canContinueStep1(
+  s: Pick<BookingState, "unit_id" | "role">,
+): boolean {
+  return !!s.unit_id && !!s.role;
+}
+
+/**
  * Reactive helper: returns the per-page eyebrow text "Step X of Y" for the
  * given canonical `stepId`, where Y reflects the current visible-step total
  * (6 in normal flows, 5 in coordination flows).

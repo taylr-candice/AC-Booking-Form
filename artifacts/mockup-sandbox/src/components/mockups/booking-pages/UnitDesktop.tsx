@@ -8,7 +8,7 @@ import {
   User,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
-import { useStepLabel } from "../../../state/bookingDerived";
+import { canContinueStep1, useStepLabel } from "../../../state/bookingDerived";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -35,7 +35,7 @@ export function UnitDesktop() {
   }, [sessionUnitId]);
 
   const selected = UNITS.find((u) => u.id === selectedId);
-  const canContinue = !!selectedId && !!role;
+  const canContinue = canContinueStep1({ unit_id: selectedId, role });
 
   const selectUnit = (id: string) => {
     setSelectedId(id);
