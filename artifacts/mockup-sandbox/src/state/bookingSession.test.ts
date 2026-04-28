@@ -183,6 +183,64 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
   });
 });
 
+// The 7→6 step migration must NOT keep down-shifting blobs that the
+// store itself just wrote. Without a schema marker, every read of a
+// freshly-persisted `current_step >= 3` would shift it down by 1
+// (because the migration treats anything >2 as legacy 7-step data).
+// `getBookingSession()` re-reads storage on every call (for cross-iframe
+// sync), so a customer reaching Step 5 would silently regress to Step 4
+// the next time any handler peeked at the session — which would in turn
+// break Task #46's "Update AC info" → slot-picker short-circuit. The
+// fix is a `__schema` version field on every write that the migrator
+// uses to skip the down-shift for current-shape blobs.
+describe("migratePersistedSession — current-schema blobs (__schema marker)", () => {
+  it("does not down-shift current_step when __schema >= current version", () => {
+    const out = migratePersistedSession(
+      persisted({ __schema: 2, current_step: 5 }),
+    );
+    expect(out.current_step).toBe(5);
+  });
+
+  it("trusts every in-range step verbatim when __schema is set", () => {
+    for (const step of [1, 2, 3, 4, 5, 6] as const) {
+      const out = migratePersistedSession(
+        persisted({ __schema: 2, current_step: step }),
+      );
+      expect(out.current_step).toBe(step);
+    }
+  });
+
+  it("still clamps out-of-range steps to Step 1 even with __schema set", () => {
+    const out = migratePersistedSession(
+      persisted({ __schema: 2, current_step: 99 }),
+    );
+    expect(out.current_step).toBe(1);
+  });
+
+  it("does not leak the __schema marker into the returned BookingState", () => {
+    const out = migratePersistedSession(
+      persisted({ __schema: 2, current_step: 3 }),
+    ) as Record<string, unknown>;
+    expect(out.__schema).toBeUndefined();
+  });
+
+  it("falls back to legacy 7→6 down-shift when __schema is missing", () => {
+    // Sanity check that the marker is what gates the behavior — a blob
+    // without it must still walk the legacy migration path so old
+    // sessionStorage payloads from before the marker existed stay
+    // correct.
+    const out = migratePersistedSession(persisted({ current_step: 5 }));
+    expect(out.current_step).toBe(4);
+  });
+
+  it("falls back to legacy down-shift when __schema is older than current", () => {
+    const out = migratePersistedSession(
+      persisted({ __schema: 1, current_step: 5 }),
+    );
+    expect(out.current_step).toBe(4);
+  });
+});
+
 // ─── B. Step 5 cascade-clearing in bookingActions ──────────────────────────
 
 describe("Step 5 cascade clears (bookingActions)", () => {

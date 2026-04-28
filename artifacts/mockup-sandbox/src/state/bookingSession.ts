@@ -245,13 +245,34 @@ const INITIAL_STATE: BookingState = {
 const isBrowser = typeof window !== "undefined";
 
 /**
+ * Schema version stamped on every persisted blob this module writes.
+ *
+ * The 7-step → 6-step migration in {@link migratePersistedSession} is
+ * lossy by design: it shifts any persisted `current_step > 2` down by
+ * one. That's correct for legacy blobs (the old Step 5 is the new
+ * Step 4) but catastrophic to apply to a freshly-written current-schema
+ * blob — `getBookingSession()` re-reads storage on every call (for
+ * cross-iframe sync), so a customer who reaches Step 5 would have
+ * their step silently rewritten to 4 the next time any handler peeked
+ * at the session.
+ *
+ * Bumping this constant is how we tell the migrator "this blob has
+ * already been rewritten in current-schema shape — leave the step
+ * alone." Legacy blobs (no `__schema` field) keep getting the
+ * down-shift treatment exactly once.
+ */
+const SCHEMA_VERSION = 2;
+
+/**
  * Migrate a raw persisted session blob (as stored in sessionStorage under
  * `STORAGE_KEY`) into the canonical {@link BookingState}.
  *
  * Pure function — no DOM access — so unit tests can drive it directly
  * without spinning up a browser environment.
  *
- * Migrates legacy persisted state from the 7-step flow:
+ * Migrates legacy persisted state from the 7-step flow (only when the
+ * blob is missing `__schema` — current-schema blobs are passed through
+ * untouched):
  *  - Old Step 2 (standalone "Your role") → new Step 1 (role lives on Unit page)
  *  - Old Steps 3..7 shift down by one to new Steps 2..6
  * Anything outside the new 1..6 range gets clamped to a safe value (Step 1).
@@ -264,15 +285,31 @@ export function migratePersistedSession(raw: string | null): BookingState {
   if (!raw) return INITIAL_STATE;
   try {
     const parsed = JSON.parse(raw) as Partial<BookingState> & {
+      __schema?: unknown;
       current_step?: unknown;
     };
     const rawStep = parsed.current_step;
+    const schema =
+      typeof parsed.__schema === "number" ? parsed.__schema : 0;
+    // Drop the wrapper field so it doesn't leak into BookingState.
+    const { __schema: _ignored, ...rest } = parsed;
+    void _ignored;
+
     let step: StepId = 1;
     if (typeof rawStep === "number" && Number.isInteger(rawStep)) {
-      const migrated = rawStep === 2 ? 1 : rawStep > 2 ? rawStep - 1 : rawStep;
-      if (migrated >= 1 && migrated <= 6) step = migrated as StepId;
+      // Current-schema blobs trust the persisted step verbatim (subject
+      // to the 1..6 range clamp). Legacy blobs get the 7→6 down-shift.
+      const candidate =
+        schema >= SCHEMA_VERSION
+          ? rawStep
+          : rawStep === 2
+            ? 1
+            : rawStep > 2
+              ? rawStep - 1
+              : rawStep;
+      if (candidate >= 1 && candidate <= 6) step = candidate as StepId;
     }
-    return { ...INITIAL_STATE, ...parsed, current_step: step };
+    return { ...INITIAL_STATE, ...rest, current_step: step };
   } catch {
     return INITIAL_STATE;
   }
@@ -291,7 +328,12 @@ function readFromStorage(): BookingState {
 function writeToStorage(state: BookingState) {
   if (!isBrowser) return;
   try {
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Stamp the current schema version so the next read can skip the
+    // legacy 7→6 down-shift. See {@link SCHEMA_VERSION}.
+    window.sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ __schema: SCHEMA_VERSION, ...state }),
+    );
   } catch {
     /* quota / private mode — ignore */
   }
