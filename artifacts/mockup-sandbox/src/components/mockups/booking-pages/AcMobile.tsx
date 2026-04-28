@@ -403,7 +403,23 @@ export function AcMobile() {
                     </p>
                   </>
                 ) : (
-                  copy.addonHelper.map((p, i) => <p key={i}>{p}</p>)
+                  <>
+                    {copy.addonHelper.map((p, i) => (
+                      <p key={i}>{p}</p>
+                    ))}
+                    <p>
+                      Not sure what an indoor unit head looks like?{" "}
+                      <button
+                        type="button"
+                        onClick={() => setExampleModal("split-indoor")}
+                        data-testid="button-see-example-inline"
+                        className="inline-flex items-center gap-1 font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                      >
+                        <Eye className="h-3 w-3" />
+                        See example
+                      </button>
+                    </p>
+                  </>
                 )}
               </div>
             </div>
