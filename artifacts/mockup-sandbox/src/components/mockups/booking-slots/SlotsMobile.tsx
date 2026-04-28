@@ -10,7 +10,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import { getBookingDurationMinutes } from "../../../state/bookingDerived";
+import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
 import { useBookingSession } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
@@ -49,7 +49,10 @@ const DAYS: Day[] = [
     morning:   { id: "20260504-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
     afternoon: { id: "20260504-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 105 } },
   { date: "2026-05-05", weekday: "Tue", day: 5, month: "May",
-    morning:   { id: "20260505-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: MORNING_WINDOW_MINUTES },
+    // Almost-full morning: 20 min left of a 240-min window. For the
+    // default 45-min job, this triggers the "Not enough time left"
+    // state — visible without the user editing the AC step.
+    morning:   { id: "20260505-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 220 },
     afternoon: { id: "20260505-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 45 } },
   { date: "2026-05-06", weekday: "Wed", day: 6, month: "May",
     morning:   { id: "20260506-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 120 },
@@ -74,13 +77,15 @@ export function SlotsMobile() {
   // If the customer's job size grows (e.g. they edit the AC step in
   // another iframe via cross-iframe sessionStorage sync), an already-
   // selected slot might no longer fit. Drop it so the Continue button
-  // can't carry a stale, now-invalid selection forward.
+  // can't carry a stale, now-invalid selection forward. Same
+  // `slotFitStatus` source of truth used by the slot tile so the two
+  // can never disagree.
   const selectedSlotFits = useMemo(() => {
     if (!selected) return true;
     for (const d of DAYS) {
       for (const slot of [d.morning, d.afternoon]) {
         if (slot.id === selected) {
-          return slot.windowMinutes - slot.bookedMinutes >= jobMinutes;
+          return slotFitStatus(slot, jobMinutes) === "available";
         }
       }
     }
@@ -269,15 +274,16 @@ function SlotCard({
 }) {
   // Fit logic stays intact from #27 — only the rendering changes:
   // customers see slots as plain selectable windows, never minute math.
-  const availableMinutes = Math.max(0, slot.windowMinutes - slot.bookedMinutes);
-  const fits = availableMinutes >= jobMinutes;
+  const status = slotFitStatus(slot, jobMinutes);
+  const fits = status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
 
-  // Single generic, non-numeric reason for any unfit slot — whether the
-  // window is fully booked or just doesn't have room for this customer's
-  // job. The customer doesn't need to reason about the distinction.
-  const reason = "Not enough room left in this window";
+  // Two distinct reasons so the customer can tell whether the window is
+  // sold out for everyone ("Full") or just too short for THIS particular
+  // booking — the latter hints they could shrink an add-on and try again.
+  const reason =
+    status === "full" ? "Full" : "Not enough time left for this service";
 
   return (
     <button

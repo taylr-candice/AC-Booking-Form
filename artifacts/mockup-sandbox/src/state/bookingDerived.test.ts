@@ -21,6 +21,7 @@ import {
   MINUTES_PER_SYSTEM,
   nextStepId,
   prevStepId,
+  slotFitStatus,
   totalSteps,
   UNSURE_FALLBACK_MINUTES,
   visibleIndex,
@@ -310,5 +311,38 @@ describe("formatDurationMinutes — compact slot-tile labels", () => {
 
   it("clamps negative inputs to zero so a slot can't display a negative remainder", () => {
     expect(formatDurationMinutes(-5)).toBe("0m");
+  });
+});
+
+describe("slotFitStatus — customer-side slot picker label", () => {
+  const slot = (windowMinutes: number, bookedMinutes: number) => ({
+    windowMinutes,
+    bookedMinutes,
+  });
+
+  it("returns 'available' when the window has more than enough time left", () => {
+    expect(slotFitStatus(slot(240, 60), 45)).toBe("available");
+  });
+
+  it("returns 'available' when the job exactly equals the remaining minutes", () => {
+    expect(slotFitStatus(slot(240, 195), 45)).toBe("available");
+  });
+
+  it("returns 'not_enough_time' when the window has SOME time left but less than the job needs", () => {
+    expect(slotFitStatus(slot(240, 220), 45)).toBe("not_enough_time");
+    expect(slotFitStatus(slot(240, 196), 45)).toBe("not_enough_time");
+  });
+
+  it("returns 'full' when the window is completely booked out, regardless of job size", () => {
+    expect(slotFitStatus(slot(240, 240), 45)).toBe("full");
+    expect(slotFitStatus(slot(240, 240), 1)).toBe("full");
+    // Defensive: an over-booked window (clamped remaining = 0) still reads as full.
+    expect(slotFitStatus(slot(240, 999), 45)).toBe("full");
+  });
+
+  it("treats a 0-minute job as 'is there ANY room left' so empty windows don't read as full", () => {
+    // Mirrors the admin-side `slotIsAvailable` semantics in adminMockData.ts.
+    expect(slotFitStatus(slot(240, 239), 0)).toBe("available");
+    expect(slotFitStatus(slot(240, 240), 0)).toBe("full");
   });
 });

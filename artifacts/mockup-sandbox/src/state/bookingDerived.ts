@@ -149,6 +149,46 @@ export function getBookingDurationMinutes(
   );
 }
 
+// ─── Customer-side slot fit status ────────────────────────────────────────
+
+/**
+ * Why the customer sees a particular state for a time-based slot.
+ *
+ * - `available`     — there's enough time left in the window for this job.
+ * - `not_enough_time` — the window has SOME time left, but less than the job
+ *                       requires (e.g. 30 min remaining, job is 45 min).
+ * - `full`          — the window is completely booked out (0 minutes left).
+ *
+ * The mirror of {@link slotIsAvailable} from `adminMockData.ts`, but
+ * scoped to the time-based fields the customer slot picker actually
+ * models (it has no notion of count-based windows). When ops run a
+ * count-based window in admin and it's out of slots, the customer
+ * picker just sees a window with 0 remaining minutes and shows "Full",
+ * which is the same plain message — the distinction is admin-only.
+ */
+export type SlotFitStatus = "available" | "not_enough_time" | "full";
+
+/**
+ * Decide which of the three states a time-based slot is in for the
+ * customer's current job size. Pure function — no DOM, no session
+ * access — so the slot picker variants and their tests share one
+ * source of truth for the rule.
+ *
+ * `jobMinutes` is treated as at least 1: a "0-minute job" makes no
+ * sense, so the function falls back to "is there ANY room left?",
+ * matching the admin-side {@link slotIsAvailable} semantics.
+ */
+export function slotFitStatus(
+  slot: { windowMinutes: number; bookedMinutes: number },
+  jobMinutes: number,
+): SlotFitStatus {
+  const remaining = Math.max(0, slot.windowMinutes - slot.bookedMinutes);
+  const required = Math.max(jobMinutes, 1);
+  if (remaining >= required) return "available";
+  if (remaining <= 0) return "full";
+  return "not_enough_time";
+}
+
 /**
  * Compact human-friendly minutes label, e.g. `45m`, `1h 45m`, `4h`.
  *
