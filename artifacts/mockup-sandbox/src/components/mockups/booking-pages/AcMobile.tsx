@@ -387,18 +387,20 @@ export function AcMobile() {
                 {effectiveType === "ducted" ? (
                   <>
                     <p>
-                      If you count more return-air grilles in the apartment than shown above, add the extras here. Not sure what one looks like?{" "}
+                      If your apartment has more indoor unit / return-air grilles than shown in the inclusions above, add the extras here.
+                    </p>
+                    <p>
+                      Not sure what a return-air grille looks like?{" "}
                       <button
                         type="button"
                         onClick={() => setExampleModal("ducted-filter")}
                         data-testid="button-see-example-inline"
-                        className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                        className="inline-flex items-center gap-1 font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
                       >
+                        <Eye className="h-3 w-3" />
                         See example
                       </button>
-                      .
                     </p>
-                    <p>Filters sit behind large return-air grilles — not small air vents or outlets.</p>
                   </>
                 ) : (
                   copy.addonHelper.map((p, i) => <p key={i}>{p}</p>)
