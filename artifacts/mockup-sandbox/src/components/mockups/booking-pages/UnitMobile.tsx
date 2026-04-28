@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Gauge,
-  CalendarCheck,
-  MessageSquare,
-  User,
   CheckCircle2,
   ChevronDown,
 } from "lucide-react";
@@ -159,29 +155,6 @@ export function UnitMobile() {
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
-
-      <nav className="flex items-center justify-around bg-slate-900 px-4 py-3 text-white">
-        <NavIcon icon={<Gauge className="h-5 w-5" />} label="Dash" />
-        <NavIcon icon={<CalendarCheck className="h-5 w-5" />} label="Bookings" active />
-        <div className="text-base font-bold tracking-tight">
-          tay<span style={{ color: "#ff3b6e" }}>lr</span>
-          <span className="text-[#ff3b6e]">.</span>
-        </div>
-        <NavIcon icon={<MessageSquare className="h-5 w-5" />} label="Chat" />
-        <NavIcon icon={<User className="h-5 w-5" />} label="Me" />
-      </nav>
     </div>
-  );
-}
-
-function NavIcon({ icon, label, active }: { icon: React.ReactNode; label: string; active?: boolean }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className={`grid place-items-center rounded-full p-1.5 ${active ? "text-white" : "text-slate-300"}`}
-    >
-      {icon}
-    </button>
   );
 }
