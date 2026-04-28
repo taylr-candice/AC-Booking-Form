@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Sun,
@@ -94,6 +94,18 @@ export function SlotsDesktop() {
   const week = weeks[weekIdx] ?? [];
   const selectedDay = ALL_DAYS.find((d) => d.morning.id === selected || d.afternoon.id === selected);
   const selectedSlot = ALL_DAYS.flatMap((d) => [d.morning, d.afternoon]).find((s) => s.id === selected);
+
+  // If the customer's job size grows (e.g. they edit the AC step in
+  // another iframe via cross-iframe sessionStorage sync), an already-
+  // selected slot might no longer fit. Drop it so the Continue button
+  // and the "Selected slot" panel can't carry a stale, now-invalid
+  // selection forward.
+  const selectedSlotFits = selectedSlot
+    ? selectedSlot.windowMinutes - selectedSlot.bookedMinutes >= jobMinutes
+    : true;
+  useEffect(() => {
+    if (selected && !selectedSlotFits) setSelected(null);
+  }, [selected, selectedSlotFits]);
 
   const monthLabel = useMemo(() => {
     if (!week.length) return "";

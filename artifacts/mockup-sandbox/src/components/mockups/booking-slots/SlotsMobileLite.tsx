@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -61,6 +61,25 @@ export function SlotsMobileLite() {
   const [selected, setSelected] = useState<string | null>(null);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
+
+  // If the customer's job size grows (e.g. they edit the AC step in
+  // another iframe via cross-iframe sessionStorage sync), an already-
+  // selected slot might no longer fit. Drop it so the Continue button
+  // can't carry a stale, now-invalid selection forward.
+  const selectedSlotFits = useMemo(() => {
+    if (!selected) return true;
+    for (const d of DAYS) {
+      for (const slot of [d.morning, d.afternoon]) {
+        if (slot.id === selected) {
+          return slot.windowMinutes - slot.bookedMinutes >= jobMinutes;
+        }
+      }
+    }
+    return false;
+  }, [selected, jobMinutes]);
+  useEffect(() => {
+    if (selected && !selectedSlotFits) setSelected(null);
+  }, [selected, selectedSlotFits]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
