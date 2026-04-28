@@ -43,7 +43,7 @@ const COPY: Record<KnownType, Copy> = {
     systemsLabel: "Number of ducted systems",
     systemsUnitSingular: "ducted service",
     systemsUnitPlural: "ducted services",
-    addonLabel: "Extra filters",
+    addonLabel: "Extra return-air grilles or extra indoor units",
     // NOTE: For ducted, the rendered helper text below is the inline JSX
     // branch (it includes the "See example" inline link). This array is kept
     // in sync as a fallback / contract for future renderers but isn't shown
