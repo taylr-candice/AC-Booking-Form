@@ -480,12 +480,23 @@ export function parseUnitsImport(
       continue;
     }
 
+    // The CSV layer doesn't currently carry `buildingId` — building
+    // assignment is edited per-unit in the Units view. For updates we
+    // preserve the existing unit's building; for new rows we default to
+    // whatever building the first existing unit lives in (a safe
+    // placeholder for a mockup; the admin can re-assign from the unit
+    // editor afterwards).
+    const buildingId = before
+      ? before.buildingId
+      : (currentUnits[0]?.buildingId ?? "");
+
     const parsed: AdminUnit = {
       id: before ? before.id : "",
       addressLine1: addr1,
       addressLine2: addr2,
       ac: { type: acType, systems, additional },
       agentId,
+      buildingId,
     };
 
     if (before) {

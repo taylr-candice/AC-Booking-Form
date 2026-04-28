@@ -7,7 +7,11 @@
 import { Download, Edit3, FileUp, Plus, X } from "lucide-react";
 import { useState } from "react";
 
-import type { AdminAgent, AdminUnit } from "@/state/adminMockData";
+import type {
+  AdminAgent,
+  AdminBuilding,
+  AdminUnit,
+} from "@/state/adminMockData";
 import { formatUnitsCsv, unitsCsvTemplate } from "@/state/unitsCsv";
 
 import { FormField } from "./atoms";
@@ -18,10 +22,12 @@ export function UnitsView({
   units,
   setUnits,
   agents,
+  buildings,
 }: {
   units: AdminUnit[];
   setUnits: (next: AdminUnit[]) => void;
   agents: AdminAgent[];
+  buildings: AdminBuilding[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -120,11 +126,17 @@ export function UnitsView({
           <tbody>
             {units.map((u) => {
               const agent = u.agentId ? agents.find((a) => a.id === u.agentId) ?? null : null;
+              const building = buildings.find((b) => b.id === u.buildingId) ?? null;
               return (
                 <tr key={u.id} className="border-b border-slate-100 last:border-b-0">
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-900">{u.addressLine1}</div>
                     <div className="text-[11px] text-slate-500">{u.addressLine2}</div>
+                    {building && (
+                      <div className="mt-0.5 text-[11px] font-medium text-slate-600">
+                        {building.name}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3 capitalize">
                     {u.ac.type === "unknown" ? (
@@ -172,9 +184,11 @@ export function UnitsView({
                   addressLine2: "",
                   ac: { type: "split", systems: 1, additional: 0 },
                   agentId: null,
+                  buildingId: buildings[0]?.id ?? "",
                 }
           }
           agents={agents}
+          buildings={buildings}
           onSave={editingId ? saveUnit : createUnit}
           onCancel={() => {
             setEditingId(null);
@@ -202,12 +216,14 @@ export function UnitsView({
 function UnitEditor({
   unit,
   agents,
+  buildings,
   onSave,
   onCancel,
   isCreate,
 }: {
   unit: AdminUnit;
   agents: AdminAgent[];
+  buildings: AdminBuilding[];
   onSave: (next: AdminUnit) => void;
   onCancel: () => void;
   isCreate: boolean;
@@ -301,6 +317,21 @@ function UnitEditor({
               />
             </FormField>
           </div>
+          <FormField label="Building">
+            <select
+              value={draft.buildingId}
+              onChange={(e) =>
+                setDraft({ ...draft, buildingId: e.target.value })
+              }
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+            >
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
           <FormField label="Managing agent">
             <select
               value={draft.agentId ?? ""}

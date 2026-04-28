@@ -33,6 +33,7 @@ function makeUnits(): AdminUnit[] {
       addressLine2: "Lot 10 · Suburb NSW 2000",
       ac: { type: "split", systems: 2, additional: 0 },
       agentId: "ag-001",
+      buildingId: "bldg-test",
     },
     {
       id: "u2",
@@ -40,6 +41,7 @@ function makeUnits(): AdminUnit[] {
       addressLine2: "Lot 12 · Suburb NSW 2000",
       ac: { type: "split", systems: 1, additional: 0 },
       agentId: "ag-002",
+      buildingId: "bldg-test",
     },
     {
       id: "u3",
@@ -47,6 +49,7 @@ function makeUnits(): AdminUnit[] {
       addressLine2: "Lot 5 · Other NSW 2000",
       ac: { type: "ducted", systems: 1, additional: 0 },
       agentId: null,
+      buildingId: "bldg-test",
     },
   ];
 }

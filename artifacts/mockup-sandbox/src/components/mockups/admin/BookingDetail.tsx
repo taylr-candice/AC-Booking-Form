@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import {
   bookerAgencyName,
+  getBuildingForUnit,
   requiresTenantCoordination,
   SERVICE_STATUS_FLOW,
   type AdminAgent,
@@ -164,6 +165,18 @@ export function BookingDetail({
                   {unit.addressLine1}
                 </div>
                 <div className="text-[12px] text-slate-500">{unit.addressLine2}</div>
+                {(() => {
+                  const building = getBuildingForUnit(unit);
+                  if (!building) return null;
+                  return (
+                    <div
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                      style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+                    >
+                      {building.name}
+                    </div>
+                  );
+                })()}
                 {agent && (
                   <div className="mt-3 rounded-lg bg-slate-50 p-3 text-[12px] text-slate-700">
                     <div className="text-[10px] uppercase tracking-wider text-slate-500">

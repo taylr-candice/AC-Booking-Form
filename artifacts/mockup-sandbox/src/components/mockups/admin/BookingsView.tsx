@@ -9,7 +9,9 @@ import { Search, TriangleAlert } from "lucide-react";
 
 import {
   bookerAgencyName,
+  getBuildingForUnit,
   type AdminBooking,
+  type AdminBuilding,
   type AdminUnit,
   type PaymentStatus,
   type ServiceStatus,
@@ -53,8 +55,11 @@ function CustomerCell({ booking }: { booking: AdminBooking }) {
 export function BookingsView({
   bookings,
   units,
+  buildings,
   statusFilter,
   onStatusFilter,
+  buildingFilter,
+  onBuildingFilter,
   search,
   onSearch,
   onOpen,
@@ -62,8 +67,11 @@ export function BookingsView({
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
+  buildings: AdminBuilding[];
   statusFilter: "all" | ServiceStatus | PaymentStatus;
   onStatusFilter: (s: "all" | ServiceStatus | PaymentStatus) => void;
+  buildingFilter: string;
+  onBuildingFilter: (id: string) => void;
   search: string;
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
@@ -95,6 +103,10 @@ export function BookingsView({
         if (b.serviceStatus !== statusFilter) return false;
       }
     }
+    if (buildingFilter !== "all") {
+      const unit = units.find((u) => u.id === b.unitId);
+      if (!unit || unit.buildingId !== buildingFilter) return false;
+    }
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
       const unit = units.find((u) => u.id === b.unitId);
@@ -123,15 +135,30 @@ export function BookingsView({
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
-        <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search by customer, ID, or address…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
-          />
+        <div className="flex flex-1 items-center gap-2">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              placeholder="Search by customer, ID, or address…"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+            />
+          </div>
+          <select
+            value={buildingFilter}
+            onChange={(e) => onBuildingFilter(e.target.value)}
+            aria-label="Filter by building"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+          >
+            <option value="all">All buildings</option>
+            {buildings.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {filterChips.map((chip) => {
@@ -219,6 +246,15 @@ export function BookingsView({
                         {unit?.addressLine1 ?? b.unitId}
                       </div>
                       <div className="text-[11px] text-slate-500">{unit?.addressLine2}</div>
+                      {(() => {
+                        const building = getBuildingForUnit(unit ?? null);
+                        if (!building) return null;
+                        return (
+                          <div className="mt-0.5 text-[11px] font-medium text-slate-600">
+                            {building.name}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 font-medium text-slate-900">

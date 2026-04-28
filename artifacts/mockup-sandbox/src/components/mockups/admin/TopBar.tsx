@@ -5,7 +5,12 @@
 
 import { Sparkles } from "lucide-react";
 
-import type { AdminBooking } from "@/state/adminMockData";
+import {
+  getBuildingForUnit,
+  type AdminBooking,
+  type AdminBuilding,
+  type AdminUnit,
+} from "@/state/adminMockData";
 
 import { BRAND_DEEP, BRAND_SOFT } from "./theme";
 import type { ViewId } from "./types";
@@ -13,28 +18,47 @@ import type { ViewId } from "./types";
 export function TopBar({
   view,
   selectedBookingId,
+  selectedBuildingId,
   bookings,
+  buildings,
+  units,
 }: {
   view: ViewId;
   selectedBookingId: string | null;
+  selectedBuildingId: string | null;
   bookings: AdminBooking[];
+  buildings: AdminBuilding[];
+  units: AdminUnit[];
 }) {
   let title = "";
   let crumb = "";
   if (view === "bookings") {
     title = selectedBookingId ? "Booking detail" : "Bookings";
     const b = bookings.find((x) => x.id === selectedBookingId);
+    const unit = b ? units.find((u) => u.id === b.unitId) ?? null : null;
+    const building = getBuildingForUnit(unit);
     crumb = selectedBookingId
-      ? `Bookings / ${b?.id ?? selectedBookingId}`
+      ? `Bookings / ${building ? `${building.name} · ` : ""}${b?.id ?? selectedBookingId}`
       : "All bookings across the workspace";
   } else if (view === "payments") {
     title = selectedBookingId ? "Booking detail" : "Payments";
+    const b = bookings.find((x) => x.id === selectedBookingId);
+    const unit = b ? units.find((u) => u.id === b.unitId) ?? null : null;
+    const building = getBuildingForUnit(unit);
     crumb = selectedBookingId
-      ? `Payments / ${selectedBookingId}`
+      ? `Payments / ${building ? `${building.name} · ` : ""}${selectedBookingId}`
       : "Bookings filtered by payment status";
   } else if (view === "calendar") {
     title = "Slot calendar";
     crumb = "Open / close days, edit windows";
+  } else if (view === "buildings") {
+    const building = buildings.find((b) => b.id === selectedBuildingId);
+    title = selectedBuildingId
+      ? building?.name ?? "Building"
+      : "Buildings";
+    crumb = selectedBuildingId
+      ? `Buildings / ${building?.name ?? selectedBuildingId}`
+      : "AC rollouts grouped by residential building";
   } else if (view === "units") {
     title = "Units";
     crumb = "AC config on file (the source of customer pre-fill)";

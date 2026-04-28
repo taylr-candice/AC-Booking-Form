@@ -22,9 +22,11 @@ import {
   liveBookingFromSession,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
+  SEEDED_BUILDINGS,
   SEEDED_UNITS,
   type AdminAgent,
   type AdminBooking,
+  type AdminBuilding,
   type AdminCalendarDay,
   type AdminUnit,
   type PaymentStatus,
@@ -35,6 +37,8 @@ import { useBookingSession } from "@/state/bookingSession";
 import { AgentsView } from "./AgentsView";
 import { BookingDetail } from "./BookingDetail";
 import { BookingsView } from "./BookingsView";
+import { BuildingDetail } from "./BuildingDetail";
+import { BuildingsView } from "./BuildingsView";
 import { CalendarView } from "./CalendarView";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -57,23 +61,50 @@ export function AdminApp() {
     ? [liveBooking, ...seededBookings]
     : seededBookings;
 
+  // Buildings are not currently editable from the admin UI — but we hold
+  // them in state so future tasks (e.g. add a building, rename one) only
+  // need to flip a `setBuildings` setter through.
+  const [buildings] = useState<AdminBuilding[]>([...SEEDED_BUILDINGS]);
+
   const [view, setView] = useState<ViewId>("bookings");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
+    null,
+  );
 
   // When jumping to Payments, default the bookings list to the payments filter.
   const [bookingsStatusFilter, setBookingsStatusFilter] =
     useState<"all" | ServiceStatus | PaymentStatus>("all");
   const [search, setSearch] = useState("");
+  // Active building filter on the Bookings list ("all" = no filter).
+  const [bookingsBuildingFilter, setBookingsBuildingFilter] =
+    useState<string>("all");
 
   function handleNav(id: ViewId) {
     setView(id);
     setSelectedBookingId(null);
+    setSelectedBuildingId(null);
     if (id === "payments") {
       setBookingsStatusFilter("pending");
     } else if (id === "bookings") {
       setBookingsStatusFilter("all");
     }
     setSearch("");
+    setBookingsBuildingFilter("all");
+  }
+
+  /**
+   * Open the bookings list filtered to a specific building (used by
+   * "View bookings" links inside the Buildings view). Clears any
+   * status filter / search so the building filter is the only lens.
+   */
+  function openBookingsForBuilding(buildingId: string) {
+    setView("bookings");
+    setSelectedBookingId(null);
+    setSelectedBuildingId(null);
+    setBookingsStatusFilter("all");
+    setSearch("");
+    setBookingsBuildingFilter(buildingId);
   }
 
   // Service-status advance / payment status / notes edits flow back into
@@ -89,7 +120,14 @@ export function AdminApp() {
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['Inter'] text-slate-900">
       <Sidebar activeView={view} onNav={handleNav} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar view={view} selectedBookingId={selectedBookingId} bookings={allBookings} />
+        <TopBar
+          view={view}
+          selectedBookingId={selectedBookingId}
+          selectedBuildingId={selectedBuildingId}
+          bookings={allBookings}
+          buildings={buildings}
+          units={units}
+        />
         <main className="flex-1 overflow-y-auto px-8 py-6">
           {view === "bookings" || view === "payments" ? (
             selectedBookingId ? (
@@ -105,8 +143,11 @@ export function AdminApp() {
               <BookingsView
                 bookings={allBookings}
                 units={units}
+                buildings={buildings}
                 statusFilter={bookingsStatusFilter}
                 onStatusFilter={setBookingsStatusFilter}
+                buildingFilter={bookingsBuildingFilter}
+                onBuildingFilter={setBookingsBuildingFilter}
                 search={search}
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}
@@ -119,8 +160,42 @@ export function AdminApp() {
             <CalendarView calendar={calendar} setCalendar={setCalendar} />
           )}
 
+          {view === "buildings" ? (
+            selectedBuildingId ? (
+              <BuildingDetail
+                buildingId={selectedBuildingId}
+                buildings={buildings}
+                units={units}
+                bookings={allBookings}
+                calendar={calendar}
+                onBack={() => setSelectedBuildingId(null)}
+                onOpenBooking={(bookingId) => {
+                  setSelectedBuildingId(null);
+                  setView("bookings");
+                  setBookingsStatusFilter("all");
+                  setSearch("");
+                  setBookingsBuildingFilter("all");
+                  setSelectedBookingId(bookingId);
+                }}
+                onOpenAllBookings={openBookingsForBuilding}
+              />
+            ) : (
+              <BuildingsView
+                buildings={buildings}
+                units={units}
+                bookings={allBookings}
+                onOpen={setSelectedBuildingId}
+              />
+            )
+          ) : null}
+
           {view === "units" && (
-            <UnitsView units={units} setUnits={setUnits} agents={agents} />
+            <UnitsView
+              units={units}
+              setUnits={setUnits}
+              agents={agents}
+              buildings={buildings}
+            />
           )}
 
           {view === "agents" && (

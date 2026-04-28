@@ -49,6 +49,7 @@ const UNITS: AdminUnit[] = [
     addressLine2: "Lot 3 · Greenway ACT 2900",
     ac: { type: "ducted", systems: 1, additional: 1 },
     agentId: "ag-001",
+    buildingId: "bldg-aspen",
   },
   {
     id: "u2",
@@ -56,6 +57,7 @@ const UNITS: AdminUnit[] = [
     addressLine2: "Lot 12 · Coogee NSW 2034",
     ac: { type: "split", systems: 2, additional: 0 },
     agentId: "ag-002",
+    buildingId: "bldg-marine",
   },
 ];
 

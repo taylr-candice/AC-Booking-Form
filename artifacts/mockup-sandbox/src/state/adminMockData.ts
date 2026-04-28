@@ -43,6 +43,39 @@ export type AdminUnit = {
   addressLine2: string;
   ac: { type: "split" | "ducted" | "unknown"; systems: number; additional: number };
   agentId: string | null;
+  /**
+   * The building this unit belongs to. Required: every unit must live
+   * inside one of the seeded buildings, so an admin can always group
+   * a unit's booking by its rollout. The building↔unit relationship
+   * has a single source of truth here on the unit (the building does
+   * NOT carry a `unitIds` field), so the two cannot drift apart —
+   * same lesson the agency↔unit refactor learned in Task #37.
+   */
+  buildingId: string;
+};
+
+/**
+ * A residential building Taylr is rolling out the AC service to.
+ *
+ * The Buildings view treats each one as its own rollout campaign:
+ * the admin sees the building's units, how many have booked vs.
+ * still to book, the date range bookings span, and a 14-day strip
+ * of where this building's bookings land inside the shared slot
+ * calendar.
+ *
+ * The unit list for a building is **derived** from
+ * `AdminUnit.buildingId` (see {@link getBuildingUnits}) — there is
+ * intentionally no `unitIds` field here, matching the pattern set
+ * by `AdminAgent` so the relationship has one source of truth.
+ */
+export type AdminBuilding = {
+  id: string;
+  /** Marketing-style name (e.g. "Aspen Village", "Marine Parade Apartments"). */
+  name: string;
+  /** Street address line, e.g. "335 Aspen Boulevard". */
+  addressLine1: string;
+  /** Suburb + state + postcode, e.g. "Greenway ACT 2900". */
+  addressLine2: string;
 };
 
 /**
@@ -140,57 +173,239 @@ export type AdminBooking = {
   isLive?: boolean;
 };
 
+// ─── Seeded buildings ───────────────────────────────────────────────────────
+
+/**
+ * Four buildings Taylr is currently rolling the AC service out to. The
+ * existing 7 demo bookings (u1, u2, u4, u5, u6, u7 — u3 too) are
+ * grouped under these so the Buildings view actually has something to
+ * display per rollout. A handful of "unbooked" units sit alongside in
+ * each building so the rollout view can show real "remaining" counts.
+ */
+export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
+  {
+    id: "bldg-aspen",
+    name: "Aspen Village",
+    addressLine1: "335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
+  },
+  {
+    id: "bldg-marine",
+    name: "Marine Parade Apartments",
+    addressLine1: "88 Marine Parade",
+    addressLine2: "Coogee NSW 2034",
+  },
+  {
+    id: "bldg-bourke",
+    name: "Bourke Street Residences",
+    addressLine1: "21 Bourke Street",
+    addressLine2: "Surry Hills NSW 2010",
+  },
+  {
+    id: "bldg-anzac",
+    name: "Anzac Parade Apartments",
+    addressLine1: "142 Anzac Parade",
+    addressLine2: "Kensington NSW 2033",
+  },
+];
+
 // ─── Seeded units ───────────────────────────────────────────────────────────
 
+/**
+ * The 7 "anchor" units (u1..u7) keep their original IDs because the
+ * seeded bookings reference them. Each one is now grouped under a
+ * building, plus a handful of unbooked sibling units per building so
+ * the rollout summary shows realistic "booked / remaining" splits.
+ *
+ * Note: u3, u6, u7 had originally-distinct addresses; they've been
+ * relocated under existing buildings (Marine Parade, Bourke Street,
+ * Anzac Parade) so the workspace fits cleanly into 4 rollouts. The
+ * customer-side address registry in `bookingHelpers.ts` is a
+ * separate dataset and is intentionally untouched.
+ */
 export const SEEDED_UNITS: readonly AdminUnit[] = [
+  // ── Aspen Village (Greenway ACT) — flagship rollout, just kicking off
   {
     id: "u1",
-    addressLine1: "G01 / 335 Aspen Village",
-    addressLine2: "Lot 3 · Greenway ACT 2900",
+    addressLine1: "G01 / 335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
     ac: { type: "ducted", systems: 1, additional: 1 },
     agentId: "ag-001",
+    buildingId: "bldg-aspen",
   },
+  {
+    id: "u-aspen-02",
+    addressLine1: "G02 / 335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
+    ac: { type: "ducted", systems: 1, additional: 0 },
+    agentId: "ag-001",
+    buildingId: "bldg-aspen",
+  },
+  {
+    id: "u-aspen-03",
+    addressLine1: "101 / 335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
+    ac: { type: "split", systems: 2, additional: 0 },
+    agentId: "ag-001",
+    buildingId: "bldg-aspen",
+  },
+  {
+    id: "u-aspen-04",
+    addressLine1: "102 / 335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
+    ac: { type: "split", systems: 2, additional: 0 },
+    agentId: "ag-001",
+    buildingId: "bldg-aspen",
+  },
+  {
+    id: "u-aspen-05",
+    addressLine1: "201 / 335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
+    ac: { type: "ducted", systems: 1, additional: 1 },
+    agentId: "ag-001",
+    buildingId: "bldg-aspen",
+  },
+  {
+    id: "u-aspen-06",
+    addressLine1: "202 / 335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
+    ac: { type: "unknown", systems: 0, additional: 0 },
+    agentId: "ag-001",
+    buildingId: "bldg-aspen",
+  },
+  {
+    id: "u-aspen-07",
+    addressLine1: "301 / 335 Aspen Boulevard",
+    addressLine2: "Greenway ACT 2900",
+    ac: { type: "split", systems: 1, additional: 0 },
+    agentId: "ag-001",
+    buildingId: "bldg-aspen",
+  },
+
+  // ── Marine Parade Apartments (Coogee NSW) — mid-rollout
   {
     id: "u2",
     addressLine1: "12 / 88 Marine Parade",
-    addressLine2: "Lot 12 · Coogee NSW 2034",
+    addressLine2: "Coogee NSW 2034",
     ac: { type: "split", systems: 2, additional: 0 },
     agentId: "ag-002",
+    buildingId: "bldg-marine",
   },
   {
     id: "u3",
-    addressLine1: "3 / 4 Example Street",
-    addressLine2: "Lot 3 · Bondi NSW 2026",
+    addressLine1: "3 / 88 Marine Parade",
+    addressLine2: "Coogee NSW 2034",
     ac: { type: "unknown", systems: 0, additional: 0 },
     agentId: null,
+    buildingId: "bldg-marine",
   },
+  {
+    id: "u-marine-04",
+    addressLine1: "8 / 88 Marine Parade",
+    addressLine2: "Coogee NSW 2034",
+    ac: { type: "split", systems: 1, additional: 0 },
+    agentId: "ag-002",
+    buildingId: "bldg-marine",
+  },
+  {
+    id: "u-marine-05",
+    addressLine1: "14 / 88 Marine Parade",
+    addressLine2: "Coogee NSW 2034",
+    ac: { type: "split", systems: 2, additional: 0 },
+    agentId: "ag-002",
+    buildingId: "bldg-marine",
+  },
+  {
+    id: "u-marine-06",
+    addressLine1: "21 / 88 Marine Parade",
+    addressLine2: "Coogee NSW 2034",
+    ac: { type: "split", systems: 1, additional: 1 },
+    agentId: "ag-002",
+    buildingId: "bldg-marine",
+  },
+  {
+    id: "u-marine-07",
+    addressLine1: "22 / 88 Marine Parade",
+    addressLine2: "Coogee NSW 2034",
+    ac: { type: "unknown", systems: 0, additional: 0 },
+    agentId: null,
+    buildingId: "bldg-marine",
+  },
+
+  // ── Bourke Street Residences (Surry Hills NSW) — early-stage rollout
   {
     id: "u4",
     addressLine1: "705 / 21 Bourke Street",
-    addressLine2: "Lot 705 · Surry Hills NSW 2010",
+    addressLine2: "Surry Hills NSW 2010",
     ac: { type: "unknown", systems: 0, additional: 0 },
     agentId: "ag-001",
-  },
-  {
-    id: "u5",
-    addressLine1: "18 / 142 Anzac Parade",
-    addressLine2: "Lot 18 · Kensington NSW 2033",
-    ac: { type: "ducted", systems: 2, additional: 0 },
-    agentId: "ag-003",
+    buildingId: "bldg-bourke",
   },
   {
     id: "u6",
-    addressLine1: "504 / 9 Riley Street",
-    addressLine2: "Lot 504 · Darlinghurst NSW 2010",
+    addressLine1: "504 / 21 Bourke Street",
+    addressLine2: "Surry Hills NSW 2010",
     ac: { type: "split", systems: 3, additional: 1 },
     agentId: "ag-002",
+    buildingId: "bldg-bourke",
+  },
+  {
+    id: "u-bourke-03",
+    addressLine1: "302 / 21 Bourke Street",
+    addressLine2: "Surry Hills NSW 2010",
+    ac: { type: "split", systems: 2, additional: 0 },
+    agentId: "ag-001",
+    buildingId: "bldg-bourke",
+  },
+  {
+    id: "u-bourke-04",
+    addressLine1: "404 / 21 Bourke Street",
+    addressLine2: "Surry Hills NSW 2010",
+    ac: { type: "unknown", systems: 0, additional: 0 },
+    agentId: null,
+    buildingId: "bldg-bourke",
+  },
+  {
+    id: "u-bourke-05",
+    addressLine1: "606 / 21 Bourke Street",
+    addressLine2: "Surry Hills NSW 2010",
+    ac: { type: "split", systems: 1, additional: 0 },
+    agentId: "ag-002",
+    buildingId: "bldg-bourke",
+  },
+
+  // ── Anzac Parade Apartments (Kensington NSW) — nearly wrapped up
+  {
+    id: "u5",
+    addressLine1: "18 / 142 Anzac Parade",
+    addressLine2: "Kensington NSW 2033",
+    ac: { type: "ducted", systems: 2, additional: 0 },
+    agentId: "ag-003",
+    buildingId: "bldg-anzac",
   },
   {
     id: "u7",
-    addressLine1: "11 / 240 Pacific Highway",
-    addressLine2: "Lot 11 · Crows Nest NSW 2065",
+    addressLine1: "11 / 142 Anzac Parade",
+    addressLine2: "Kensington NSW 2033",
     ac: { type: "split", systems: 1, additional: 0 },
     agentId: null,
+    buildingId: "bldg-anzac",
+  },
+  {
+    id: "u-anzac-03",
+    addressLine1: "5 / 142 Anzac Parade",
+    addressLine2: "Kensington NSW 2033",
+    ac: { type: "split", systems: 1, additional: 0 },
+    agentId: "ag-003",
+    buildingId: "bldg-anzac",
+  },
+  {
+    id: "u-anzac-04",
+    addressLine1: "9 / 142 Anzac Parade",
+    addressLine2: "Kensington NSW 2033",
+    ac: { type: "ducted", systems: 1, additional: 0 },
+    agentId: "ag-003",
+    buildingId: "bldg-anzac",
   },
 ];
 
@@ -884,4 +1099,191 @@ export function bookingDurationMinutes(b: AdminBooking): number {
     b.systems * MINUTES_PER_SYSTEM +
     b.additional * MINUTES_PER_ADDITIONAL_INDOOR
   );
+}
+
+// ─── Building joins / rollout summary ──────────────────────────────────────
+
+/** Look a building up by id. Returns `null` for an unknown / null id. */
+export function getBuildingById(id: string | null): AdminBuilding | null {
+  if (!id) return null;
+  return SEEDED_BUILDINGS.find((b) => b.id === id) ?? null;
+}
+
+/** Convenience: from a unit (or null), follow `buildingId` to its building. */
+export function getBuildingForUnit(
+  unit: AdminUnit | null,
+): AdminBuilding | null {
+  if (!unit) return null;
+  return getBuildingById(unit.buildingId);
+}
+
+/** All units that belong to a given building, in their input order. */
+export function getBuildingUnits(
+  buildingId: string,
+  units: readonly AdminUnit[],
+): AdminUnit[] {
+  return units.filter((u) => u.buildingId === buildingId);
+}
+
+/**
+ * All bookings that touch a given building (i.e. their unit lives in
+ * that building). Order is preserved from the input — callers can
+ * sort however they need.
+ */
+export function getBuildingBookings(
+  buildingId: string,
+  units: readonly AdminUnit[],
+  bookings: readonly AdminBooking[],
+): AdminBooking[] {
+  const unitIds = new Set(
+    getBuildingUnits(buildingId, units).map((u) => u.id),
+  );
+  return bookings.filter((b) => unitIds.has(b.unitId));
+}
+
+/**
+ * Per-building rollout summary used by the Buildings list and the
+ * building detail header. All counts are derived — no caching, no
+ * stored state — so the summary always agrees with `units` /
+ * `bookings` as they're updated by the rest of the admin shell.
+ *
+ * - `bookedUnits` counts a unit once even if it has multiple bookings
+ *   (a re-booking still represents one occupied unit, not two).
+ * - `completedUnits` is the subset of `bookedUnits` whose latest
+ *   booking has reached `complete` or `invoice_adjusted`.
+ * - `remainingUnits = totalUnits − bookedUnits` (units that haven't
+ *   been booked at all yet — the rollout's "still to-do" list).
+ * - `dateRange` is the earliest and latest scheduled `serviceDate`
+ *   across this building's bookings (coordination bookings without a
+ *   date are excluded). `null` when nothing is scheduled.
+ * - `nextScheduled` is the next future booking (today or later) in
+ *   `scheduled` / `en_route` status — what the admin should care
+ *   about when planning the week.
+ * - `coordinationCount` is bookings whose slot is `to_be_coordinated`,
+ *   surfaced separately because they don't fit on the schedule strip.
+ */
+export type BuildingRolloutSummary = {
+  totalUnits: number;
+  bookedUnits: number;
+  completedUnits: number;
+  remainingUnits: number;
+  totalBookings: number;
+  dateRange: { from: string; to: string } | null;
+  nextScheduled: {
+    date: string;
+    slot: "morning" | "afternoon";
+  } | null;
+  coordinationCount: number;
+};
+
+function isoDayOf(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export function summarizeBuildingRollout(
+  buildingId: string,
+  units: readonly AdminUnit[],
+  bookings: readonly AdminBooking[],
+  today: Date = new Date(),
+): BuildingRolloutSummary {
+  const buildingUnits = getBuildingUnits(buildingId, units);
+  const buildingBookings = getBuildingBookings(buildingId, units, bookings);
+
+  const bookedUnitIds = new Set(buildingBookings.map((b) => b.unitId));
+
+  // Per-unit "latest" booking is the one with the highest booking id
+  // (seed ids are monotonic — `bk-1042` is newer than `bk-1041`). A
+  // unit only counts as completed when *its latest* booking has reached
+  // a completion status, so an old `complete` booking superseded by a
+  // newer active re-booking no longer counts.
+  const latestBookingByUnit = new Map<string, AdminBooking>();
+  for (const b of buildingBookings) {
+    const existing = latestBookingByUnit.get(b.unitId);
+    if (!existing || b.id > existing.id) {
+      latestBookingByUnit.set(b.unitId, b);
+    }
+  }
+  const completedUnitIds = new Set(
+    Array.from(latestBookingByUnit.values())
+      .filter(
+        (b) =>
+          b.serviceStatus === "complete" ||
+          b.serviceStatus === "invoice_adjusted",
+      )
+      .map((b) => b.unitId),
+  );
+
+  const dated = buildingBookings.filter(
+    (b): b is AdminBooking & { serviceDate: string } => b.serviceDate !== null,
+  );
+  const sortedDates = dated.map((b) => b.serviceDate).sort();
+  const dateRange =
+    sortedDates.length > 0
+      ? { from: sortedDates[0], to: sortedDates[sortedDates.length - 1] }
+      : null;
+
+  const todayIso = isoDayOf(today);
+  const upcoming = dated
+    .filter(
+      (b) =>
+        b.serviceDate >= todayIso &&
+        (b.serviceStatus === "scheduled" || b.serviceStatus === "en_route") &&
+        (b.serviceSlot === "morning" || b.serviceSlot === "afternoon"),
+    )
+    .sort((a, b) => {
+      if (a.serviceDate !== b.serviceDate) {
+        return a.serviceDate.localeCompare(b.serviceDate);
+      }
+      // morning before afternoon
+      const aSlot = a.serviceSlot === "morning" ? 0 : 1;
+      const bSlot = b.serviceSlot === "morning" ? 0 : 1;
+      return aSlot - bSlot;
+    });
+  const nextScheduled = upcoming[0]
+    ? {
+        date: upcoming[0].serviceDate,
+        slot: upcoming[0].serviceSlot as "morning" | "afternoon",
+      }
+    : null;
+
+  const coordinationCount = buildingBookings.filter(
+    (b) => b.serviceSlot === "to_be_coordinated",
+  ).length;
+
+  return {
+    totalUnits: buildingUnits.length,
+    bookedUnits: bookedUnitIds.size,
+    completedUnits: completedUnitIds.size,
+    remainingUnits: buildingUnits.length - bookedUnitIds.size,
+    totalBookings: buildingBookings.length,
+    dateRange,
+    nextScheduled,
+    coordinationCount,
+  };
+}
+
+/**
+ * Format the date range from a {@link BuildingRolloutSummary} into a
+ * single short string for the rollout list (e.g. "29 Apr – 2 May",
+ * "29 Apr" if both dates are equal). Returns the placeholder when
+ * the building has no scheduled bookings.
+ */
+export function formatRolloutDateRange(
+  range: { from: string; to: string } | null,
+  placeholder: string = "—",
+): string {
+  if (!range) return placeholder;
+  const fromShort = formatShortDate(range.from);
+  const toShort = formatShortDate(range.to);
+  return fromShort === toShort ? fromShort : `${fromShort} – ${toShort}`;
+}
+
+function formatShortDate(iso: string): string {
+  // Hand-rolled to keep the output deterministic across timezones / locales —
+  // the seeded data uses ISO YYYY-MM-DD and we only need day + month-short.
+  const [y, m, d] = iso.split("-").map((s) => parseInt(s, 10));
+  if (!y || !m || !d) return iso;
+  const day = String(d);
+  const month = SHORT_MONTHS[m - 1] ?? "";
+  return `${day} ${month}`;
 }

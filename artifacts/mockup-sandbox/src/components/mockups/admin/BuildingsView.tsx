@@ -1,0 +1,201 @@
+/**
+ * Buildings list — one row per residential building Taylr is rolling
+ * the AC service out to. Each row summarises the rollout: total units
+ * vs. units that have booked, the date range of bookings so far, and
+ * the next service the admin should be aware of. Selecting a row
+ * tells the `AdminApp` shell to mount `BuildingDetail`.
+ *
+ * Counts are derived live from `units` + `bookings` via
+ * `summarizeBuildingRollout`, so they stay in sync as the rest of
+ * the admin shell mutates state.
+ */
+
+import { Building2, ChevronRight } from "lucide-react";
+
+import {
+  formatRolloutDateRange,
+  summarizeBuildingRollout,
+  type AdminBooking,
+  type AdminBuilding,
+  type AdminUnit,
+} from "@/state/adminMockData";
+
+import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+
+export function BuildingsView({
+  buildings,
+  units,
+  bookings,
+  onOpen,
+}: {
+  buildings: AdminBuilding[];
+  units: AdminUnit[];
+  bookings: AdminBooking[];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 text-[12px] text-slate-600">
+        <div className="font-semibold text-slate-900">
+          Each row is a building rollout
+        </div>
+        <div className="mt-1 text-slate-600">
+          The AC service is sold building-by-building. Use this view to
+          track how many units inside each building have booked, when
+          the work is happening, and which buildings still have
+          customers to convert.
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <table className="w-full text-left text-[13px]">
+          <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
+            <tr>
+              <th className="px-4 py-3 font-semibold">Building</th>
+              <th className="px-4 py-3 font-semibold">Units</th>
+              <th className="px-4 py-3 font-semibold">Booked</th>
+              <th className="px-4 py-3 font-semibold">Remaining</th>
+              <th className="px-4 py-3 font-semibold">Date range</th>
+              <th className="px-4 py-3 font-semibold">Next service</th>
+              <th className="px-4 py-3 font-semibold" />
+            </tr>
+          </thead>
+          <tbody>
+            {buildings.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-10 text-center text-slate-500"
+                >
+                  No buildings have been added yet.
+                </td>
+              </tr>
+            ) : (
+              buildings.map((building) => {
+                const summary = summarizeBuildingRollout(
+                  building.id,
+                  units,
+                  bookings,
+                );
+                const progressPct =
+                  summary.totalUnits > 0
+                    ? Math.round(
+                        (summary.bookedUnits / summary.totalUnits) * 100,
+                      )
+                    : 0;
+                return (
+                  <tr
+                    key={building.id}
+                    onClick={() => onOpen(building.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onOpen(building.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Open ${building.name}`}
+                    className="cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="flex h-9 w-9 items-center justify-center rounded-lg"
+                          style={{ backgroundColor: BRAND_SOFT }}
+                        >
+                          <Building2
+                            className="h-4 w-4"
+                            style={{ color: BRAND_DEEP }}
+                          />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-900">
+                            {building.name}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {building.addressLine1} · {building.addressLine2}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {summary.totalUnits}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900">
+                          {summary.bookedUnits}
+                        </span>
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${progressPct}%`,
+                              backgroundColor: BRAND,
+                            }}
+                          />
+                        </div>
+                        <span className="text-[11px] text-slate-500">
+                          {progressPct}%
+                        </span>
+                      </div>
+                      {summary.completedUnits > 0 && (
+                        <div className="mt-0.5 text-[11px] text-slate-500">
+                          {summary.completedUnits} complete
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {summary.remainingUnits}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {formatRolloutDateRange(summary.dateRange)}
+                      {summary.coordinationCount > 0 && (
+                        <div className="mt-0.5 text-[11px] text-slate-500">
+                          + {summary.coordinationCount} to coordinate
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {summary.nextScheduled ? (
+                        <NextServiceCell
+                          date={summary.nextScheduled.date}
+                          slot={summary.nextScheduled.slot}
+                        />
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-[11px] text-slate-500">
+        Showing {buildings.length} building
+        {buildings.length === 1 ? "" : "s"}.
+      </div>
+    </div>
+  );
+}
+
+function NextServiceCell({
+  date,
+  slot,
+}: {
+  date: string;
+  slot: "morning" | "afternoon";
+}) {
+  return (
+    <>
+      <div className="font-medium text-slate-900">{date}</div>
+      <div className="text-[11px] text-slate-500 capitalize">{slot}</div>
+    </>
+  );
+}

@@ -5,6 +5,7 @@
  */
 
 import {
+  Building2,
   Calendar,
   CreditCard,
   Home,
@@ -21,6 +22,7 @@ const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string; icon: LucideIcon }> 
   { id: "bookings", label: "Bookings", icon: Calendar },
   { id: "payments", label: "Payments", icon: CreditCard },
   { id: "calendar", label: "Slot calendar", icon: Sparkles },
+  { id: "buildings", label: "Buildings", icon: Building2 },
   { id: "units", label: "Units", icon: Home },
   { id: "agents", label: "Agents", icon: Users },
 ];
