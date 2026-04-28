@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
+import { useStepLabel } from "../../../state/bookingDerived";
 import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isParcelLockerMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
@@ -26,7 +27,7 @@ export function AccessDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 4 of 6</div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">{useStepLabel(4)}</div>
             <h1 className="text-2xl font-semibold text-slate-900">How will the technician access the property?</h1>
           </div>
 

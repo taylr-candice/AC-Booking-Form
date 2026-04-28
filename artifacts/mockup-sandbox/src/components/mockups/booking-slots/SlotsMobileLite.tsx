@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useStepLabel } from "../../../state/bookingDerived";
 import {
   ArrowLeft,
   ArrowRight,
@@ -43,7 +44,7 @@ export function SlotsMobileLite() {
           <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
             Schedule
           </h1>
-          <div className="mt-0.5 text-xs text-slate-500">Step 5 of 6 · Pick a service slot</div>
+          <div className="mt-0.5 text-xs text-slate-500">{useStepLabel(5)} · Pick a service slot</div>
         </div>
         <button
           type="button"

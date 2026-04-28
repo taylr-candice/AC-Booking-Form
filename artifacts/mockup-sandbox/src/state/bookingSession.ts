@@ -97,7 +97,7 @@ export type BookingState = {
 
 const STORAGE_KEY = "taylr.bookingSession.v2";
 
-/** Access methods that skip Step 6 (Schedule).
+/** Access methods that skip Step 5 (Schedule).
  *
  * `agent_tenant_self` is intentionally NOT here — the agent is arranging
  * the slot directly with the tenant, so they still need to pick one.

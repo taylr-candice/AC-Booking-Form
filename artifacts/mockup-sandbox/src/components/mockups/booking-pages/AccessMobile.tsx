@@ -20,6 +20,7 @@ import {
   type AccessMethod,
   type PrimaryResidence,
 } from "../../../state/bookingSession";
+import { useStepLabel } from "../../../state/bookingDerived";
 import {
   DEMO_MANAGING_AGENCIES,
   getAccessOptions,
@@ -64,7 +65,7 @@ export function AccessMobile() {
             Property access
           </h1>
           <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
-            Step 4 of 6
+            {useStepLabel(4)}
           </div>
         </div>
         <button

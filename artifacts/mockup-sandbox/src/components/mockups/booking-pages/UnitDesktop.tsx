@@ -8,6 +8,7 @@ import {
   User,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
+import { useStepLabel } from "../../../state/bookingDerived";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -23,6 +24,7 @@ const UNITS = [
 export function UnitDesktop() {
   const sessionUnitId = useBookingSelector((s) => s.unit_id);
   const role = useBookingSelector((s) => s.role);
+  const stepLabel = useStepLabel(1);
   const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
 
@@ -47,7 +49,7 @@ export function UnitDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
 
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 1 of 6</div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">{stepLabel}</div>
             <h1 className="text-2xl font-semibold text-slate-900">Select the property</h1>
             <p className="text-sm text-slate-500 mt-2">For which the service will take place</p>
           </div>

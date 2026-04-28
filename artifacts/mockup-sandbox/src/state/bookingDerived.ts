@@ -8,6 +8,7 @@
 
 import {
   COORDINATION_ACCESS_METHODS,
+  useBookingSelector,
   type AccessMethod,
   type BookingState,
   type StepId,
@@ -81,6 +82,18 @@ export function prevStepId(
   }
   if (idx <= 0) return current;
   return ids[idx - 1];
+}
+
+/**
+ * Reactive helper: returns the per-page eyebrow text "Step X of Y" for the
+ * given canonical `stepId`, where Y reflects the current visible-step total
+ * (6 in normal flows, 5 in coordination flows).
+ */
+export function useStepLabel(stepId: StepId): string {
+  const accessMethod = useBookingSelector((s) => s.access_method);
+  const idx = visibleIndex({ access_method: accessMethod }, stepId);
+  const total = totalSteps({ access_method: accessMethod });
+  return `Step ${idx} of ${total}`;
 }
 
 export type { AccessMethod };
