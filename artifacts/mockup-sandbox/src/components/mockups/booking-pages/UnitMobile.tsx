@@ -7,14 +7,11 @@ import {
   MessageSquare,
   User,
   CheckCircle2,
-  MapPin,
-  Building2,
   ChevronDown,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 
 type Unit = {
   id: string;
@@ -59,12 +56,12 @@ export function UnitMobile() {
 
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
         <div>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+            Step 1 of 7
+          </div>
           <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
             Select the property
           </h1>
-          <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
-            Step 1 of 7
-          </div>
         </div>
         <button
           type="button"
@@ -151,44 +148,6 @@ export function UnitMobile() {
             </div>
           )}
         </div>
-
-        {selected && !open && (
-          <div
-            className="mt-5 rounded-xl border p-4"
-            style={{
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
-            }}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full"
-                style={{ backgroundColor: SELECTED_GREEN }}
-              >
-                <Building2 className="h-4 w-4 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div
-                  className="text-[11px] font-semibold uppercase tracking-wide"
-                  style={{ color: SELECTED_GREEN }}
-                >
-                  Booking for
-                </div>
-                <div className="mt-0.5 text-[15px] font-semibold text-slate-900">
-                  {selected.address}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-slate-600">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" /> {selected.lot}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Building2 className="h-3 w-3" /> {selected.building}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
 
