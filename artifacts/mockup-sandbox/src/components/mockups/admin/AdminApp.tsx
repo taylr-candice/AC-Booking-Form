@@ -30,9 +30,7 @@ import {
 
 import {
   bookingDurationMinutes,
-  getAgentById,
   getCalendar,
-  getUnitById,
   liveBookingFromSession,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
@@ -1173,7 +1171,7 @@ function UnitsView({
           </thead>
           <tbody>
             {units.map((u) => {
-              const agent = u.agentId ? getAgentById(u.agentId) : null;
+              const agent = u.agentId ? agents.find((a) => a.id === u.agentId) ?? null : null;
               return (
                 <tr key={u.id} className="border-b border-slate-100 last:border-b-0">
                   <td className="px-4 py-3">
@@ -1465,7 +1463,7 @@ function AgentsView({
                       <span className="text-slate-500">—</span>
                     ) : (
                       a.unitIds.map((uid) => {
-                        const u = getUnitById(uid);
+                        const u = units.find((x) => x.id === uid) ?? null;
                         return (
                           <span
                             key={uid}
