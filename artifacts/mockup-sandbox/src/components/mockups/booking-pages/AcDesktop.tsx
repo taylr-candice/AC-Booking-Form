@@ -38,21 +38,20 @@ const COPY: Record<KnownType, Copy> = {
   ducted: {
     heading: "Confirm your ducted AC setup",
     intro:
-      "Please confirm the number of systems and any extra filters so we can price your service correctly.",
+      "Please confirm the number of systems and any extra return-air grilles so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
     systemsUnitSingular: "ducted service",
     systemsUnitPlural: "ducted services",
-    addonLabel: "Extra return-air grilles or extra indoor units",
+    addonLabel: "Extra return-air grilles",
     // NOTE: For ducted, the rendered helper text below is the inline JSX
     // branch (it includes the "See example" inline link). This array is kept
     // in sync as a fallback / contract for future renderers but isn't shown
     // for ducted today.
     addonHelper: [
-      "If you count more return-air grilles in the apartment than shown above, add the extras here.",
-      "Filters sit behind large return-air grilles — not small air vents or outlets.",
+      "If your apartment has more return-air grilles than shown above, add the extras here.",
     ],
-    addonUnitSingular: "extra filter",
-    addonUnitPlural: "extra filters",
+    addonUnitSingular: "extra return-air grille",
+    addonUnitPlural: "extra return-air grilles",
   },
   split: {
     heading: "Confirm your split AC setup",
@@ -90,15 +89,15 @@ const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number 
 };
 
 const ACK_LABEL =
-  "I understand the final price may be adjusted if the number of systems, indoor unit heads or filters on-site is different from what I booked.";
+  "I understand the final price may be adjusted if the number of systems or indoor units on-site is different from what I booked.";
 const ACK_HELPER_INTRO =
   "This only applies when the booking selection doesn't match what's actually on-site. Taylr will not perform any work beyond the preventative maintenance service shown above.";
 const ACK_HELPER_BULLETS = [
-  "If there are more systems, indoor unit heads or filters on the day, Taylr will service all of them and invoice the unpaid difference afterward.",
+  "If there are more systems or indoor units on the day, Taylr will service all of them and invoice the unpaid difference afterward.",
   "If there are fewer, Taylr will credit or refund the difference.",
 ];
 const ACK_ERROR =
-  "Please confirm you understand the price may be adjusted if the booked number of systems, indoor unit heads or filters doesn't match what's on-site.";
+  "Please confirm you understand the price may be adjusted if the booked number of systems or indoor units doesn't match what's on-site.";
 
 type Override = null | "split" | "ducted" | "unsure";
 
@@ -219,12 +218,10 @@ export function AcDesktop() {
                         ? [
                             { value: "keep-split", label: "No, keep split system" },
                             { value: "ducted", label: "Yes, it is now ducted" },
-                            { value: "unsure", label: "I’m not sure — technician to confirm on-site" },
                           ]
                         : [
                             { value: "keep-ducted", label: "No, keep ducted system" },
                             { value: "split", label: "Yes, it is now a split system" },
-                            { value: "unsure", label: "I’m not sure — technician to confirm on-site" },
                           ]
                     }
                     onSelect={(choice) => {
@@ -234,8 +231,6 @@ export function AcDesktop() {
                         setOverride("ducted");
                       } else if (choice === "split") {
                         setOverride("split");
-                      } else if (choice === "unsure") {
-                        setOverride("unsure");
                       }
                       setOverridePanelOpen(false);
                     }}
@@ -354,7 +349,7 @@ export function AcDesktop() {
                       </div>
                       <div className="mt-2 flex items-center gap-3 flex-wrap">
                         <p className="text-xs font-medium" style={{ color: BRAND }}>
-                          ${ADDON_PRICE} per extra {effectiveType === "ducted" ? "filter" : "unit"}
+                          ${ADDON_PRICE} per extra {effectiveType === "ducted" ? "grille" : "unit"}
                         </p>
                         <button
                           type="button"
@@ -612,7 +607,7 @@ function overrideBannerTitle(acTypeFromUnit: AcType, override: Override): string
 }
 
 function overrideBannerDetail(override: Override): string {
-  if (override === "ducted") return "Showing ducted setup. Adjust systems and filters below.";
+  if (override === "ducted") return "Showing ducted setup. Adjust systems and return-air grilles below.";
   if (override === "split") return "Showing split setup. Adjust systems and indoor units below.";
   if (override === "unsure")
     return "We’ll book a default of 1 system with 0 additional components and confirm on-site.";

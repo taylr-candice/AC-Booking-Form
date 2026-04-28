@@ -36,15 +36,15 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
     ],
   },
   "ducted-filter": {
-    title: "What counts as an extra filter?",
+    title: "What counts as an extra return-air grille?",
     sections: [
       {
-        label: "Counts as an extra filter",
+        label: "Counts as an extra return-air grille",
         imageSrc: `${ASSET_BASE}/examples/ducted-return-grille.jpg`,
         imageAlt:
           "A large white ceiling return-air grille, typical of a ducted AC system.",
         paragraphs: [
-          "Filters sit behind large return-air grilles.",
+          "Each large return-air grille in the ceiling counts as one.",
           "Your service already includes the number of return-air grilles shown in the 'Includes' section.",
           "Only add extras if the apartment has more large return-air grilles than shown there.",
         ],
@@ -55,7 +55,7 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
         imageAlt: "Two small ceiling supply-air vents in a white plaster ceiling.",
         paragraphs: [
           "Do not count small air vents or outlets on walls or ceilings.",
-          "These may be assessed as part of the visit, but no extra filter charge is required for them.",
+          "These may be assessed as part of the visit, but no extra grille charge is required for them.",
         ],
       },
     ],
