@@ -400,11 +400,38 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
 
 // ─── Slot calendar (next 14 days) ──────────────────────────────────────────
 
+/**
+ * Two ways an admin can run a service window.
+ *
+ * - `time_based` — the window has a wall-clock length (e.g. 8am–12pm =
+ *   240 min). Each booking eats minutes proportional to the customer's
+ *   service requirement (`getBookingDurationMinutes`). The window stays
+ *   selectable for a customer iff the booking they're attempting fits
+ *   in the remaining minutes; otherwise it shows as full.
+ *
+ * - `count_based` — the window has N booking slots regardless of how
+ *   long each booking takes. Each confirmed booking eats one slot.
+ *   When `bookedCount === slotCount` the window is full.
+ *
+ * Both modes are first-class: ops can mix and match per-window. The
+ * customer-facing slot picker should only ever surface "available" or
+ * "full" — the mode and capacity numbers are admin-only concerns.
+ */
+export type AdminSlotMode = "time_based" | "count_based";
+
 export type AdminSlot = {
   id: string;
   window: "morning" | "afternoon";
+  mode: AdminSlotMode;
+  /** Wall-clock length of the window. Always meaningful (for the
+   *  customer-visible "8am–12pm" label) even in count_based mode. */
   windowMinutes: number;
+  /** Used by `time_based` mode. In `count_based` mode this is informational
+   *  only (e.g. "2 bookings ≈ 90 min so far") and not enforced. */
   bookedMinutes: number;
+  /** Used by `count_based` mode. */
+  slotCount: number;
+  bookedCount: number;
 };
 
 export type AdminCalendarDay = {
@@ -421,8 +448,30 @@ export type AdminCalendarDay = {
   afternoon: AdminSlot;
 };
 
+/**
+ * Returns true when a slot can accept a new booking of `jobMinutes`.
+ *
+ * - `time_based`: there must be enough remaining minutes in the window.
+ * - `count_based`: there must be at least one slot left (the duration
+ *   of the booking is not part of the gate — that's the whole point of
+ *   count mode).
+ *
+ * Pass `jobMinutes = 0` (the default) when you only want a generic
+ * "is this window completely full?" answer (e.g. for an admin overview
+ * with no specific booking in mind).
+ */
+export function slotIsAvailable(slot: AdminSlot, jobMinutes: number = 0): boolean {
+  if (slot.mode === "count_based") {
+    return slot.bookedCount < slot.slotCount;
+  }
+  const remaining = slot.windowMinutes - slot.bookedMinutes;
+  return remaining >= Math.max(jobMinutes, 1);
+}
+
 const MORNING_WINDOW_MINUTES = 240;
 const AFTERNOON_WINDOW_MINUTES = 300;
+const DEFAULT_MORNING_SLOT_COUNT = 4;
+const DEFAULT_AFTERNOON_SLOT_COUNT = 5;
 
 const SHORT_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SHORT_MONTHS = [
@@ -444,24 +493,135 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Believable booked-minutes pattern keyed by day index (0..13).
- *  Tweaked so the calendar shows a mix of empty / partial / full days. */
-const SEED_BOOKING_PATTERN: ReadonlyArray<{ am: number; pm: number; open: boolean }> = [
-  { am: 75, pm: 195, open: true },
-  { am: 240, pm: 60, open: true },
-  { am: 0, pm: 105, open: true },
-  { am: 165, pm: 300, open: true },
-  { am: 45, pm: 90, open: true },
-  { am: 0, pm: 0, open: false }, // Sunday closed
-  { am: 0, pm: 60, open: true },
-  { am: 240, pm: 30, open: true },
-  { am: 105, pm: 240, open: true },
-  { am: 0, pm: 0, open: true },
-  { am: 60, pm: 90, open: true },
-  { am: 150, pm: 300, open: true },
-  { am: 0, pm: 0, open: false },
-  { am: 30, pm: 0, open: true },
+type SeedSlotPattern = {
+  mode: AdminSlotMode;
+  /** Booked minutes if `mode === "time_based"`. */
+  bookedMinutes: number;
+  /** Booked count if `mode === "count_based"`. */
+  bookedCount: number;
+};
+
+/** Believable seeded usage per day. Mixes time-based and count-based
+ *  windows so the calendar showcases both scheduling models side by
+ *  side. */
+const SEED_BOOKING_PATTERN: ReadonlyArray<{
+  am: SeedSlotPattern;
+  pm: SeedSlotPattern;
+  open: boolean;
+}> = [
+  // Day 0 — both windows on time
+  {
+    am: { mode: "time_based", bookedMinutes: 75, bookedCount: 0 },
+    pm: { mode: "time_based", bookedMinutes: 195, bookedCount: 0 },
+    open: true,
+  },
+  // Day 1 — morning fully booked (time), afternoon on count (1/5 used)
+  {
+    am: { mode: "time_based", bookedMinutes: 240, bookedCount: 0 },
+    pm: { mode: "count_based", bookedMinutes: 0, bookedCount: 1 },
+    open: true,
+  },
+  // Day 2 — morning empty count, afternoon on time
+  {
+    am: { mode: "count_based", bookedMinutes: 0, bookedCount: 0 },
+    pm: { mode: "time_based", bookedMinutes: 105, bookedCount: 0 },
+    open: true,
+  },
+  // Day 3 — morning on time (heavy), afternoon count fully booked (5/5)
+  {
+    am: { mode: "time_based", bookedMinutes: 165, bookedCount: 0 },
+    pm: { mode: "count_based", bookedMinutes: 0, bookedCount: 5 },
+    open: true,
+  },
+  // Day 4 — both count, light usage
+  {
+    am: { mode: "count_based", bookedMinutes: 0, bookedCount: 1 },
+    pm: { mode: "count_based", bookedMinutes: 0, bookedCount: 2 },
+    open: true,
+  },
+  // Day 5 — Sunday closed
+  {
+    am: { mode: "time_based", bookedMinutes: 0, bookedCount: 0 },
+    pm: { mode: "time_based", bookedMinutes: 0, bookedCount: 0 },
+    open: false,
+  },
+  // Day 6 — both empty time
+  {
+    am: { mode: "time_based", bookedMinutes: 0, bookedCount: 0 },
+    pm: { mode: "time_based", bookedMinutes: 60, bookedCount: 0 },
+    open: true,
+  },
+  // Day 7 — morning full count, afternoon time partial
+  {
+    am: { mode: "count_based", bookedMinutes: 0, bookedCount: 4 },
+    pm: { mode: "time_based", bookedMinutes: 30, bookedCount: 0 },
+    open: true,
+  },
+  // Day 8 — both time, busy afternoon
+  {
+    am: { mode: "time_based", bookedMinutes: 105, bookedCount: 0 },
+    pm: { mode: "time_based", bookedMinutes: 240, bookedCount: 0 },
+    open: true,
+  },
+  // Day 9 — both empty
+  {
+    am: { mode: "count_based", bookedMinutes: 0, bookedCount: 0 },
+    pm: { mode: "count_based", bookedMinutes: 0, bookedCount: 0 },
+    open: true,
+  },
+  // Day 10 — light count, light time
+  {
+    am: { mode: "count_based", bookedMinutes: 0, bookedCount: 1 },
+    pm: { mode: "time_based", bookedMinutes: 90, bookedCount: 0 },
+    open: true,
+  },
+  // Day 11 — heavy time both
+  {
+    am: { mode: "time_based", bookedMinutes: 150, bookedCount: 0 },
+    pm: { mode: "time_based", bookedMinutes: 300, bookedCount: 0 },
+    open: true,
+  },
+  // Day 12 — closed
+  {
+    am: { mode: "time_based", bookedMinutes: 0, bookedCount: 0 },
+    pm: { mode: "time_based", bookedMinutes: 0, bookedCount: 0 },
+    open: false,
+  },
+  // Day 13 — light morning count
+  {
+    am: { mode: "count_based", bookedMinutes: 0, bookedCount: 1 },
+    pm: { mode: "count_based", bookedMinutes: 0, bookedCount: 0 },
+    open: true,
+  },
 ];
+
+/** Average booking length used to derive a believable value for the
+ *  *inactive* utilization track when seeding (e.g. give a count-based
+ *  slot a `bookedMinutes` figure even though its mode doesn't enforce
+ *  it). Keeps demo realism when an admin toggles a slot between modes
+ *  — the load doesn't visually evaporate. */
+const AVG_BOOKING_MINUTES = 45;
+
+function pairedSlotFields(
+  pattern: SeedSlotPattern,
+  windowMinutes: number,
+  slotCount: number,
+): { bookedMinutes: number; bookedCount: number } {
+  if (pattern.mode === "time_based") {
+    const bookedMinutes = pattern.bookedMinutes;
+    const derivedCount = Math.min(
+      slotCount,
+      Math.ceil(bookedMinutes / AVG_BOOKING_MINUTES),
+    );
+    return { bookedMinutes, bookedCount: derivedCount };
+  }
+  const bookedCount = pattern.bookedCount;
+  const derivedMinutes = Math.min(
+    windowMinutes,
+    bookedCount * AVG_BOOKING_MINUTES,
+  );
+  return { bookedMinutes: derivedMinutes, bookedCount };
+}
 
 /** Generates a 14-day calendar starting from today (admin day-zero). */
 export function getCalendar(today: Date = new Date()): AdminCalendarDay[] {
@@ -470,6 +630,16 @@ export function getCalendar(today: Date = new Date()): AdminCalendarDay[] {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     const pattern = SEED_BOOKING_PATTERN[i];
+    const morningPaired = pairedSlotFields(
+      pattern.am,
+      MORNING_WINDOW_MINUTES,
+      DEFAULT_MORNING_SLOT_COUNT,
+    );
+    const afternoonPaired = pairedSlotFields(
+      pattern.pm,
+      AFTERNOON_WINDOW_MINUTES,
+      DEFAULT_AFTERNOON_SLOT_COUNT,
+    );
     out.push({
       isoDate: isoDate(d),
       dayLabel: String(d.getDate()),
@@ -479,14 +649,20 @@ export function getCalendar(today: Date = new Date()): AdminCalendarDay[] {
       morning: {
         id: `${isoDate(d)}-am`,
         window: "morning",
+        mode: pattern.am.mode,
         windowMinutes: MORNING_WINDOW_MINUTES,
-        bookedMinutes: pattern.open ? pattern.am : 0,
+        bookedMinutes: pattern.open ? morningPaired.bookedMinutes : 0,
+        slotCount: DEFAULT_MORNING_SLOT_COUNT,
+        bookedCount: pattern.open ? morningPaired.bookedCount : 0,
       },
       afternoon: {
         id: `${isoDate(d)}-pm`,
         window: "afternoon",
+        mode: pattern.pm.mode,
         windowMinutes: AFTERNOON_WINDOW_MINUTES,
-        bookedMinutes: pattern.open ? pattern.pm : 0,
+        bookedMinutes: pattern.open ? afternoonPaired.bookedMinutes : 0,
+        slotCount: DEFAULT_AFTERNOON_SLOT_COUNT,
+        bookedCount: pattern.open ? afternoonPaired.bookedCount : 0,
       },
     });
   }

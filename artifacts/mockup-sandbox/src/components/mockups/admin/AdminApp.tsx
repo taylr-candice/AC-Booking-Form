@@ -39,6 +39,7 @@ import {
   type AdminAgent,
   type AdminBooking,
   type AdminCalendarDay,
+  type AdminSlot,
   type AdminUnit,
   type PaymentStatus,
   type ServiceStatus,
@@ -885,7 +886,10 @@ function SlotCalendar({
   calendar: AdminCalendarDay[];
   setCalendar: (next: AdminCalendarDay[]) => void;
 }) {
-  const [editingSlot, setEditingSlot] = useState<{ dayIso: string; window: "morning" | "afternoon" } | null>(null);
+  const [editingSlot, setEditingSlot] = useState<{
+    dayIso: string;
+    window: "morning" | "afternoon";
+  } | null>(null);
 
   function toggleOpen(dayIso: string) {
     setCalendar(
@@ -893,22 +897,15 @@ function SlotCalendar({
     );
   }
 
-  function setWindowMinutes(
+  function patchSlot(
     dayIso: string,
     window: "morning" | "afternoon",
-    nextMinutes: number,
+    patch: Partial<AdminSlot>,
   ) {
     setCalendar(
       calendar.map((d) =>
         d.isoDate === dayIso
-          ? {
-              ...d,
-              [window]: {
-                ...d[window],
-                windowMinutes: Math.max(60, Math.min(540, nextMinutes)),
-                bookedMinutes: Math.min(d[window].bookedMinutes, nextMinutes),
-              },
-            }
+          ? { ...d, [window]: { ...d[window], ...patch } }
           : d,
       ),
     );
@@ -917,10 +914,43 @@ function SlotCalendar({
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-[12px] text-slate-600">
-        Each day has a morning and afternoon window. Capacity is shown in
-        minutes (matches the customer-side time-budget concept). Click "Edit"
-        on a slot to change its window length, or toggle a day open / closed
-        to stop accepting bookings.
+        <div className="font-semibold text-slate-900">
+          Two ways to run a window
+        </div>
+        <div className="mt-1.5 grid grid-cols-2 gap-3">
+          <div className="rounded-lg bg-slate-50 p-2.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: BRAND }}
+              />
+              <strong className="text-slate-900">Time-based</strong>
+            </div>
+            <div className="mt-1 text-slate-600">
+              Window has a wall-clock length (e.g. 8am–12pm). Each booking
+              eats minutes based on how long the service takes. The window
+              stays open for a customer until their job no longer fits.
+            </div>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-2.5">
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: "#3B82F6" }}
+              />
+              <strong className="text-slate-900">Count-based</strong>
+            </div>
+            <div className="mt-1 text-slate-600">
+              Window has a fixed number of booking slots, regardless of
+              how long each booking takes. One booking uses one slot.
+              Window goes full when all slots are taken.
+            </div>
+          </div>
+        </div>
+        <div className="mt-2.5 text-slate-500">
+          Customers only ever see "available" or "full" — the mode and the
+          numbers below stay on this page.
+        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-3">
@@ -944,13 +974,9 @@ function SlotCalendar({
                 type="button"
                 onClick={() => toggleOpen(day.isoDate)}
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  day.open
-                    ? "text-emerald-700"
-                    : "text-slate-500"
+                  day.open ? "text-emerald-700" : "text-slate-500"
                 }`}
-                style={{
-                  backgroundColor: day.open ? "#DCFCE7" : "#F1F5F9",
-                }}
+                style={{ backgroundColor: day.open ? "#DCFCE7" : "#F1F5F9" }}
               >
                 {day.open ? "Open" : "Closed"}
               </button>
@@ -958,15 +984,17 @@ function SlotCalendar({
             <CalendarSlot
               slot={day.morning}
               label="Morning"
-              icon={<Sparkles className="h-3 w-3" />}
-              onEdit={() => setEditingSlot({ dayIso: day.isoDate, window: "morning" })}
+              onEdit={() =>
+                setEditingSlot({ dayIso: day.isoDate, window: "morning" })
+              }
               disabled={!day.open}
             />
             <CalendarSlot
               slot={day.afternoon}
               label="Afternoon"
-              icon={<Sparkles className="h-3 w-3" />}
-              onEdit={() => setEditingSlot({ dayIso: day.isoDate, window: "afternoon" })}
+              onEdit={() =>
+                setEditingSlot({ dayIso: day.isoDate, window: "afternoon" })
+              }
               disabled={!day.open}
             />
           </div>
@@ -978,7 +1006,9 @@ function SlotCalendar({
           dayIso={editingSlot.dayIso}
           window={editingSlot.window}
           calendar={calendar}
-          onChange={(min) => setWindowMinutes(editingSlot.dayIso, editingSlot.window, min)}
+          onPatch={(patch) =>
+            patchSlot(editingSlot.dayIso, editingSlot.window, patch)
+          }
           onClose={() => setEditingSlot(null)}
         />
       )}
@@ -986,23 +1016,30 @@ function SlotCalendar({
   );
 }
 
+function modeColor(mode: "time_based" | "count_based"): string {
+  return mode === "count_based" ? "#3B82F6" : BRAND;
+}
+
 function CalendarSlot({
   slot,
   label,
-  icon,
   onEdit,
   disabled,
 }: {
-  slot: { windowMinutes: number; bookedMinutes: number };
+  slot: AdminSlot;
   label: string;
-  icon: React.ReactNode;
   onEdit: () => void;
   disabled: boolean;
 }) {
-  const fillPct = Math.min(
-    100,
-    Math.round((slot.bookedMinutes / slot.windowMinutes) * 100),
-  );
+  const isCount = slot.mode === "count_based";
+  const fillPct = isCount
+    ? Math.min(100, Math.round((slot.bookedCount / Math.max(slot.slotCount, 1)) * 100))
+    : Math.min(100, Math.round((slot.bookedMinutes / slot.windowMinutes) * 100));
+  const accent = disabled ? "#cbd5e1" : modeColor(slot.mode);
+  const headlineLabel = isCount
+    ? `${slot.bookedCount} / ${slot.slotCount} booked`
+    : `${formatDurationMinutes(slot.bookedMinutes)} / ${formatDurationMinutes(slot.windowMinutes)}`;
+  const subLabel = isCount ? "Count-based" : "Time-based";
   return (
     <div
       className={`rounded-lg border p-2 ${
@@ -1011,28 +1048,29 @@ function CalendarSlot({
     >
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 text-[11px] font-medium text-slate-700">
-          <span className="text-slate-400">{icon}</span>
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: accent }}
+          />
           {label}
         </div>
         <button
           type="button"
           onClick={onEdit}
-          className="text-[10px] font-semibold text-slate-500 hover:text-slate-900"
+          className="text-[10px] font-semibold text-slate-500 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled}
         >
           Edit
         </button>
       </div>
       <div className="mt-1 text-[11px] font-semibold text-slate-900">
-        {formatDurationMinutes(slot.bookedMinutes)} / {formatDurationMinutes(slot.windowMinutes)}
+        {headlineLabel}
       </div>
+      <div className="text-[10px] text-slate-500">{subLabel}</div>
       <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-100">
         <div
           className="h-full rounded-full"
-          style={{
-            width: `${fillPct}%`,
-            backgroundColor: disabled ? "#cbd5e1" : BRAND,
-          }}
+          style={{ width: `${fillPct}%`, backgroundColor: accent }}
         />
       </div>
     </div>
@@ -1043,18 +1081,40 @@ function SlotWindowEditor({
   dayIso,
   window: win,
   calendar,
-  onChange,
+  onPatch,
   onClose,
 }: {
   dayIso: string;
   window: "morning" | "afternoon";
   calendar: AdminCalendarDay[];
-  onChange: (min: number) => void;
+  onPatch: (patch: Partial<AdminSlot>) => void;
   onClose: () => void;
 }) {
   const day = calendar.find((d) => d.isoDate === dayIso);
   if (!day) return null;
   const slot = day[win];
+
+  function setMode(nextMode: "time_based" | "count_based") {
+    if (nextMode === slot.mode) return;
+    onPatch({ mode: nextMode });
+  }
+
+  function setWindowMinutes(next: number) {
+    const clamped = Math.max(60, Math.min(540, next));
+    onPatch({
+      windowMinutes: clamped,
+      bookedMinutes: Math.min(slot.bookedMinutes, clamped),
+    });
+  }
+
+  function setSlotCount(next: number) {
+    const clamped = Math.max(1, Math.min(20, Math.round(next)));
+    onPatch({
+      slotCount: clamped,
+      bookedCount: Math.min(slot.bookedCount, clamped),
+    });
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl">
@@ -1075,30 +1135,93 @@ function SlotWindowEditor({
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Mode toggle */}
         <div className="mt-4">
-          <label className="text-[12px] font-medium text-slate-700">
-            Window length
-          </label>
-          <div className="mt-1 flex items-center gap-2">
-            <input
-              type="range"
-              min={60}
-              max={540}
-              step={15}
-              value={slot.windowMinutes}
-              onChange={(e) => onChange(Number(e.target.value))}
-              className="flex-1 accent-pink-500"
-              style={{ accentColor: BRAND }}
+          <div className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+            How this window fills up
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <ModePill
+              active={slot.mode === "time_based"}
+              accent={modeColor("time_based")}
+              title="Time-based"
+              subtitle="Bookings eat minutes"
+              onClick={() => setMode("time_based")}
             />
-            <div className="w-20 text-right text-[13px] font-semibold text-slate-900">
-              {formatDurationMinutes(slot.windowMinutes)}
-            </div>
+            <ModePill
+              active={slot.mode === "count_based"}
+              accent={modeColor("count_based")}
+              title="Count-based"
+              subtitle="Bookings eat slots"
+              onClick={() => setMode("count_based")}
+            />
           </div>
         </div>
-        <div className="mt-3 rounded-lg bg-slate-50 p-3 text-[12px] text-slate-600">
-          Already booked: <strong>{formatDurationMinutes(slot.bookedMinutes)}</strong>{" "}
-          (will be capped if you shrink the window).
-        </div>
+
+        {slot.mode === "time_based" ? (
+          <div className="mt-4">
+            <label className="text-[12px] font-medium text-slate-700">
+              Window length
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="range"
+                min={60}
+                max={540}
+                step={15}
+                value={slot.windowMinutes}
+                onChange={(e) => setWindowMinutes(Number(e.target.value))}
+                className="flex-1"
+                style={{ accentColor: BRAND }}
+              />
+              <div className="w-20 text-right text-[13px] font-semibold text-slate-900">
+                {formatDurationMinutes(slot.windowMinutes)}
+              </div>
+            </div>
+            <div className="mt-3 rounded-lg bg-slate-50 p-3 text-[12px] text-slate-600">
+              Already booked:{" "}
+              <strong>{formatDurationMinutes(slot.bookedMinutes)}</strong> (will
+              be capped if you shrink the window).
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <label className="text-[12px] font-medium text-slate-700">
+              Number of booking slots
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="range"
+                min={1}
+                max={20}
+                step={1}
+                value={slot.slotCount}
+                onChange={(e) => setSlotCount(Number(e.target.value))}
+                className="flex-1"
+                style={{ accentColor: "#3B82F6" }}
+              />
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={slot.slotCount}
+                onChange={(e) => setSlotCount(Number(e.target.value))}
+                className="w-16 rounded-md border border-slate-200 px-2 py-1 text-right text-[13px] font-semibold text-slate-900 focus:border-slate-400 focus:outline-none"
+              />
+            </div>
+            <div className="mt-3 rounded-lg bg-slate-50 p-3 text-[12px] text-slate-600">
+              Already booked: <strong>{slot.bookedCount}</strong> of{" "}
+              <strong>{slot.slotCount}</strong> (will be capped if you shrink
+              the count).
+            </div>
+            <div className="mt-2 text-[11px] text-slate-500">
+              The wall-clock window is still {formatDurationMinutes(slot.windowMinutes)}{" "}
+              — bookings just don't have to add up to it.
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 flex justify-end">
           <button
             type="button"
@@ -1111,6 +1234,37 @@ function SlotWindowEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function ModePill({
+  active,
+  accent,
+  title,
+  subtitle,
+  onClick,
+}: {
+  active: boolean;
+  accent: string;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-lg border p-2.5 text-left transition ${
+        active ? "border-transparent text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+      }`}
+      style={active ? { backgroundColor: accent } : undefined}
+    >
+      <div className="text-[12px] font-semibold leading-tight">{title}</div>
+      <div className={`mt-0.5 text-[10px] ${active ? "opacity-90" : "text-slate-500"}`}>
+        {subtitle}
+      </div>
+    </button>
   );
 }
 
