@@ -29,7 +29,7 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
           "A white wall-mounted split AC indoor unit installed high on a living-room wall.",
         paragraphs: [
           "Each wall-mounted indoor unit head counts as one indoor unit.",
-          "Your service already includes the indoor unit heads shown in the 'Includes' section.",
+          "Your service already includes the number of indoor unit heads shown in the 'Includes' section.",
           "Only add extras if the apartment has more indoor unit heads than shown there.",
         ],
       },
@@ -45,7 +45,7 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
           "A large white ceiling return-air grille, typical of a ducted AC system.",
         paragraphs: [
           "Filters sit behind large return-air grilles.",
-          "Your service already includes the filter cleans shown in the 'Includes' section.",
+          "Your service already includes the number of filter cleans shown in the 'Includes' section.",
           "Only add extras if the apartment has more large return-air grilles than shown there.",
         ],
       },

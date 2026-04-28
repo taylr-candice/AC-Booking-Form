@@ -49,8 +49,8 @@ const COPY: Record<KnownType, Copy> = {
     systemsUnitPlural: "ducted services",
     addonLabel: "Extra filters",
     addonHelper: [
-      "Each service includes 1 filter clean.",
-      "If the apartment has more large return-air grilles than shown above, add the extras here.",
+      "Each service includes 1 return-air grille + filter clean.",
+      "If you count more return-air grilles in the apartment than your booked service includes, add the extras here.",
       "Filters sit behind large return-air grilles — not small air vents or outlets.",
     ],
     addonUnitSingular: "extra filter",
@@ -349,19 +349,17 @@ export function AcMobile() {
                     <AddonIcon className="h-3.5 w-3.5" />
                   </div>
                   <h3 className="font-semibold text-slate-900">{copy.addonLabel}</h3>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExampleModal(
-                        effectiveType === "ducted" ? "ducted-filter" : "split-indoor",
-                      )
-                    }
-                    data-testid="button-see-example"
-                    className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                  >
-                    <Eye className="h-3 w-3" />
-                    See example
-                  </button>
+                  {effectiveType !== "ducted" && (
+                    <button
+                      type="button"
+                      onClick={() => setExampleModal("split-indoor")}
+                      data-testid="button-see-example"
+                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                    >
+                      <Eye className="h-3 w-3" />
+                      See example
+                    </button>
+                  )}
                 </div>
                 <p className="text-xs font-medium shrink-0" style={{ color: BRAND }}>
                   ${ADDON_PRICE} ea.
@@ -390,12 +388,29 @@ export function AcMobile() {
                 </button>
               </div>
               <div
-                className="mt-2 space-y-1.5 text-[12px] text-slate-500"
+                className="mt-2 space-y-1.5 text-[11px] text-slate-500"
                 data-testid="text-extras-helper"
               >
-                {copy.addonHelper.map((p, i) => (
-                  <p key={i}>{p}</p>
-                ))}
+                {effectiveType === "ducted" ? (
+                  <>
+                    <p>Each service includes 1 return-air grille + filter clean.</p>
+                    <p>
+                      If you count more return-air grilles in the apartment than your booked service includes, add the extras here. Not sure what one looks like?{" "}
+                      <button
+                        type="button"
+                        onClick={() => setExampleModal("ducted-filter")}
+                        data-testid="button-see-example-inline"
+                        className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                      >
+                        See example
+                      </button>
+                      .
+                    </p>
+                    <p>Filters sit behind large return-air grilles — not small air vents or outlets.</p>
+                  </>
+                ) : (
+                  copy.addonHelper.map((p, i) => <p key={i}>{p}</p>)
+                )}
               </div>
             </div>
           </div>
