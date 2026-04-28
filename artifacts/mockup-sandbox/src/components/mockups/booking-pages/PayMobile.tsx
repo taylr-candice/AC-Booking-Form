@@ -52,11 +52,6 @@ export function PayMobile() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Inter']">
-      {/* Top hint strip */}
-      <div className="border-b border-slate-100 bg-white px-5 pb-1 pt-2 text-[11px] text-slate-400">
-        Booking
-      </div>
-
       {/* Page header */}
       <div className="flex items-start justify-between bg-white px-5 pb-4 pt-5">
         <div>

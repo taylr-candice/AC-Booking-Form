@@ -170,10 +170,6 @@ export function AcMobile() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
-      <div className="border-b border-slate-100 bg-slate-50/70 px-5 pb-1 pt-2 text-[11px] text-slate-400">
-        Booking
-      </div>
-
       <div className="flex items-start justify-between px-5 pb-3 pt-5">
         <div className="pr-3">
           <h1 className="text-[22px] font-semibold leading-tight text-slate-900">{heading}</h1>

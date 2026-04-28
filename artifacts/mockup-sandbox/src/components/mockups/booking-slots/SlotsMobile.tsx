@@ -50,11 +50,6 @@ export function SlotsMobile() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
-      {/* Top hint of previous screen (matches Figma's "Reports & Records" peek) */}
-      <div className="border-b border-slate-100 bg-slate-50/70 px-5 pb-1 pt-2 text-[11px] text-slate-400">
-        Booking
-      </div>
-
       {/* Page header — "Check out" style */}
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
         <div>

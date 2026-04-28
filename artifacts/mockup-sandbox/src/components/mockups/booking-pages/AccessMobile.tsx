@@ -61,11 +61,6 @@ export function AccessMobile() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
-      {/* Top hint strip */}
-      <div className="border-b border-slate-100 bg-slate-50/70 px-5 pb-1 pt-2 text-[11px] text-slate-400">
-        Booking
-      </div>
-
       {/* Page header */}
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
         <div>
