@@ -79,7 +79,7 @@ export function UnitMobile() {
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         <p className="mb-4 text-[14px] leading-relaxed text-slate-500">
-          Choose the apartment you'd like to book this service for.
+          For which the service will take place
         </p>
 
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">

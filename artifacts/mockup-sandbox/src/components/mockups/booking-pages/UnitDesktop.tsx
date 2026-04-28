@@ -40,7 +40,7 @@ export function UnitDesktop() {
           <div className="mb-8">
             <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 1 of 7</div>
             <h1 className="text-2xl font-semibold text-slate-900">Select the property</h1>
-            <p className="text-sm text-slate-500 mt-2">Select the apartment where the air-conditioning service will take place.</p>
+            <p className="text-sm text-slate-500 mt-2">For which the service will take place</p>
           </div>
 
           <div className="flex-1">
