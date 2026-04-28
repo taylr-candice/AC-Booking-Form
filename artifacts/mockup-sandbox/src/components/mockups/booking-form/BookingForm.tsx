@@ -219,17 +219,20 @@ export function BookingForm() {
   const slot = useMemo(() => SLOTS.find((x) => x.id === s.scheduleSlotId) ?? null, [s.scheduleSlotId]);
 
   const isCoordination = !!s.accessMethod && COORDINATION_METHODS.includes(s.accessMethod);
-  const totalSteps = isCoordination ? 6 : 7;
-  // Step numbering for coordination: 1,2,3,4,5,6=Review (skip schedule which would have been step 6)
+  // Steps:
+  //   1 Unit & role · 2 Your details · 3 Systems · 4 Access · 5 Schedule · 6 Review & pay
+  // For coordination flows, step 5 (Schedule) is skipped, so display becomes 5 of 5
+  // when the user reaches Review & pay.
+  const totalSteps = isCoordination ? 5 : 6;
   const displayStep = (() => {
-    if (s.step <= 5) return s.step;
-    if (isCoordination) return s.step === 7 ? 6 : s.step;
-    return s.step;
+    if (s.step <= 4) return s.step;
+    if (s.step === 5) return 5; // Schedule (only reachable when not coordination)
+    return isCoordination ? 5 : 6; // s.step === 6 → Review & pay
   })();
 
   const stepTitles = isCoordination
-    ? ["Unit", "Role", "Your details", "Systems", "Access", "Review & pay"]
-    : ["Unit", "Role", "Your details", "Systems", "Access", "Schedule", "Review & pay"];
+    ? ["Unit & role", "Your details", "Systems", "Access", "Review & pay"]
+    : ["Unit & role", "Your details", "Systems", "Access", "Schedule", "Review & pay"];
 
   const update = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
 
@@ -304,18 +307,16 @@ export function BookingForm() {
   const stepValid = (() => {
     switch (s.step) {
       case 1:
-        return !!s.unitId;
-      case 2:
-        return !!s.role;
-      case 3: {
+        return !!s.unitId && !!s.role;
+      case 2: {
         const { firstName, lastName, email, mobile } = s.booker;
         const baseOk = firstName.trim() && lastName.trim() && isEmail(email) && mobile.trim().length >= 6;
         if (s.role === "agent") return !!baseOk && !!s.agencyId;
         return !!baseOk;
       }
-      case 4:
+      case 3:
         return s.ac.systems >= 1 && s.ac.systems <= 10 && s.ac.additional >= 0 && s.ac.additional <= 29;
-      case 5: {
+      case 4: {
         if (s.role === "owner" && !s.ownerType) return false;
         if (!s.accessMethod) return false;
         const m = s.accessMethod;
@@ -333,10 +334,10 @@ export function BookingForm() {
         if (m === "collect_agent_trade_key") return sigOk;
         return false;
       }
-      case 6:
+      case 5:
         if (isCoordination) return true; // skipped logically
         return !!s.scheduleSlotId;
-      case 7:
+      case 6:
         return true;
       default:
         return false;
@@ -345,17 +346,17 @@ export function BookingForm() {
 
   const goNext = () => {
     if (!stepValid) return;
-    // If on step 5 and coordination, skip schedule (step 6) → jump to 7
-    if (s.step === 5 && isCoordination) {
-      setS((p) => ({ ...p, step: 7 }));
+    // If on access step and coordination, skip schedule (step 5) → jump to review (6)
+    if (s.step === 4 && isCoordination) {
+      setS((p) => ({ ...p, step: 6 }));
       return;
     }
-    setS((p) => ({ ...p, step: Math.min(7, p.step + 1) }));
+    setS((p) => ({ ...p, step: Math.min(6, p.step + 1) }));
   };
 
   const goBack = () => {
-    if (s.step === 7 && isCoordination) {
-      setS((p) => ({ ...p, step: 5 }));
+    if (s.step === 6 && isCoordination) {
+      setS((p) => ({ ...p, step: 4 }));
       return;
     }
     setS((p) => ({ ...p, step: Math.max(1, p.step - 1) }));
@@ -420,16 +421,15 @@ export function BookingForm() {
 
         <div className="mt-6 rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="px-5 py-5 sm:px-7 sm:py-7">
-            {s.step === 1 && <Step1 unit={unit} onSelect={selectUnit} />}
-            {s.step === 2 && <Step2 role={s.role} setRole={setRole} />}
-            {s.step === 3 && <Step3 s={s} update={update} />}
-            {s.step === 4 && <Step4 s={s} update={update} unit={unit} total={total} />}
-            {s.step === 5 && <Step5 s={s} update={update} setOwnerType={setOwnerType} setAccessMethod={setAccessMethod} />}
-            {s.step === 6 && !isCoordination && <Step6 s={s} update={update} />}
-            {s.step === 7 && <Step7 s={s} unit={unit} agency={agency} arrangeAgency={arrangeAgency} slot={slot} total={total} isCoordination={isCoordination} onPay={submitPayment} />}
+            {s.step === 1 && <Step1 unit={unit} onSelect={selectUnit} role={s.role} setRole={setRole} />}
+            {s.step === 2 && <Step2 s={s} update={update} />}
+            {s.step === 3 && <Step3 s={s} update={update} unit={unit} total={total} />}
+            {s.step === 4 && <Step4 s={s} update={update} setOwnerType={setOwnerType} setAccessMethod={setAccessMethod} />}
+            {s.step === 5 && !isCoordination && <Step5 s={s} update={update} />}
+            {s.step === 6 && <Step6 s={s} unit={unit} agency={agency} arrangeAgency={arrangeAgency} slot={slot} total={total} isCoordination={isCoordination} onPay={submitPayment} />}
           </div>
 
-          {s.step !== 7 && (
+          {s.step !== 6 && (
             <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/60 px-5 py-4 sm:px-7">
               <Button
                 variant="ghost"
@@ -456,7 +456,7 @@ export function BookingForm() {
               </Button>
             </div>
           )}
-          {s.step === 7 && (
+          {s.step === 6 && (
             <div className="flex items-center justify-start border-t border-slate-200 bg-slate-50/60 px-5 py-4 sm:px-7">
               <Button variant="ghost" onClick={goBack} data-testid="button-back-review" className="text-slate-700">
                 <ChevronLeft className="mr-1 h-4 w-4" />
@@ -497,8 +497,8 @@ function Stepper({
           const num = idx + 1;
           const completed = num < currentDisplay;
           const current = num === currentDisplay;
-          // Map display num → internal step (compensate for skipped step 6 in coordination)
-          const target = isCoordination && num === 6 ? 7 : num;
+          // Map display num → internal step (compensate for skipped step 5 in coordination)
+          const target = isCoordination && num === 5 ? 6 : num;
           const canJump = target <= internalStep;
           return (
             <li key={title} className="flex flex-1 items-center gap-2">
@@ -559,14 +559,21 @@ function Stepper({
   );
 }
 
-/* ---------- Step 1: Select unit ---------- */
-function Step1({ unit, onSelect }: { unit: Unit | null; onSelect: (id: string) => void }) {
+/* ---------- Step 1: Unit & role ---------- */
+function Step1({
+  unit, onSelect, role, setRole,
+}: {
+  unit: Unit | null;
+  onSelect: (id: string) => void;
+  role: Role | null;
+  setRole: (r: Role) => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <StepShell
       icon={<Home className="h-5 w-5" />}
       title="Which unit is this booking for?"
-      subtitle="Choose the apartment we'll be servicing. Search by address or lot number."
+      subtitle="Choose the apartment we'll be servicing, then tell us your role for this property."
     >
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -625,36 +632,35 @@ function Step1({ unit, onSelect }: { unit: Unit | null; onSelect: (id: string) =
       <Note>
         Don't see your unit? Your strata committee may not have onboarded with Taylr yet — call us on 1300 TAYLR and we'll sort it out.
       </Note>
-    </StepShell>
-  );
-}
 
-/* ---------- Step 2: Role ---------- */
-function Step2({ role, setRole }: { role: Role | null; setRole: (r: Role) => void }) {
-  return (
-    <StepShell
-      icon={<UserIcon className="h-5 w-5" />}
-      title="What's your relationship to this unit?"
-      subtitle="This helps us tailor the rest of the form to your situation."
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <RoleCard
-          active={role === "owner"}
-          onClick={() => setRole("owner")}
-          icon={<Home className="h-5 w-5" />}
-          title="Owner"
-          desc="I own the unit (whether I live there or it's leased out)."
-          testId="role-owner"
-        />
-        <RoleCard
-          active={role === "agent"}
-          onClick={() => setRole("agent")}
-          icon={<Building2 className="h-5 w-5" />}
-          title="Agent / Property Manager"
-          desc="I manage this unit on behalf of the owner."
-          testId="role-agent"
-        />
-      </div>
+      {/* Role chooser — appears once a unit is selected (mirrors the live booking flow). */}
+      {unit && (
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <div className="mb-1 flex items-center gap-2">
+            <UserIcon className="h-4 w-4 text-slate-500" />
+            <h3 className="text-sm font-semibold text-slate-900">Your role for this property</h3>
+          </div>
+          <p className="mb-3 text-xs text-slate-500">Are you the owner, or a managing agent?</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <RoleCard
+              active={role === "owner"}
+              onClick={() => setRole("owner")}
+              icon={<Home className="h-5 w-5" />}
+              title="Owner"
+              desc="I own the unit (whether I live there or it's leased out)."
+              testId="role-owner"
+            />
+            <RoleCard
+              active={role === "agent"}
+              onClick={() => setRole("agent")}
+              icon={<Building2 className="h-5 w-5" />}
+              title="Agent / Property Manager"
+              desc="I manage this unit on behalf of the owner."
+              testId="role-agent"
+            />
+          </div>
+        </div>
+      )}
     </StepShell>
   );
 }
@@ -683,8 +689,8 @@ function RoleCard({
   );
 }
 
-/* ---------- Step 3: Booker details ---------- */
-function Step3({ s, update }: { s: State; update: (p: Partial<State>) => void }) {
+/* ---------- Step 2: Booker details ---------- */
+function Step2({ s, update }: { s: State; update: (p: Partial<State>) => void }) {
   return (
     <StepShell
       icon={<Mail className="h-5 w-5" />}
@@ -757,8 +763,8 @@ function Step3({ s, update }: { s: State; update: (p: Partial<State>) => void })
   );
 }
 
-/* ---------- Step 4: AC details ---------- */
-function Step4({ s, update, unit, total }: { s: State; update: (p: Partial<State>) => void; unit: Unit | null; total: number }) {
+/* ---------- Step 3: AC details ---------- */
+function Step3({ s, update, unit, total }: { s: State; update: (p: Partial<State>) => void; unit: Unit | null; total: number }) {
   const hasSaved = unit && (unit.savedSystems != null || unit.savedAdditional != null);
   return (
     <StepShell
@@ -814,7 +820,7 @@ function Step4({ s, update, unit, total }: { s: State; update: (p: Partial<State
             {s.ac.systems} × ${SYSTEM_PRICE} {s.ac.additional > 0 ? `+ ${s.ac.additional} × $${ADDON_PRICE}` : ""}
           </div>
         </div>
-        <div className="text-2xl font-bold text-slate-900" data-testid="text-total-step4">${total.toFixed(0)}</div>
+        <div className="text-2xl font-bold text-slate-900" data-testid="text-total-step3">${total.toFixed(0)}</div>
       </div>
     </StepShell>
   );
@@ -858,8 +864,8 @@ function Counter({
   );
 }
 
-/* ---------- Step 5: Property access ---------- */
-function Step5({
+/* ---------- Step 4: Property access ---------- */
+function Step4({
   s, update, setOwnerType, setAccessMethod,
 }: {
   s: State;
@@ -1237,8 +1243,8 @@ function SignatureBlock({ s, update, text }: { s: State; update: (p: Partial<Sta
   );
 }
 
-/* ---------- Step 6: Schedule ---------- */
-function Step6({ s, update }: { s: State; update: (p: Partial<State>) => void }) {
+/* ---------- Step 5: Schedule ---------- */
+function Step5({ s, update }: { s: State; update: (p: Partial<State>) => void }) {
   // group slots by date
   const grouped = useMemo(() => {
     const map = new Map<string, { date: string; label: string; morning?: Slot; afternoon?: Slot }>();
@@ -1321,8 +1327,8 @@ function SlotChip({
   );
 }
 
-/* ---------- Step 7: Review & pay ---------- */
-function Step7({
+/* ---------- Step 6: Review & pay ---------- */
+function Step6({
   s, unit, agency, arrangeAgency, slot, total, isCoordination, onPay,
 }: {
   s: State;
