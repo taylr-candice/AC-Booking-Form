@@ -87,6 +87,17 @@ export function SlotsDesktop() {
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
+  // Role-conditional accountability nudge inside the "Not sure" callout.
+  // Owners and managing agents have very different burdens when a second
+  // visit is needed — owners have to physically open up again, agents
+  // have to re-coordinate tenant access. The copy below is short on
+  // purpose so the distinct keywords ("be home for" / "coordinate with
+  // the tenant") double as test anchors. Falls back to the owner
+  // phrasing when role is unset (the customer hasn't reached Step 1 yet).
+  const accountabilityNudge =
+    session.role === "agent"
+      ? "you'll need to coordinate a second visit with the tenant"
+      : "you'll need to be home for a second visit";
 
   const weeks = useMemo(() => {
     const out: Day[][] = [];
@@ -181,7 +192,10 @@ export function SlotsDesktop() {
                   You picked <span className="font-semibold">"Not sure"</span> on the AC
                   step, so we've sized your slot for one indoor unit. If we find more
                   on-site, the technician may not finish in one visit and Taylr will
-                  book a second slot — which means a second access.{" "}
+                  book a second slot — which means{" "}
+                  <span className="font-semibold" data-testid="nudge-accountability-desktop">
+                    {accountabilityNudge}
+                  </span>.{" "}
                   <span className="font-semibold">If you can confirm the AC details
                   now, you'll likely avoid that.</span>
                 </div>
