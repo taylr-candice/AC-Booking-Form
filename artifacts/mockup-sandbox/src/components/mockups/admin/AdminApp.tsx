@@ -1082,7 +1082,7 @@ function CalendarSlot({
   );
 }
 
-function SlotWindowEditor({
+export function SlotWindowEditor({
   dayIso,
   window: win,
   calendar,
