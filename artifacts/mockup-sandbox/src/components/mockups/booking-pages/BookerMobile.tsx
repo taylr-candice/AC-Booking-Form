@@ -73,10 +73,23 @@ export function BookerMobile() {
   const isAgent = role === "agent";
   const showOtherInput = isAgent && isOtherAgency(agencyId);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [mobile, setMobile] = useState("");
+  // Contact fields live in the booking session (single source of truth) so
+  // that navigating away from Step 2 and back — or jumping in via a step
+  // dot / edit-jump — re-populates the inputs and downstream steps (Pay,
+  // Confirmation) read the same values. Persist on every keystroke,
+  // mirroring how `setAgency`/`setAgencyOtherName` are wired above.
+  const firstName = useBookingSelector((s) => s.contact_first_name);
+  const lastName = useBookingSelector((s) => s.contact_last_name);
+  const email = useBookingSelector((s) => s.contact_email);
+  const mobile = useBookingSelector((s) => s.contact_phone);
+  const setFirstName = (v: string) =>
+    bookingActions.setContact({ contact_first_name: v });
+  const setLastName = (v: string) =>
+    bookingActions.setContact({ contact_last_name: v });
+  const setEmail = (v: string) =>
+    bookingActions.setContact({ contact_email: v });
+  const setMobile = (v: string) =>
+    bookingActions.setContact({ contact_phone: v });
 
   const [touched, setTouched] = useState({
     agency: false,
