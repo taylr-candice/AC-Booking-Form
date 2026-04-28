@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Lock, CreditCard as CreditCardIcon, Apple, Info, Clock, CheckCircle2, FileText } from "lucide-react";
+import { ArrowRight, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import { isCoordinationFlow } from "../../../state/bookingDerived";
 import {
@@ -10,20 +10,25 @@ import {
   CANCELLATION_POLICY_PARAGRAPHS,
   computeBookingTotal,
   COORDINATION_NOTE,
+  INVOICE_LABEL,
   INVOICE_PREPAYMENT_BODY,
   INVOICE_PREPAYMENT_TITLE,
   INVOICE_REFERENCE_NOTE,
+  INVOICE_SUBLABEL,
   isStep7PayEnabled,
   labelForAccessMethod,
   labelForRole,
+  PAY_NOW_LABEL,
+  PAY_NOW_SUBLABEL,
   scheduleDisplay,
+  STRIPE_REDIRECT_NOTE,
   unitLabel,
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
 
-type PayMethod = "card" | "apple" | "invoice";
+type PayMethod = "pay_now" | "invoice";
 
 export function PayDesktop() {
   const [method, setMethod] = useState<PayMethod | null>(null);
@@ -41,7 +46,13 @@ export function PayDesktop() {
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
 
-  const payEnabled = isStep7PayEnabled(session);
+  const payEnabled = isStep7PayEnabled(session) && method !== null;
+  const ctaLabel =
+    method === "invoice"
+      ? "Submit booking"
+      : method === "pay_now"
+        ? `Continue to payment $${total}`
+        : `Pay $${total}`;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
@@ -105,16 +116,16 @@ export function PayDesktop() {
                 </div>
               </div>
 
-              <div className={`grid ${isAgent ? "grid-cols-3" : "grid-cols-2"} gap-3 mb-6`}>
-                {/* Credit Card */}
+              <div className={`grid ${isAgent ? "grid-cols-2" : "grid-cols-1"} gap-3 mb-6`}>
+                {/* Pay now — everyone */}
                 <button
                   type="button"
-                  onClick={() => setMethod("card")}
-                  data-testid="card-method-card"
-                  aria-pressed={method === "card"}
-                  className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition"
+                  onClick={() => setMethod("pay_now")}
+                  data-testid="card-method-pay-now"
+                  aria-pressed={method === "pay_now"}
+                  className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-5 transition"
                   style={
-                    method === "card"
+                    method === "pay_now"
                       ? {
                           borderColor: "rgba(95,187,151,0.45)",
                           backgroundColor: "rgba(95,187,151,0.08)",
@@ -123,31 +134,9 @@ export function PayDesktop() {
                   }
                 >
                   <CreditCardIcon className="h-6 w-6 text-slate-700" />
-                  <span className="text-sm font-semibold text-slate-900">Credit Card</span>
-                  {method === "card" && (
-                    <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
-                  )}
-                </button>
-
-                {/* Apple Pay */}
-                <button
-                  type="button"
-                  onClick={() => setMethod("apple")}
-                  data-testid="card-method-apple"
-                  aria-pressed={method === "apple"}
-                  className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition"
-                  style={
-                    method === "apple"
-                      ? {
-                          borderColor: "rgba(95,187,151,0.45)",
-                          backgroundColor: "rgba(95,187,151,0.08)",
-                        }
-                      : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
-                  }
-                >
-                  <Apple className="h-6 w-6 text-slate-700" />
-                  <span className="text-sm font-semibold text-slate-900">Apple Pay</span>
-                  {method === "apple" && (
+                  <span className="text-sm font-semibold text-slate-900">{PAY_NOW_LABEL}</span>
+                  <span className="text-[11px] font-medium text-slate-500">{PAY_NOW_SUBLABEL}</span>
+                  {method === "pay_now" && (
                     <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
                   )}
                 </button>
@@ -159,7 +148,7 @@ export function PayDesktop() {
                     onClick={() => setMethod("invoice")}
                     data-testid="card-method-invoice"
                     aria-pressed={method === "invoice"}
-                    className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-4 transition"
+                    className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-5 transition"
                     style={
                       method === "invoice"
                         ? {
@@ -170,8 +159,8 @@ export function PayDesktop() {
                     }
                   >
                     <FileText className="h-6 w-6 text-slate-700" />
-                    <span className="text-sm font-semibold text-slate-900">Invoice me</span>
-                    <span className="text-[11px] font-medium text-slate-500">Pay before service</span>
+                    <span className="text-sm font-semibold text-slate-900">{INVOICE_LABEL}</span>
+                    <span className="text-[11px] font-medium text-slate-500">{INVOICE_SUBLABEL}</span>
                     {method === "invoice" && (
                       <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
                     )}
@@ -179,34 +168,17 @@ export function PayDesktop() {
                 )}
               </div>
 
-              {method === "card" && (
-                <div className="space-y-4 animate-in fade-in duration-300">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">Card number</label>
-                    <div className="relative">
-                      <input type="text" placeholder="0000 0000 0000 0000" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition" />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        <div className="h-5 w-8 rounded bg-slate-200"></div>
-                        <div className="h-5 w-8 rounded bg-slate-200"></div>
-                      </div>
-                    </div>
+              {method === "pay_now" && (
+                <div
+                  className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-5 animate-in fade-in duration-300"
+                  data-testid="block-pay-now-desktop"
+                >
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white border border-slate-200 text-slate-700">
+                    <Lock className="h-5 w-5" />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">Expiry date</label>
-                      <input type="text" placeholder="MM/YY" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">CVC</label>
-                      <input type="text" placeholder="123" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition" />
-                    </div>
-                  </div>
-                </div>
-              )}
-              {method === "apple" && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center animate-in fade-in duration-300">
-                  <Apple className="mx-auto mb-3 h-8 w-8 text-slate-900" />
-                  <p className="text-sm text-slate-600">You'll be prompted to authenticate with Apple Pay when you click Pay below.</p>
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    {STRIPE_REDIRECT_NOTE}
+                  </p>
                 </div>
               )}
               {method === "invoice" && isAgent && (
@@ -332,7 +304,7 @@ export function PayDesktop() {
               }`}
               style={{ backgroundColor: BRAND }}
             >
-              Pay ${total}
+              {ctaLabel}
               <ArrowRight className="h-5 w-5" />
             </button>
           </div>

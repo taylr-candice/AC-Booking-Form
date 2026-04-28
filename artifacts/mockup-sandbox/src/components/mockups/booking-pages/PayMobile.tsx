@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   Pencil,
   CreditCard,
-  Apple,
   FileText,
   CheckCircle2,
   Info,
+  Lock,
   Clock,
 } from "lucide-react";
 import {
@@ -17,22 +17,31 @@ import {
 import { isCoordinationFlow } from "../../../state/bookingDerived";
 import {
   acSummary,
+  BILLING_EMAIL_HELPER,
   CANCELLATION_ACK_LABEL,
   CANCELLATION_CONTACT_EMAIL,
   CANCELLATION_POLICY_PARAGRAPHS,
   computeBookingTotal,
   COORDINATION_NOTE,
+  INVOICE_LABEL,
+  INVOICE_PREPAYMENT_BODY,
+  INVOICE_PREPAYMENT_TITLE,
+  INVOICE_REFERENCE_NOTE,
+  INVOICE_SUBLABEL,
   isStep7PayEnabled,
   labelForAccessMethod,
   labelForRole,
+  PAY_NOW_LABEL,
+  PAY_NOW_SUBLABEL,
   scheduleDisplay,
+  STRIPE_REDIRECT_NOTE,
   unitLabel,
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
 
-type PayMethod = "card" | "apple";
+type PayMethod = "pay_now" | "invoice";
 
 export function PayMobile() {
   const [method, setMethod] = useState<PayMethod | null>(null);
@@ -45,7 +54,18 @@ export function PayMobile() {
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
 
-  const payEnabled = isStep7PayEnabled(session);
+  // If role changes away from agent while invoice is selected, clear the selection.
+  useEffect(() => {
+    if (!isAgent && method === "invoice") setMethod(null);
+  }, [isAgent, method]);
+
+  const payEnabled = isStep7PayEnabled(session) && method !== null;
+  const ctaLabel =
+    method === "invoice"
+      ? "Submit booking"
+      : method === "pay_now"
+        ? `Continue to payment $${total}`
+        : `Pay $${total}`;
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Inter']">
@@ -181,85 +201,101 @@ export function PayMobile() {
 
         <div className="space-y-3 mb-6">
           <MethodCard
-            selected={method === "card"}
-            onClick={() => setMethod("card")}
+            selected={method === "pay_now"}
+            onClick={() => setMethod("pay_now")}
             icon={<CreditCard className="h-5 w-5" />}
-            label="Credit card"
-            id="card"
+            label={PAY_NOW_LABEL}
+            sublabel={PAY_NOW_SUBLABEL}
+            id="pay-now"
           />
-          <MethodCard
-            selected={method === "apple"}
-            onClick={() => setMethod("apple")}
-            icon={<Apple className="h-5 w-5" />}
-            label="Apple Pay"
-            id="apple"
-          />
+          {isAgent && (
+            <MethodCard
+              selected={method === "invoice"}
+              onClick={() => setMethod("invoice")}
+              icon={<FileText className="h-5 w-5" />}
+              label={INVOICE_LABEL}
+              sublabel={INVOICE_SUBLABEL}
+              id="invoice"
+            />
+          )}
         </div>
 
-        {method === "card" && (
-          <div className="space-y-4 mb-8">
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Card number</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="0000 0000 0000 0000"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-[15px] outline-none focus:border-slate-400"
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
-                  <div className="h-5 w-8 rounded bg-slate-100 flex items-center justify-center text-[8px] font-bold text-blue-800">VISA</div>
-                  <div className="h-5 w-8 rounded bg-slate-100 flex items-center justify-center text-[8px] font-bold text-orange-600">MC</div>
-                </div>
-              </div>
+        {method === "pay_now" && (
+          <div
+            className="mb-8 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
+            data-testid="block-pay-now-mobile"
+          >
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white border border-slate-200 text-slate-700">
+              <Lock className="h-4 w-4" />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Expiration</label>
-                <input
-                  type="text"
-                  placeholder="MM/YY"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-[15px] outline-none focus:border-slate-400"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">CVV</label>
-                <input
-                  type="text"
-                  placeholder="123"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-[15px] outline-none focus:border-slate-400"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Country</label>
-                <input
-                  type="text"
-                  value="Australia"
-                  readOnly
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-[15px] text-slate-500 outline-none"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Postcode</label>
-                <input
-                  type="text"
-                  placeholder="2900"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-[15px] outline-none focus:border-slate-400"
-                />
-              </div>
-            </div>
+            <p className="text-[13px] leading-relaxed text-slate-600">
+              {STRIPE_REDIRECT_NOTE}
+            </p>
           </div>
         )}
 
-        {method === "apple" && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 text-center mb-8">
-            <Apple className="mx-auto mb-3 h-8 w-8 text-slate-900" />
-            <p className="text-[13px] text-slate-600">
-              You'll be prompted to authenticate with Apple Pay when you tap Pay.
-            </p>
+        {method === "invoice" && isAgent && (
+          <div
+            className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4"
+            data-testid="block-invoice-mobile"
+          >
+            <div className="flex items-start gap-3 mb-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white border border-slate-200 text-slate-700">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div>
+                <div
+                  className="text-[13px] font-semibold mb-1"
+                  style={{ color: "#9D174D" }}
+                  data-testid="text-invoice-prepayment-title-mobile"
+                >
+                  {INVOICE_PREPAYMENT_TITLE}
+                </div>
+                <p
+                  className="text-[12.5px] text-slate-600 leading-relaxed"
+                  data-testid="text-invoice-prepayment-body-mobile"
+                >
+                  {INVOICE_PREPAYMENT_BODY}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="billing-email-mobile" className="text-[12px] font-medium text-slate-700">
+                  Billing email{" "}
+                  <span className="font-normal text-slate-500">(if different to the email above)</span>
+                </label>
+                <input
+                  id="billing-email-mobile"
+                  type="email"
+                  inputMode="email"
+                  placeholder={session.contact_email || "accounts@youragency.com.au"}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] outline-none focus:border-slate-400"
+                  data-testid="input-billing-email-mobile"
+                />
+                <p className="text-[11px] text-slate-500">{BILLING_EMAIL_HELPER}</p>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="po-ref-mobile" className="text-[12px] font-medium text-slate-700">
+                  Purchase order / reference (optional)
+                </label>
+                <input
+                  id="po-ref-mobile"
+                  type="text"
+                  placeholder="e.g. PO-12345"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] outline-none focus:border-slate-400"
+                />
+              </div>
+            </div>
+            <div
+              className="mt-3 flex items-start gap-2 rounded-lg border border-pink-200 bg-pink-50/60 p-3"
+              data-testid="note-invoice-reference-mobile"
+            >
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BRAND }} />
+              <p className="text-[11.5px] leading-relaxed text-slate-700">
+                {INVOICE_REFERENCE_NOTE}
+              </p>
+            </div>
           </div>
         )}
 
@@ -317,7 +353,7 @@ export function PayMobile() {
       </div>
 
       {/* Docked CTA */}
-      <div className="border-t border-slate-100 bg-white px-5 py-3 space-y-2">
+      <div className="border-t border-slate-100 bg-white px-5 py-3">
         <button
           type="button"
           data-testid="button-pay"
@@ -327,21 +363,9 @@ export function PayMobile() {
           }`}
           style={{ backgroundColor: BRAND }}
         >
-          Pay ${total}
+          {ctaLabel}
           <ArrowRight className="h-4 w-4" />
         </button>
-
-        {isAgent && (
-          <button
-            type="button"
-            data-testid="button-pay-later"
-            disabled
-            className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-slate-200 bg-slate-50 px-6 py-3 text-[13px] font-semibold text-slate-400 cursor-not-allowed"
-          >
-            <FileText className="h-4 w-4" />
-            Pay later (invoice) — coming soon
-          </button>
-        )}
       </div>
     </div>
   );
@@ -363,12 +387,14 @@ function MethodCard({
   onClick,
   icon,
   label,
+  sublabel,
   id,
 }: {
   selected: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  sublabel?: string;
   id: string;
 }) {
   return (
@@ -376,6 +402,7 @@ function MethodCard({
       type="button"
       onClick={onClick}
       data-testid={`card-method-${id}`}
+      aria-pressed={selected}
       className={`relative flex min-h-[60px] w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition ${
         selected
           ? ""
@@ -398,9 +425,14 @@ function MethodCard({
       >
         {icon}
       </span>
-      <span className="font-semibold flex-1 text-slate-900">{label}</span>
+      <span className="flex-1">
+        <span className="block font-semibold text-slate-900">{label}</span>
+        {sublabel && (
+          <span className="block text-[11.5px] font-medium text-slate-500">{sublabel}</span>
+        )}
+      </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5" style={{ color: SELECTED_GREEN }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_GREEN }} />
       )}
     </button>
   );

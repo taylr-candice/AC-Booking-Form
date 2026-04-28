@@ -241,13 +241,23 @@ export const CANCELLATION_CONTACT_EMAIL = "support@taylr.com.au";
 export const CANCELLATION_ACK_LABEL =
   "I have read and accept the cancellation and rescheduling terms above.";
 
-// ─── Invoice (agent) prepayment copy ──────────────────────────────────────
+// ─── Pay step: payment method copy ────────────────────────────────────────
 //
-// Shown inside the "Invoice me" payment block on the Pay step. The customer
-// (non-agent) flow doesn't see this — it only applies when an agent picks
-// the invoice payment method.
+// Pay step offers two methods: "Pay now" (everyone) and "Invoice me"
+// (agents only). The customer (non-agent) flow only ever sees Pay now.
 
-/** Headline for the invoice prepayment block. */
+/** Method tile labels. */
+export const PAY_NOW_LABEL = "Pay now";
+export const PAY_NOW_SUBLABEL = "Card or Apple Pay";
+export const INVOICE_LABEL = "Invoice me";
+export const INVOICE_SUBLABEL = "Pay before service";
+
+/** Body copy shown when "Pay now" is selected — explains the Stripe handoff. */
+export const STRIPE_REDIRECT_NOTE =
+  "You'll be taken to our secure payment page (powered by Stripe), where you " +
+  "can pay by card or Apple Pay. Your booking is confirmed as soon as payment succeeds.";
+
+/** Headline for the invoice prepayment block (agent-only). */
 export const INVOICE_PREPAYMENT_TITLE =
   "Invoice must be paid before your service";
 
@@ -262,14 +272,19 @@ export const INVOICE_PREPAYMENT_BODY =
   "To honour those rates, the invoice must be paid prior to your scheduled service — " +
   "we don't invoice agents after the work is completed.";
 
-/** Note shown under the billing email/PO inputs in the invoice block. */
+/**
+ * Note shown under the billing email/PO inputs in the invoice block —
+ * explains what happens on submission (order created with pending payment
+ * status, tax invoice auto-emailed).
+ */
 export const INVOICE_REFERENCE_NOTE =
-  "An invoice reference is generated when you submit this booking and emailed " +
-  "to your billing address along with the tax invoice for payment.";
+  "On submission we'll create your booking with a pending payment status and " +
+  "email a tax invoice to your contact email — and to the billing email above " +
+  "if it's different — for payment.";
 
 /** Helper copy under the billing email field. */
 export const BILLING_EMAIL_HELPER =
-  "Leave blank to use your contact email above.";
+  "Leave blank to receive the invoice only at your contact email above.";
 
 // ─── Step 7 validation ─────────────────────────────────────────────────────
 
