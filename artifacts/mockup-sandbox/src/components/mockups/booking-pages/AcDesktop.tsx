@@ -11,8 +11,14 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
-import { useBookingSelector } from "../../../state/bookingSession";
-import { getAcType, type AcType } from "../../../state/bookingHelpers";
+import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
+import {
+  computeAcDiscrepancy,
+  getAcRecord,
+  getAcType,
+  type AcRecord,
+  type AcType,
+} from "../../../state/bookingHelpers";
 import { AcExampleModal, type ExampleVariant } from "./AcExampleModal";
 
 const BRAND = "#ED017F";
@@ -108,13 +114,16 @@ function buildAck(type: AcType) {
 }
 
 type Override = null | "split" | "ducted" | "unsure";
+/** Which inline panel (if any) is open under the pre-filled banner. */
+type OpenPanel = null | "type" | "numbers";
 
 export function AcDesktop() {
   const unitId = useBookingSelector((s) => s.unit_id);
   const acTypeFromUnit = getAcType(unitId);
+  const recorded = getAcRecord(unitId);
 
   const [override, setOverride] = useState<Override>(null);
-  const [overridePanelOpen, setOverridePanelOpen] = useState(false);
+  const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
   const [notSureCount, setNotSureCount] = useState(false);
 
   // Resolved type after considering any override.
@@ -129,7 +138,16 @@ export function AcDesktop() {
   const hasOverride = override !== null;
 
   const copy = knownType ? COPY[knownType] : null;
-  const defaults = knownType ? PREFILL_DEFAULTS[knownType] : { systems: 1, additional: 0 };
+  // Seed the steppers from the unit's recorded counts when we have a
+  // record AND the customer hasn't switched away from that recorded
+  // type. After a type override, fall back to the type's generic
+  // defaults so the customer doesn't see e.g. "1 ducted system" pre-set
+  // when they just told us they actually have a split system.
+  const defaults = knownType
+    ? recorded && recorded.type === knownType
+      ? { systems: recorded.systems, additional: recorded.additional }
+      : PREFILL_DEFAULTS[knownType]
+    : { systems: 1, additional: 0 };
 
   const [systems, setSystems] = useState(defaults.systems);
   const [additional, setAdditional] = useState(defaults.additional);
@@ -150,10 +168,64 @@ export function AcDesktop() {
   // Step-1 unit changes wipe any prior override + count shortcut.
   useEffect(() => {
     setOverride(null);
-    setOverridePanelOpen(false);
+    setOpenPanel(null);
     setNotSureCount(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acTypeFromUnit]);
+
+  // Continuously sync the discrepancy snapshot to the booking session so
+  // the admin mockup can read it. The action no-ops on equal writes, so
+  // calling it on every render-driven dep change is safe.
+  useEffect(() => {
+    if (!recorded) {
+      bookingActions.setAcDiscrepancy(null);
+      return;
+    }
+    if (isUnsureMode) {
+      bookingActions.setAcDiscrepancy(
+        computeAcDiscrepancy(recorded, { type: "unsure" }),
+      );
+      return;
+    }
+    if (effectiveType === "split" || effectiveType === "ducted") {
+      bookingActions.setAcDiscrepancy(
+        computeAcDiscrepancy(recorded, {
+          type: effectiveType,
+          systems,
+          additional,
+        }),
+      );
+      return;
+    }
+    bookingActions.setAcDiscrepancy(null);
+    // `unitId` is included so the effect always rewrites the snapshot
+    // after a unit switch, even when the new unit's recorded values and
+    // the customer's current steppers happen to be identical (the alias
+    // case `u1` ↔ `unit-g01-335-aspen` is the canonical example). Without
+    // it, `setUnit`'s clear-to-null would survive into a state that
+    // actually has a discrepancy.
+  }, [
+    unitId,
+    recorded?.type,
+    recorded?.systems,
+    recorded?.additional,
+    effectiveType,
+    isUnsureMode,
+    systems,
+    additional,
+  ]);
+
+  // Re-derived locally for the calm "we'll update our records" note
+  // below the steppers — same source of truth as what we write to the
+  // session above.
+  const liveDiscrepancy =
+    recorded && !isUnsureMode && (effectiveType === "split" || effectiveType === "ducted")
+      ? computeAcDiscrepancy(recorded, {
+          type: effectiveType,
+          systems,
+          additional,
+        })
+      : null;
 
   const displaySystems = isUnsureMode ? 1 : systems;
   const displayAdditional = isUnsureMode ? 0 : additional;
@@ -166,7 +238,7 @@ export function AcDesktop() {
 
   const resetOverride = () => {
     setOverride(null);
-    setOverridePanelOpen(false);
+    setOpenPanel(null);
     setNotSureCount(false);
   };
 
@@ -193,8 +265,8 @@ export function AcDesktop() {
           </div>
 
           <div className="flex-1">
-            {/* Pre-filled pink box — only when we have records (known type) and the user hasn't overridden. */}
-            {knownType && !hasOverride && acTypeFromUnit !== "unknown" && (
+            {/* Pre-filled pink box — only when we actually have records on file for this unit. */}
+            {knownType && !hasOverride && acTypeFromUnit !== "unknown" && recorded && (
               <div className="mb-3 rounded-xl border border-pink-200 bg-pink-50 p-4 flex gap-3">
                 <Info className="h-5 w-5 text-pink-600 shrink-0" />
                 <div className="text-sm text-pink-900">
@@ -206,19 +278,32 @@ export function AcDesktop() {
               </div>
             )}
 
-            {/* "This isn't correct" affordance — only when we know the type and the user hasn't overridden. */}
-            {knownType && !hasOverride && acTypeFromUnit !== "unknown" && (
+            {/* Two-intent change affordance — only when we have records (known type) and the user hasn't overridden. */}
+            {knownType && !hasOverride && acTypeFromUnit !== "unknown" && recorded && (
               <div className="mb-6">
-                {!overridePanelOpen ? (
-                  <button
-                    type="button"
-                    onClick={() => setOverridePanelOpen(true)}
-                    data-testid="link-not-correct"
-                    className="text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
-                  >
-                    This isn’t correct
-                  </button>
-                ) : (
+                {openPanel === null && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <span className="text-slate-500">Something not right?</span>
+                    <button
+                      type="button"
+                      onClick={() => setOpenPanel("type")}
+                      data-testid="link-change-ac-type"
+                      className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                    >
+                      Change AC type
+                    </button>
+                    <span className="text-slate-300" aria-hidden="true">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setOpenPanel("numbers")}
+                      data-testid="link-change-ac-numbers"
+                      className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                    >
+                      The numbers we have are wrong
+                    </button>
+                  </div>
+                )}
+                {openPanel === "type" && (
                   <ChoicePanel
                     eyebrow="Update AC type"
                     title="Has your AC system type changed?"
@@ -241,9 +326,19 @@ export function AcDesktop() {
                       } else if (choice === "split") {
                         setOverride("split");
                       }
-                      setOverridePanelOpen(false);
+                      setOpenPanel(null);
                     }}
-                    onClose={() => setOverridePanelOpen(false)}
+                    onClose={() => setOpenPanel(null)}
+                  />
+                )}
+                {openPanel === "numbers" && (
+                  <NumbersPanel
+                    recorded={recorded}
+                    systems={systems}
+                    additional={additional}
+                    onSystems={(n) => setSystems(Math.max(1, Math.min(10, n)))}
+                    onAdditional={(n) => setAdditional(Math.max(0, Math.min(29, n)))}
+                    onClose={() => setOpenPanel(null)}
                   />
                 )}
               </div>
@@ -332,7 +427,7 @@ export function AcDesktop() {
                   </div>
 
                   {/* "Not sure?" shortcut — only when AC type is unknown or user has signaled uncertainty */}
-                  {(acTypeFromUnit === "unknown" || hasOverride || overridePanelOpen) && (
+                  {(acTypeFromUnit === "unknown" || hasOverride || openPanel === "type") && (
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"
@@ -441,6 +536,15 @@ export function AcDesktop() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {liveDiscrepancy && openPanel !== "numbers" && (
+              <p
+                data-testid="text-discrepancy-note"
+                className="mt-3 text-xs text-slate-500"
+              >
+                We’ll update our records based on your booking.
+              </p>
             )}
 
             {/* Unsure card — replaces the steppers when in unsure mode. */}
@@ -704,6 +808,152 @@ function OverrideBanner({
       >
         {resetLabel}
       </button>
+    </div>
+  );
+}
+
+function NumbersPanel({
+  recorded,
+  systems,
+  additional,
+  onSystems,
+  onAdditional,
+  onClose,
+}: {
+  recorded: AcRecord;
+  systems: number;
+  additional: number;
+  onSystems: (n: number) => void;
+  onAdditional: (n: number) => void;
+  onClose: () => void;
+}) {
+  const isDucted = recorded.type === "ducted";
+  const sysWord = isDucted ? "ducted system" : "split system";
+  const sysWordPlural = isDucted ? "ducted systems" : "split systems";
+  const addonWord = isDucted ? "return-air grille" : "indoor unit";
+  const addonWordPlural = isDucted ? "return-air grilles" : "indoor units";
+  const recordedSystemsLabel = `${recorded.systems} ${
+    recorded.systems === 1 ? sysWord : sysWordPlural
+  }`;
+  const recordedAddonLabel = `${recorded.additional} extra ${
+    recorded.additional === 1 ? addonWord : addonWordPlural
+  }`;
+
+  return (
+    <div
+      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      data-testid="panel-change-numbers"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Update what’s on-site
+          </p>
+          <p className="mt-1 text-sm font-medium text-slate-900">
+            Tell us the actual numbers in your apartment.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          data-testid="button-close-numbers-panel"
+          className="text-xs font-medium text-slate-400 hover:text-slate-700"
+        >
+          Done
+        </button>
+      </div>
+
+      <div className="mt-3 rounded-lg bg-slate-50 px-4 py-3 text-[13px] text-slate-600">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          We have on record
+        </p>
+        <ul className="mt-1.5 space-y-0.5">
+          <li>· {recordedSystemsLabel}</li>
+          <li>· {recordedAddonLabel}</li>
+        </ul>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <PanelStepperRow
+          label={`Number of ${sysWordPlural} on-site`}
+          value={systems}
+          min={1}
+          max={10}
+          onChange={onSystems}
+          testIdMinus="btn-numbers-systems-minus"
+          testIdPlus="btn-numbers-systems-plus"
+          testIdValue="value-numbers-systems"
+        />
+        <PanelStepperRow
+          label={`Extra ${addonWordPlural} on-site`}
+          value={additional}
+          min={0}
+          max={29}
+          onChange={onAdditional}
+          testIdMinus="btn-numbers-additional-minus"
+          testIdPlus="btn-numbers-additional-plus"
+          testIdValue="value-numbers-additional"
+        />
+      </div>
+
+      <p className="mt-3 text-xs text-slate-500">
+        We’ll update our records based on your booking.
+      </p>
+    </div>
+  );
+}
+
+function PanelStepperRow({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+  testIdMinus,
+  testIdPlus,
+  testIdValue,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+  testIdMinus: string;
+  testIdPlus: string;
+  testIdValue: string;
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-medium text-slate-700">{label}</p>
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
+        <button
+          type="button"
+          onClick={() => onChange(value - 1)}
+          disabled={value <= min}
+          aria-label={`Decrease ${label.toLowerCase()}`}
+          data-testid={testIdMinus}
+          className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <div
+          className="text-base font-bold text-slate-900 w-10 text-center"
+          data-testid={testIdValue}
+        >
+          {value}
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          disabled={value >= max}
+          aria-label={`Increase ${label.toLowerCase()}`}
+          data-testid={testIdPlus}
+          className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

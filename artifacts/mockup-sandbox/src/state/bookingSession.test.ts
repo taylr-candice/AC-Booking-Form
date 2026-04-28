@@ -28,6 +28,7 @@ import {
   getBookingSession,
   migratePersistedSession,
   type AccessMethod,
+  type AcDiscrepancy,
   type BookingState,
   type StepId,
 } from "./bookingSession";
@@ -610,6 +611,19 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       expect(s.current_step).toBe(1);
     });
 
+    it("bookAnother clears the recorded ac_discrepancy snapshot", () => {
+      bookingActions.setUnit("u2");
+      bookingActions.setAcDiscrepancy({
+        recorded: { type: "split", systems: 2, additional: 0 },
+        customer: { type: "split", systems: 3, additional: 0 },
+      });
+      expect(getBookingSession().ac_discrepancy).not.toBeNull();
+
+      bookingActions.bookAnother();
+
+      expect(getBookingSession().ac_discrepancy).toBeNull();
+    });
+
     it("bookAnother drops agency_other_name when the retained agency is a listed one", () => {
       // Simulate a prior session where the user originally typed an "Other"
       // value and then switched to a listed agency. setAgency already wipes
@@ -627,6 +641,116 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       const s = getBookingSession();
       expect(s.agency_id).toBe("agency-001");
       expect(s.agency_other_name).toBe("");
+    });
+  });
+
+  // ─── D. AC discrepancy snapshot ────────────────────────────────────────
+  //
+  // The Step 4 AC page records the gap between Taylr's records and what
+  // the customer actually has on-site so the admin mockup can act on it.
+  // This block covers:
+  //   1. Default state — no discrepancy on a fresh session.
+  //   2. setAcDiscrepancy round-trip + null clearing.
+  //   3. The structural-equality guard that keeps the action safe to
+  //      call from a render-driven effect (no subscriber storms).
+  //   4. Cascade clearing on setUnit (records belong to the prior unit).
+  //   5. migratePersistedSession defaults the new field to null when
+  //      legacy persisted blobs don't include it.
+  describe("D. AC discrepancy snapshot", () => {
+    beforeEach(() => {
+      bookingActions.reset();
+    });
+
+    it("starts null on a fresh session", () => {
+      expect(getBookingSession().ac_discrepancy).toBeNull();
+    });
+
+    it("setAcDiscrepancy round-trips and accepts null to clear", () => {
+      const snap: AcDiscrepancy = {
+        recorded: { type: "ducted", systems: 1, additional: 1 },
+        customer: { type: "ducted", systems: 2, additional: 0 },
+      };
+      bookingActions.setAcDiscrepancy(snap);
+      expect(getBookingSession().ac_discrepancy).toEqual(snap);
+
+      bookingActions.setAcDiscrepancy(null);
+      expect(getBookingSession().ac_discrepancy).toBeNull();
+    });
+
+    it("setAcDiscrepancy is a no-op when the new value is structurally equal", () => {
+      const snapA: AcDiscrepancy = {
+        recorded: { type: "split", systems: 2, additional: 0 },
+        customer: { type: "split", systems: 3, additional: 1 },
+      };
+      bookingActions.setAcDiscrepancy(snapA);
+      const ref1 = getBookingSession();
+      // Same shape, fresh object reference — must not produce a new state.
+      bookingActions.setAcDiscrepancy({
+        recorded: { type: "split", systems: 2, additional: 0 },
+        customer: { type: "split", systems: 3, additional: 1 },
+      });
+      expect(getBookingSession()).toBe(ref1);
+
+      // Same is true of null → null.
+      bookingActions.setAcDiscrepancy(null);
+      const ref2 = getBookingSession();
+      bookingActions.setAcDiscrepancy(null);
+      expect(getBookingSession()).toBe(ref2);
+    });
+
+    it("setAcDiscrepancy treats two 'unsure' snapshots with same record as equal", () => {
+      // 'unsure' carries no numbers on the customer side, so the
+      // equality check must compare records only.
+      const recorded = { type: "ducted", systems: 1, additional: 1 } as const;
+      bookingActions.setAcDiscrepancy({ recorded, customer: { type: "unsure" } });
+      const ref = getBookingSession();
+      bookingActions.setAcDiscrepancy({
+        recorded: { type: "ducted", systems: 1, additional: 1 },
+        customer: { type: "unsure" },
+      });
+      expect(getBookingSession()).toBe(ref);
+    });
+
+    it("setUnit wipes the discrepancy snapshot — records belong to the prior unit", () => {
+      bookingActions.setUnit("u2");
+      bookingActions.setAcDiscrepancy({
+        recorded: { type: "split", systems: 2, additional: 0 },
+        customer: { type: "ducted", systems: 1, additional: 0 },
+      });
+      expect(getBookingSession().ac_discrepancy).not.toBeNull();
+
+      bookingActions.setUnit("u5");
+      expect(getBookingSession().ac_discrepancy).toBeNull();
+    });
+
+    it("setUnit to the same id leaves the snapshot intact", () => {
+      bookingActions.setUnit("u1");
+      const snap: AcDiscrepancy = {
+        recorded: { type: "ducted", systems: 1, additional: 1 },
+        customer: { type: "ducted", systems: 1, additional: 2 },
+      };
+      bookingActions.setAcDiscrepancy(snap);
+
+      bookingActions.setUnit("u1");
+      expect(getBookingSession().ac_discrepancy).toEqual(snap);
+    });
+
+    it("migratePersistedSession defaults ac_discrepancy to null when missing", () => {
+      const out = migratePersistedSession(
+        JSON.stringify({ unit_id: "u1", current_step: 4 }),
+      );
+      expect(out.ac_discrepancy).toBeNull();
+    });
+
+    it("migratePersistedSession preserves a persisted ac_discrepancy snapshot", () => {
+      const snap = {
+        recorded: { type: "split", systems: 2, additional: 0 },
+        customer: { type: "split", systems: 4, additional: 1 },
+      };
+      const out = migratePersistedSession(
+        JSON.stringify({ unit_id: "u2", current_step: 4, ac_discrepancy: snap }),
+      );
+      expect(out.ac_discrepancy).toEqual(snap);
     });
   });
 });

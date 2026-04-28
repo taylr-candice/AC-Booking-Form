@@ -60,6 +60,27 @@ export type Tenant = {
   phone: string;
 };
 
+/**
+ * Snapshot of how the customer's AC selection on Step 4 differs from
+ * what Taylr has on record for their unit. Captured purely so the admin
+ * mockup can surface the discrepancy after the booking — the customer
+ * is never blocked, prompted, or warned about it.
+ *
+ * `customer.type === "unsure"` is always treated as a discrepancy when
+ * the unit has an AC record on file (the customer is essentially saying
+ * "I don't know", which by definition doesn't match a known recorded
+ * type). Numbers are omitted in that case because the customer never
+ * commits to a count.
+ */
+export type AcDiscrepancyCustomer =
+  | { type: "split" | "ducted"; systems: number; additional: number }
+  | { type: "unsure" };
+
+export type AcDiscrepancy = {
+  recorded: { type: "split" | "ducted"; systems: number; additional: number };
+  customer: AcDiscrepancyCustomer;
+};
+
 /** Step ids in canonical order — Step 5 may be skipped at runtime. */
 export type StepId = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -84,6 +105,11 @@ export type BookingState = {
   // Step 4
   num_systems: number;
   num_additional_indoor: number;
+  /** Snapshot of how the customer's selection on Step 4 differs from
+   *  Taylr's records. Null while it matches (or the unit has no AC
+   *  record to compare against). Read by the admin mockup to surface
+   *  the discrepancy after the booking. */
+  ac_discrepancy: AcDiscrepancy | null;
   // Step 5 — primary residence + access method + follow-ups
   primary_residence: PrimaryResidence | null;
   access_method: AccessMethod | null;
@@ -131,6 +157,7 @@ const INITIAL_STATE: BookingState = {
   contact_phone: "",
   num_systems: 1,
   num_additional_indoor: 0,
+  ac_discrepancy: null,
   primary_residence: null,
   access_method: null,
   key_holder_name: "",
@@ -301,6 +328,29 @@ function clearRoleDownstream(s: BookingState): BookingState {
   });
 }
 
+/** Structural equality for {@link AcDiscrepancy}; treats `null` as equal
+ *  to `null`. Inlined so this module stays dependency-free. */
+function acDiscrepancyEqual(
+  a: AcDiscrepancy | null,
+  b: AcDiscrepancy | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (
+    a.recorded.type !== b.recorded.type ||
+    a.recorded.systems !== b.recorded.systems ||
+    a.recorded.additional !== b.recorded.additional
+  ) {
+    return false;
+  }
+  if (a.customer.type !== b.customer.type) return false;
+  if (a.customer.type === "unsure") return true;
+  // Both customers are "split"|"ducted" with numbers — narrowed by the
+  // type-equality check above (b.customer.type === a.customer.type).
+  const bc = b.customer as { systems: number; additional: number };
+  return a.customer.systems === bc.systems && a.customer.additional === bc.additional;
+}
+
 // ─── Public actions ─────────────────────────────────────────────────────────
 
 export const bookingActions = {
@@ -317,7 +367,10 @@ export const bookingActions = {
             ...s,
             unit_id,
             // Spec §13.3: changing unit re-loads AC pre-fill (handled by Step 4).
-            // No other downstream clears required here.
+            // The discrepancy snapshot refers to the previous unit's record
+            // and would be misleading once the unit changes — wipe it so the
+            // AC step starts from a clean slate when the customer revisits it.
+            ac_discrepancy: null,
           },
     );
   },
@@ -371,6 +424,18 @@ export const bookingActions = {
     const clamped = Math.max(0, Math.min(29, Math.round(n)));
     setState((s) =>
       s.num_additional_indoor === clamped ? s : { ...s, num_additional_indoor: clamped },
+    );
+  },
+  /** Persist the latest discrepancy snapshot from the AC step. Null when the
+   *  customer's selection matches Taylr's records (or there's no record on
+   *  file). The action skips writes when the new value is structurally equal
+   *  to the current one so a render-driven effect can call it on every render
+   *  without triggering subscriber storms. */
+  setAcDiscrepancy(discrepancy: AcDiscrepancy | null) {
+    setState((s) =>
+      acDiscrepancyEqual(s.ac_discrepancy, discrepancy)
+        ? s
+        : { ...s, ac_discrepancy: discrepancy },
     );
   },
 

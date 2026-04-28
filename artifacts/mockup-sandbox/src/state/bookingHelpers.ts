@@ -10,6 +10,8 @@
 
 import {
   type AccessMethod,
+  type AcDiscrepancy,
+  type AcDiscrepancyCustomer,
   type BookingState,
   type PrimaryResidence,
   type Role,
@@ -104,18 +106,74 @@ export function unitLabel(unit_id: string | null): { line1: string; line2?: stri
  */
 export type AcType = "split" | "ducted" | "unknown";
 
-const UNIT_AC_TYPE: Readonly<Record<string, AcType>> = {
-  u1: "ducted",  // G01 / 335 Aspen Village
-  "unit-g01-335-aspen": "ducted",
-  u2: "split",   // 12 / 88 Marine Parade
-  u3: "unknown", // 3 / 4 Example Street — no records on file
-  u4: "unknown", // 705 / 21 Bourke Street — no records on file
-  u5: "ducted",  // 18 / 142 Anzac Parade
+/** Full AC record on file for a unit — type + recorded counts. The AC
+ *  step seeds its steppers from these values when the customer hasn't
+ *  overridden the type. Undefined for units with no record (their type
+ *  shows as `"unknown"` and the customer is asked to pick one). */
+export type AcRecord = {
+  type: "split" | "ducted";
+  systems: number;
+  additional: number;
+};
+
+type UnitAcCatalogEntry = AcRecord | { type: "unknown" };
+
+const UNIT_AC_CATALOG: Readonly<Record<string, UnitAcCatalogEntry>> = {
+  // G01 / 335 Aspen Village — ducted, 1 system, 1 extra grille on file.
+  u1: { type: "ducted", systems: 1, additional: 1 },
+  "unit-g01-335-aspen": { type: "ducted", systems: 1, additional: 1 },
+  // 12 / 88 Marine Parade — split, 2 systems on file.
+  u2: { type: "split", systems: 2, additional: 0 },
+  // No records on file.
+  u3: { type: "unknown" },
+  u4: { type: "unknown" },
+  // 18 / 142 Anzac Parade — ducted, 2 systems on file.
+  u5: { type: "ducted", systems: 2, additional: 0 },
 };
 
 export function getAcType(unit_id: string | null): AcType {
   if (!unit_id) return "split";
-  return UNIT_AC_TYPE[unit_id] ?? "split";
+  return UNIT_AC_CATALOG[unit_id]?.type ?? "split";
+}
+
+/** Returns the recorded AC details for a unit, or `null` when there are
+ *  no records on file (type === "unknown") or the unit isn't in the
+ *  catalog. The Step 4 page uses this to (a) seed the steppers from the
+ *  recorded counts, (b) render the "we have on record" panel content,
+ *  and (c) compute the discrepancy snapshot. */
+export function getAcRecord(unit_id: string | null): AcRecord | null {
+  if (!unit_id) return null;
+  const entry = UNIT_AC_CATALOG[unit_id];
+  if (!entry || entry.type === "unknown") return null;
+  return entry;
+}
+
+/**
+ * Pure comparator — returns `null` when the customer's selection on
+ * Step 4 matches what Taylr has on record exactly. Otherwise returns
+ * the snapshot to persist on the booking session so the admin mockup
+ * can read it.
+ *
+ * "Unsure" is always treated as a discrepancy when there's a record on
+ * file (the customer is opting out of confirming a known recorded
+ * type). Numbers are intentionally absent from the customer side in
+ * that case — they never committed to a count.
+ */
+export function computeAcDiscrepancy(
+  recorded: AcRecord,
+  customer: AcDiscrepancyCustomer,
+): AcDiscrepancy | null {
+  if (customer.type === "unsure") {
+    return { recorded, customer };
+  }
+  if (
+    customer.type === recorded.type &&
+    customer.systems === recorded.systems &&
+    customer.additional === recorded.additional
+  ) {
+    return null;
+  }
+  return { recorded, customer };
 }
 
 /** Compact AC summary, e.g. "2 systems + 1 add." */
