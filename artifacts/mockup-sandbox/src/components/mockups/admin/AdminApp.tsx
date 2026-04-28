@@ -1096,8 +1096,20 @@ function SlotWindowEditor({
   onClose: () => void;
 }) {
   const day = calendar.find((d) => d.isoDate === dayIso);
+  // Snapshot of the mode the slot was in when this editor opened, so we
+  // can tell whether the admin has flipped modes during this session and
+  // surface a "the now-active value was inferred — reset to 0?" prompt.
+  // Hooks must run unconditionally before any early return.
+  const initialMode = day ? day[win].mode : "time_based";
+  const [sessionStartMode] = useState<"time_based" | "count_based">(initialMode);
   if (!day) return null;
   const slot = day[win];
+
+  const modeJustChanged = slot.mode !== sessionStartMode;
+  const nowActiveValueIsNonZero =
+    slot.mode === "count_based" ? slot.bookedCount > 0 : slot.bookedMinutes > 0;
+  const showSwitchResetPrompt = modeJustChanged && nowActiveValueIsNonZero;
+  const usageIsNonZero = slot.bookedMinutes > 0 || slot.bookedCount > 0;
 
   function setMode(nextMode: "time_based" | "count_based") {
     if (nextMode === slot.mode) return;
@@ -1118,6 +1130,23 @@ function SlotWindowEditor({
       slotCount: clamped,
       bookedCount: Math.min(slot.bookedCount, clamped),
     });
+  }
+
+  /** Zeros the value of the *now-active* track. Used by the contextual
+   *  reset prompt that appears after the admin flips modes — typically
+   *  to discard the value inferred from the previous mode. */
+  function resetActiveTrack() {
+    if (slot.mode === "count_based") {
+      onPatch({ bookedCount: 0 });
+    } else {
+      onPatch({ bookedMinutes: 0 });
+    }
+  }
+
+  /** Zeros both the minute count and the slot count, so the window is
+   *  reported as completely empty regardless of which mode it's in. */
+  function resetAllUsage() {
+    onPatch({ bookedMinutes: 0, bookedCount: 0 });
   }
 
   return (
@@ -1162,6 +1191,29 @@ function SlotWindowEditor({
               onClick={() => setMode("count_based")}
             />
           </div>
+          {showSwitchResetPrompt && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[12px] text-amber-900">
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="font-semibold">
+                  Just switched to{" "}
+                  {slot.mode === "count_based" ? "count-based" : "time-based"}.
+                </div>
+                <div className="mt-0.5">
+                  {slot.mode === "count_based"
+                    ? `The count of ${slot.bookedCount} booked was inferred from the previous mode.`
+                    : `The ${formatDurationMinutes(slot.bookedMinutes)} booked was inferred from the previous mode.`}
+                </div>
+                <button
+                  type="button"
+                  onClick={resetActiveTrack}
+                  className="mt-1.5 rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100"
+                >
+                  Reset {slot.mode === "count_based" ? "count" : "minutes"} to 0
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {slot.mode === "time_based" ? (
@@ -1227,7 +1279,15 @@ function SlotWindowEditor({
           </div>
         )}
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={resetAllUsage}
+            disabled={!usageIsNonZero}
+            className="text-[12px] font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
+          >
+            Reset usage
+          </button>
           <button
             type="button"
             onClick={onClose}
