@@ -36,6 +36,7 @@ The `artifacts/mockup-sandbox` package hosts the Taylr customer-facing booking f
   - `booking-pages/` — per-step pages (Unit, Role, Booker, Ac, Access, Pay) in mobile + desktop
   - `booking-slots/SlotsDesktop.tsx`, `SlotsMobile.tsx`, `SlotsMobileLite.tsx` — Step 6 slot picker
   - `booking-form/BookingForm.tsx` — original combined form (legacy)
+  - `admin/AdminApp.tsx` — single-page admin ops mockup (bookings list + detail, slot calendar, units, agents, payments). Reads the customer's current sessionStorage booking via `liveBookingFromSession()` so the demo's live row appears alongside seeded data.
 - Shared session store: `src/state/bookingSession.ts` (sessionStorage-backed, key `taylr.bookingSession.v1`)
 - Derived selectors and helpers: `src/state/bookingDerived.ts`, `src/state/bookingHelpers.ts`
 - Step-5 access-method matrix: `src/state/accessMethodCatalog.ts`
