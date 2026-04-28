@@ -97,4 +97,71 @@ export function canContinueStep1(
   return !!s.unit_id && !!s.role;
 }
 
+// ─── Booking duration (time-budget model) ──────────────────────────────────
+
+/**
+ * Per-system base duration in minutes — every booking starts here.
+ * Mirrors the slot picker's time-budget model (Task #27).
+ */
+export const MINUTES_PER_SYSTEM = 45;
+
+/**
+ * Per-additional-indoor add-on duration in minutes.
+ */
+export const MINUTES_PER_ADDITIONAL_INDOOR = 15;
+
+/**
+ * Fallback duration used when the customer's AC selection is "I'm not sure"
+ * (so `num_systems` / `num_additional_indoor` are not committed values).
+ *
+ * Equivalent to a single-system booking with no extras — the smallest job
+ * Taylr will dispatch — so the slot picker leans permissive rather than
+ * locking the customer out of slots they might actually fit. The admin
+ * mockup will surface the unsure flag separately and let ops adjust.
+ */
+export const UNSURE_FALLBACK_MINUTES = MINUTES_PER_SYSTEM;
+
+/**
+ * How long the customer's current booking will take, in minutes.
+ *
+ * Formula: `45 × num_systems + 15 × num_additional_indoor`.
+ *
+ * When the customer answered "I'm not sure" on the AC step
+ * (`ac_discrepancy.customer.type === "unsure"`) we don't trust the seeded
+ * stepper values, so we fall back to {@link UNSURE_FALLBACK_MINUTES}.
+ *
+ * Pure function — used by the slot picker (to size each slot's time
+ * budget) and by the admin mockup later (to render the booked job's
+ * duration).
+ */
+export function getBookingDurationMinutes(
+  s: Pick<
+    BookingState,
+    "num_systems" | "num_additional_indoor" | "ac_discrepancy"
+  >,
+): number {
+  if (s.ac_discrepancy?.customer.type === "unsure") {
+    return UNSURE_FALLBACK_MINUTES;
+  }
+  return (
+    s.num_systems * MINUTES_PER_SYSTEM +
+    s.num_additional_indoor * MINUTES_PER_ADDITIONAL_INDOOR
+  );
+}
+
+/**
+ * Compact human-friendly minutes label, e.g. `45m`, `1h 45m`, `4h`.
+ *
+ * Intentionally terse so it fits inside a slot tile and a top-of-page
+ * chip without wrapping. Negative inputs are clamped to zero.
+ */
+export function formatDurationMinutes(total: number): string {
+  const m = Math.max(0, Math.round(total));
+  const hours = Math.floor(m / 60);
+  const mins = m % 60;
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
 export type { AccessMethod };

@@ -14,10 +14,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   canContinueStep1,
+  formatDurationMinutes,
+  getBookingDurationMinutes,
   isCoordinationFlow,
+  MINUTES_PER_ADDITIONAL_INDOOR,
+  MINUTES_PER_SYSTEM,
   nextStepId,
   prevStepId,
   totalSteps,
+  UNSURE_FALLBACK_MINUTES,
   visibleIndex,
   visibleSteps,
 } from "./bookingDerived";
@@ -214,5 +219,96 @@ describe("prevStepId — backward navigation that respects hidden steps", () => 
       const s = { access_method };
       expect(prevStepId(s, 5)).toBe(4);
     }
+  });
+});
+
+describe("getBookingDurationMinutes — slot picker time-budget", () => {
+  it("returns 45 minutes for a 1-system, 0-extra booking (the smallest job)", () => {
+    expect(
+      getBookingDurationMinutes({
+        num_systems: 1,
+        num_additional_indoor: 0,
+        ac_discrepancy: null,
+      }),
+    ).toBe(45);
+    // Cross-check against the published constant so the test catches
+    // accidental drift in either direction.
+    expect(MINUTES_PER_SYSTEM).toBe(45);
+  });
+
+  it("adds 15 minutes per additional indoor unit on top of the per-system base", () => {
+    // 2 systems + 1 extra indoor = 2×45 + 1×15 = 105 (the spec's worked example).
+    expect(
+      getBookingDurationMinutes({
+        num_systems: 2,
+        num_additional_indoor: 1,
+        ac_discrepancy: null,
+      }),
+    ).toBe(105);
+    // 3 systems + 2 extras = 3×45 + 2×15 = 165.
+    expect(
+      getBookingDurationMinutes({
+        num_systems: 3,
+        num_additional_indoor: 2,
+        ac_discrepancy: null,
+      }),
+    ).toBe(165);
+    expect(MINUTES_PER_ADDITIONAL_INDOOR).toBe(15);
+  });
+
+  it("falls back to the unsure default when the customer answered 'I'm not sure' on AC", () => {
+    // Even though the steppers carry seeded values, the customer never
+    // confirmed them — so the slot picker should size the booking at the
+    // documented fallback (one base system).
+    expect(
+      getBookingDurationMinutes({
+        num_systems: 5,
+        num_additional_indoor: 3,
+        ac_discrepancy: {
+          recorded: { type: "split", systems: 2, additional: 0 },
+          customer: { type: "unsure" },
+        },
+      }),
+    ).toBe(UNSURE_FALLBACK_MINUTES);
+    expect(UNSURE_FALLBACK_MINUTES).toBe(45);
+  });
+
+  it("ignores a non-unsure discrepancy snapshot and trusts the steppers", () => {
+    // A customer who confirmed "ducted, 2 systems, 1 extra" but whose
+    // record on file said something different still has a committed
+    // count — the duration must use the steppers, not the fallback.
+    expect(
+      getBookingDurationMinutes({
+        num_systems: 2,
+        num_additional_indoor: 1,
+        ac_discrepancy: {
+          recorded: { type: "split", systems: 1, additional: 0 },
+          customer: { type: "ducted", systems: 2, additional: 1 },
+        },
+      }),
+    ).toBe(105);
+  });
+});
+
+describe("formatDurationMinutes — compact slot-tile labels", () => {
+  it("renders sub-hour values with the minutes suffix only", () => {
+    expect(formatDurationMinutes(0)).toBe("0m");
+    expect(formatDurationMinutes(15)).toBe("15m");
+    expect(formatDurationMinutes(45)).toBe("45m");
+  });
+
+  it("drops the minutes segment when the duration lands on a whole hour", () => {
+    expect(formatDurationMinutes(60)).toBe("1h");
+    expect(formatDurationMinutes(240)).toBe("4h");
+  });
+
+  it("renders mixed hours + minutes without a leading zero or extra spaces", () => {
+    expect(formatDurationMinutes(75)).toBe("1h 15m");
+    expect(formatDurationMinutes(105)).toBe("1h 45m");
+    expect(formatDurationMinutes(165)).toBe("2h 45m");
+  });
+
+  it("clamps negative inputs to zero so a slot can't display a negative remainder", () => {
+    expect(formatDurationMinutes(-5)).toBe("0m");
   });
 });

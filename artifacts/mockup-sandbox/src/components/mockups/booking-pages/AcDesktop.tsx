@@ -229,6 +229,19 @@ export function AcDesktop() {
 
   const displaySystems = isUnsureMode ? 1 : systems;
   const displayAdditional = isUnsureMode ? 0 : additional;
+
+  // Persist the customer's stepper values to the booking session so the
+  // slot picker (Task #27 time-budget chip + capacity calc) and the
+  // admin mockup read the same numbers. The actions no-op on equal
+  // writes, so calling this on every render-driven dep change is safe.
+  // For "unsure" mode we still write 1/0 — the duration helper uses
+  // `ac_discrepancy.customer.type === "unsure"` to apply its fallback,
+  // so the stored counts don't matter for slot fitting in that case.
+  useEffect(() => {
+    bookingActions.setSystems(displaySystems);
+    bookingActions.setAdditionalIndoor(displayAdditional);
+  }, [displaySystems, displayAdditional]);
+
   const systemsCost = displaySystems * SYSTEM_PRICE;
   const addonsCost = displayAdditional * ADDON_PRICE;
   const total = systemsCost + addonsCost;

@@ -7,34 +7,60 @@ import {
   Pencil,
   CheckCircle2,
   CalendarClock,
+  Clock,
 } from "lucide-react";
+
+import {
+  formatDurationMinutes,
+  getBookingDurationMinutes,
+} from "../../../state/bookingDerived";
+import { useBookingSession } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
 
-type Slot = { id: string; window: "morning" | "afternoon"; remaining: number };
-type Day = { date: string; weekday: string; day: number; month: string; morning: Slot; afternoon: Slot };
+const MORNING_WINDOW_MINUTES = 240; // 8am – 12pm
+const AFTERNOON_WINDOW_MINUTES = 300; // 12pm – 5pm
 
+type Slot = {
+  id: string;
+  window: "morning" | "afternoon";
+  windowMinutes: number;
+  bookedMinutes: number;
+};
+type Day = {
+  date: string;
+  weekday: string;
+  day: number;
+  month: string;
+  morning: Slot;
+  afternoon: Slot;
+};
+
+/** Lite layout has only 3 visible dates — seed each one differently so the
+ *  mix of empty / partly-full / nearly-full reads at a glance. */
 const DAYS: Day[] = [
   {
     date: "2026-05-04", weekday: "Mon", day: 4, month: "May",
-    morning:   { id: "20260504-am", window: "morning",   remaining: 2 },
-    afternoon: { id: "20260504-pm", window: "afternoon", remaining: 3 },
+    morning:   { id: "20260504-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 60 },
+    afternoon: { id: "20260504-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 },
   },
   {
     date: "2026-05-06", weekday: "Wed", day: 6, month: "May",
-    morning:   { id: "20260506-am", window: "morning",   remaining: 1 },
-    afternoon: { id: "20260506-pm", window: "afternoon", remaining: 2 },
+    morning:   { id: "20260506-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 195 },
+    afternoon: { id: "20260506-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 105 },
   },
   {
     date: "2026-05-08", weekday: "Fri", day: 8, month: "May",
-    morning:   { id: "20260508-am", window: "morning",   remaining: 3 },
-    afternoon: { id: "20260508-pm", window: "afternoon", remaining: 2 },
+    morning:   { id: "20260508-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
+    afternoon: { id: "20260508-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES },
   },
 ];
 
 export function SlotsMobileLite() {
   const [selected, setSelected] = useState<string | null>(null);
+  const session = useBookingSession();
+  const jobMinutes = getBookingDurationMinutes(session);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -66,6 +92,22 @@ export function SlotsMobileLite() {
           </button>
         </div>
 
+        {/* "Your service" chip — anchors the disabled-slot reasoning */}
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            style={{ backgroundColor: "#FFF1F8", color: "#9D174D" }}
+            data-testid="chip-job-duration-mobile"
+          >
+            <Clock className="h-3 w-3" />
+            Your service: ~{formatDurationMinutes(jobMinutes)}
+          </span>
+        </div>
+        <p className="mb-3 text-xs leading-relaxed text-slate-500">
+          Slots fill by <span className="font-medium text-slate-700">time</span>, not by booking count —
+          we'll show you the windows that still have room.
+        </p>
+
         <div
           className="mb-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] leading-relaxed"
           style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
@@ -82,6 +124,7 @@ export function SlotsMobileLite() {
             <DayBlock
               key={d.date}
               day={d}
+              jobMinutes={jobMinutes}
               selected={selected}
               onSelect={(id) => setSelected(id)}
             />
@@ -112,8 +155,8 @@ export function SlotsMobileLite() {
 
 
 function DayBlock({
-  day, selected, onSelect,
-}: { day: Day; selected: string | null; onSelect: (id: string) => void }) {
+  day, jobMinutes, selected, onSelect,
+}: { day: Day; jobMinutes: number; selected: string | null; onSelect: (id: string) => void }) {
   return (
     <div className="flex gap-3">
       <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white py-2">
@@ -125,6 +168,7 @@ function DayBlock({
       <div className="grid flex-1 grid-cols-2 gap-2">
         <SlotCard
           slot={day.morning}
+          jobMinutes={jobMinutes}
           icon={<Sun className="h-4 w-4" />}
           label="Morning"
           hint="8am – 12pm"
@@ -133,6 +177,7 @@ function DayBlock({
         />
         <SlotCard
           slot={day.afternoon}
+          jobMinutes={jobMinutes}
           icon={<Moon className="h-4 w-4" />}
           label="Afternoon"
           hint="12pm – 5pm"
@@ -145,19 +190,40 @@ function DayBlock({
 }
 
 function SlotCard({
-  slot, icon, label, hint, selected, onClick,
-}: { slot: Slot; icon: React.ReactNode; label: string; hint: string; selected: boolean; onClick: () => void }) {
-  const full = slot.remaining <= 0;
-  const isSelected = selected && !full;
+  slot, jobMinutes, icon, label, hint, selected, onClick,
+}: {
+  slot: Slot;
+  jobMinutes: number;
+  icon: React.ReactNode;
+  label: string;
+  hint: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const availableMinutes = Math.max(0, slot.windowMinutes - slot.bookedMinutes);
+  const fits = availableMinutes >= jobMinutes;
+  const full = availableMinutes <= 0;
+  const disabled = !fits;
+  const isSelected = selected && fits;
+  const fillPct = Math.min(
+    100,
+    Math.round((slot.bookedMinutes / slot.windowMinutes) * 100),
+  );
+
+  const reason = full
+    ? "Full"
+    : `Won't fit your ${formatDurationMinutes(jobMinutes)} service`;
+  const availableLabel = `${formatDurationMinutes(availableMinutes)} available`;
+
   return (
     <button
       type="button"
-      disabled={full}
+      disabled={disabled}
       onClick={onClick}
       data-testid={`mobile-slot-${slot.id}`}
       aria-pressed={isSelected}
       className={`relative flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition ${
-        full
+        disabled
           ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
           : isSelected
             ? "text-white shadow-sm"
@@ -170,16 +236,32 @@ function SlotCard({
       }
     >
       <div className="flex w-full items-center justify-between">
-        <div className={full ? "text-slate-400" : isSelected ? "text-white" : "text-slate-500"}>
+        <div className={disabled ? "text-slate-400" : isSelected ? "text-white" : "text-slate-500"}>
           {icon}
         </div>
         {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
-      <div className={`text-[10px] ${full ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>{hint}</div>
-      <div className={`text-[10px] font-medium ${full ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>
-        {full ? "Full" : `${slot.remaining} left`}
+      <div className={`text-[10px] ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>{hint}</div>
+      <div className={`text-[10px] font-medium ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-700"}`}>
+        {disabled ? reason : availableLabel}
       </div>
+      {!disabled && (
+        <div
+          className={`mt-1 h-1 w-full overflow-hidden rounded-full ${
+            isSelected ? "bg-white/30" : "bg-slate-100"
+          }`}
+          aria-hidden
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${fillPct}%`,
+              backgroundColor: isSelected ? "#ffffff" : BRAND,
+            }}
+          />
+        </div>
+      )}
     </button>
   );
 }
