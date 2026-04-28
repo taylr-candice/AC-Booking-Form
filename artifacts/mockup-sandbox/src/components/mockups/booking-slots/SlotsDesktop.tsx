@@ -136,34 +136,61 @@ export function SlotsDesktop() {
 
           {/* Access-window commitment — prominent, always shown. */}
           <div
-            className="mb-6 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-relaxed"
+            className="mb-6 rounded-xl border px-4 py-3 text-sm leading-relaxed"
             style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
             data-testid="banner-access-commitment-desktop"
           >
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <span className="font-semibold">Heads up:</span> we can't guarantee an
-              exact arrival or finish time within the window you pick, so please make
-              sure we have access to the unit for the{" "}
-              <span className="font-semibold">entire window</span>.
+            <div className="flex items-start gap-2.5">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <span className="font-semibold">Heads up:</span> we can't guarantee an
+                exact arrival or finish time within the window you pick, so please make
+                sure we have access to the unit for the{" "}
+                <span className="font-semibold">entire window</span>.
+              </div>
+            </div>
+            {/* Quieter, always-available shortcut — gives non-unsure customers
+                a one-tap way to fix AC details without burying the affordance
+                in a step they may have already passed. */}
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                data-testid="button-edit-ac"
+                className="text-xs font-semibold underline underline-offset-2 hover:opacity-80"
+                style={{ color: "#9D174D" }}
+              >
+                Edit AC info
+              </button>
             </div>
           </div>
 
           {/* "Not sure" callout — only when AC step was answered "unsure". */}
           {isUnsure && (
             <div
-              className="mb-6 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-relaxed"
+              className="mb-6 rounded-xl border px-4 py-3 text-sm leading-relaxed"
               style={{ borderColor: "#FCD34D", backgroundColor: "#FFFBEB", color: "#92400E" }}
               data-testid="callout-unsure-desktop"
             >
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                You picked <span className="font-semibold">"Not sure"</span> on the AC
-                step, so we've sized your slot for one indoor unit. If we find more
-                on-site, the technician may not finish in one visit and Taylr will
-                book a second slot — which means a second access.{" "}
-                <span className="font-semibold">If you can confirm the AC details
-                now, you'll likely avoid that.</span>
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  You picked <span className="font-semibold">"Not sure"</span> on the AC
+                  step, so we've sized your slot for one indoor unit. If we find more
+                  on-site, the technician may not finish in one visit and Taylr will
+                  book a second slot — which means a second access.{" "}
+                  <span className="font-semibold">If you can confirm the AC details
+                  now, you'll likely avoid that.</span>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  data-testid="button-edit-ac"
+                  className="rounded-full px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
+                  style={{ backgroundColor: "#B45309" }}
+                >
+                  Update AC info
+                </button>
               </div>
             </div>
           )}

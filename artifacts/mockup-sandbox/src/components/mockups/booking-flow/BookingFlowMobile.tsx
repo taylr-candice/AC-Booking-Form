@@ -27,6 +27,14 @@ const NAV_BACK = new Set([
   "button-back-mobile",
   "button-back-desktop",
 ]);
+// Direct jumps to a specific step. Each entry maps a data-testid the
+// inner iframe might emit to the StepId we should jump to. Today only
+// the slot picker uses this — its "Update/Edit AC info" affordances
+// take the customer straight back to the AC step (id 3) instead of
+// making them tap "Back" twice.
+const NAV_GOTO: Record<string, StepId> = {
+  "button-edit-ac": 3,
+};
 
 type Step = {
   id: StepId;
@@ -75,6 +83,8 @@ export function BookingFlowMobile() {
         const fresh = getBookingSession();
         const prev = prevStepId({ access_method: fresh.access_method }, fresh.current_step);
         bookingActions.goToStep(prev);
+      } else if (id in NAV_GOTO) {
+        bookingActions.goToStep(NAV_GOTO[id]);
       }
     };
     doc.addEventListener("click", handler);
