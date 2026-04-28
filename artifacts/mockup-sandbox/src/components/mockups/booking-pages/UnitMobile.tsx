@@ -203,7 +203,7 @@ export function UnitMobile() {
                 onClick={() => bookingActions.setRole("agent")}
                 icon={<Briefcase className="h-5 w-5" />}
                 title="Agent · Property Manager"
-                description="I manage this unit on behalf of the owner"
+                description="I manage this unit for the owner"
                 id="agent"
               />
             </div>

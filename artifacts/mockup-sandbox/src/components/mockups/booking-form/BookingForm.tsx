@@ -652,7 +652,7 @@ function Step1({
               onClick={() => setRole("agent")}
               icon={<Building2 className="h-5 w-5" />}
               title="Agent / Property Manager"
-              desc="I manage this unit on behalf of the owner."
+              desc="I manage this unit for the owner."
               testId="role-agent"
             />
           </div>
