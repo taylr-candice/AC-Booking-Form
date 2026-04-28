@@ -9,7 +9,10 @@ import {
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import { useStepLabel } from "../../../state/bookingDerived";
-import { DEMO_MANAGING_AGENCIES } from "../../../state/accessMethodCatalog";
+import {
+  DEMO_MANAGING_AGENCIES,
+  isOtherAgency,
+} from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const ERROR_PURPLE = "#9747FF";
@@ -67,7 +70,9 @@ function errorStyle(hasError: boolean): React.CSSProperties | undefined {
 export function BookerMobile() {
   const role = useBookingSelector((s) => s.role);
   const agencyId = useBookingSelector((s) => s.agency_id);
+  const agencyOtherName = useBookingSelector((s) => s.agency_other_name);
   const isAgent = role === "agent";
+  const showOtherInput = isAgent && isOtherAgency(agencyId);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -76,6 +81,7 @@ export function BookerMobile() {
 
   const [touched, setTouched] = useState({
     agency: false,
+    agencyOther: false,
     firstName: false,
     lastName: false,
     email: false,
@@ -90,13 +96,27 @@ export function BookerMobile() {
   // dropdown before the user has interacted.
   useEffect(() => {
     if (!isAgent) {
-      setTouched((t) => (t.agency ? { ...t, agency: false } : t));
+      setTouched((t) =>
+        t.agency || t.agencyOther ? { ...t, agency: false, agencyOther: false } : t,
+      );
       setAgencyOpen(false);
     }
   }, [isAgent]);
 
+  // Reset the "other" touched flag whenever the user switches to a different
+  // agency option so the empty input doesn't show a stale error.
+  useEffect(() => {
+    if (!showOtherInput) {
+      setTouched((t) => (t.agencyOther ? { ...t, agencyOther: false } : t));
+    }
+  }, [showOtherInput]);
+
   const errors = {
     agency: isAgent && !agencyId ? "Please select your agency" : null,
+    agencyOther:
+      showOtherInput && !agencyOtherName.trim()
+        ? "Please tell us your agency name"
+        : null,
     firstName: validateRequired(firstName, "First name"),
     lastName: validateRequired(lastName, "Last name"),
     email: validateEmail(email),
@@ -113,6 +133,7 @@ export function BookerMobile() {
 
   const errorIds = {
     agency: "booker-agency-mobile-error",
+    agencyOther: "booker-agency-other-mobile-error",
     firstName: "booker-first-mobile-error",
     lastName: "booker-last-mobile-error",
     email: "booker-email-mobile-error",
@@ -231,6 +252,35 @@ export function BookerMobile() {
               )}
             </div>
             {showErr("agency") && <FieldError id={errorIds.agency} message={errors.agency} />}
+
+            {showOtherInput && (
+              <div className="mt-4 space-y-1.5">
+                <label
+                  htmlFor="booker-agency-other-mobile"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Your agency / company name
+                </label>
+                <input
+                  id="booker-agency-other-mobile"
+                  type="text"
+                  value={agencyOtherName}
+                  onChange={(e) => bookingActions.setAgencyOtherName(e.target.value)}
+                  onBlur={() => markTouched("agencyOther")}
+                  placeholder="e.g. Westside Property Co."
+                  aria-invalid={showErr("agencyOther")}
+                  aria-describedby={
+                    showErr("agencyOther") ? errorIds.agencyOther : undefined
+                  }
+                  className={inputClassFor(showErr("agencyOther"))}
+                  style={errorStyle(showErr("agencyOther"))}
+                  data-testid="input-agency-other"
+                />
+                {showErr("agencyOther") && (
+                  <FieldError id={errorIds.agencyOther} message={errors.agencyOther} />
+                )}
+              </div>
+            )}
           </div>
         )}
 

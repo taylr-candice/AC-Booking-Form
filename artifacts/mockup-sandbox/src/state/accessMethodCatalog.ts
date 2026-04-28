@@ -200,6 +200,15 @@ export const DEMO_MANAGING_AGENCIES: readonly AgencyOption[] = [
   { id: "agency-005", name: "Other / not listed" },
 ];
 
+/** The single "Other / not listed" agency id — when this is selected the
+ *  Step 2 page shows a free-text company-name input and the Continue
+ *  gate requires it to be filled in. */
+export const OTHER_AGENCY_ID = "agency-005";
+
+export function isOtherAgency(id: string | null): boolean {
+  return id === OTHER_AGENCY_ID;
+}
+
 // ─── Validation (spec §6.7) ─────────────────────────────────────────────────
 
 import type { BookingState } from "./bookingSession";

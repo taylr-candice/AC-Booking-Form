@@ -526,4 +526,65 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       expect(s.current_step).toBe(4);
     });
   });
+
+  describe("setAgency / setAgencyOtherName — 'Other / not listed' free-text capture", () => {
+    // When an agent picks "Other / not listed" (agency-005) we capture a free-
+    // text company name. If the user later changes their mind and picks a real
+    // listed agency, that text must be wiped so it can't quietly travel with
+    // the booking and be misread as an override of the chosen agency.
+
+    it("setAgencyOtherName persists the typed value", () => {
+      bookingActions.setAgency("agency-005");
+      bookingActions.setAgencyOtherName("Westside Property Co.");
+
+      expect(getBookingSession().agency_other_name).toBe("Westside Property Co.");
+    });
+
+    it("switching from 'Other' to a listed agency clears agency_other_name", () => {
+      bookingActions.setAgency("agency-005");
+      bookingActions.setAgencyOtherName("Westside Property Co.");
+
+      bookingActions.setAgency("agency-001");
+
+      const s = getBookingSession();
+      expect(s.agency_id).toBe("agency-001");
+      expect(s.agency_other_name).toBe("");
+    });
+
+    it("clearing the agency (setAgency(null)) also clears agency_other_name", () => {
+      bookingActions.setAgency("agency-005");
+      bookingActions.setAgencyOtherName("Westside Property Co.");
+
+      bookingActions.setAgency(null);
+
+      const s = getBookingSession();
+      expect(s.agency_id).toBeNull();
+      expect(s.agency_other_name).toBe("");
+    });
+
+    it("re-selecting the same 'Other' agency is a no-op and preserves the typed value", () => {
+      bookingActions.setAgency("agency-005");
+      bookingActions.setAgencyOtherName("Westside Property Co.");
+      const before = getBookingSession();
+
+      bookingActions.setAgency("agency-005");
+      const after = getBookingSession();
+
+      // Reference equality proves the early-return path was hit.
+      expect(after).toBe(before);
+      expect(after.agency_other_name).toBe("Westside Property Co.");
+    });
+
+    it("setRole cascade clears agency_other_name alongside agency_id", () => {
+      bookingActions.setRole("agent");
+      bookingActions.setAgency("agency-005");
+      bookingActions.setAgencyOtherName("Westside Property Co.");
+
+      bookingActions.setRole("owner");
+
+      const s = getBookingSession();
+      expect(s.agency_id).toBeNull();
+      expect(s.agency_other_name).toBe("");
+    });
+  });
 });

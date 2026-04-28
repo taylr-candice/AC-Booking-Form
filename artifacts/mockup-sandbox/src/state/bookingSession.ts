@@ -14,6 +14,12 @@
 
 import { useSyncExternalStore } from "react";
 
+// Mirror of `OTHER_AGENCY_ID` in `./accessMethodCatalog`. Kept as a local
+// constant so this module remains dependency-free per the file header
+// contract — the catalog is allowed to import from here, not the other
+// way round. If the canonical id ever changes, update both files.
+const OTHER_AGENCY_ID_INTERNAL = "agency-005";
+
 // ─── Domain types ───────────────────────────────────────────────────────────
 
 export type Role = "owner" | "agent";
@@ -67,6 +73,10 @@ export type BookingState = {
   role: Role | null;
   // Step 3
   agency_id: string | null;
+  /** Free-text company name when an agent picks the "Other / not listed"
+   *  agency option. Empty string when the user has not provided one
+   *  (treat as "not provided" for validation). */
+  agency_other_name: string;
   contact_first_name: string;
   contact_last_name: string;
   contact_email: string;
@@ -114,6 +124,7 @@ const INITIAL_STATE: BookingState = {
   unit_id: null,
   role: null,
   agency_id: null,
+  agency_other_name: "",
   contact_first_name: "",
   contact_last_name: "",
   contact_email: "",
@@ -282,6 +293,7 @@ function clearRoleDownstream(s: BookingState): BookingState {
   return clearAccessFollowUps({
     ...s,
     agency_id: null,
+    agency_other_name: "",
     primary_residence: null,
     access_method: null,
     service_date: null,
@@ -317,7 +329,24 @@ export const bookingActions = {
 
   // Step 3
   setAgency(agency_id: string | null) {
-    setState((s) => ({ ...s, agency_id }));
+    setState((s) => {
+      if (s.agency_id === agency_id) return s;
+      // When the user moves OFF the "Other / not listed" option, also clear
+      // any free-text company name so it can't silently linger in the booking.
+      // Mirrors the OTHER_AGENCY_ID constant in accessMethodCatalog.ts —
+      // duplicated here to keep this module dependency-free (see file header).
+      const isOther = agency_id === OTHER_AGENCY_ID_INTERNAL;
+      return {
+        ...s,
+        agency_id,
+        agency_other_name: isOther ? s.agency_other_name : "",
+      };
+    });
+  },
+  setAgencyOtherName(value: string) {
+    setState((s) =>
+      s.agency_other_name === value ? s : { ...s, agency_other_name: value },
+    );
   },
   setContact(
     fields: Partial<
