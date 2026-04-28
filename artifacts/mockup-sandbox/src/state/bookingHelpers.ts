@@ -96,6 +96,38 @@ export function unitLabel(unit_id: string | null): { line1: string; line2?: stri
   return DEMO_UNIT_LABELS[unit_id] ?? { line1: unit_id };
 }
 
+/**
+ * Australian state/territory → reference city used for the slot
+ * picker's timezone pill. The pill historically showed "Sydney Time"
+ * for every booking, which was misleading for buildings outside NSW.
+ * Now the pill reflects the city the building is actually in (e.g.
+ * Canberra for an ACT unit, Melbourne for a VIC unit) so customers
+ * know the windows are in their own local time.
+ *
+ * Falls back to "Sydney" when the unit isn't known or the address
+ * doesn't carry a recognised state code — preserves the previous
+ * behaviour for the seed/demo unit and any future unit without an
+ * address line yet.
+ */
+const STATE_TO_CITY: Readonly<Record<string, string>> = {
+  ACT: "Canberra",
+  NSW: "Sydney",
+  VIC: "Melbourne",
+  QLD: "Brisbane",
+  WA: "Perth",
+  SA: "Adelaide",
+  TAS: "Hobart",
+  NT: "Darwin",
+};
+
+export function unitCity(unit_id: string | null): string {
+  const label = unitLabel(unit_id);
+  const line2 = label.line2 ?? "";
+  const match = line2.match(/\b(ACT|NSW|VIC|QLD|WA|SA|TAS|NT)\b/);
+  if (match) return STATE_TO_CITY[match[1]] ?? "Sydney";
+  return "Sydney";
+}
+
 // ─── AC type assignment (demo) ─────────────────────────────────────────────
 
 /**

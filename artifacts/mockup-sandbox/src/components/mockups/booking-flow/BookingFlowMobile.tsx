@@ -38,6 +38,12 @@ const NAV_BACK = new Set([
 //      `editAcFromSlotPicker` action does the navigation + origin
 //      writes atomically.
 const TESTID_EDIT_AC = "button-edit-ac";
+// Sibling affordance to TESTID_EDIT_AC: jumps the customer back to
+// Step 4 (Property access) so they can swap to a hands-off access
+// option (parcel locker / leave a key / coordinate with tenant) and
+// not have to be home for the entire booking window. Lives in the
+// slot picker's "Heads up" access banner.
+const TESTID_EDIT_ACCESS = "button-edit-access";
 // Step ids the wrapper should remember as "where the customer came
 // from" when the edit-AC affordance fires from that step. Used to
 // short-circuit the next "Continue" tap on the AC step so the
@@ -45,6 +51,11 @@ const TESTID_EDIT_AC = "button-edit-ac";
 // steps in between. Today only the slot picker (Step 5) uses this
 // affordance.
 const NAV_GOTO_RETURN_FROM: ReadonlySet<StepId> = new Set<StepId>([5]);
+// Step ids that should consume a `return_to` hint when the customer
+// taps Continue. Edit-AC lands the customer on Step 3, edit-access
+// lands them on Step 4 — both should fling them straight back to
+// the hinted step (Step 5 in practice) on Continue.
+const NAV_GOTO_RETURN_TO: ReadonlySet<StepId> = new Set<StepId>([3, 4]);
 
 type Step = {
   id: StepId;
@@ -94,9 +105,20 @@ export function BookingFlowMobile() {
         // fling them straight back to where they came from instead of
         // walking them through the intermediate steps. `goToStep`
         // clears `return_to` automatically once they land.
-        if (fresh.return_to !== null && fresh.current_step === 3) {
-          bookingActions.goToStep(fresh.return_to);
-          return;
+        if (fresh.return_to !== null && NAV_GOTO_RETURN_TO.has(fresh.current_step)) {
+          // Only honour the hint if the hinted step is still in the
+          // customer's visible flow. Otherwise the hint is stale —
+          // e.g. they tapped "Change access option" from Step 5
+          // (return_to=5), then on Step 4 swapped to a coordination
+          // method that hides Step 5. In that case clear the hint
+          // and fall through to normal forward navigation, which
+          // takes them to the correct next visible step (Step 6).
+          const visible = visibleSteps({ access_method: fresh.access_method });
+          if (visible.includes(fresh.return_to)) {
+            bookingActions.goToStep(fresh.return_to);
+            return;
+          }
+          bookingActions.setReturnTo(null);
         }
         const next = nextStepId({ access_method: fresh.access_method }, fresh.current_step);
         bookingActions.goToStep(next);
@@ -110,6 +132,12 @@ export function BookingFlowMobile() {
           bookingActions.setReturnTo(fresh.current_step);
         }
         bookingActions.editAcFromSlotPicker();
+      } else if (id === TESTID_EDIT_ACCESS) {
+        const fresh = getBookingSession();
+        if (NAV_GOTO_RETURN_FROM.has(fresh.current_step)) {
+          bookingActions.setReturnTo(fresh.current_step);
+        }
+        bookingActions.goToStep(4);
       }
     };
     doc.addEventListener("click", handler);

@@ -13,6 +13,7 @@ import {
 
 import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
 import { useBookingSession } from "../../../state/bookingSession";
+import { unitCity } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -98,6 +99,11 @@ export function SlotsDesktop() {
     session.role === "agent"
       ? "you'll need to coordinate a second visit with the tenant"
       : "you'll need to be home for a second visit";
+  // Timezone pill mirrors the city the building is in — a Canberra unit
+  // shows "Canberra time", a Melbourne unit shows "Melbourne time", and
+  // so on. Falls back to "Sydney" when no unit is known. See
+  // `unitCity` in bookingHelpers.ts for the full state→city map.
+  const cityLabel = unitCity(session.unit_id);
 
   const weeks = useMemo(() => {
     const out: Day[][] = [];
@@ -143,9 +149,12 @@ export function SlotsDesktop() {
                 Pick an arrival window that works for you.
               </p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
+            <div
+              className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200"
+              data-testid="pill-timezone-desktop"
+            >
               <Clock className="h-3.5 w-3.5" />
-              Sydney Time
+              {cityLabel} time
             </div>
           </div>
 
@@ -162,19 +171,25 @@ export function SlotsDesktop() {
                 exact arrival or finish time within the window you pick, so please make
                 sure we have access to the unit for the{" "}
                 <span className="font-semibold">entire window</span>.
+                {" "}
+                <span>
+                  Don't want to wait around? Pick an access option that doesn't need you on-site —
+                  leave a key, use a parcel locker, or coordinate with a tenant.
+                </span>
               </div>
             </div>
-            {/* Quieter, always-available shortcut — gives non-unsure customers
-                a one-tap way to fix AC details without burying the affordance
-                in a step they may have already passed. */}
+            {/* Quieter, always-available shortcut — opens Step 4 so the
+                customer can swap to a hands-off access option (parcel
+                locker, leave a key, coordinate with tenant) and not have
+                to be home for the whole window. */}
             <div className="mt-2 flex justify-end">
               <button
                 type="button"
-                data-testid="button-edit-ac"
+                data-testid="button-edit-access"
                 className="text-xs font-semibold underline underline-offset-2 hover:opacity-80"
                 style={{ color: "#9D174D" }}
               >
-                Edit AC info
+                Change access option
               </button>
             </div>
           </div>

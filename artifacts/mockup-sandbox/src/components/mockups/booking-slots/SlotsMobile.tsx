@@ -152,19 +152,25 @@ export function SlotsMobile() {
               exact arrival or finish time within the window you pick, so please make
               sure we have access to the unit for the{" "}
               <span className="font-semibold">entire window</span>.
+              {" "}
+              <span>
+                Don't want to wait around? Pick an access option that doesn't need you on-site —
+                leave a key, use a parcel locker, or coordinate with a tenant.
+              </span>
             </div>
           </div>
-          {/* Quieter, always-available shortcut — gives non-unsure customers
-              a one-tap way to fix AC details without burying the affordance
-              in a step they may have already passed. */}
+          {/* Quieter, always-available shortcut — opens Step 4 so the
+              customer can swap to a hands-off access option (parcel
+              locker, leave a key, coordinate with tenant) and not have
+              to be home for the whole window. */}
           <div className="mt-2 flex justify-end">
             <button
               type="button"
-              data-testid="button-edit-ac"
+              data-testid="button-edit-access"
               className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80"
               style={{ color: "#9D174D" }}
             >
-              Edit AC info
+              Change access option
             </button>
           </div>
         </div>

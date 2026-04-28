@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeAcDiscrepancy,
   getAcRecord,
+  unitCity,
   type AcRecord,
 } from "./bookingHelpers";
 
@@ -113,5 +114,26 @@ describe("computeAcDiscrepancy", () => {
       additional: 1,
     });
     expect(got?.recorded).toEqual(ducted);
+  });
+});
+
+describe("unitCity", () => {
+  it("returns Sydney for NSW units", () => {
+    expect(unitCity("u2")).toBe("Sydney");
+    expect(unitCity("u3")).toBe("Sydney");
+    expect(unitCity("u4")).toBe("Sydney");
+    expect(unitCity("u5")).toBe("Sydney");
+  });
+
+  it("returns Canberra for ACT units", () => {
+    expect(unitCity("u1")).toBe("Canberra");
+  });
+
+  it("falls back to Sydney for an unknown unit id", () => {
+    expect(unitCity("does-not-exist")).toBe("Sydney");
+  });
+
+  it("falls back to Sydney when no unit is selected", () => {
+    expect(unitCity(null)).toBe("Sydney");
   });
 });
