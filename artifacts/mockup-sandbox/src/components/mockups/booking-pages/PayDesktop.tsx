@@ -4,11 +4,15 @@ import { bookingActions, useBookingSelector } from "../../../state/bookingSessio
 import { isCoordinationFlow } from "../../../state/bookingDerived";
 import {
   acSummary,
+  BILLING_EMAIL_HELPER,
   CANCELLATION_ACK_LABEL,
   CANCELLATION_CONTACT_EMAIL,
   CANCELLATION_POLICY_PARAGRAPHS,
   computeBookingTotal,
   COORDINATION_NOTE,
+  INVOICE_PREPAYMENT_BODY,
+  INVOICE_PREPAYMENT_TITLE,
+  INVOICE_REFERENCE_NOTE,
   isStep7PayEnabled,
   labelForAccessMethod,
   labelForRole,
@@ -167,7 +171,7 @@ export function PayDesktop() {
                   >
                     <FileText className="h-6 w-6 text-slate-700" />
                     <span className="text-sm font-semibold text-slate-900">Invoice me</span>
-                    <span className="text-[11px] font-medium text-slate-500">Pay later</span>
+                    <span className="text-[11px] font-medium text-slate-500">Pay before service</span>
                     {method === "invoice" && (
                       <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
                     )}
@@ -206,25 +210,65 @@ export function PayDesktop() {
                 </div>
               )}
               {method === "invoice" && isAgent && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 animate-in fade-in duration-300">
+                <div
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-6 animate-in fade-in duration-300"
+                  data-testid="block-invoice-desktop"
+                >
                   <div className="flex items-start gap-3 mb-4">
                     <div className="grid h-10 w-10 place-items-center rounded-xl bg-white border border-slate-200 text-slate-700">
                       <FileText className="h-5 w-5" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900 mb-1">Invoice will be sent after the service</div>
-                      <p className="text-sm text-slate-600 leading-relaxed">We'll email a tax invoice to your agency once the technician completes the job. Standard agency net-14 terms apply.</p>
+                      <div
+                        className="text-sm font-semibold mb-1"
+                        style={{ color: "#9D174D" }}
+                        data-testid="text-invoice-prepayment-title-desktop"
+                      >
+                        {INVOICE_PREPAYMENT_TITLE}
+                      </div>
+                      <p
+                        className="text-sm text-slate-600 leading-relaxed"
+                        data-testid="text-invoice-prepayment-body-desktop"
+                      >
+                        {INVOICE_PREPAYMENT_BODY}
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Billing email</label>
-                      <input type="email" placeholder="accounts@youragency.com.au" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition" />
+                      <label htmlFor="billing-email-desktop" className="text-sm font-medium text-slate-700">
+                        Billing email{" "}
+                        <span className="font-normal text-slate-500">(if different to the email above)</span>
+                      </label>
+                      <input
+                        id="billing-email-desktop"
+                        type="email"
+                        placeholder={session.contact_email || "accounts@youragency.com.au"}
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
+                        data-testid="input-billing-email-desktop"
+                      />
+                      <p className="text-xs text-slate-500">{BILLING_EMAIL_HELPER}</p>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Purchase order / reference (optional)</label>
-                      <input type="text" placeholder="e.g. PO-12345" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition" />
+                      <label htmlFor="po-ref-desktop" className="text-sm font-medium text-slate-700">
+                        Purchase order / reference (optional)
+                      </label>
+                      <input
+                        id="po-ref-desktop"
+                        type="text"
+                        placeholder="e.g. PO-12345"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
+                      />
                     </div>
+                  </div>
+                  <div
+                    className="mt-4 flex items-start gap-2 rounded-lg border border-pink-200 bg-pink-50/60 p-3"
+                    data-testid="note-invoice-reference-desktop"
+                  >
+                    <Info className="h-4 w-4 mt-0.5 shrink-0" style={{ color: BRAND }} />
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      {INVOICE_REFERENCE_NOTE}
+                    </p>
                   </div>
                 </div>
               )}

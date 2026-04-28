@@ -241,6 +241,36 @@ export const CANCELLATION_CONTACT_EMAIL = "support@taylr.com.au";
 export const CANCELLATION_ACK_LABEL =
   "I have read and accept the cancellation and rescheduling terms above.";
 
+// ─── Invoice (agent) prepayment copy ──────────────────────────────────────
+//
+// Shown inside the "Invoice me" payment block on the Pay step. The customer
+// (non-agent) flow doesn't see this — it only applies when an agent picks
+// the invoice payment method.
+
+/** Headline for the invoice prepayment block. */
+export const INVOICE_PREPAYMENT_TITLE =
+  "Invoice must be paid before your service";
+
+/**
+ * Body copy explaining WHY agents are prepaying. The pre-negotiated rates
+ * are conditional on a minimum number of services per building per day, so
+ * Taylr cannot extend post-service invoicing terms.
+ */
+export const INVOICE_PREPAYMENT_BODY =
+  "We've pre-negotiated heavily discounted rates with our service provider, " +
+  "subject to a minimum number of services being completed at the building each day. " +
+  "To honour those rates, the invoice must be paid prior to your scheduled service — " +
+  "we don't invoice agents after the work is completed.";
+
+/** Note shown under the billing email/PO inputs in the invoice block. */
+export const INVOICE_REFERENCE_NOTE =
+  "An invoice reference is generated when you submit this booking and emailed " +
+  "to your billing address along with the tax invoice for payment.";
+
+/** Helper copy under the billing email field. */
+export const BILLING_EMAIL_HELPER =
+  "Leave blank to use your contact email above.";
+
 // ─── Step 7 validation ─────────────────────────────────────────────────────
 
 /**
