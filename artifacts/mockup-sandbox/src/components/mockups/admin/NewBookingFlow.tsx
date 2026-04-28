@@ -47,7 +47,10 @@ import {
   isOtherAgency,
   OTHER_AGENCY_ID,
 } from "@/state/accessMethodCatalog";
-import { formatDurationMinutes } from "@/state/bookingDerived";
+import {
+  formatDurationMinutes,
+  getBookingDurationMinutes,
+} from "@/state/bookingDerived";
 
 import { FormField } from "./atoms";
 import { BRAND, BRAND_DEEP, BRAND_SOFT, modeColor } from "./theme";
@@ -1242,7 +1245,22 @@ function ReviewCard({
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
+// Single source of truth for job duration: delegate to the same
+// `getBookingDurationMinutes` used everywhere else (customer slot
+// picker, admin chips, slot-fit decisions). We map our admin form
+// fields onto the snake_case BookingState shape that helper expects,
+// and signal "unsure" via an `ac_discrepancy.customer.type` of
+// `"unsure"` (its documented unsure-fallback trigger).
 function derivedJobMinutes(form: FormState): number {
-  if (form.acType === "unsure") return 45;
-  return form.acSystems * 45 + form.acAdditional * 15;
+  return getBookingDurationMinutes({
+    num_systems: form.acSystems,
+    num_additional_indoor: form.acAdditional,
+    ac_discrepancy:
+      form.acType === "unsure"
+        ? {
+            recorded: { type: "split", systems: 0, additional: 0 },
+            customer: { type: "unsure" },
+          }
+        : null,
+  });
 }

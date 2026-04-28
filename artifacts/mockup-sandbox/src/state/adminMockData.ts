@@ -1424,7 +1424,6 @@ export function buildAdminCreatedBooking(
   bookingId: string,
 ): AdminBooking {
   const at = input.timestamp ?? "Just now";
-  const isCoordination = input.schedule.kind === "to_be_coordinated";
 
   const totalAud =
     input.ac.type === "unsure"
@@ -1433,6 +1432,15 @@ export function buildAdminCreatedBooking(
         input.ac.additional * PRICE_PER_ADDITIONAL_INDOOR_AUD;
 
   const discrepancy = computeAdminAcDiscrepancy(input.unit.ac, input.ac);
+
+  // Discriminated-union narrowing for the schedule choice — avoids
+  // unsafe casts when reading date/window off the slot variant.
+  const serviceDate =
+    input.schedule.kind === "slot" ? input.schedule.date : null;
+  const serviceSlot: AdminBooking["serviceSlot"] =
+    input.schedule.kind === "slot"
+      ? input.schedule.window
+      : "to_be_coordinated";
 
   return {
     id: bookingId,
@@ -1453,12 +1461,8 @@ export function buildAdminCreatedBooking(
     additional: input.ac.additional,
     acType: input.ac.type,
     discrepancy,
-    serviceDate: isCoordination
-      ? null
-      : (input.schedule as { date: string }).date,
-    serviceSlot: isCoordination
-      ? "to_be_coordinated"
-      : (input.schedule as { window: "morning" | "afternoon" }).window,
+    serviceDate,
+    serviceSlot,
     paymentStatus: "pending",
     serviceStatus: "scheduled",
     totalAud,
