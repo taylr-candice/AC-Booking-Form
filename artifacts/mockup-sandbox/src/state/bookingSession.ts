@@ -136,6 +136,21 @@ export type BookingState = {
   // never inherits the previous booking's confirmation state.
   submitted: boolean;
   reference: string | null;
+
+  /** Short-circuit hint for the booking flow wrapper.
+   *
+   *  When non-null, the wrapper takes the customer straight to this
+   *  step the next time they tap "Continue" on the AC step (Step 3),
+   *  bypassing the usual sequential walk. Set by the wrapper itself
+   *  when the customer jumps back to the AC step from the slot picker
+   *  via "Update AC info", so that confirming AC details takes them
+   *  back to where they were in one tap instead of three.
+   *
+   *  Cleared automatically as soon as the customer lands on the
+   *  hinted step (see `goToStep`) so it never leaks into normal
+   *  forward navigation later in the flow.
+   */
+  return_to: StepId | null;
 };
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -183,6 +198,7 @@ const INITIAL_STATE: BookingState = {
   cancellation_acknowledged: false,
   submitted: false,
   reference: null,
+  return_to: null,
 };
 
 // ─── Persisted store ────────────────────────────────────────────────────────
@@ -388,7 +404,25 @@ function genBookingReference(): string {
 
 export const bookingActions = {
   goToStep(step: StepId) {
-    setState((s) => ({ ...s, current_step: step }));
+    setState((s) => {
+      // The wrapper sets `return_to` when the customer jumps back to
+      // the AC step from the slot picker so that confirming AC details
+      // brings them straight back. The hint is consumed the moment
+      // they actually arrive at the hinted step (typically Step 5),
+      // so it never lingers and influences normal forward navigation
+      // on a subsequent pass through the flow.
+      const nextReturnTo =
+        s.return_to !== null && step === s.return_to ? null : s.return_to;
+      if (s.current_step === step && s.return_to === nextReturnTo) return s;
+      return { ...s, current_step: step, return_to: nextReturnTo };
+    });
+  },
+
+  /** Stash a "where the customer came from" hint so the wrapper can
+   *  short-circuit the next Continue tap on the AC step. Pass `null`
+   *  to clear an existing hint. */
+  setReturnTo(step: StepId | null) {
+    setState((s) => (s.return_to === step ? s : { ...s, return_to: step }));
   },
 
   // Step 1

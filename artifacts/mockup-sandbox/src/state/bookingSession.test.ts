@@ -754,3 +754,69 @@ describe("Step 5 cascade clears (bookingActions)", () => {
     });
   });
 });
+
+// ─── D. return_to short-circuit hint ───────────────────────────────────────
+
+describe("return_to — short-circuit hint for the booking flow wrapper", () => {
+  beforeEach(() => {
+    bookingActions.reset();
+  });
+
+  it("defaults to null on a fresh session", () => {
+    expect(getBookingSession().return_to).toBeNull();
+  });
+
+  it("setReturnTo stores the StepId so the wrapper can read it back", () => {
+    bookingActions.setReturnTo(5);
+    expect(getBookingSession().return_to).toBe(5);
+  });
+
+  it("setReturnTo(null) clears the hint", () => {
+    bookingActions.setReturnTo(5);
+    bookingActions.setReturnTo(null);
+    expect(getBookingSession().return_to).toBeNull();
+  });
+
+  it("setReturnTo no-ops when the value is unchanged", () => {
+    bookingActions.setReturnTo(5);
+    const ref = getBookingSession();
+    bookingActions.setReturnTo(5);
+    expect(getBookingSession()).toBe(ref);
+  });
+
+  it("goToStep clears return_to when the customer arrives at the hinted step", () => {
+    // Simulate the wrapper: customer was on the slot picker (Step 5),
+    // tapped "Update AC info", which jumps to AC (Step 3) and stashes
+    // the hint. After confirming, the wrapper jumps to Step 5 — at
+    // which point the hint must clear so it never affects later
+    // forward navigation.
+    bookingActions.goToStep(5);
+    bookingActions.setReturnTo(5);
+    bookingActions.goToStep(3);
+    expect(getBookingSession().return_to).toBe(5);
+
+    bookingActions.goToStep(5);
+    expect(getBookingSession().current_step).toBe(5);
+    expect(getBookingSession().return_to).toBeNull();
+  });
+
+  it("goToStep keeps return_to intact when stepping to a different step", () => {
+    bookingActions.setReturnTo(5);
+    bookingActions.goToStep(2);
+    expect(getBookingSession().return_to).toBe(5);
+    bookingActions.goToStep(4);
+    expect(getBookingSession().return_to).toBe(5);
+  });
+
+  it("reset wipes return_to back to null", () => {
+    bookingActions.setReturnTo(5);
+    bookingActions.reset();
+    expect(getBookingSession().return_to).toBeNull();
+  });
+
+  it("bookAnother wipes return_to back to null", () => {
+    bookingActions.setReturnTo(5);
+    bookingActions.bookAnother();
+    expect(getBookingSession().return_to).toBeNull();
+  });
+});

@@ -35,6 +35,12 @@ const NAV_BACK = new Set([
 const NAV_GOTO: Record<string, StepId> = {
   "button-edit-ac": 3,
 };
+// Step ids the wrapper should remember as "where the customer came
+// from" when a NAV_GOTO jump fires from that step. Used to short-circuit
+// the next "Continue" tap on the destination step so the customer is
+// flung straight back instead of walked through the steps in between.
+// Today only the slot picker (Step 5) uses this affordance.
+const NAV_GOTO_RETURN_FROM: ReadonlySet<StepId> = new Set<StepId>([5]);
 
 type Step = {
   id: StepId;
@@ -77,6 +83,16 @@ export function BookingFlowMobile() {
       if (NAV_FORWARD.has(id)) {
         // Read latest state — the iframe may have just written to it.
         const fresh = getBookingSession();
+        // Short-circuit: if the customer came here via a NAV_GOTO jump
+        // (e.g. "Update AC info" from the slot picker) and is now
+        // tapping Continue on that hinted-from step's destination,
+        // fling them straight back to where they came from instead of
+        // walking them through the intermediate steps. `goToStep`
+        // clears `return_to` automatically once they land.
+        if (fresh.return_to !== null && fresh.current_step === 3) {
+          bookingActions.goToStep(fresh.return_to);
+          return;
+        }
         const next = nextStepId({ access_method: fresh.access_method }, fresh.current_step);
         bookingActions.goToStep(next);
       } else if (NAV_BACK.has(id)) {
@@ -84,7 +100,12 @@ export function BookingFlowMobile() {
         const prev = prevStepId({ access_method: fresh.access_method }, fresh.current_step);
         bookingActions.goToStep(prev);
       } else if (id in NAV_GOTO) {
-        bookingActions.goToStep(NAV_GOTO[id]);
+        const target = NAV_GOTO[id];
+        const fresh = getBookingSession();
+        if (NAV_GOTO_RETURN_FROM.has(fresh.current_step)) {
+          bookingActions.setReturnTo(fresh.current_step);
+        }
+        bookingActions.goToStep(target);
       }
     };
     doc.addEventListener("click", handler);
