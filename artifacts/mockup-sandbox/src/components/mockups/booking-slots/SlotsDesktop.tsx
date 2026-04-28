@@ -319,22 +319,24 @@ function DesktopSlotCard({
       <div className={`text-[10px] font-medium ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-700"}`}>
         {disabled ? reason : availableLabel}
       </div>
-      {!disabled && (
+      <div
+        className={`mt-1 h-1 w-full overflow-hidden rounded-full ${
+          isSelected ? "bg-white/30" : "bg-slate-100"
+        }`}
+        aria-hidden
+      >
         <div
-          className={`mt-1 h-1 w-full overflow-hidden rounded-full ${
-            isSelected ? "bg-white/30" : "bg-slate-100"
-          }`}
-          aria-hidden
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${fillPct}%`,
-              backgroundColor: isSelected ? "#ffffff" : BRAND,
-            }}
-          />
-        </div>
-      )}
+          className="h-full rounded-full"
+          style={{
+            width: `${fillPct}%`,
+            backgroundColor: isSelected
+              ? "#ffffff"
+              : disabled
+                ? "#cbd5e1"
+                : BRAND,
+          }}
+        />
+      </div>
     </button>
   );
 }

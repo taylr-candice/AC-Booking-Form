@@ -268,24 +268,27 @@ function SlotCard({
       <div className={`text-[10px] font-medium ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-700"}`}>
         {disabled ? reason : availableLabel}
       </div>
-      {/* Capacity bar — sits flush below the text, hidden on full/disabled
-          slots where the reason text already does the work. */}
-      {!disabled && (
+      {/* Capacity bar — shown on every tile so customers can compare load
+          at a glance. Disabled tiles use a muted grey fill instead of the
+          brand pink so the disabled state still reads first. */}
+      <div
+        className={`mt-1 h-1 w-full overflow-hidden rounded-full ${
+          isSelected ? "bg-white/30" : "bg-slate-100"
+        }`}
+        aria-hidden
+      >
         <div
-          className={`mt-1 h-1 w-full overflow-hidden rounded-full ${
-            isSelected ? "bg-white/30" : "bg-slate-100"
-          }`}
-          aria-hidden
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${fillPct}%`,
-              backgroundColor: isSelected ? "#ffffff" : BRAND,
-            }}
-          />
-        </div>
-      )}
+          className="h-full rounded-full"
+          style={{
+            width: `${fillPct}%`,
+            backgroundColor: isSelected
+              ? "#ffffff"
+              : disabled
+                ? "#cbd5e1"
+                : BRAND,
+          }}
+        />
+      </div>
     </button>
   );
 }
