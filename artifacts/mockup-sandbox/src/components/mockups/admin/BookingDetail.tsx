@@ -167,13 +167,12 @@ export function BookingDetail({
                 {agent && (
                   <div className="mt-3 rounded-lg bg-slate-50 p-3 text-[12px] text-slate-700">
                     <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                      Managing agent
+                      Managing agency
                     </div>
-                    <div className="font-medium">
-                      {agent.firstName} {agent.lastName} · {agent.company}
-                    </div>
-                    <div className="text-slate-500">
-                      {agent.email} · {agent.phone}
+                    <div className="font-medium">{agent.company}</div>
+                    <div className="text-[11px] text-slate-500">
+                      Booker contact details are on the booking — see the
+                      Customer card.
                     </div>
                   </div>
                 )}

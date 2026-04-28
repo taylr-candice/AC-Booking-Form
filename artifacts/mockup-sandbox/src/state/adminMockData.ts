@@ -45,14 +45,24 @@ export type AdminUnit = {
   agentId: string | null;
 };
 
+/**
+ * A managing agency on file. Agents are tracked at the company level
+ * only — there is no individual contact person on the agency record
+ * itself, since multiple people from the same agency may book on its
+ * behalf at different times. The actual booker's name / email / phone
+ * is captured on the booking instead (see `AdminBooking.customerName`
+ * etc. when `bookerRole === "agent"`), so the admin can always tell
+ * who specifically placed each individual booking.
+ *
+ * Which units an agency manages is **derived** from `AdminUnit.agentId`
+ * — there is intentionally no `unitIds` field here, so the unit↔agency
+ * relationship has a single source of truth and cannot drift between
+ * the agents view and the units view.
+ */
 export type AdminAgent = {
   id: string;
-  firstName: string;
-  lastName: string;
+  /** Display name of the agency (e.g. "Vantage Strata Management"). */
   company: string;
-  email: string;
-  phone: string;
-  unitIds: string[];
 };
 
 export type PaymentStatus = "paid" | "pending" | "refund_pending" | "refunded";
@@ -187,33 +197,9 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
 // ─── Seeded agents ──────────────────────────────────────────────────────────
 
 export const SEEDED_AGENTS: readonly AdminAgent[] = [
-  {
-    id: "ag-001",
-    firstName: "Priya",
-    lastName: "Nair",
-    company: "Vantage Strata Management",
-    email: "priya.nair@vantagestrata.com.au",
-    phone: "0412 555 901",
-    unitIds: ["u1", "u4"],
-  },
-  {
-    id: "ag-002",
-    firstName: "Marcus",
-    lastName: "Holloway",
-    company: "City Edge Property Group",
-    email: "marcus.h@cityedgeproperty.com.au",
-    phone: "0438 117 220",
-    unitIds: ["u2", "u6"],
-  },
-  {
-    id: "ag-003",
-    firstName: "Eloise",
-    lastName: "Tran",
-    company: "Capital Realty & Co.",
-    email: "eloise.tran@capitalrealty.com.au",
-    phone: "0455 802 614",
-    unitIds: ["u5"],
-  },
+  { id: "ag-001", company: "Vantage Strata Management" },
+  { id: "ag-002", company: "City Edge Property Group" },
+  { id: "ag-003", company: "Capital Realty & Co." },
 ];
 
 // ─── Seeded bookings ───────────────────────────────────────────────────────

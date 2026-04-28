@@ -124,7 +124,12 @@ export function AdminApp() {
           )}
 
           {view === "agents" && (
-            <AgentsView agents={agents} setAgents={setAgents} units={units} />
+            <AgentsView
+              agents={agents}
+              setAgents={setAgents}
+              units={units}
+              setUnits={setUnits}
+            />
           )}
         </main>
       </div>

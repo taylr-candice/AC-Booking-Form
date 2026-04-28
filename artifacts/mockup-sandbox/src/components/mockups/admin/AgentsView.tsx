@@ -1,7 +1,18 @@
 /**
- * Agents view + add/edit modal — leasing contacts and the units they
- * manage. Agents show up in the customer booking flow when the booker
- * says they're an agent.
+ * Agents view + add/edit modal — managing agencies on file. Each row
+ * represents a company (e.g. "Vantage Strata Management"), not an
+ * individual person. The actual booker's name / email / phone is
+ * captured per-booking on `AdminBooking.customerName` etc., so we can
+ * always tell who specifically from the agency placed any given
+ * booking. Agencies show up in the customer booking flow when the
+ * booker says they're an agent.
+ *
+ * Source-of-truth note: the unit↔agency relationship lives entirely
+ * on `AdminUnit.agentId`. This view derives "units managed" by
+ * filtering units, and toggling a unit's membership in the editor
+ * mutates `unit.agentId` (not a per-agent list). That keeps the
+ * agents view and the units view in lockstep — there is no second
+ * representation that could drift.
  */
 
 import { Edit3, Plus, X } from "lucide-react";
@@ -16,31 +27,61 @@ export function AgentsView({
   agents,
   setAgents,
   units,
+  setUnits,
 }: {
   agents: AdminAgent[];
   setAgents: (next: AdminAgent[]) => void;
   units: AdminUnit[];
+  setUnits: (next: AdminUnit[]) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
-  function saveAgent(next: AdminAgent) {
+  function saveAgent(next: AdminAgent, nextUnitIds: string[]) {
     setAgents(agents.map((a) => (a.id === next.id ? next : a)));
+    applyUnitAssignment(next.id, nextUnitIds);
     setEditingId(null);
   }
 
-  function createAgent(next: AdminAgent) {
+  function createAgent(next: AdminAgent, nextUnitIds: string[]) {
     setAgents([...agents, next]);
+    applyUnitAssignment(next.id, nextUnitIds);
     setCreating(false);
+  }
+
+  /**
+   * Reassigns units so exactly the units in `nextUnitIds` are managed
+   * by `agentId`. Any unit currently flagged as managed by `agentId`
+   * but no longer in the list becomes owner-managed (`agentId: null`).
+   * Any unit being added is reassigned away from whatever agency it
+   * was previously under (one unit → at most one agency).
+   */
+  function applyUnitAssignment(agentId: string, nextUnitIds: string[]) {
+    const target = new Set(nextUnitIds);
+    setUnits(
+      units.map((u) => {
+        if (target.has(u.id)) {
+          return u.agentId === agentId ? u : { ...u, agentId };
+        }
+        if (u.agentId === agentId) {
+          return { ...u, agentId: null };
+        }
+        return u;
+      }),
+    );
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-[12px] text-slate-600">
-          Agents are the leasing contacts on file. They show up on the
-          customer-side dropdown when a booker says they're an agent. Each
-          agent can be associated with one or more units they manage.
+          Agents are the managing agencies on file — tracked at the company
+          level only. They show up on the customer-side dropdown when a
+          booker says they're an agent. Each agency can be associated with
+          one or more units they manage. The individual person who places
+          each booking is captured on the booking itself (under the
+          Customer card on the booking detail), so you always know who
+          specifically from the agency made the request.
         </div>
         <button
           type="button"
@@ -49,7 +90,7 @@ export function AgentsView({
           style={{ backgroundColor: BRAND }}
         >
           <Plus className="h-4 w-4" />
-          Add agent
+          Add agency
         </button>
       </div>
 
@@ -57,63 +98,51 @@ export function AgentsView({
         <table className="w-full text-left text-[13px]">
           <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-4 py-3 font-semibold">Agent</th>
-              <th className="px-4 py-3 font-semibold">Company</th>
-              <th className="px-4 py-3 font-semibold">Contact</th>
+              <th className="px-4 py-3 font-semibold">Agency</th>
               <th className="px-4 py-3 font-semibold">Units managed</th>
               <th className="px-4 py-3 font-semibold"></th>
             </tr>
           </thead>
           <tbody>
-            {agents.map((a) => (
-              <tr key={a.id} className="border-b border-slate-100 last:border-b-0">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700">
-                      {a.firstName[0]}
-                      {a.lastName[0]}
-                    </div>
-                    <div className="font-medium text-slate-900">
-                      {a.firstName} {a.lastName}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3">{a.company}</td>
-                <td className="px-4 py-3">
-                  <div className="text-[12px] text-slate-700">{a.email}</div>
-                  <div className="text-[11px] text-slate-500">{a.phone}</div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {a.unitIds.length === 0 ? (
-                      <span className="text-slate-500">—</span>
-                    ) : (
-                      a.unitIds.map((uid) => {
-                        const u = units.find((x) => x.id === uid) ?? null;
-                        return (
+            {agents.map((a) => {
+              const managed = units.filter((u) => u.agentId === a.id);
+              return (
+                <tr
+                  key={a.id}
+                  className="border-b border-slate-100 last:border-b-0"
+                >
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-slate-900">{a.company}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {managed.length === 0 ? (
+                        <span className="text-slate-500">—</span>
+                      ) : (
+                        managed.map((u) => (
                           <span
-                            key={uid}
+                            key={u.id}
                             className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700"
                           >
-                            {u?.addressLine1 ?? uid}
+                            {u.addressLine1}
                           </span>
-                        );
-                      })
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(a.id)}
-                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-600 hover:text-slate-900"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" />
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
+                        ))
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(a.id)}
+                      className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-600 hover:text-slate-900"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -123,17 +152,14 @@ export function AgentsView({
           agent={
             editingId
               ? agents.find((a) => a.id === editingId)!
-              : {
-                  id: `ag-${Date.now()}`,
-                  firstName: "",
-                  lastName: "",
-                  company: "",
-                  email: "",
-                  phone: "",
-                  unitIds: [],
-                }
+              : { id: `ag-${Date.now()}`, company: "" }
           }
           units={units}
+          initialUnitIds={
+            editingId
+              ? units.filter((u) => u.agentId === editingId).map((u) => u.id)
+              : []
+          }
           onSave={editingId ? saveAgent : createAgent}
           onCancel={() => {
             setEditingId(null);
@@ -149,23 +175,24 @@ export function AgentsView({
 function AgentEditor({
   agent,
   units,
+  initialUnitIds,
   onSave,
   onCancel,
   isCreate,
 }: {
   agent: AdminAgent;
   units: AdminUnit[];
-  onSave: (next: AdminAgent) => void;
+  initialUnitIds: string[];
+  onSave: (next: AdminAgent, nextUnitIds: string[]) => void;
   onCancel: () => void;
   isCreate: boolean;
 }) {
   const [draft, setDraft] = useState<AdminAgent>(agent);
+  const [draftUnitIds, setDraftUnitIds] = useState<string[]>(initialUnitIds);
 
   function toggleUnit(uid: string) {
-    setDraft((d) =>
-      d.unitIds.includes(uid)
-        ? { ...d, unitIds: d.unitIds.filter((x) => x !== uid) }
-        : { ...d, unitIds: [...d.unitIds, uid] },
+    setDraftUnitIds((ids) =>
+      ids.includes(uid) ? ids.filter((x) => x !== uid) : [...ids, uid],
     );
   }
 
@@ -175,10 +202,10 @@ function AgentEditor({
         <div className="flex items-start justify-between">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-slate-500">
-              {isCreate ? "New agent" : "Edit agent"}
+              {isCreate ? "New agency" : "Edit agency"}
             </div>
             <div className="text-[16px] font-semibold text-slate-900">
-              Agent contact + assigned units
+              Agency name + assigned units
             </div>
           </div>
           <button
@@ -190,25 +217,7 @@ function AgentEditor({
           </button>
         </div>
         <div className="mt-4 flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="First name">
-              <input
-                type="text"
-                value={draft.firstName}
-                onChange={(e) => setDraft({ ...draft, firstName: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
-              />
-            </FormField>
-            <FormField label="Last name">
-              <input
-                type="text"
-                value={draft.lastName}
-                onChange={(e) => setDraft({ ...draft, lastName: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
-              />
-            </FormField>
-          </div>
-          <FormField label="Company">
+          <FormField label="Agency name">
             <input
               type="text"
               value={draft.company}
@@ -216,28 +225,12 @@ function AgentEditor({
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
             />
           </FormField>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Email">
-              <input
-                type="email"
-                value={draft.email}
-                onChange={(e) => setDraft({ ...draft, email: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
-              />
-            </FormField>
-            <FormField label="Phone">
-              <input
-                type="tel"
-                value={draft.phone}
-                onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
-              />
-            </FormField>
-          </div>
           <FormField label="Units managed">
-            <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-2 max-h-40 overflow-y-auto">
+            <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
               {units.map((u) => {
-                const checked = draft.unitIds.includes(u.id);
+                const checked = draftUnitIds.includes(u.id);
+                const otherAgentId =
+                  u.agentId && u.agentId !== draft.id ? u.agentId : null;
                 return (
                   <label
                     key={u.id}
@@ -254,7 +247,14 @@ function AgentEditor({
                       <div className="text-[12px] font-medium text-slate-900">
                         {u.addressLine1}
                       </div>
-                      <div className="text-[11px] text-slate-500">{u.addressLine2}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {u.addressLine2}
+                        {otherAgentId && checked ? (
+                          <span className="ml-1 text-amber-600">
+                            · will reassign from another agency
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </label>
                 );
@@ -272,10 +272,8 @@ function AgentEditor({
           </button>
           <button
             type="button"
-            onClick={() => onSave(draft)}
-            disabled={
-              !draft.firstName.trim() || !draft.lastName.trim() || !draft.company.trim()
-            }
+            onClick={() => onSave(draft, draftUnitIds)}
+            disabled={!draft.company.trim()}
             className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
             style={{ backgroundColor: BRAND }}
           >

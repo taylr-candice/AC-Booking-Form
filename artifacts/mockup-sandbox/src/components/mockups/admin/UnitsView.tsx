@@ -137,11 +137,8 @@ export function UnitsView({
                   <td className="px-4 py-3">{u.ac.additional || "—"}</td>
                   <td className="px-4 py-3">
                     {agent ? (
-                      <div>
-                        <div className="font-medium text-slate-900">
-                          {agent.firstName} {agent.lastName}
-                        </div>
-                        <div className="text-[11px] text-slate-500">{agent.company}</div>
+                      <div className="font-medium text-slate-900">
+                        {agent.company}
                       </div>
                     ) : (
                       <span className="text-slate-500">—</span>
@@ -315,7 +312,7 @@ function UnitEditor({
               <option value="">— Owner-managed —</option>
               {agents.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.firstName} {a.lastName} · {a.company}
+                  {a.company}
                 </option>
               ))}
             </select>
