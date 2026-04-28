@@ -367,6 +367,117 @@ describe("Step 5 cascade clears (bookingActions)", () => {
     });
   });
 
+  describe("setRole — cascade clears role-dependent fields", () => {
+    // `clearRoleDownstream` runs a much wider cascade than the access-method
+    // ones above: switching role wipes the agency, primary_residence, the
+    // chosen access_method, every Step 5 follow-up, and the schedule slot.
+    // If a regression leaves any of those behind when a user toggles between
+    // Owner and Agent mid-session, we silently send mismatched data
+    // downstream (e.g. an agent booking still carrying a primary_residence).
+
+    /** Populate every role-dependent field so the cascade has something to clear. */
+    function populateRoleDownstream(opts: {
+      access_method: AccessMethod;
+      primary_residence?: BookingState["primary_residence"];
+    }) {
+      bookingActions.setAgency("agency-001");
+      if (opts.primary_residence) {
+        bookingActions.setPrimaryResidence(opts.primary_residence);
+      }
+      bookingActions.setAccessMethod(opts.access_method);
+      bookingActions.setKeyHolder({
+        key_holder_name: "Alex Smith",
+        key_holder_phone: "0400 000 000",
+      });
+      bookingActions.setKeyCollectionLocation("Concierge desk, Lvl 1");
+      bookingActions.setReturnMethod("hand_delivery");
+      bookingActions.setManagingAgency("agency-002");
+      bookingActions.setTenants([
+        { first: "Sam", last: "Tenant", email: "sam@example.com", phone: "0411 111 111" },
+      ]);
+      bookingActions.setSignature({
+        signature_acknowledged: true,
+        signature_name: "Alex Smith",
+      });
+      bookingActions.setSchedule("2026-05-01", "morning");
+    }
+
+    /** Assert that every field cleared by `clearRoleDownstream` is empty. */
+    function expectRoleDownstreamCleared(s: BookingState) {
+      expect(s.agency_id).toBeNull();
+      expect(s.primary_residence).toBeNull();
+      expect(s.access_method).toBeNull();
+      expect(s.key_holder_name).toBe("");
+      expect(s.key_holder_phone).toBe("");
+      expect(s.key_collection_location).toBe("");
+      expect(s.return_method).toBeNull();
+      expect(s.managing_agency_id).toBeNull();
+      expect(s.tenants).toEqual([]);
+      expect(s.signature_acknowledged).toBe(false);
+      expect(s.signature_name).toBe("");
+      expect(s.service_date).toBeNull();
+      expect(s.service_slot).toBeNull();
+    }
+
+    it("owner → agent: clears agency, primary_residence, access_method, every Step 5 follow-up, and the schedule slot", () => {
+      bookingActions.setRole("owner");
+      populateRoleDownstream({
+        primary_residence: "leased_out",
+        access_method: "owner_leased_leave_key",
+      });
+
+      bookingActions.setRole("agent");
+
+      const s = getBookingSession();
+      expect(s.role).toBe("agent");
+      expectRoleDownstreamCleared(s);
+    });
+
+    it("agent → owner: clears the same fields in the reverse direction", () => {
+      bookingActions.setRole("agent");
+      populateRoleDownstream({
+        // Agents have no primary_residence in the spec, but the cascade
+        // still wipes it — populate it directly so we can prove it's cleared.
+        primary_residence: "leased_out",
+        access_method: "agent_be_there",
+      });
+
+      bookingActions.setRole("owner");
+
+      const s = getBookingSession();
+      expect(s.role).toBe("owner");
+      expectRoleDownstreamCleared(s);
+    });
+
+    it("re-selecting the same role is a no-op — in-progress data is preserved", () => {
+      bookingActions.setRole("owner");
+      populateRoleDownstream({
+        primary_residence: "leased_out",
+        access_method: "owner_leased_leave_key",
+      });
+
+      bookingActions.setRole("owner");
+
+      const s = getBookingSession();
+      expect(s.role).toBe("owner");
+      // Nothing along the cascade should have been touched.
+      expect(s.agency_id).toBe("agency-001");
+      expect(s.primary_residence).toBe("leased_out");
+      expect(s.access_method).toBe("owner_leased_leave_key");
+      expect(s.key_holder_name).toBe("Alex Smith");
+      expect(s.key_holder_phone).toBe("0400 000 000");
+      expect(s.key_collection_location).toBe("Concierge desk, Lvl 1");
+      expect(s.return_method).toBe("hand_delivery");
+      expect(s.managing_agency_id).toBe("agency-002");
+      expect(s.tenants).toHaveLength(1);
+      expect(s.tenants[0]).toMatchObject({ first: "Sam", last: "Tenant" });
+      expect(s.signature_acknowledged).toBe(true);
+      expect(s.signature_name).toBe("Alex Smith");
+      expect(s.service_date).toBe("2026-05-01");
+      expect(s.service_slot).toBe("morning");
+    });
+  });
+
   describe("setAccessMethod — auto-advances away from a now-hidden Step 5", () => {
     it("advances current_step from 5 → 6 when switching INTO any coordination method while on Step 5", () => {
       const coordinationMethods: AccessMethod[] = Array.from(
