@@ -40,6 +40,7 @@ export function BuildingDetail({
   onBack,
   onOpenBooking,
   onOpenAllBookings,
+  onNewBooking,
 }: {
   buildingId: string;
   buildings: AdminBuilding[];
@@ -49,6 +50,7 @@ export function BuildingDetail({
   onBack: () => void;
   onOpenBooking: (bookingId: string) => void;
   onOpenAllBookings: (buildingId: string) => void;
+  onNewBooking: (buildingId: string) => void;
 }) {
   const building = buildings.find((b) => b.id === buildingId);
 
@@ -89,15 +91,25 @@ export function BuildingDetail({
           <ChevronLeft className="h-4 w-4" />
           Back to buildings
         </button>
-        <button
-          type="button"
-          onClick={() => onOpenAllBookings(buildingId)}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
-          style={{ backgroundColor: BRAND }}
-        >
-          View all bookings
-          <ChevronRight className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onNewBooking(buildingId)}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition hover:bg-slate-50"
+            style={{ borderColor: BRAND, color: BRAND }}
+          >
+            New booking
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenAllBookings(buildingId)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
+            style={{ backgroundColor: BRAND }}
+          >
+            View all bookings
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Summary card */}

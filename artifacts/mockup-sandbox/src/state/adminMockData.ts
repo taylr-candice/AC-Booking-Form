@@ -1304,3 +1304,230 @@ function formatShortDate(iso: string): string {
   const month = SHORT_MONTHS[m - 1] ?? "";
   return `${day} ${month}`;
 }
+
+// ─── Admin-created bookings (phone bookings) ───────────────────────────────
+
+/**
+ * The admin user creating phone bookings in this mockup. Surfaced on the
+ * service timeline of every admin-created booking so ops can always tell
+ * who took the call.
+ */
+export const ADMIN_USER_LABEL = "Mia (admin)";
+
+/**
+ * Per-system / per-extra prices used to compute `totalAud` for an
+ * admin-created booking. Mirrors the customer-side total (see
+ * `liveBookingFromSession` and the customer pricing card). Kept here so
+ * the admin "Create booking" flow can quote the same total a customer
+ * would have seen on Step 6.
+ */
+export const PRICE_PER_SYSTEM_AUD = 179;
+export const PRICE_PER_ADDITIONAL_INDOOR_AUD = 39;
+
+/**
+ * Generate the next monotonic `bk-NNNN` id given the current bookings
+ * list. The seeded ids count down from `bk-1042`, the live row uses the
+ * sentinel `bk-live`, and any admin-created booking should be greater
+ * than every existing seeded id so {@link latestBookingByUnit} treats it
+ * as the unit's *current* booking on the very next render. Pure / data-only.
+ *
+ * Strategy: scan every id, keep only ones shaped `bk-<digits>`, take the
+ * max numeric suffix, and return one above it. Falls back to `bk-1043`
+ * when no numeric ids exist (so a freshly cleared store still produces
+ * a sensible first id).
+ */
+export function nextBookingId(bookings: readonly AdminBooking[]): string {
+  let max = 1042;
+  for (const b of bookings) {
+    const m = /^bk-(\d+)$/.exec(b.id);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `bk-${max + 1}`;
+}
+
+/**
+ * The schedule outcome captured on Step 3 of the admin "New booking"
+ * flow — either a concrete day + window, or the "to be coordinated"
+ * sibling option (no date, no slot, treated like the customer-side
+ * coordination flows).
+ */
+export type AdminCreatedScheduleChoice =
+  | { kind: "slot"; date: string; window: "morning" | "afternoon" }
+  | { kind: "to_be_coordinated" };
+
+/**
+ * Inputs the admin "New booking" flow collects across its 4 steps.
+ *
+ * Kept narrow on purpose — the flow is mockup-only and skips access
+ * method / tenant capture (those are admin-followup concerns once the
+ * tech is dispatched). The factory below fills the resulting
+ * `AdminBooking` with the right pending-payment + admin-attribution
+ * shape so the rest of the admin UI treats the row identically to a
+ * seeded one.
+ */
+export type AdminCreatedBookingInput = {
+  unit: AdminUnit;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  bookerRole: "owner" | "agent";
+  /** When `bookerRole === "agent"`, the agency id picked on Step 1
+   *  (matches one of `DEMO_MANAGING_AGENCIES`). `null` for owners. */
+  bookerAgencyId: string | null;
+  /** Free-text agency name when the agent picked "Other / not listed".
+   *  Empty string otherwise. */
+  bookerAgencyOtherName: string;
+  /** AC config the admin captured on Step 2. */
+  ac: { type: "split" | "ducted" | "unsure"; systems: number; additional: number };
+  schedule: AdminCreatedScheduleChoice;
+  /** Optional free-text notes (defaults to an admin-friendly stub). */
+  notes?: string;
+  /** Override timestamp for the timeline entry (used by tests for
+   *  determinism). Defaults to "Just now". */
+  timestamp?: string;
+};
+
+/**
+ * Build a fully-formed {@link AdminBooking} for the admin "New booking"
+ * (phone booking) flow.
+ *
+ * Pure function — no DOM, no clock, no random — so the factory can be
+ * unit-tested directly and the calling component just appends the
+ * result to its bookings array.
+ *
+ * Shape contract (validated by `adminCreatedBooking.test.ts`):
+ *   - `paymentStatus` is always `"pending"` (admin will invoice
+ *     separately — no card capture in this flow).
+ *   - `serviceTimeline` carries an admin-created marker attributing the
+ *     row to {@link ADMIN_USER_LABEL} so the booking detail timeline
+ *     can render "Booking created by admin (phone)".
+ *   - `paymentTimeline` carries a single "Awaiting invoice" entry, also
+ *     attributed to the admin user.
+ *   - `discrepancy` is computed by comparing the captured AC against
+ *     the unit's record on file (matches the customer-side
+ *     `ac_discrepancy` shape: type-mismatch OR a non-zero numeric
+ *     difference, or `"unsure"` when the unit has a known type).
+ *   - `totalAud` mirrors the customer-side pricing model
+ *     ($179/system + $39/extra). For "unsure" we still bill at one
+ *     system × $179 so the admin has a placeholder; the tech updates
+ *     it on arrival.
+ *   - `serviceDate` / `serviceSlot` mirror the schedule choice:
+ *     `null + "to_be_coordinated"` for the coordination sibling, or
+ *     the picked date + window otherwise.
+ *   - `accessMethod` and `tenants` are intentionally left null/empty —
+ *     the admin captures those later if needed.
+ */
+export function buildAdminCreatedBooking(
+  input: AdminCreatedBookingInput,
+  bookingId: string,
+): AdminBooking {
+  const at = input.timestamp ?? "Just now";
+  const isCoordination = input.schedule.kind === "to_be_coordinated";
+
+  const totalAud =
+    input.ac.type === "unsure"
+      ? PRICE_PER_SYSTEM_AUD
+      : input.ac.systems * PRICE_PER_SYSTEM_AUD +
+        input.ac.additional * PRICE_PER_ADDITIONAL_INDOOR_AUD;
+
+  const discrepancy = computeAdminAcDiscrepancy(input.unit.ac, input.ac);
+
+  return {
+    id: bookingId,
+    unitId: input.unit.id,
+    customerName: input.customerName,
+    customerEmail: input.customerEmail,
+    customerPhone: input.customerPhone,
+    bookerRole: input.bookerRole,
+    bookerAgencyId: input.bookerRole === "agent" ? input.bookerAgencyId : null,
+    bookerAgencyOtherName:
+      input.bookerRole === "agent" &&
+      input.bookerAgencyId === OTHER_AGENCY_ID
+        ? input.bookerAgencyOtherName
+        : "",
+    accessMethod: null,
+    tenants: [],
+    systems: input.ac.systems,
+    additional: input.ac.additional,
+    acType: input.ac.type,
+    discrepancy,
+    serviceDate: isCoordination
+      ? null
+      : (input.schedule as { date: string }).date,
+    serviceSlot: isCoordination
+      ? "to_be_coordinated"
+      : (input.schedule as { window: "morning" | "afternoon" }).window,
+    paymentStatus: "pending",
+    serviceStatus: "scheduled",
+    totalAud,
+    paymentTimeline: [
+      {
+        status: "pending",
+        label: "Awaiting invoice · admin-created booking",
+        at,
+        by: ADMIN_USER_LABEL,
+      },
+    ],
+    serviceTimeline: [
+      {
+        status: "scheduled",
+        label: "Booking created by admin (phone)",
+        at,
+        by: ADMIN_USER_LABEL,
+      },
+    ],
+    notes: input.notes ?? "Phone booking — captured by admin on the customer's behalf.",
+  };
+}
+
+/**
+ * Compare the unit's recorded AC config against what the admin captured
+ * during the "New booking" flow. Mirrors the customer-side
+ * `ac_discrepancy` shape so the bookings list / detail can render the
+ * same "Mismatch" treatment whether the booking came from the customer
+ * or from an admin phone call.
+ *
+ * Returns:
+ *   - `null` when the unit has no record on file (`type === "unknown"`)
+ *     — there's nothing to compare against, so no mismatch is surfaced.
+ *   - `null` when the captured config matches the record exactly.
+ *   - A populated discrepancy when types differ, numbers differ, or
+ *     the admin captured "unsure" against a known recorded type.
+ */
+export function computeAdminAcDiscrepancy(
+  recorded: AdminUnit["ac"],
+  captured: { type: "split" | "ducted" | "unsure"; systems: number; additional: number },
+): AcDiscrepancy | null {
+  if (recorded.type === "unknown") return null;
+  if (captured.type === "unsure") {
+    return {
+      recorded: {
+        type: recorded.type,
+        systems: recorded.systems,
+        additional: recorded.additional,
+      },
+      customer: { type: "unsure" },
+    };
+  }
+  if (
+    captured.type === recorded.type &&
+    captured.systems === recorded.systems &&
+    captured.additional === recorded.additional
+  ) {
+    return null;
+  }
+  return {
+    recorded: {
+      type: recorded.type,
+      systems: recorded.systems,
+      additional: recorded.additional,
+    },
+    customer: {
+      type: captured.type,
+      systems: captured.systems,
+      additional: captured.additional,
+    },
+  };
+}

@@ -5,7 +5,7 @@
  * `AdminApp` shell to mount `BookingDetail`.
  */
 
-import { Search, TriangleAlert } from "lucide-react";
+import { Plus, Search, TriangleAlert } from "lucide-react";
 
 import {
   bookerAgencyName,
@@ -63,6 +63,7 @@ export function BookingsView({
   search,
   onSearch,
   onOpen,
+  onNewBooking,
   paymentMode,
 }: {
   bookings: AdminBooking[];
@@ -75,6 +76,7 @@ export function BookingsView({
   search: string;
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
+  onNewBooking: () => void;
   paymentMode: boolean;
 }) {
   const filterChips: ReadonlyArray<{
@@ -161,6 +163,17 @@ export function BookingsView({
           </select>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          {!paymentMode && (
+            <button
+              type="button"
+              onClick={onNewBooking}
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-semibold text-white transition hover:brightness-110"
+              style={{ backgroundColor: BRAND }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New booking
+            </button>
+          )}
           {filterChips.map((chip) => {
             const active = statusFilter === chip.key;
             return (
