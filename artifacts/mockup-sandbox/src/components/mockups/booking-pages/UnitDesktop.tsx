@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Building2, MapPin, ChevronDown, Plus, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Building2, MapPin, ChevronDown, CheckCircle2 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
@@ -39,13 +39,13 @@ export function UnitDesktop() {
           
           <div className="mb-8">
             <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 1 of 7</div>
-            <h1 className="text-2xl font-semibold text-slate-900">Find your unit</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">Select the property</h1>
             <p className="text-sm text-slate-500 mt-2">Select the apartment where the air-conditioning service will take place.</p>
           </div>
 
           <div className="flex-1">
             <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Your units
+              Properties
             </label>
 
             <div className="relative">
@@ -71,7 +71,7 @@ export function UnitDesktop() {
                         </div>
                       </>
                     ) : (
-                      <span className="text-[15px] text-slate-400">Select a unit…</span>
+                      <span className="text-[15px] text-slate-400">Select a property…</span>
                     )}
                   </div>
                 </div>
@@ -120,23 +120,8 @@ export function UnitDesktop() {
                       </button>
                     );
                   })}
-                  <div className="border-t border-slate-100">
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-[13px] font-medium hover:bg-slate-50"
-                      style={{ color: BRAND }}
-                      data-testid="dropdown-unit-add"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add a different unit
-                    </button>
-                  </div>
                 </div>
               )}
-            </div>
-
-            <div className="mt-8 rounded-xl border border-slate-200/60 bg-slate-50 p-4 text-[13px] text-slate-500 text-center">
-              Don't see your unit? Choose <span className="font-medium text-slate-900">Add a different unit</span> in the list above and we'll set it up.
             </div>
           </div>
 

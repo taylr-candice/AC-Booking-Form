@@ -10,7 +10,6 @@ import {
   MapPin,
   Building2,
   ChevronDown,
-  Plus,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
@@ -61,7 +60,7 @@ export function UnitMobile() {
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
         <div>
           <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
-            Pick a unit
+            Select the property
           </h1>
           <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
             Step 1 of 7
@@ -84,7 +83,7 @@ export function UnitMobile() {
         </p>
 
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">
-          Your units
+          Properties
         </label>
 
         <div className="relative">
@@ -106,7 +105,7 @@ export function UnitMobile() {
                   </div>
                 </>
               ) : (
-                <span className="text-[15px] text-slate-400">Select a unit…</span>
+                <span className="text-[15px] text-slate-400">Select a property…</span>
               )}
             </div>
             <ChevronDown
@@ -149,17 +148,6 @@ export function UnitMobile() {
                   </button>
                 );
               })}
-              <div className="border-t border-slate-100">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-[13px] font-medium hover:bg-slate-50"
-                  style={{ color: BRAND }}
-                  data-testid="dropdown-unit-add"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add a different unit
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -202,9 +190,6 @@ export function UnitMobile() {
           </div>
         )}
 
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-[11px] text-slate-500">
-          Don't see your unit? Choose <span className="font-medium" style={{ color: BRAND }}>Add a different unit</span> in the list above and we'll set it up.
-        </div>
       </div>
 
       <div className="border-t border-slate-100 bg-white px-5 py-3">
