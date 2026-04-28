@@ -44,9 +44,12 @@ const COPY: Record<KnownType, Copy> = {
     systemsUnitSingular: "ducted service",
     systemsUnitPlural: "ducted services",
     addonLabel: "Extra filters",
+    // NOTE: For ducted, the rendered helper text below is the inline JSX
+    // branch (it includes the "See example" inline link). This array is kept
+    // in sync as a fallback / contract for future renderers but isn't shown
+    // for ducted today.
     addonHelper: [
-      "Each service includes 1 return-air grille + filter clean.",
-      "If you count more return-air grilles in the apartment than your booked service includes, add the extras here.",
+      "If you count more return-air grilles in the apartment than shown above, add the extras here.",
       "Filters sit behind large return-air grilles — not small air vents or outlets.",
     ],
     addonUnitSingular: "extra filter",
@@ -61,7 +64,6 @@ const COPY: Record<KnownType, Copy> = {
     systemsUnitPlural: "split services",
     addonLabel: "Extra indoor units",
     addonHelper: [
-      "Each service includes 1 indoor unit head.",
       "If your apartment has more indoor unit heads than shown above, add the extras here.",
       "Example: If 2 indoor unit heads are included above, only add extras if the apartment has 3 or more indoor unit heads.",
     ],
@@ -76,9 +78,12 @@ function formatSystemsIncludes(type: KnownType, systems: number): string[] {
     const indoor = systems === 1 ? "indoor unit head" : "indoor unit heads";
     return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
   }
-  const service = systems === 1 ? "system service" : "system services";
-  const clean = systems === 1 ? "filter clean" : "filter cleans";
-  return [`${systems} ${service}`, `${systems} ${clean}`];
+  // Ducted: each system = 1 outdoor + 1 indoor distribution unit (which gets
+  // the filter clean). Showing "indoor units / filter cleans" gives bookers
+  // a clearer physical picture than the old "system services / filter cleans".
+  const outdoor = systems === 1 ? "outdoor unit" : "outdoor units";
+  const indoor = systems === 1 ? "indoor unit / filter clean" : "indoor units / filter cleans";
+  return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
 }
 
 const PREFILL_DEFAULTS: Record<KnownType, { systems: number; additional: number }> = {
@@ -399,9 +404,8 @@ export function AcDesktop() {
                   >
                     {effectiveType === "ducted" ? (
                       <>
-                        <p>Each service includes 1 return-air grille + filter clean.</p>
                         <p>
-                          If you count more return-air grilles in the apartment than your booked service includes, add the extras here. Not sure what one looks like?{" "}
+                          If you count more return-air grilles in the apartment than shown above, add the extras here. Not sure what one looks like?{" "}
                           <button
                             type="button"
                             onClick={() => setExampleModal("ducted-filter")}
