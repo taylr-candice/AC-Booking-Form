@@ -24,7 +24,7 @@
  *     caller at apply-time, not here, so the parser stays pure).
  */
 
-import type { AdminAgent, AdminUnit } from "./adminMockData";
+import { SEEDED_BUILDINGS, type AdminAgent, type AdminUnit } from "./adminMockData";
 
 // ─── Column contract ────────────────────────────────────────────────────────
 
@@ -483,12 +483,14 @@ export function parseUnitsImport(
     // The CSV layer doesn't currently carry `buildingId` — building
     // assignment is edited per-unit in the Units view. For updates we
     // preserve the existing unit's building; for new rows we default to
-    // whatever building the first existing unit lives in (a safe
-    // placeholder for a mockup; the admin can re-assign from the unit
-    // editor afterwards).
+    // the building of the first existing unit (so a CSV import on top
+    // of an existing dataset keeps the obvious default), falling back
+    // to the first seeded building when the dataset is empty so we
+    // never produce a dangling `""` reference. The admin can re-assign
+    // from the unit editor afterwards.
     const buildingId = before
       ? before.buildingId
-      : (currentUnits[0]?.buildingId ?? "");
+      : (currentUnits[0]?.buildingId ?? SEEDED_BUILDINGS[0]?.id ?? "");
 
     const parsed: AdminUnit = {
       id: before ? before.id : "",
