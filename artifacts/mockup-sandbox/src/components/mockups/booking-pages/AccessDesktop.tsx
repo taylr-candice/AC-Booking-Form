@@ -26,7 +26,7 @@ export function AccessDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 5 of 7</div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 4 of 6</div>
             <h1 className="text-2xl font-semibold text-slate-900">How will the technician access the property?</h1>
           </div>
 
@@ -117,7 +117,7 @@ export function AccessDesktop() {
 function RoleMissingBanner() {
   return (
     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-      Please complete Step 2 (Your role) first — the access options depend on
+      Please complete Step 1 (Property &amp; role) first — the access options depend on
       whether you're the owner or a managing agent.
     </div>
   );

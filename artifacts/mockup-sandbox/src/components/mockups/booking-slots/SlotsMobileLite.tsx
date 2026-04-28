@@ -43,7 +43,7 @@ export function SlotsMobileLite() {
           <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
             Schedule
           </h1>
-          <div className="mt-0.5 text-xs text-slate-500">Step 6 of 7 · Pick a service slot</div>
+          <div className="mt-0.5 text-xs text-slate-500">Step 5 of 6 · Pick a service slot</div>
         </div>
         <button
           type="button"

@@ -64,7 +64,7 @@ export function AccessMobile() {
             Property access
           </h1>
           <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
-            Step 5
+            Step 4 of 6
           </div>
         </div>
         <button
@@ -164,7 +164,7 @@ export function AccessMobile() {
 function RoleMissingBanner() {
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-      Please complete Step 2 (Your role) first — the access options depend on
+      Please complete Step 1 (Property &amp; role) first — the access options depend on
       whether you're the owner or a managing agent.
     </div>
   );

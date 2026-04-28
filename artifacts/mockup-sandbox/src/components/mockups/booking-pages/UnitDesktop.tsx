@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Building2, MapPin, ChevronDown, CheckCircle2 } from "lucide-react";
+import {
+  ArrowRight,
+  Briefcase,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  User,
+} from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
@@ -15,6 +22,7 @@ const UNITS = [
 
 export function UnitDesktop() {
   const sessionUnitId = useBookingSelector((s) => s.unit_id);
+  const role = useBookingSelector((s) => s.role);
   const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
 
@@ -25,6 +33,7 @@ export function UnitDesktop() {
   }, [sessionUnitId]);
 
   const selected = UNITS.find((u) => u.id === selectedId);
+  const canContinue = !!selectedId && !!role;
 
   const selectUnit = (id: string) => {
     setSelectedId(id);
@@ -36,9 +45,9 @@ export function UnitDesktop() {
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
       <div className="w-full max-w-xl">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
-          
+
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 1 of 7</div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 1 of 6</div>
             <h1 className="text-2xl font-semibold text-slate-900">Select the property</h1>
             <p className="text-sm text-slate-500 mt-2">For which the service will take place</p>
           </div>
@@ -123,6 +132,36 @@ export function UnitDesktop() {
                 </div>
               )}
             </div>
+
+            {/* Progressive disclosure: role chooser appears once a property is picked. */}
+            {selected && (
+              <div className="mt-8">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Your role for this property
+                </label>
+                <p className="mb-3 text-[13px] text-slate-500">
+                  Are you the owner, or a managing agent?
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <RoleCard
+                    selected={role === "owner"}
+                    onClick={() => bookingActions.setRole("owner")}
+                    icon={<User className="h-5 w-5" />}
+                    title="Owner"
+                    description="I own this unit"
+                    id="owner"
+                  />
+                  <RoleCard
+                    selected={role === "agent"}
+                    onClick={() => bookingActions.setRole("agent")}
+                    icon={<Briefcase className="h-5 w-5" />}
+                    title="Agent · Property Manager"
+                    description="I manage this unit on behalf of the owner"
+                    id="agent"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-12 pt-6 border-t border-slate-100 flex items-center justify-between">
@@ -135,7 +174,7 @@ export function UnitDesktop() {
             </button>
             <button
               type="button"
-              disabled={!selectedId}
+              disabled={!canContinue}
               data-testid="button-continue"
               className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
               style={{ backgroundColor: BRAND }}
@@ -148,5 +187,62 @@ export function UnitDesktop() {
         </div>
       </div>
     </div>
+  );
+}
+
+function RoleCard({
+  selected,
+  onClick,
+  icon,
+  title,
+  description,
+  id,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  id: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={`card-role-${id}`}
+      aria-pressed={selected}
+      className={`relative flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${
+        selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
+      }`}
+      style={
+        selected
+          ? {
+              borderColor: "rgba(95,187,151,0.45)",
+              backgroundColor: "rgba(95,187,151,0.08)",
+            }
+          : undefined
+      }
+    >
+      <span
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+          selected ? "text-white" : "bg-slate-100 text-slate-700"
+        }`}
+        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+      >
+        {icon}
+      </span>
+      <span className="text-[15px] font-semibold leading-tight text-slate-900">
+        {title}
+      </span>
+      <span className="text-[12.5px] leading-snug text-slate-500">
+        {description}
+      </span>
+      {selected && (
+        <CheckCircle2
+          className="absolute right-3 top-3 h-5 w-5"
+          style={{ color: SELECTED_GREEN }}
+        />
+      )}
+    </button>
   );
 }

@@ -35,12 +35,11 @@ type Step = {
 
 const STEPS: readonly Step[] = [
   { id: 1, label: "Pick a unit",     url: "/__mockup/preview/booking-pages/UnitDesktop" },
-  { id: 2, label: "Your role",       url: "/__mockup/preview/booking-pages/RoleDesktop" },
-  { id: 3, label: "Your details",    url: "/__mockup/preview/booking-pages/BookerDesktop" },
-  { id: 4, label: "Your AC",         url: "/__mockup/preview/booking-pages/AcDesktop" },
-  { id: 5, label: "Property access", url: "/__mockup/preview/booking-pages/AccessDesktop" },
-  { id: 6, label: "Pick a slot",     url: "/__mockup/preview/booking-slots/SlotsDesktop" },
-  { id: 7, label: "Review & pay",    url: "/__mockup/preview/booking-pages/PayDesktop" },
+  { id: 2, label: "Your details",    url: "/__mockup/preview/booking-pages/BookerDesktop" },
+  { id: 3, label: "Your AC",         url: "/__mockup/preview/booking-pages/AcDesktop" },
+  { id: 4, label: "Property access", url: "/__mockup/preview/booking-pages/AccessDesktop" },
+  { id: 5, label: "Pick a slot",     url: "/__mockup/preview/booking-slots/SlotsDesktop" },
+  { id: 6, label: "Review & pay",    url: "/__mockup/preview/booking-pages/PayDesktop" },
 ];
 
 export function BookingFlowDesktop() {

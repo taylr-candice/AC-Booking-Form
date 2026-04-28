@@ -44,7 +44,7 @@ export function PayDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 7 of 7</div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 6 of 6</div>
             <h1 className="text-2xl font-semibold text-slate-900">Review & pay</h1>
           </div>
 

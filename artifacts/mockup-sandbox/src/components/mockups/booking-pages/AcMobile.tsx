@@ -170,7 +170,7 @@ export function AcMobile() {
         <div className="pr-3">
           <h1 className="text-[22px] font-semibold leading-tight text-slate-900">{heading}</h1>
           <div className="mt-0.5 text-[11px] font-semibold tracking-wide uppercase text-slate-500">
-            Step 4 of 7
+            Step 3 of 6
           </div>
         </div>
         <button

@@ -119,7 +119,7 @@ export function BookerDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
 
           <div className="mb-8">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 3 of 7</div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 2 of 6</div>
             <h1 className="text-2xl font-semibold text-slate-900">
               {isAgent ? "Your agency & contact details" : "Your contact details"}
             </h1>

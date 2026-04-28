@@ -127,7 +127,7 @@ export function BookerMobile() {
             Your details
           </h1>
           <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
-            Step 3 of 7
+            Step 2 of 6
           </div>
         </div>
         <button

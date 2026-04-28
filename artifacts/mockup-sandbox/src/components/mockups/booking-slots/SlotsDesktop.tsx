@@ -52,7 +52,7 @@ export function SlotsDesktop() {
           
           <div className="mb-8 flex items-start justify-between">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 6 of 7</div>
+              <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Step 5 of 6</div>
               <h1 className="text-2xl font-semibold text-slate-900">Schedule your service</h1>
               <p className="text-sm text-slate-500 mt-2">Pick an arrival window for the technician.</p>
             </div>

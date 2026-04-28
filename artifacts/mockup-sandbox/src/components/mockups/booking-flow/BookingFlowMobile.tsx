@@ -35,12 +35,11 @@ type Step = {
 
 const STEPS: readonly Step[] = [
   { id: 1, label: "Pick a unit",     url: "/__mockup/preview/booking-pages/UnitMobile" },
-  { id: 2, label: "Your role",       url: "/__mockup/preview/booking-pages/RoleMobile" },
-  { id: 3, label: "Your details",    url: "/__mockup/preview/booking-pages/BookerMobile" },
-  { id: 4, label: "Your AC",         url: "/__mockup/preview/booking-pages/AcMobile" },
-  { id: 5, label: "Property access", url: "/__mockup/preview/booking-pages/AccessMobile" },
-  { id: 6, label: "Pick a slot",     url: "/__mockup/preview/booking-slots/SlotsMobile" },
-  { id: 7, label: "Review & pay",    url: "/__mockup/preview/booking-pages/PayMobile" },
+  { id: 2, label: "Your details",    url: "/__mockup/preview/booking-pages/BookerMobile" },
+  { id: 3, label: "Your AC",         url: "/__mockup/preview/booking-pages/AcMobile" },
+  { id: 4, label: "Property access", url: "/__mockup/preview/booking-pages/AccessMobile" },
+  { id: 5, label: "Pick a slot",     url: "/__mockup/preview/booking-slots/SlotsMobile" },
+  { id: 6, label: "Review & pay",    url: "/__mockup/preview/booking-pages/PayMobile" },
 ];
 
 export function BookingFlowMobile() {

@@ -177,7 +177,7 @@ export function AcDesktop() {
 
           <div className="mb-8">
             <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-              Step 4 of 7
+              Step 3 of 6
             </div>
             <h1 className="text-2xl font-semibold text-slate-900">{heading}</h1>
             <p className="mt-2 text-sm text-slate-500">{intro}</p>

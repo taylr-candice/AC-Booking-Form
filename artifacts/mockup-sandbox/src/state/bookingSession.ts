@@ -54,8 +54,8 @@ export type Tenant = {
   phone: string;
 };
 
-/** Step ids in canonical order — Step 6 may be skipped at runtime. */
-export type StepId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/** Step ids in canonical order — Step 5 may be skipped at runtime. */
+export type StepId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type BookingState = {
   /** Wrapper navigation. */
@@ -145,8 +145,20 @@ function readFromStorage(): BookingState {
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return INITIAL_STATE;
-    const parsed = JSON.parse(raw) as Partial<BookingState>;
-    return { ...INITIAL_STATE, ...parsed };
+    const parsed = JSON.parse(raw) as Partial<BookingState> & {
+      current_step?: number;
+    };
+    // Migrate legacy persisted state from the 7-step flow:
+    //  - Old Step 2 (standalone "Your role") → new Step 1 (role lives on Unit page)
+    //  - Old Steps 3..7 shift down by one to new Steps 2..6
+    // Anything outside the new 1..6 range gets clamped to a safe value.
+    const rawStep = parsed.current_step;
+    let step: StepId = 1;
+    if (typeof rawStep === "number") {
+      const migrated = rawStep === 2 ? 1 : rawStep > 2 ? rawStep - 1 : rawStep;
+      if (migrated >= 1 && migrated <= 6) step = migrated as StepId;
+    }
+    return { ...INITIAL_STATE, ...parsed, current_step: step };
   } catch {
     return INITIAL_STATE;
   }
@@ -342,11 +354,11 @@ export const bookingActions = {
         next.service_date = null;
         next.service_slot = null;
       }
-      // If the user is currently sitting on Step 6 (Schedule) and the new
-      // method makes Step 6 hidden, jump forward to Step 7 so the wrapper
+      // If the user is currently sitting on Step 5 (Schedule) and the new
+      // method makes Step 5 hidden, jump forward to Step 6 so the wrapper
       // never lingers on a hidden step.
-      if (isCoordination && next.current_step === 6) {
-        next.current_step = 7;
+      if (isCoordination && next.current_step === 5) {
+        next.current_step = 6;
       }
       return next;
     });
