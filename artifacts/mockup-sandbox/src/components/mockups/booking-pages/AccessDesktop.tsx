@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
-import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isParcelLockerMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -77,7 +77,6 @@ export function AccessDesktop() {
 
                 {note && <InfoBanner title={note.title} body={note.body} />}
                 {isLeaveKeyMethod(access) && <KeyHolderSection />}
-                {isParcelLockerMethod(access) && <ParcelLockerHint />}
                 {isCollectReturnMethod(access) && <CollectReturnSection />}
                 {isManagingAgentMethod(access) && <ManagingAgencySection />}
                 {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
@@ -274,14 +273,6 @@ function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { se
       <div className="text-[14px] font-semibold text-slate-900">{title}</div>
       <div className="text-[12px] text-slate-500">{subtitle}</div>
     </button>
-  );
-}
-
-function ParcelLockerHint() {
-  return (
-    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-      No further details needed here — we'll send the parcel-locker drop code by email before your service window.
-    </div>
   );
 }
 

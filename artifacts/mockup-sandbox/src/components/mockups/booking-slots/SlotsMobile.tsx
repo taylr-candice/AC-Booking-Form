@@ -12,6 +12,11 @@ import {
 
 import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
 import { useBookingSession } from "../../../state/bookingSession";
+import {
+  attendedPartyFor,
+  isBeThereMethod,
+  isUnattendedAccessMethod,
+} from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -73,6 +78,21 @@ export function SlotsMobile() {
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
+  // Slot-picker banner branches on the customer's access method.
+  // See SlotsDesktop for the full rationale — same logic, mobile copy.
+  const accessMethod = session.access_method;
+  const unattended = isUnattendedAccessMethod(accessMethod);
+  const attendedParty = attendedPartyFor(accessMethod);
+  const partyLabel =
+    attendedParty === "key_holder"
+      ? "your key holder"
+      : attendedParty === "tenant"
+        ? "your tenant"
+        : "you";
+  // Subject-verb agreement: "you are" vs "your key holder is" /
+  // "your tenant is". Mirrors SlotsDesktop.
+  const partyVerb = partyLabel === "you" ? "are" : "is";
+  const showChangeAccess = isBeThereMethod(accessMethod);
   // Role-conditional accountability nudge inside the "Not sure" callout.
   // Owners and managing agents have very different burdens when a second
   // visit is needed — owners have to physically open up again, agents
@@ -139,40 +159,55 @@ export function SlotsMobile() {
           </button>
         </div>
 
-        {/* Access-window commitment — prominent, always shown. */}
+        {/* Access-window commitment — prominent, always shown.
+            Copy and the optional "Change access method" nudge branch
+            on the customer's access method (see comments above the
+            `unattended` / `showChangeAccess` derivations). */}
         <div
           className="mb-4 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed"
           style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
           data-testid="banner-access-commitment-mobile"
+          data-access-mode={unattended ? "unattended" : "attended"}
         >
           <div className="flex items-start gap-2">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <span className="font-semibold">Heads up:</span> we can't guarantee an
-              exact arrival or finish time within the window you pick, so please make
-              sure we have access to the unit for the{" "}
-              <span className="font-semibold">entire window</span>.
-              {" "}
-              <span>
-                Don't want to wait around? Pick an access option that doesn't need you on-site —
-                leave a key, use a parcel locker, or coordinate with a tenant.
-              </span>
-            </div>
+            {unattended ? (
+              <div>
+                <span className="font-semibold">You're authorising us</span>{" "}
+                to access the unit during the window you pick to carry out
+                the service — no one needs to be there.
+              </div>
+            ) : (
+              <div>
+                <span className="font-semibold">Heads up:</span> we can't
+                guarantee an exact arrival or finish time within the window
+                you pick, so please make sure{" "}
+                <span className="font-semibold">{partyLabel}</span>{" "}
+                {partyVerb} available for the{" "}
+                <span className="font-semibold">entire window</span>.
+              </div>
+            )}
           </div>
-          {/* Quieter, always-available shortcut — opens Step 4 so the
-              customer can swap to a hands-off access option (parcel
-              locker, leave a key, coordinate with tenant) and not have
-              to be home for the whole window. */}
-          <div className="mt-2 flex justify-end">
-            <button
+          <div className="mt-2 flex justify-end gap-3">
+            {showChangeAccess && (
+              <button
               type="button"
-              data-testid="button-edit-access"
+              data-testid="button-change-access"
               className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80"
               style={{ color: "#9D174D" }}
             >
-              Change access option
+              Change access method
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            data-testid="button-edit-ac"
+            className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80"
+            style={{ color: "#9D174D" }}
+          >
+            Update AC info
+          </button>
+        </div>
         </div>
 
         {/* "Not sure" callout — only when AC step was answered "unsure". */}

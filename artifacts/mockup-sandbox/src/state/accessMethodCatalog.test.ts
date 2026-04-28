@@ -191,8 +191,11 @@ describe("isStep5Valid — leave-key family", () => {
 });
 
 describe("isStep5Valid — parcel-locker family", () => {
-  // Parcel-locker methods need no follow-ups: Taylr emails the drop code
-  // ahead of the service window, so picking the option is enough.
+  // Parcel-locker methods are unattended — the customer authorises Taylr to
+  // retrieve the key, access the unit, and return the key without anyone
+  // present. The signature lives on the access step (so the slot picker
+  // doesn't need its own checkbox), and the gate requires both the
+  // acknowledgement and a typed name before Step 5 is valid.
   const parcelLockerMethods: Array<{
     method: AccessMethod;
     residence: PrimaryResidence;
@@ -203,16 +206,32 @@ describe("isStep5Valid — parcel-locker family", () => {
   ];
 
   for (const { method, residence } of parcelLockerMethods) {
-    it(`${method}: returns true immediately on selection (no follow-ups required)`, () => {
-      expect(
-        isStep5Valid(
-          baseState({
-            role: "owner",
-            primary_residence: residence,
-            access_method: method,
-          }),
-        ),
-      ).toBe(true);
+    const valid = baseState({
+      role: "owner",
+      primary_residence: residence,
+      access_method: method,
+      signature_acknowledged: true,
+      signature_name: "Pat Owner",
+    });
+
+    describe(method, () => {
+      it("accepts when the access-authorisation signature is captured", () => {
+        expect(isStep5Valid(valid)).toBe(true);
+      });
+
+      it("rejects when the acknowledgement checkbox is unchecked", () => {
+        expect(
+          isStep5Valid({ ...valid, signature_acknowledged: false }),
+        ).toBe(false);
+      });
+
+      it("rejects when the typed signature name is empty", () => {
+        expect(isStep5Valid({ ...valid, signature_name: "" })).toBe(false);
+      });
+
+      it("rejects when the typed signature name is whitespace only", () => {
+        expect(isStep5Valid({ ...valid, signature_name: "   " })).toBe(false);
+      });
     });
   }
 });

@@ -82,6 +82,59 @@ export function isParcelLockerMethod(m: AccessMethod | null): boolean {
   );
 }
 
+/** "I'll be there" / on-site owner-or-agent methods — the customer (or
+ *  the booking agent themselves) physically meets the technician at the
+ *  property. These are the only methods that get the "Change access
+ *  method" nudge on the slot picker, since the alternative options
+ *  (parcel locker, collect & return, agency trade key) let them skip
+ *  waiting around for the entire arrival window. */
+export function isBeThereMethod(m: AccessMethod | null): boolean {
+  return (
+    m === "owner_live_at_unit" ||
+    m === "owner_leased_be_there" ||
+    m === "owner_vacant_be_there" ||
+    m === "agent_be_there"
+  );
+}
+
+/** Methods where no one needs to be on-site during the service window —
+ *  the customer authorises Taylr to access the unit unattended. Used by
+ *  the slot picker to swap the "be available for the entire window"
+ *  warning for the lighter "you're authorising us to access the unit"
+ *  framing, and to suppress the "Change access method" nudge for
+ *  customers who already picked a convenient option. */
+export function isUnattendedAccessMethod(m: AccessMethod | null): boolean {
+  return (
+    isParcelLockerMethod(m) ||
+    isCollectReturnMethod(m) ||
+    isAgentTradeMethod(m)
+  );
+}
+
+/** Which party has to be available for the entire arrival window for a
+ *  given attended access method. Drives the slot-picker banner copy so
+ *  the wording always references the right person:
+ *
+ *    - `"self"`        → the customer themselves (be-there options)
+ *    - `"key_holder"`  → the nominated key holder (leave-key options)
+ *    - `"tenant"`      → the tenant (only `agent_tenant_self`, where
+ *                         the agent picks the slot and tells the tenant)
+ *
+ *  Returns `null` for unattended methods (parcel locker, collect &
+ *  return, agency trade key) and for methods that never reach the
+ *  slot picker at all (managing-agent + tenant coordination flows
+ *  skip Step 5). */
+export type AttendedParty = "self" | "key_holder" | "tenant";
+
+export function attendedPartyFor(
+  m: AccessMethod | null,
+): AttendedParty | null {
+  if (isBeThereMethod(m)) return "self";
+  if (isLeaveKeyMethod(m)) return "key_holder";
+  if (m === "agent_tenant_self") return "tenant";
+  return null;
+}
+
 /** Methods that require a tenants list + tenant-contact authorisation. */
 export function isTenantMethod(m: AccessMethod | null): boolean {
   return m === "owner_leased_tenant" || m === "agent_tenant_taylr";
@@ -117,6 +170,8 @@ export const SIG_ACCESS_AUTH = `By signing below I authorise Taylr to collect ou
 
 export const SIG_TENANT = `By signing below I authorise Taylr to contact the tenant(s) listed in this booking under the terms of the Residential Tenancies Act for the purpose of arranging essential maintenance access to the unit. I confirm I have authority (as owner or managing agent) to authorise this contact and that an authorisation letter will be sent to the tenant(s) prior to the technician's visit.`;
 
+export const SIG_PARCEL_LOCKER = `By signing below I authorise Taylr to retrieve the key from the nominated parcel locker, use it to access the unit at the address provided, perform the booked service, and return the key to the parcel locker afterwards. I confirm I am authorised to grant this access and that the unit's occupants (where applicable) have been made aware that essential air-conditioning maintenance access may occur unattended during the booked service window.`;
+
 export type SignatureVariant = {
   title: string;
   body: string;
@@ -133,6 +188,10 @@ export function signatureVariantFor(
     case "owner_leased_tenant":
     case "agent_tenant_taylr":
       return { title: "Tenant-contact authorisation", body: SIG_TENANT };
+    case "owner_live_parcel_locker":
+    case "owner_leased_parcel_locker":
+    case "owner_vacant_parcel_locker":
+      return { title: "Parcel-locker access authorisation", body: SIG_PARCEL_LOCKER };
     default:
       return null;
   }
@@ -243,8 +302,11 @@ export function isStep5Valid(s: BookingState): boolean {
   }
 
   if (isParcelLockerMethod(s.access_method)) {
-    // No required follow-ups — the drop code is provided by Taylr ahead of time.
-    return true;
+    // Parcel-locker methods are unattended — the customer authorises Taylr
+    // to retrieve the key, access the unit, and return the key. The
+    // signature lives on the access step so the slot picker doesn't need
+    // to add a separate checkbox down the line.
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
   }
 
   if (isCollectReturnMethod(s.access_method)) {

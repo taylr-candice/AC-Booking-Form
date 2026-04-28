@@ -28,7 +28,6 @@ import {
   isCollectReturnMethod,
   isLeaveKeyMethod,
   isManagingAgentMethod,
-  isParcelLockerMethod,
   isStep5Valid,
   isTenantMethod,
   signatureVariantFor,
@@ -128,7 +127,6 @@ export function AccessMobile() {
             {note && <InfoBanner title={note.title} body={note.body} />}
 
             {isLeaveKeyMethod(access) && <KeyHolderSection />}
-            {isParcelLockerMethod(access) && <ParcelLockerHint />}
             {isCollectReturnMethod(access) && <CollectReturnSection />}
             {isManagingAgentMethod(access) && <ManagingAgencySection />}
             {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
@@ -434,15 +432,6 @@ function CoordinationChoiceCard({
         </span>
       </span>
     </button>
-  );
-}
-
-function ParcelLockerHint() {
-  return (
-    <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[12.5px] text-slate-600">
-      No further details needed here — we'll send the parcel-locker drop code
-      by email before your service window.
-    </div>
   );
 }
 
