@@ -9,8 +9,6 @@ import {
 import {
   nextStepId,
   prevStepId,
-  totalSteps,
-  visibleIndex,
   visibleSteps,
 } from "../../../state/bookingDerived";
 
@@ -49,8 +47,6 @@ export function BookingFlowMobile() {
   const active = useBookingSelector((s) => s.current_step);
   const accessMethod = useBookingSelector((s) => s.access_method);
   const visible = visibleSteps({ access_method: accessMethod });
-  const total = totalSteps({ access_method: accessMethod });
-  const position = visibleIndex({ access_method: accessMethod }, active);
 
   const current = STEPS.find((s) => s.id === active) ?? STEPS[0];
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -96,12 +92,8 @@ export function BookingFlowMobile() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Inter']">
       {/* Top step bar */}
-      <div className="border-b border-slate-200 bg-white px-4 pb-3 pt-4">
-        <div className="text-center text-[12px] font-medium text-slate-500">
-          Step <span className="font-semibold text-slate-900">{position}</span> of {total}
-        </div>
-
-        <div className="mt-2.5 flex items-center">
+      <div className="border-b border-slate-200 bg-white px-4 py-3">
+        <div className="flex items-center">
           {visible.map((stepId, idx) => {
             const isActive = stepId === active;
             const activePos = visible.indexOf(active);
