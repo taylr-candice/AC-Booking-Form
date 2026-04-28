@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  Sunrise,
   Sun,
-  Moon,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
@@ -338,7 +338,7 @@ export function SlotsDesktop() {
                   key={`${d.date}-am`}
                   slot={d.morning}
                   jobMinutes={jobMinutes}
-                  icon={<Sun className="h-4 w-4" />}
+                  icon={<Sunrise className="h-4 w-4" />}
                   label="Morning"
                   hint="8am – 12pm"
                   selected={selected === d.morning.id}
@@ -350,7 +350,7 @@ export function SlotsDesktop() {
                   key={`${d.date}-pm`}
                   slot={d.afternoon}
                   jobMinutes={jobMinutes}
-                  icon={<Moon className="h-4 w-4" />}
+                  icon={<Sun className="h-4 w-4" />}
                   label="Afternoon"
                   hint="12pm – 5pm"
                   selected={selected === d.afternoon.id}

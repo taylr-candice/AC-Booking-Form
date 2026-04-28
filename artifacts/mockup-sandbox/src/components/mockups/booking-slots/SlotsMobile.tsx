@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Sunrise,
   Sun,
-  Moon,
   Pencil,
   CheckCircle2,
   Info,
@@ -306,7 +306,7 @@ function DayBlock({
         <SlotCard
           slot={day.morning}
           jobMinutes={jobMinutes}
-          icon={<Sun className="h-4 w-4" />}
+          icon={<Sunrise className="h-4 w-4" />}
           label="Morning"
           hint="8am – 12pm"
           selected={selected === day.morning.id}
@@ -315,7 +315,7 @@ function DayBlock({
         <SlotCard
           slot={day.afternoon}
           jobMinutes={jobMinutes}
-          icon={<Moon className="h-4 w-4" />}
+          icon={<Sun className="h-4 w-4" />}
           label="Afternoon"
           hint="12pm – 5pm"
           selected={selected === day.afternoon.id}
