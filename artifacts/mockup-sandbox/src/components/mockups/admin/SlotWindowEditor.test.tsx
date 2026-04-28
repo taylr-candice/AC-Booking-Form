@@ -27,7 +27,7 @@
  * banner to appear).
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 
@@ -474,13 +474,210 @@ describe("SlotWindowEditor — footer 'Reset usage' button", () => {
       fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
     });
 
-    // After confirming, usage is zero and the trigger stays disabled
-    // because there's nothing left to reset.
+    // After confirming, usage is zero. The footer now shows the
+    // "Undo" affordance instead of the disabled "Reset usage" button.
     expect(readBookedMinutes()).toBe(0);
     expect(readBookedCount()).toBe(0);
-    expect(
-      (screen.getByRole("button", { name: /^reset usage$/i }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
+    expect(screen.queryByRole("button", { name: /^reset usage$/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /^undo$/i })).toBeTruthy();
+  });
+});
+
+// ─── Task #54: post-reset Undo affordance ──────────────────────────────────
+
+describe("SlotWindowEditor — post-reset Undo affordance", () => {
+  it("shows the Undo affordance after the footer 'Reset usage' is confirmed", () => {
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          bookedMinutes: 120,
+          bookedCount: 3,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+
+    // Reset has happened.
+    expect(readBookedMinutes()).toBe(0);
+    expect(readBookedCount()).toBe(0);
+    // Footer swap: "Reset usage" is replaced by the Undo link.
+    expect(screen.queryByRole("button", { name: /^reset usage$/i })).toBeNull();
+    expect(screen.getByText(/usage reset\./i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^undo$/i })).toBeTruthy();
+  });
+
+  it("clicking Undo restores the exact pre-reset bookedMinutes and bookedCount", () => {
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          bookedMinutes: 135,
+          bookedCount: 2,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+    expect(readBookedMinutes()).toBe(0);
+    expect(readBookedCount()).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /^undo$/i }));
+
+    // Pre-reset values restored exactly.
+    expect(readBookedMinutes()).toBe(135);
+    expect(readBookedCount()).toBe(2);
+    // The Undo affordance is gone; the footer trigger is back to
+    // "Reset usage" (and enabled, since usage is non-zero again).
+    expect(screen.queryByRole("button", { name: /^undo$/i })).toBeNull();
+    const trigger = screen.getByRole("button", { name: /^reset usage$/i });
+    expect((trigger as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("clicking Undo also restores values after the contextual reset zeros only one track", () => {
+    // Start in time-based with both tracks non-zero; flip to
+    // count-based so the contextual reset prompt appears, then confirm
+    // it. The contextual reset only zeros bookedCount but the snapshot
+    // captures BOTH fields, so Undo restores both unchanged.
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          bookedMinutes: 90,
+          bookedCount: 2,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /count-based/i }));
+    fireEvent.click(screen.getByRole("button", { name: /reset count to 0/i }));
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+    expect(readBookedCount()).toBe(0);
+    expect(readBookedMinutes()).toBe(90);
+
+    // Undo affordance shows in the footer.
+    fireEvent.click(screen.getByRole("button", { name: /^undo$/i }));
+
+    // Both fields are exactly what they were before the reset.
+    expect(readBookedMinutes()).toBe(90);
+    expect(readBookedCount()).toBe(2);
+  });
+
+  it("auto-dismisses the Undo affordance after ~7 seconds", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <Harness
+          initialMorning={makeSlot("morning", {
+            mode: "time_based",
+            bookedMinutes: 60,
+            bookedCount: 1,
+          })}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+      expect(screen.getByRole("button", { name: /^undo$/i })).toBeTruthy();
+
+      // Just before the timeout — still visible.
+      act(() => {
+        vi.advanceTimersByTime(6_999);
+      });
+      expect(screen.getByRole("button", { name: /^undo$/i })).toBeTruthy();
+
+      // Past the timeout — Undo is gone, "Reset usage" trigger is back
+      // (and disabled because both tracks are still 0).
+      act(() => {
+        vi.advanceTimersByTime(2);
+      });
+      expect(screen.queryByRole("button", { name: /^undo$/i })).toBeNull();
+      const trigger = screen.getByRole("button", { name: /^reset usage$/i });
+      expect((trigger as HTMLButtonElement).disabled).toBe(true);
+      // Values stay at zero — the auto-dismiss must NOT auto-restore.
+      expect(readBookedMinutes()).toBe(0);
+      expect(readBookedCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("dismisses Undo when the admin makes any other edit (mode toggle)", () => {
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          bookedMinutes: 90,
+          bookedCount: 2,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+    expect(screen.getByRole("button", { name: /^undo$/i })).toBeTruthy();
+
+    // Any other patch — here, switching mode — wipes the snapshot.
+    fireEvent.click(screen.getByRole("button", { name: /count-based/i }));
+
+    expect(screen.queryByRole("button", { name: /^undo$/i })).toBeNull();
+    // And of course the values stay at zero — the dismiss is silent.
+    expect(readBookedMinutes()).toBe(0);
+    expect(readBookedCount()).toBe(0);
+  });
+
+  it("dismisses Undo when the admin edits the window length slider", () => {
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          windowMinutes: 240,
+          bookedMinutes: 90,
+          bookedCount: 1,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+    expect(screen.getByRole("button", { name: /^undo$/i })).toBeTruthy();
+
+    // Drag the window-length slider — the only `range` input in the
+    // editor while in time-based mode.
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    fireEvent.change(slider, { target: { value: "180" } });
+
+    expect(screen.queryByRole("button", { name: /^undo$/i })).toBeNull();
+  });
+
+  it("a fresh reset after Undo offers a fresh Undo affordance", () => {
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          bookedMinutes: 120,
+          bookedCount: 3,
+        })}
+      />,
+    );
+
+    // Reset → Undo → values restored.
+    fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^undo$/i }));
+    expect(readBookedMinutes()).toBe(120);
+    expect(readBookedCount()).toBe(3);
+
+    // Reset again → fresh Undo appears with the same restorable values.
+    fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+    expect(screen.getByRole("button", { name: /^undo$/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^undo$/i }));
+    expect(readBookedMinutes()).toBe(120);
+    expect(readBookedCount()).toBe(3);
   });
 });

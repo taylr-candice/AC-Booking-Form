@@ -9,7 +9,7 @@
  */
 
 import { TriangleAlert, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { AdminCalendarDay, AdminSlot } from "@/state/adminMockData";
 import { formatDurationMinutes } from "@/state/bookingDerived";
@@ -41,6 +41,26 @@ export function SlotWindowEditor({
   // confirms) we fall back to the normal button view.
   const [confirmingResetAll, setConfirmingResetAll] = useState(false);
   const [confirmingResetActive, setConfirmingResetActive] = useState(false);
+  // Short-lived snapshot of the pre-reset `{ bookedMinutes, bookedCount }`
+  // pair. While this is non-null, the footer surfaces an inline "Undo"
+  // affordance so the admin can recover from an over-eager reset without
+  // typing the values back in by hand. Cleared automatically after a
+  // timeout (see effect below), when the editor unmounts (state goes
+  // away with the component), or when the admin makes any other edit
+  // to this window (see `patchAndDismissUndo`).
+  const [undoSnapshot, setUndoSnapshot] = useState<
+    { bookedMinutes: number; bookedCount: number } | null
+  >(null);
+
+  // Auto-dismiss the undo affordance ~7s after a reset is confirmed.
+  // Re-runs whenever `undoSnapshot` flips from null → snapshot, so a
+  // fresh reset always gets a fresh window.
+  useEffect(() => {
+    if (!undoSnapshot) return;
+    const timer = setTimeout(() => setUndoSnapshot(null), 7000);
+    return () => clearTimeout(timer);
+  }, [undoSnapshot]);
+
   if (!day) return null;
   const slot = day[win];
 
@@ -50,14 +70,22 @@ export function SlotWindowEditor({
   const showSwitchResetPrompt = modeJustChanged && nowActiveValueIsNonZero;
   const usageIsNonZero = slot.bookedMinutes > 0 || slot.bookedCount > 0;
 
+  /** Forwards a patch to the parent and, as a side effect, dismisses
+   *  any pending "Undo" affordance — the admin has moved on to another
+   *  edit, so the snapshot is no longer relevant. */
+  function patchAndDismissUndo(patch: Partial<AdminSlot>) {
+    if (undoSnapshot) setUndoSnapshot(null);
+    onPatch(patch);
+  }
+
   function setMode(nextMode: "time_based" | "count_based") {
     if (nextMode === slot.mode) return;
-    onPatch({ mode: nextMode });
+    patchAndDismissUndo({ mode: nextMode });
   }
 
   function setWindowMinutes(next: number) {
     const clamped = Math.max(60, Math.min(540, next));
-    onPatch({
+    patchAndDismissUndo({
       windowMinutes: clamped,
       bookedMinutes: Math.min(slot.bookedMinutes, clamped),
     });
@@ -65,7 +93,7 @@ export function SlotWindowEditor({
 
   function setSlotCount(next: number) {
     const clamped = Math.max(1, Math.min(20, Math.round(next)));
-    onPatch({
+    patchAndDismissUndo({
       slotCount: clamped,
       bookedCount: Math.min(slot.bookedCount, clamped),
     });
@@ -75,6 +103,10 @@ export function SlotWindowEditor({
    *  reset prompt that appears after the admin flips modes — typically
    *  to discard the value inferred from the previous mode. */
   function resetActiveTrack() {
+    setUndoSnapshot({
+      bookedMinutes: slot.bookedMinutes,
+      bookedCount: slot.bookedCount,
+    });
     if (slot.mode === "count_based") {
       onPatch({ bookedCount: 0 });
     } else {
@@ -86,8 +118,25 @@ export function SlotWindowEditor({
   /** Zeros both the minute count and the slot count, so the window is
    *  reported as completely empty regardless of which mode it's in. */
   function resetAllUsage() {
+    setUndoSnapshot({
+      bookedMinutes: slot.bookedMinutes,
+      bookedCount: slot.bookedCount,
+    });
     onPatch({ bookedMinutes: 0, bookedCount: 0 });
     setConfirmingResetAll(false);
+  }
+
+  /** Restores the pre-reset usage values from the snapshot and clears
+   *  the undo affordance. Calls `onPatch` directly (not the dismissing
+   *  wrapper) so the restore itself doesn't immediately wipe the
+   *  snapshot it's reading from. */
+  function undoReset() {
+    if (!undoSnapshot) return;
+    onPatch({
+      bookedMinutes: undoSnapshot.bookedMinutes,
+      bookedCount: undoSnapshot.bookedCount,
+    });
+    setUndoSnapshot(null);
   }
 
   return (
@@ -283,14 +332,27 @@ export function SlotWindowEditor({
         )}
 
         <div className="mt-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setConfirmingResetAll(true)}
-            disabled={!usageIsNonZero || confirmingResetAll}
-            className="text-[12px] font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
-          >
-            Reset usage
-          </button>
+          {undoSnapshot ? (
+            <div className="flex items-center gap-2 text-[12px] text-slate-600">
+              <span>Usage reset.</span>
+              <button
+                type="button"
+                onClick={undoReset}
+                className="font-semibold text-slate-900 underline underline-offset-2 hover:text-slate-700"
+              >
+                Undo
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingResetAll(true)}
+              disabled={!usageIsNonZero || confirmingResetAll}
+              className="text-[12px] font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
+            >
+              Reset usage
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
