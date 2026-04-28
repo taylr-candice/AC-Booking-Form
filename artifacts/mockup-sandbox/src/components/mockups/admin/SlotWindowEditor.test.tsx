@@ -2,17 +2,22 @@
 
 /**
  * Component-level regression tests for the admin `SlotWindowEditor`
- * reset controls added in Task #35:
+ * reset controls added in Task #35 and the two-step confirmation
+ * added in Task #44:
  *
  *  1. The contextual "Reset minutes/count to 0" prompt only appears
  *     after the admin flips modes during the editor session, and the
  *     prompt copy reflects the now-active mode.
- *  2. Clicking that contextual button zeros only the now-active track
- *     (`bookedMinutes` for time-based, `bookedCount` for count-based).
- *  3. The footer "Reset usage" button zeros BOTH `bookedMinutes` and
- *     `bookedCount` — regardless of which mode is active.
+ *  2. Clicking that contextual button surfaces a confirmation widget
+ *     and only zeros the now-active track (`bookedMinutes` for
+ *     time-based, `bookedCount` for count-based) once "Yes, reset" is
+ *     clicked. "Cancel" leaves the value untouched.
+ *  3. The footer "Reset usage" button surfaces a confirmation panel
+ *     and only zeros BOTH `bookedMinutes` and `bookedCount` — once
+ *     the admin confirms.
  *  4. The footer "Reset usage" button is disabled when both
- *     `bookedMinutes` and `bookedCount` are already zero.
+ *     `bookedMinutes` and `bookedCount` are already zero, and while
+ *     the confirmation panel is open.
  *
  * The editor is a controlled-style component: its parent owns the
  * calendar state and feeds patches back in via `onPatch`. We mirror
@@ -240,7 +245,7 @@ describe("SlotWindowEditor — contextual mode-switch reset prompt", () => {
 });
 
 describe("SlotWindowEditor — contextual reset zeros only the now-active track", () => {
-  it("zeros bookedCount but leaves bookedMinutes alone after switching to count-based", () => {
+  it("zeros bookedCount but leaves bookedMinutes alone after switching to count-based (with confirmation)", () => {
     render(
       <Harness
         initialMorning={makeSlot("morning", {
@@ -255,7 +260,14 @@ describe("SlotWindowEditor — contextual reset zeros only the now-active track"
     expect(readMode()).toBe("count_based");
     expect(readBookedCount()).toBe(2);
 
+    // First click only opens the confirmation widget — the value must
+    // not yet be zeroed.
     fireEvent.click(screen.getByRole("button", { name: /reset count to 0/i }));
+    expect(readBookedCount()).toBe(2);
+    expect(screen.getByText(/reset count to 0\?/i)).toBeTruthy();
+
+    // Confirm.
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
 
     expect(readBookedCount()).toBe(0);
     // bookedMinutes was preserved (unaffected by the contextual reset).
@@ -264,7 +276,7 @@ describe("SlotWindowEditor — contextual reset zeros only the now-active track"
     expect(screen.queryByText(/just switched to/i)).toBeNull();
   });
 
-  it("zeros bookedMinutes but leaves bookedCount alone after switching to time-based", () => {
+  it("zeros bookedMinutes but leaves bookedCount alone after switching to time-based (with confirmation)", () => {
     render(
       <Harness
         initialMorning={makeSlot("morning", {
@@ -280,16 +292,44 @@ describe("SlotWindowEditor — contextual reset zeros only the now-active track"
     expect(readBookedMinutes()).toBe(60);
 
     fireEvent.click(screen.getByRole("button", { name: /reset minutes to 0/i }));
+    expect(readBookedMinutes()).toBe(60);
+    expect(screen.getByText(/reset minutes to 0\?/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
 
     expect(readBookedMinutes()).toBe(0);
     // bookedCount was preserved (unaffected by the contextual reset).
     expect(readBookedCount()).toBe(3);
     expect(screen.queryByText(/just switched to/i)).toBeNull();
   });
+
+  it("Cancel in the contextual reset confirmation leaves the value untouched", () => {
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          bookedMinutes: 90,
+          bookedCount: 2,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /count-based/i }));
+    fireEvent.click(screen.getByRole("button", { name: /reset count to 0/i }));
+    expect(readBookedCount()).toBe(2);
+
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    // Value unchanged; the original "Reset count to 0" button is back.
+    expect(readBookedCount()).toBe(2);
+    expect(
+      screen.getByRole("button", { name: /reset count to 0/i }),
+    ).toBeTruthy();
+  });
 });
 
 describe("SlotWindowEditor — footer 'Reset usage' button", () => {
-  it("zeros BOTH bookedMinutes and bookedCount when clicked (time-based)", () => {
+  it("zeros BOTH bookedMinutes and bookedCount once confirmed (time-based)", () => {
     render(
       <Harness
         initialMorning={makeSlot("morning", {
@@ -303,13 +343,19 @@ describe("SlotWindowEditor — footer 'Reset usage' button", () => {
     const resetUsage = screen.getByRole("button", { name: /^reset usage$/i });
     expect((resetUsage as HTMLButtonElement).disabled).toBe(false);
 
+    // First click only opens the confirmation panel.
     fireEvent.click(resetUsage);
+    expect(readBookedMinutes()).toBe(120);
+    expect(readBookedCount()).toBe(3);
+    expect(screen.getByText(/reset usage for this window\?/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
 
     expect(readBookedMinutes()).toBe(0);
     expect(readBookedCount()).toBe(0);
   });
 
-  it("zeros BOTH bookedMinutes and bookedCount when clicked (count-based)", () => {
+  it("zeros BOTH bookedMinutes and bookedCount once confirmed (count-based)", () => {
     render(
       <Harness
         initialMorning={makeSlot("morning", {
@@ -324,9 +370,39 @@ describe("SlotWindowEditor — footer 'Reset usage' button", () => {
     expect((resetUsage as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(resetUsage);
+    expect(readBookedMinutes()).toBe(75);
+    expect(readBookedCount()).toBe(4);
+
+    fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
 
     expect(readBookedMinutes()).toBe(0);
     expect(readBookedCount()).toBe(0);
+  });
+
+  it("Cancel in the footer confirmation leaves both tracks untouched", () => {
+    render(
+      <Harness
+        initialMorning={makeSlot("morning", {
+          mode: "time_based",
+          bookedMinutes: 120,
+          bookedCount: 3,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^reset usage$/i }));
+    expect(screen.getByText(/reset usage for this window\?/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(readBookedMinutes()).toBe(120);
+    expect(readBookedCount()).toBe(3);
+    expect(screen.queryByText(/reset usage for this window\?/i)).toBeNull();
+    // The trigger button is enabled again now that the panel is closed.
+    expect(
+      (screen.getByRole("button", { name: /^reset usage$/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   });
 
   it("is disabled when both bookedMinutes AND bookedCount are already 0", () => {
@@ -371,7 +447,7 @@ describe("SlotWindowEditor — footer 'Reset usage' button", () => {
     expect((resetUsage as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("becomes disabled after a successful reset", () => {
+  it("becomes disabled after a successful reset (post-confirmation)", () => {
     render(
       <Harness
         initialMorning={makeSlot("morning", {
@@ -386,6 +462,22 @@ describe("SlotWindowEditor — footer 'Reset usage' button", () => {
     act(() => {
       fireEvent.click(resetUsage);
     });
+    // Now in confirmation: trigger remains disabled while the panel
+    // is open, and the values have not changed yet.
+    expect(
+      (screen.getByRole("button", { name: /^reset usage$/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(readBookedMinutes()).toBe(60);
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /yes, reset/i }));
+    });
+
+    // After confirming, usage is zero and the trigger stays disabled
+    // because there's nothing left to reset.
+    expect(readBookedMinutes()).toBe(0);
+    expect(readBookedCount()).toBe(0);
     expect(
       (screen.getByRole("button", { name: /^reset usage$/i }) as HTMLButtonElement)
         .disabled,

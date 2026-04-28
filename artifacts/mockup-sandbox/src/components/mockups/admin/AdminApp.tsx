@@ -1102,6 +1102,11 @@ export function SlotWindowEditor({
   // Hooks must run unconditionally before any early return.
   const initialMode = day ? day[win].mode : "time_based";
   const [sessionStartMode] = useState<"time_based" | "count_based">(initialMode);
+  // Two-step confirmation state for the destructive reset actions. We keep
+  // these as local UI state — once the prompt is dismissed (or the user
+  // confirms) we fall back to the normal button view.
+  const [confirmingResetAll, setConfirmingResetAll] = useState(false);
+  const [confirmingResetActive, setConfirmingResetActive] = useState(false);
   if (!day) return null;
   const slot = day[win];
 
@@ -1141,12 +1146,14 @@ export function SlotWindowEditor({
     } else {
       onPatch({ bookedMinutes: 0 });
     }
+    setConfirmingResetActive(false);
   }
 
   /** Zeros both the minute count and the slot count, so the window is
    *  reported as completely empty regardless of which mode it's in. */
   function resetAllUsage() {
     onPatch({ bookedMinutes: 0, bookedCount: 0 });
+    setConfirmingResetAll(false);
   }
 
   return (
@@ -1204,13 +1211,44 @@ export function SlotWindowEditor({
                     ? `The count of ${slot.bookedCount} booked was inferred from the previous mode.`
                     : `The ${formatDurationMinutes(slot.bookedMinutes)} booked was inferred from the previous mode.`}
                 </div>
-                <button
-                  type="button"
-                  onClick={resetActiveTrack}
-                  className="mt-1.5 rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100"
-                >
-                  Reset {slot.mode === "count_based" ? "count" : "minutes"} to 0
-                </button>
+                {confirmingResetActive ? (
+                  <div className="mt-1.5 rounded-md bg-white p-2 ring-1 ring-amber-300">
+                    <div className="font-semibold">
+                      Reset {slot.mode === "count_based" ? "count" : "minutes"} to 0?
+                    </div>
+                    <div className="mt-0.5 text-[11px]">
+                      This will zero the{" "}
+                      {slot.mode === "count_based"
+                        ? `${slot.bookedCount} booked slot${slot.bookedCount === 1 ? "" : "s"}`
+                        : `${formatDurationMinutes(slot.bookedMinutes)} booked`}
+                      .
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={resetActiveTrack}
+                        className="rounded-md bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700"
+                      >
+                        Yes, reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingResetActive(false)}
+                        className="rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingResetActive(true)}
+                    className="mt-1.5 rounded-md bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100"
+                  >
+                    Reset {slot.mode === "count_based" ? "count" : "minutes"} to 0
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1279,11 +1317,42 @@ export function SlotWindowEditor({
           </div>
         )}
 
+        {confirmingResetAll && (
+          <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[12px] text-rose-900">
+            <div className="font-semibold">Reset usage for this window?</div>
+            <div className="mt-1">
+              This will zero{" "}
+              <strong>{formatDurationMinutes(slot.bookedMinutes)}</strong>{" "}
+              booked and{" "}
+              <strong>
+                {slot.bookedCount} booked slot{slot.bookedCount === 1 ? "" : "s"}
+              </strong>
+              .
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={resetAllUsage}
+                className="rounded-md bg-rose-600 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-rose-700"
+              >
+                Yes, reset
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingResetAll(false)}
+                className="rounded-md bg-white px-3 py-1.5 text-[12px] font-semibold text-rose-900 ring-1 ring-rose-300 hover:bg-rose-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 flex items-center justify-between">
           <button
             type="button"
-            onClick={resetAllUsage}
-            disabled={!usageIsNonZero}
+            onClick={() => setConfirmingResetAll(true)}
+            disabled={!usageIsNonZero || confirmingResetAll}
             className="text-[12px] font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
           >
             Reset usage
