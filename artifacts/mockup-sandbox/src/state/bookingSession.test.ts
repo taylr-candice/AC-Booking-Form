@@ -586,5 +586,47 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       expect(s.agency_id).toBeNull();
       expect(s.agency_other_name).toBe("");
     });
+
+    it("bookAnother carries agency_other_name forward when the retained agency is still 'Other'", () => {
+      bookingActions.setRole("agent");
+      bookingActions.setAgency("agency-005");
+      bookingActions.setAgencyOtherName("Westside Property Co.");
+      bookingActions.setContact({
+        contact_first_name: "Sam",
+        contact_last_name: "Lee",
+        contact_email: "sam@example.com",
+        contact_phone: "+15551234567",
+      });
+
+      bookingActions.bookAnother();
+
+      const s = getBookingSession();
+      // Identity-level fields preserved.
+      expect(s.role).toBe("agent");
+      expect(s.agency_id).toBe("agency-005");
+      // The typed company name comes with us — it's the same agency.
+      expect(s.agency_other_name).toBe("Westside Property Co.");
+      // And we land back on Step 1.
+      expect(s.current_step).toBe(1);
+    });
+
+    it("bookAnother drops agency_other_name when the retained agency is a listed one", () => {
+      // Simulate a prior session where the user originally typed an "Other"
+      // value and then switched to a listed agency. setAgency already wipes
+      // agency_other_name in that flow, but we double-check the bookAnother
+      // path: even if somehow agency_other_name still held a stale value,
+      // it must not survive into a new booking against a real agency.
+      bookingActions.setRole("agent");
+      bookingActions.setAgency("agency-001");
+      // Force a stale value in only via the dedicated setter (so we exercise
+      // bookAnother's defensive branch, not setAgency's clearing branch).
+      bookingActions.setAgencyOtherName("Stale Co.");
+
+      bookingActions.bookAnother();
+
+      const s = getBookingSession();
+      expect(s.agency_id).toBe("agency-001");
+      expect(s.agency_other_name).toBe("");
+    });
   });
 });

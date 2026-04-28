@@ -450,6 +450,11 @@ export const bookingActions = {
       ...INITIAL_STATE,
       role: s.role,
       agency_id: s.agency_id,
+      // Carry the free-text company name forward IFF the retained agency
+      // is still "Other / not listed" — otherwise it would point at a
+      // different (real) agency from the previous booking.
+      agency_other_name:
+        s.agency_id === OTHER_AGENCY_ID_INTERNAL ? s.agency_other_name : "",
       contact_first_name: s.contact_first_name,
       contact_last_name: s.contact_last_name,
       contact_email: s.contact_email,
