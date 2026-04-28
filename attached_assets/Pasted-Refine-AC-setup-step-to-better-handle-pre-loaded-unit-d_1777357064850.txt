@@ -1,0 +1,121 @@
+Refine AC setup step to better handle pre-loaded unit data vs user input.
+
+Do NOT redesign layout — adjust behaviour, states, and interaction logic.
+
+--------------------------------------------------
+1. LOCK PRE-LOADED DATA (DEFAULT STATE)
+--------------------------------------------------
+
+If AC data exists for the unit:
+
+- Display the pre-loaded configuration clearly (read-only)
+- Disable all increment/decrement controls (systems, extras)
+- Do NOT allow users to freely adjust values
+
+Example display:
+
+System type: Ducted  
+Number of systems: 2  
+Includes: 2 outdoor units + 2 indoor units / return air grilles  
+Extra filters: 1  
+
+- Show service estimate as the primary “Service cost”
+
+--------------------------------------------------
+2. REMOVE UNNECESSARY EXPLANATIONS (PRE-LOADED STATE)
+--------------------------------------------------
+
+When data is pre-loaded:
+
+- Do NOT show instructional text
+- Do NOT show “how to count” explanations
+- Do NOT show “see example” links inline
+
+Keep the UI simple and confirmatory:
+→ “This is what we have on file for your unit”
+
+--------------------------------------------------
+3. ADD “DISAGREE / UPDATE” ENTRY POINT
+--------------------------------------------------
+
+Provide a clear action:
+
+Button/link:
+“This doesn’t look right”
+
+When clicked:
+
+- Unlock the UI
+- Transition user into full configuration flow
+- Allow editing of:
+  - system type
+  - number of systems
+  - extras
+
+--------------------------------------------------
+4. FULL CONFIGURATION FLOW (ONLY WHEN UNLOCKED OR NO DATA)
+--------------------------------------------------
+
+If:
+- user clicks “This doesn’t look right”
+OR
+- no AC data exists for the unit
+
+Then:
+
+- Enable all controls
+- Show full explanations
+- Show helper text and guidance
+- Show “See example” content (via info icon, see below)
+
+--------------------------------------------------
+5. USE (i) ICON FOR EXPLANATIONS (ALL STATES)
+--------------------------------------------------
+
+Replace “See example” links with an (i) info icon.
+
+Placement:
+- Next to “Extra indoor units” / “Extra filters” headings
+
+Behaviour:
+- On click/hover → open modal with:
+  - images
+  - explanation of what counts
+
+This applies in ALL states:
+- pre-loaded (read-only)
+- unlocked/editing
+- no data
+
+--------------------------------------------------
+6. KEEP INFO AVAILABLE IN PRE-LOADED STATE
+--------------------------------------------------
+
+Even when values are locked:
+
+- Users can still access explanations via (i) icon
+- Do NOT clutter UI with visible text
+- Only show on demand
+
+--------------------------------------------------
+7. SERVICE COST DISPLAY
+--------------------------------------------------
+
+When pre-loaded:
+
+- Emphasise service estimate as “Service cost”
+- Reflect:
+  - number of systems
+  - extras already included
+
+No need to show calculation breakdown unless user expands or edits
+
+--------------------------------------------------
+MAIN GOAL
+--------------------------------------------------
+
+- Treat pre-loaded data as the default “confirmed” state
+- Prevent unnecessary edits unless user explicitly disagrees
+- Reduce cognitive load by hiding explanations unless needed
+- Provide a clear path to override when required
+- Keep explanations accessible but not intrusive
