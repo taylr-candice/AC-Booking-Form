@@ -48,6 +48,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { bookingActions } from "@/state/bookingSession";
 
 const BRAND = "#ED017F";
 const SYSTEM_PRICE = 179;
@@ -382,11 +383,33 @@ export function BookingForm() {
     }));
   };
 
-  const reset = () => setS({ ...initialState });
+  // Spec §12: "Book another" keeps the booker's identity-level fields
+  // (role, agency, name/email/mobile) and wipes everything else so the
+  // user lands back on Step 1 ready to pick a fresh unit. Mirrors the
+  // contract enforced by `bookingActions.bookAnother` in the shared
+  // booking session store — we call the store action too so any other
+  // surface subscribing to the session sees the same reset.
+  const bookAnother = () => {
+    bookingActions.bookAnother();
+    setS((prev) => ({
+      ...initialState,
+      role: prev.role,
+      agencyId: prev.agencyId,
+      booker: { ...prev.booker },
+    }));
+  };
 
   // Terminal screens take over the whole page
   if (s.terminal) {
-    return <Terminal state={s} onRetry={() => setS((p) => ({ ...p, terminal: null }))} onReset={reset} unit={unit} slot={slot} />;
+    return (
+      <Terminal
+        state={s}
+        onRetry={() => setS((p) => ({ ...p, terminal: null }))}
+        onBookAnother={bookAnother}
+        unit={unit}
+        slot={slot}
+      />
+    );
   }
 
   return (
@@ -1456,8 +1479,8 @@ function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 /* ---------- Terminal screens ---------- */
 function Terminal({
-  state, onRetry, onReset, unit, slot,
-}: { state: State; onRetry: () => void; onReset: () => void; unit: Unit | null; slot: Slot | null }) {
+  state, onRetry, onBookAnother, unit, slot,
+}: { state: State; onRetry: () => void; onBookAnother: () => void; unit: Unit | null; slot: Slot | null }) {
   if (state.terminal === "cancelled") {
     return (
       <TerminalShell
@@ -1481,7 +1504,7 @@ function Terminal({
           </>
         }
         reference={state.reference}
-        primary={<Button variant="outline" onClick={onReset} data-testid="button-new-booking">Make another booking</Button>}
+        primary={<Button variant="outline" onClick={onBookAnother} data-testid="button-book-another">Book another</Button>}
       />
     );
   }
@@ -1499,7 +1522,7 @@ function Terminal({
         </>
       }
       reference={state.reference}
-      primary={<Button variant="outline" onClick={onReset} data-testid="button-new-booking-coord">Make another booking</Button>}
+      primary={<Button variant="outline" onClick={onBookAnother} data-testid="button-book-another-coord">Book another</Button>}
     />
   );
 }
