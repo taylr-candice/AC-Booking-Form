@@ -6,13 +6,11 @@ import {
   Moon,
   Pencil,
   CheckCircle2,
-  Clock,
+  Info,
+  AlertTriangle,
 } from "lucide-react";
 
-import {
-  formatDurationMinutes,
-  getBookingDurationMinutes,
-} from "../../../state/bookingDerived";
+import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { useBookingSession } from "../../../state/bookingSession";
 
 const BRAND = "#ED017F";
@@ -38,7 +36,8 @@ type Day = {
 
 /** Seed data: a believable mix — empty, partly full, nearly full, full —
  *  so the time-budget concept reads at a glance without the user needing
- *  to play with multiple test bookings. */
+ *  to play with multiple test bookings. The customer never sees the
+ *  minute counts; they just see which windows are still selectable. */
 const DAYS: Day[] = [
   { date: "2026-04-28", weekday: "Tue", day: 28, month: "Apr",
     morning:   { id: "20260428-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 60 },
@@ -70,6 +69,8 @@ export function SlotsMobile() {
   const [selected, setSelected] = useState<string | null>(null);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
+  const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
+  const isAgent = session.role === "agent";
 
   // If the customer's job size grows (e.g. they edit the AC step in
   // another iframe via cross-iframe sessionStorage sync), an already-
@@ -123,20 +124,58 @@ export function SlotsMobile() {
           </button>
         </div>
 
-        {/* "Your service" chip — anchors the disabled-slot reasoning */}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
-            style={{ backgroundColor: "#FFF1F8", color: "#9D174D" }}
-            data-testid="chip-job-duration-mobile"
-          >
-            <Clock className="h-3 w-3" />
-            Your service: ~{formatDurationMinutes(jobMinutes)}
-          </span>
+        {/* Access-window commitment — prominent, always shown. */}
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed"
+          style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
+          data-testid="banner-access-commitment-mobile"
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <span className="font-semibold">Heads up:</span> whichever window you pick,
+            please make sure we can access the unit for the <span className="font-semibold">entire window</span>
+            {" "}— not just for the length of the service itself.
+          </div>
         </div>
-        <p className="mb-4 text-xs leading-relaxed text-slate-500">
-          Slots fill by <span className="font-medium text-slate-700">time</span>, not by booking count —
-          we'll show you the windows that still have room for your service.
+
+        {/* "Not sure" callout — only when AC step was answered "unsure". */}
+        {isUnsure && (
+          <div
+            className="mb-3 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed"
+            style={{ borderColor: "#FCD34D", backgroundColor: "#FFFBEB", color: "#92400E" }}
+            data-testid="callout-unsure-mobile"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              You picked <span className="font-semibold">"Not sure"</span> on the AC step,
+              so we've sized your slot for one indoor unit. If we find more on-site,
+              the technician may not finish in one visit and Taylr will book a
+              second slot — which means a second access.{" "}
+              <span className="font-semibold">If you can confirm the AC details now,
+              you'll likely avoid that.</span>
+            </div>
+          </div>
+        )}
+
+        {/* Accountability nudge — visible to everyone, slightly firmer for agents. */}
+        <p
+          className="mb-4 text-[11px] leading-relaxed text-slate-500"
+          data-testid="nudge-accountability-mobile"
+        >
+          {isAgent ? (
+            <>
+              The window held for this booking is sized off the AC info you entered,
+              so please make sure it's accurate. If the details turn out to be off,
+              we'll need to rebook or add a follow-up visit — which means more
+              coordination for you and the tenant.
+            </>
+          ) : (
+            <>
+              The window we hold for you is sized off the AC info you entered.
+              If those details change after booking, we may need to rebook your
+              slot or schedule a follow-up visit.
+            </>
+          )}
         </p>
 
         <div className="space-y-3">
@@ -222,20 +261,17 @@ function SlotCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  // Fit logic stays intact from #27 — only the rendering changes:
+  // customers see slots as plain selectable windows, never minute math.
   const availableMinutes = Math.max(0, slot.windowMinutes - slot.bookedMinutes);
   const fits = availableMinutes >= jobMinutes;
-  const full = availableMinutes <= 0;
   const disabled = !fits;
   const isSelected = selected && fits;
-  const fillPct = Math.min(
-    100,
-    Math.round((slot.bookedMinutes / slot.windowMinutes) * 100),
-  );
 
-  const reason = full
-    ? "Full"
-    : `Won't fit your ${formatDurationMinutes(jobMinutes)} service`;
-  const availableLabel = `${formatDurationMinutes(availableMinutes)} available`;
+  // Single generic, non-numeric reason for any unfit slot — whether the
+  // window is fully booked or just doesn't have room for this customer's
+  // job. The customer doesn't need to reason about the distinction.
+  const reason = "Not enough room left in this window";
 
   return (
     <button
@@ -265,30 +301,9 @@ function SlotCard({
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
       <div className={`text-[10px] ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>{hint}</div>
-      <div className={`text-[10px] font-medium ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-700"}`}>
-        {disabled ? reason : availableLabel}
-      </div>
-      {/* Capacity bar — shown on every tile so customers can compare load
-          at a glance. Disabled tiles use a muted grey fill instead of the
-          brand pink so the disabled state still reads first. */}
-      <div
-        className={`mt-1 h-1 w-full overflow-hidden rounded-full ${
-          isSelected ? "bg-white/30" : "bg-slate-100"
-        }`}
-        aria-hidden
-      >
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${fillPct}%`,
-            backgroundColor: isSelected
-              ? "#ffffff"
-              : disabled
-                ? "#cbd5e1"
-                : BRAND,
-          }}
-        />
-      </div>
+      {disabled && (
+        <div className="text-[10px] font-medium text-slate-400">{reason}</div>
+      )}
     </button>
   );
 }
