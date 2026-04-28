@@ -356,17 +356,19 @@ export function AcDesktop() {
                         <p className="text-xs font-medium" style={{ color: BRAND }}>
                           ${ADDON_PRICE} per extra {effectiveType === "ducted" ? "filter" : "unit"}
                         </p>
-                        {effectiveType !== "ducted" && (
-                          <button
-                            type="button"
-                            onClick={() => setExampleModal("split-indoor")}
-                            data-testid="button-see-example"
-                            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            See example
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExampleModal(
+                              effectiveType === "ducted" ? "ducted-filter" : "split-indoor",
+                            )
+                          }
+                          data-testid="button-see-example"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          See example
+                        </button>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 shrink-0">
@@ -408,9 +410,8 @@ export function AcDesktop() {
                             type="button"
                             onClick={() => setExampleModal("ducted-filter")}
                             data-testid="button-see-example-inline"
-                            className="inline-flex items-center gap-1 font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                            className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
                           >
-                            <Eye className="h-3 w-3" />
                             See example
                           </button>
                         </p>
@@ -426,9 +427,8 @@ export function AcDesktop() {
                             type="button"
                             onClick={() => setExampleModal("split-indoor")}
                             data-testid="button-see-example-inline"
-                            className="inline-flex items-center gap-1 font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                            className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
                           >
-                            <Eye className="h-3 w-3" />
                             See example
                           </button>
                         </p>

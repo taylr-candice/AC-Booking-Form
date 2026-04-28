@@ -342,17 +342,17 @@ export function AcMobile() {
                     <AddonIcon className="h-3.5 w-3.5" />
                   </div>
                   <h3 className="font-semibold text-slate-900">{copy.addonLabel}</h3>
-                  {effectiveType !== "ducted" && (
-                    <button
-                      type="button"
-                      onClick={() => setExampleModal("split-indoor")}
-                      data-testid="button-see-example"
-                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                    >
-                      <Eye className="h-3 w-3" />
-                      See example
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExampleModal(effectiveType === "ducted" ? "ducted-filter" : "split-indoor")
+                    }
+                    data-testid="button-see-example"
+                    className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                  >
+                    <Eye className="h-3 w-3" />
+                    See example
+                  </button>
                 </div>
                 <p className="text-xs font-medium shrink-0" style={{ color: BRAND }}>
                   ${ADDON_PRICE} ea.
@@ -395,9 +395,8 @@ export function AcMobile() {
                         type="button"
                         onClick={() => setExampleModal("ducted-filter")}
                         data-testid="button-see-example-inline"
-                        className="inline-flex items-center gap-1 font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                        className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
                       >
-                        <Eye className="h-3 w-3" />
                         See example
                       </button>
                     </p>
@@ -413,9 +412,8 @@ export function AcMobile() {
                         type="button"
                         onClick={() => setExampleModal("split-indoor")}
                         data-testid="button-see-example-inline"
-                        className="inline-flex items-center gap-1 font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                        className="font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
                       >
-                        <Eye className="h-3 w-3" />
                         See example
                       </button>
                     </p>
