@@ -84,7 +84,6 @@ export function SlotsDesktop() {
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
-  const isAgent = session.role === "agent";
 
   const weeks = useMemo(() => {
     const out: Day[][] = [];
@@ -137,23 +136,23 @@ export function SlotsDesktop() {
 
           {/* Access-window commitment — prominent, always shown. */}
           <div
-            className="mb-4 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-relaxed"
+            className="mb-6 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-relaxed"
             style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
             data-testid="banner-access-commitment-desktop"
           >
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <span className="font-semibold">Heads up:</span> whichever window you pick,
-              please make sure we can access the unit for the{" "}
-              <span className="font-semibold">entire window</span> — not just for the
-              length of the service itself.
+              <span className="font-semibold">Heads up:</span> we can't guarantee an
+              exact arrival or finish time within the window you pick, so please make
+              sure we have access to the unit for the{" "}
+              <span className="font-semibold">entire window</span>.
             </div>
           </div>
 
           {/* "Not sure" callout — only when AC step was answered "unsure". */}
           {isUnsure && (
             <div
-              className="mb-4 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-relaxed"
+              className="mb-6 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-relaxed"
               style={{ borderColor: "#FCD34D", backgroundColor: "#FFFBEB", color: "#92400E" }}
               data-testid="callout-unsure-desktop"
             >
@@ -168,27 +167,6 @@ export function SlotsDesktop() {
               </div>
             </div>
           )}
-
-          {/* Accountability nudge — visible to everyone, slightly firmer for agents. */}
-          <p
-            className="mb-6 text-xs leading-relaxed text-slate-500"
-            data-testid="nudge-accountability-desktop"
-          >
-            {isAgent ? (
-              <>
-                The window held for this booking is sized off the AC info you entered,
-                so please make sure it's accurate. If the details turn out to be off,
-                we'll need to rebook or add a follow-up visit — which means more
-                coordination for you and the tenant.
-              </>
-            ) : (
-              <>
-                The window we hold for you is sized off the AC info you entered.
-                If those details change after booking, we may need to rebook your
-                slot or schedule a follow-up visit.
-              </>
-            )}
-          </p>
 
           <div className="flex-1">
             <div className="flex items-center justify-between mb-4">

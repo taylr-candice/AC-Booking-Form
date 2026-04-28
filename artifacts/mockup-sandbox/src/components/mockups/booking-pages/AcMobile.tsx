@@ -279,7 +279,16 @@ export function AcMobile() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
-        <p className="mb-4 text-sm text-slate-500">{intro}</p>
+        <p className="mb-2 text-sm text-slate-500">{intro}</p>
+        <p
+          className="mb-4 text-[13px] font-medium leading-snug"
+          style={{ color: "#9D174D" }}
+          data-testid="note-ac-accuracy-mobile"
+        >
+          Please get this right — these details set how long we'll need at
+          your unit. If they don't match what we find on-site, we may not
+          finish in one visit and could need to rebook.
+        </p>
 
         {knownType && !hasOverride && acTypeFromUnit !== "unknown" && recorded && (
           <div className="mb-2 rounded-lg border border-pink-200 bg-pink-50 p-3 text-sm text-pink-900 flex gap-2.5 items-start">
