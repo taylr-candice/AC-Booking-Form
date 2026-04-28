@@ -299,6 +299,7 @@ export function PayDesktop() {
               type="button"
               data-testid="button-pay"
               disabled={!payEnabled}
+              onClick={() => bookingActions.submitBooking()}
               className={`flex items-center gap-2 rounded-full px-8 py-3.5 text-base font-bold text-white shadow-md transition ${
                 payEnabled ? "hover:opacity-90 hover:shadow-lg" : "opacity-50 cursor-not-allowed"
               }`}

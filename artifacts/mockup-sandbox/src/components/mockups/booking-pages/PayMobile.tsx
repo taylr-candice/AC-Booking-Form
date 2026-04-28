@@ -358,6 +358,7 @@ export function PayMobile() {
           type="button"
           data-testid="button-pay"
           disabled={!payEnabled}
+          onClick={() => bookingActions.submitBooking()}
           className={`flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold text-white shadow-sm transition ${
             payEnabled ? "hover:opacity-90" : "opacity-50 cursor-not-allowed"
           }`}

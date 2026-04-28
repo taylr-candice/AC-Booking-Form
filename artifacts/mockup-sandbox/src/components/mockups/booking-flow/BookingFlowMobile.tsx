@@ -11,6 +11,7 @@ import {
   prevStepId,
   visibleSteps,
 } from "../../../state/bookingDerived";
+import { BookingFlowConfirmation } from "./BookingFlowConfirmation";
 
 const BRAND = "#ED017F";
 const COMPLETE = "#5FBB97";
@@ -45,6 +46,7 @@ const STEPS: readonly Step[] = [
 export function BookingFlowMobile() {
   const active = useBookingSelector((s) => s.current_step);
   const accessMethod = useBookingSelector((s) => s.access_method);
+  const submitted = useBookingSelector((s) => s.submitted);
   const visible = visibleSteps({ access_method: accessMethod });
 
   const current = STEPS.find((s) => s.id === active) ?? STEPS[0];
@@ -87,6 +89,18 @@ export function BookingFlowMobile() {
       }
     };
   }, []);
+
+  // Submitted bookings get a dedicated confirmation that owns the full
+  // viewport — same UX as the legacy BookingForm `Terminal` screen.
+  // The step bar is suppressed because the user is no longer
+  // navigating between steps.
+  if (submitted) {
+    return (
+      <div className="h-screen w-screen overflow-hidden bg-slate-50 font-['Inter']">
+        <BookingFlowConfirmation />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Inter']">

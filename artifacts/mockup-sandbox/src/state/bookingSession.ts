@@ -127,6 +127,15 @@ export type BookingState = {
   service_slot: string | null;
   // Step 7
   cancellation_acknowledged: boolean;
+
+  // Terminal — set by `submitBooking()` after the user clicks Pay on
+  // Step 6. The wrapper renders the confirmation screen instead of the
+  // step iframe whenever `submitted === true`. `reference` is the
+  // human-friendly booking reference shown on that screen. Both are
+  // wiped by `bookAnother()` (and by `reset()`) so a fresh booking
+  // never inherits the previous booking's confirmation state.
+  submitted: boolean;
+  reference: string | null;
 };
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -172,6 +181,8 @@ const INITIAL_STATE: BookingState = {
   service_date: null,
   service_slot: null,
   cancellation_acknowledged: false,
+  submitted: false,
+  reference: null,
 };
 
 // ─── Persisted store ────────────────────────────────────────────────────────
@@ -351,6 +362,28 @@ function acDiscrepancyEqual(
   return a.customer.systems === bc.systems && a.customer.additional === bc.additional;
 }
 
+// ─── Reference generation ──────────────────────────────────────────────────
+
+/**
+ * Generate a short, human-friendly booking reference shaped like
+ * `TLR-AB23CD` — two letters, two digits, two letters. Intentionally
+ * skips visually ambiguous characters (`I`, `O`, `0`, `1`) so a
+ * customer reading the reference back over the phone is unlikely to
+ * misread it.
+ *
+ * Inlined here (rather than living in `bookingHelpers.ts`) so this
+ * module stays dependency-free per the file header contract.
+ */
+function genBookingReference(): string {
+  const alpha = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const num = "23456789";
+  const pick = (chars: string, n: number) =>
+    Array.from({ length: n }, () =>
+      chars[Math.floor(Math.random() * chars.length)],
+    ).join("");
+  return `TLR-${pick(alpha, 2)}${pick(num, 2)}${pick(alpha, 2)}`;
+}
+
 // ─── Public actions ─────────────────────────────────────────────────────────
 
 export const bookingActions = {
@@ -507,6 +540,18 @@ export const bookingActions = {
   // Step 7
   setCancellationAcknowledged(value: boolean) {
     setState((s) => ({ ...s, cancellation_acknowledged: value }));
+  },
+
+  /** Spec §9: mark the booking as successfully submitted and assign a
+   *  human-friendly reference. The wrapper renders the confirmation
+   *  screen whenever `submitted === true`. Idempotent — once submitted,
+   *  re-submitting keeps the same reference (so a stray double-click
+   *  on the iframed Pay button doesn't change the reference the
+   *  customer is already reading). */
+  submitBooking() {
+    setState((s) =>
+      s.submitted ? s : { ...s, submitted: true, reference: genBookingReference() },
+    );
   },
 
   /** Spec §12: keep role/agency/contact, reset everything else. */
