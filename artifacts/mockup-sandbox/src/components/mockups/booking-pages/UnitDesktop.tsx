@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Briefcase,
   Building2,
   CheckCircle2,
   ChevronDown,
+  Search,
   User,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
@@ -27,6 +28,7 @@ export function UnitDesktop() {
   const stepLabel = useStepLabel(1);
   const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   // Keep local state in sync if session changes elsewhere (e.g. on Back).
   useEffect(() => {
@@ -34,8 +36,21 @@ export function UnitDesktop() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionUnitId]);
 
+  // Reset search when dropdown closes so it opens fresh next time.
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
+
   const selected = UNITS.find((u) => u.id === selectedId);
   const canContinue = canContinueStep1({ unit_id: selectedId, role });
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return UNITS;
+    return UNITS.filter((u) =>
+      `${u.address} ${u.lot} ${u.building} ${u.suburb}`.toLowerCase().includes(q),
+    );
+  }, [query]);
 
   const selectUnit = (id: string) => {
     setSelectedId(id);
@@ -55,10 +70,6 @@ export function UnitDesktop() {
           </div>
 
           <div className="flex-1">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Properties
-            </label>
-
             <div className="relative">
               <button
                 type="button"
@@ -92,45 +103,71 @@ export function UnitDesktop() {
               </button>
 
               {open && (
-                <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                  {UNITS.map((u) => {
-                    const active = u.id === selectedId;
-                    return (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => selectUnit(u.id)}
-                        data-testid={`dropdown-unit-${u.id}`}
-                        className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
-                          active ? "bg-pink-50" : "hover:bg-slate-50"
-                        }`}
+                <div className="absolute inset-x-0 top-full z-20 mt-2 flex max-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                  <div className="border-b border-slate-100 p-2">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        autoFocus
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search by lot, street or building…"
+                        data-testid="input-unit-search"
+                        aria-label="Search properties"
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-200"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto py-1">
+                    {filtered.length === 0 ? (
+                      <div
+                        className="px-4 py-6 text-center text-[13px] text-slate-500"
+                        data-testid="dropdown-unit-empty"
                       >
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
-                          <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100">
-                            <Building2 className="h-4 w-4 text-slate-500" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div
-                              className={`truncate text-[14px] font-semibold ${
-                                active ? "text-pink-700" : "text-slate-900"
-                              }`}
-                            >
-                              {u.address}
+                        No properties match "{query.trim()}"
+                      </div>
+                    ) : (
+                      filtered.map((u) => {
+                        const active = u.id === selectedId;
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => selectUnit(u.id)}
+                            data-testid={`dropdown-unit-${u.id}`}
+                            className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
+                              active ? "bg-pink-50" : "hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                              <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100">
+                                <Building2 className="h-4 w-4 text-slate-500" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className={`truncate text-[14px] font-semibold ${
+                                    active ? "text-pink-700" : "text-slate-900"
+                                  }`}
+                                >
+                                  {u.address}
+                                </div>
+                                <div className="mt-0.5 truncate text-[12px] text-slate-500">
+                                  {u.lot} · {u.building} · {u.suburb}
+                                </div>
+                              </div>
                             </div>
-                            <div className="mt-0.5 truncate text-[12px] text-slate-500">
-                              {u.lot} · {u.building} · {u.suburb}
-                            </div>
-                          </div>
-                        </div>
-                        {active && (
-                          <CheckCircle2
-                            className="mt-2 h-5 w-5 shrink-0"
-                            style={{ color: BRAND }}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
+                            {active && (
+                              <CheckCircle2
+                                className="mt-2 h-5 w-5 shrink-0"
+                                style={{ color: BRAND }}
+                              />
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -138,11 +175,11 @@ export function UnitDesktop() {
             {/* Progressive disclosure: role chooser appears once a property is picked. */}
             {selected && (
               <div className="mt-8">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Your role for this property
-                </label>
-                <p className="mb-3 text-[13px] text-slate-500">
-                  Are you the owner, or a managing agent?
+                <h2 className="text-[18px] font-semibold leading-tight text-slate-900">
+                  Your role
+                </h2>
+                <p className="mb-3 mt-1 text-[13px] text-slate-500">
+                  In relation to the selected property
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <RoleCard
