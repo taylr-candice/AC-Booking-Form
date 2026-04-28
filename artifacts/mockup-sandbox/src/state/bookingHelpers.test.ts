@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeAcDiscrepancy,
   getAcRecord,
+  isPastDate,
   unitCity,
   type AcRecord,
 } from "./bookingHelpers";
@@ -135,5 +136,37 @@ describe("unitCity", () => {
 
   it("falls back to Sydney when no unit is selected", () => {
     expect(unitCity(null)).toBe("Sydney");
+  });
+});
+
+describe("isPastDate", () => {
+  // Pinned clock so these assertions never drift over time. The slot
+  // picker seed data is anchored to fixed 2026 dates, so we test
+  // around that anchor.
+  const pinnedNow = new Date(2026, 3, 28, 14, 30); // Apr 28 2026, 14:30 local
+
+  it("returns true for any date strictly before today's local date", () => {
+    expect(isPastDate("2026-04-27", pinnedNow)).toBe(true);
+    expect(isPastDate("2025-12-31", pinnedNow)).toBe(true);
+    expect(isPastDate("1999-01-01", pinnedNow)).toBe(true);
+  });
+
+  it("returns false for today (regardless of the time of day)", () => {
+    expect(isPastDate("2026-04-28", pinnedNow)).toBe(false);
+    expect(isPastDate("2026-04-28", new Date(2026, 3, 28, 0, 0))).toBe(false);
+    expect(isPastDate("2026-04-28", new Date(2026, 3, 28, 23, 59))).toBe(false);
+  });
+
+  it("returns false for any date in the future", () => {
+    expect(isPastDate("2026-04-29", pinnedNow)).toBe(false);
+    expect(isPastDate("2026-05-09", pinnedNow)).toBe(false);
+    expect(isPastDate("2030-01-01", pinnedNow)).toBe(false);
+  });
+
+  it("handles month and year rollovers correctly", () => {
+    const newYearsEve = new Date(2026, 11, 31, 12, 0); // Dec 31 2026
+    expect(isPastDate("2026-12-30", newYearsEve)).toBe(true);
+    expect(isPastDate("2026-12-31", newYearsEve)).toBe(false);
+    expect(isPastDate("2027-01-01", newYearsEve)).toBe(false);
   });
 });

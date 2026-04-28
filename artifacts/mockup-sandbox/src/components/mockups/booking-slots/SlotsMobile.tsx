@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
+import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
   attendedPartyFor,
@@ -105,15 +106,24 @@ export function SlotsMobile() {
       ? "you'll need to coordinate a second visit with the tenant"
       : "you'll need to be home for a second visit";
 
+  // Hide any dates that have already passed — customers can never
+  // book a service into the past, and leaving expired rows in the
+  // calendar just pushes the bookable dates further down.
+  const visibleDays = useMemo(
+    () => DAYS.filter((d) => !isPastDate(d.date)),
+    [],
+  );
+
   // If the customer's job size grows (e.g. they edit the AC step in
   // another iframe via cross-iframe sessionStorage sync), an already-
   // selected slot might no longer fit. Drop it so the Continue button
   // can't carry a stale, now-invalid selection forward. Same
   // `slotFitStatus` source of truth used by the slot tile so the two
-  // can never disagree.
+  // can never disagree. We also drop it if the slot's date is no
+  // longer visible (it has rolled into the past).
   const selectedSlotFits = useMemo(() => {
     if (!selected) return true;
-    for (const d of DAYS) {
+    for (const d of visibleDays) {
       for (const slot of [d.morning, d.afternoon]) {
         if (slot.id === selected) {
           return slotFitStatus(slot, jobMinutes) === "available";
@@ -121,7 +131,7 @@ export function SlotsMobile() {
       }
     }
     return false;
-  }, [selected, jobMinutes]);
+  }, [selected, jobMinutes, visibleDays]);
   useEffect(() => {
     if (selected && !selectedSlotFits) setSelected(null);
   }, [selected, selectedSlotFits]);
@@ -245,7 +255,7 @@ export function SlotsMobile() {
         )}
 
         <div className="space-y-3">
-          {DAYS.map((d) => (
+          {visibleDays.map((d) => (
             <DayBlock
               key={d.date}
               day={d}

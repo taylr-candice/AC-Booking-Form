@@ -331,3 +331,25 @@ export function isStep7PayEnabled(s: BookingState): boolean {
   if (isCoordinationFlow(s)) return true;
   return Boolean(s.service_date && s.service_slot);
 }
+
+// ─── Past-date filtering ───────────────────────────────────────────────────
+
+/**
+ * True when an ISO `YYYY-MM-DD` date string falls strictly before today
+ * in the local timezone. Used by the customer-facing slot picker to
+ * hide dates that have already passed — a customer can never book a
+ * service into the past, so leaving stale dates on the page is just
+ * clutter that pushes the bookable dates further down.
+ *
+ * `now` is injectable so tests can pin the clock and not drift over
+ * time (the slot-picker seed data is anchored to fixed dates in 2026).
+ *
+ * Pure / no DOM access.
+ */
+export function isPastDate(dateStr: string, now: Date = new Date()): boolean {
+  const todayStr =
+    `${now.getFullYear()}-` +
+    `${String(now.getMonth() + 1).padStart(2, "0")}-` +
+    `${String(now.getDate()).padStart(2, "0")}`;
+  return dateStr < todayStr;
+}

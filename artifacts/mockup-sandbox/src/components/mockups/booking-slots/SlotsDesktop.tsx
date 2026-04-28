@@ -18,7 +18,7 @@ import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
-import { unitCity } from "../../../state/bookingHelpers";
+import { isPastDate, unitCity } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -140,27 +140,43 @@ export function SlotsDesktop() {
   // `unitCity` in bookingHelpers.ts for the full state→city map.
   const cityLabel = unitCity(session.unit_id);
 
+  // Hide any dates that have already passed — customers can never
+  // book a service into the past, and leaving expired rows in the
+  // calendar just pushes the bookable dates further down. The seed
+  // data is anchored to fixed 2026 dates, so as the clock moves
+  // forward the picker shrinks the same way it would in production.
+  const visibleDays = useMemo(
+    () => ALL_DAYS.filter((d) => !isPastDate(d.date)),
+    [],
+  );
+
   const weeks = useMemo(() => {
     const out: Day[][] = [];
-    for (let i = 0; i < ALL_DAYS.length; i += 6) {
-      out.push(ALL_DAYS.slice(i, i + 6));
+    for (let i = 0; i < visibleDays.length; i += 6) {
+      out.push(visibleDays.slice(i, i + 6));
     }
     return out;
-  }, []);
+  }, [visibleDays]);
 
   const week = weeks[weekIdx] ?? [];
-  const selectedDay = ALL_DAYS.find((d) => d.morning.id === selected || d.afternoon.id === selected);
-  const selectedSlot = ALL_DAYS.flatMap((d) => [d.morning, d.afternoon]).find((s) => s.id === selected);
+  const selectedDay = visibleDays.find((d) => d.morning.id === selected || d.afternoon.id === selected);
+  const selectedSlot = visibleDays.flatMap((d) => [d.morning, d.afternoon]).find((s) => s.id === selected);
 
   // If the customer's job size grows (e.g. they edit the AC step in
   // another iframe via cross-iframe sessionStorage sync), an already-
   // selected slot might no longer fit. Drop it so the Continue button
   // and the "Selected slot" panel can't carry a stale, now-invalid
   // selection forward. Same `slotFitStatus` source of truth used by
-  // the slot tile so the two can never disagree.
-  const selectedSlotFits = selectedSlot
-    ? slotFitStatus(selectedSlot, jobMinutes) === "available"
-    : true;
+  // the slot tile so the two can never disagree. We also drop a
+  // selection if the slot's day has rolled into the past — in that
+  // case `selectedSlot` is undefined because past days are filtered
+  // out of `visibleDays`.
+  const selectedSlotFits =
+    selected && !selectedSlot
+      ? false
+      : selectedSlot
+        ? slotFitStatus(selectedSlot, jobMinutes) === "available"
+        : true;
   useEffect(() => {
     if (selected && !selectedSlotFits) setSelected(null);
   }, [selected, selectedSlotFits]);
