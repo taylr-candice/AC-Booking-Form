@@ -25,7 +25,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { isStep5Valid } from "./accessMethodCatalog";
+import {
+  isStep5Valid,
+  SIG_COLLECT_RETURN,
+  signatureVariantFor,
+} from "./accessMethodCatalog";
 import type {
   AccessMethod,
   BookingState,
@@ -234,6 +238,27 @@ describe("isStep5Valid — parcel-locker family", () => {
       });
     });
   }
+});
+
+describe("signatureVariantFor — collect-and-return family", () => {
+  // The collect-and-return signature panel is rendered on the access step
+  // and gates Continue (signature_acknowledged + signature_name). If
+  // `signatureVariantFor` returns null for a method that `isStep5Valid`
+  // requires the signature for, the panel never renders and the user is
+  // silently blocked from advancing — pin both vacant and live-in here.
+  it("returns the Collect & Return T&Cs variant for owner_live_collect", () => {
+    expect(signatureVariantFor("owner_live_collect")).toEqual({
+      title: "Collect & Return T&Cs",
+      body: SIG_COLLECT_RETURN,
+    });
+  });
+
+  it("returns the Collect & Return T&Cs variant for owner_vacant_collect", () => {
+    expect(signatureVariantFor("owner_vacant_collect")).toEqual({
+      title: "Collect & Return T&Cs",
+      body: SIG_COLLECT_RETURN,
+    });
+  });
 });
 
 describe("isStep5Valid — collect-and-return family", () => {

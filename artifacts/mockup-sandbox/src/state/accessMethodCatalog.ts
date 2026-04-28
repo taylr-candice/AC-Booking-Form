@@ -182,6 +182,7 @@ export function signatureVariantFor(
 ): SignatureVariant | null {
   switch (method) {
     case "owner_live_collect":
+    case "owner_vacant_collect":
       return { title: "Collect & Return T&Cs", body: SIG_COLLECT_RETURN };
     case "agent_trade_key":
       return { title: "Access authorisation", body: SIG_ACCESS_AUTH };
