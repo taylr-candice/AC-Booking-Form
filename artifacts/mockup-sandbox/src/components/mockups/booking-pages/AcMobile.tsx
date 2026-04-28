@@ -65,7 +65,6 @@ const COPY: Record<KnownType, Copy> = {
     addonLabel: "Extra indoor units",
     addonHelper: [
       "If your apartment has more indoor unit heads than shown above, add the extras here.",
-      "Example: If 2 indoor unit heads are included above, only add extras if the apartment has 3 or more indoor unit heads.",
     ],
     addonUnitSingular: "extra indoor unit",
     addonUnitPlural: "extra indoor units",
