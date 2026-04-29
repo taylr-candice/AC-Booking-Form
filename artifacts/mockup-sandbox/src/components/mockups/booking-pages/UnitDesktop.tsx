@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
   Briefcase,
   Building2,
   CheckCircle2,
   ChevronDown,
+  Lock,
   Search,
   User,
 } from "lucide-react";
@@ -20,6 +22,12 @@ import {
   DEMO_MANAGING_AGENCIES,
   isOtherAgency,
 } from "../../../state/accessMethodCatalog";
+import {
+  findRolloutForBooking,
+  getActiveBookingForUnit,
+  SEEDED_BOOKINGS,
+  type ActiveBookingForUnit,
+} from "../../../state/adminMockData";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -64,6 +72,25 @@ function errorStyle(hasError: boolean): React.CSSProperties | undefined {
   return hasError
     ? { borderColor: ERROR_PURPLE, boxShadow: `0 0 0 1px ${ERROR_PURPLE}` }
     : undefined;
+}
+
+/**
+ * Build the customer-facing "Already booked" reason for a paid unit.
+ * Falls back to a generic phrasing when the booking is missing a date
+ * or window (coordination-only bookings rarely block a unit, but we
+ * still render something useful).
+ */
+function formatPaidReason(b: import("../../../state/adminMockData").AdminBooking): string {
+  const who = b.customerName || "another customer";
+  if (
+    b.serviceDate &&
+    (b.serviceSlot === "morning" || b.serviceSlot === "afternoon")
+  ) {
+    const window =
+      b.serviceSlot === "morning" ? "morning" : "afternoon";
+    return `${who} booked ${b.serviceDate} ${window}`;
+  }
+  return `${who} has a confirmed booking`;
 }
 
 export function UnitDesktop() {
@@ -119,7 +146,37 @@ export function UnitDesktop() {
     }
   }, [showOtherInput]);
 
+  // Per-unit "is this unit already taken?" lookup.
+  //
+  // Spec: enforce "one confirmed booking per unit per service rollout"
+  // across the customer flow. We compute the verdict for every unit
+  // up-front (cheap — one rollout lookup + one bookings scan per unit)
+  // so the dropdown can disable/warn each row inline.
+  //
+  //   - "paid"             → unit is taken; render disabled with a
+  //                          "Already booked" reason. Cannot be picked.
+  //   - "invoice_pending"  → soft block; the row stays selectable but
+  //                          a warning panel appears under the picker
+  //                          telling the customer their booking will
+  //                          supersede the existing invoice at submit.
+  //   - "none"             → bookable as normal.
+  //
+  // We deliberately ignore the live-demo session row here (it never
+  // appears in `SEEDED_BOOKINGS`), so a customer who already picked
+  // a unit and walked back doesn't block themselves.
+  const unitStatuses = useMemo(() => {
+    const out = new Map<string, ActiveBookingForUnit>();
+    for (const u of UNITS) {
+      const rollout = findRolloutForBooking("svc-ac", u.id);
+      out.set(
+        u.id,
+        getActiveBookingForUnit(u.id, SEEDED_BOOKINGS, rollout?.id ?? null),
+      );
+    }
+    return out;
+  }, []);
   const selected = UNITS.find((u) => u.id === selectedId);
+  const selectedStatus = selected ? unitStatuses.get(selected.id) : undefined;
   const canContinue = canContinueStep1({
     unit_id: selectedId,
     role,
@@ -140,6 +197,10 @@ export function UnitDesktop() {
   }, [query]);
 
   const selectUnit = (id: string) => {
+    // Defensive guard — the dropdown button is already disabled for
+    // "paid" rows, but if anything ever bypasses that we still refuse
+    // to commit a paid-blocked unit to the session.
+    if (unitStatuses.get(id)?.kind === "paid") return;
     setSelectedId(id);
     bookingActions.setUnit(id);
     setOpen(false);
@@ -242,24 +303,48 @@ export function UnitDesktop() {
                     ) : (
                       filtered.map((u) => {
                         const active = u.id === selectedId;
+                        const status = unitStatuses.get(u.id);
+                        const blocked = status?.kind === "paid";
+                        const reason = blocked
+                          ? formatPaidReason(status.booking)
+                          : null;
                         return (
                           <button
                             key={u.id}
                             type="button"
+                            disabled={blocked}
                             onClick={() => selectUnit(u.id)}
                             data-testid={`dropdown-unit-${u.id}`}
+                            aria-disabled={blocked}
+                            title={blocked ? `Already booked — ${reason}` : ""}
                             className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
-                              active ? "bg-pink-50" : "hover:bg-slate-50"
+                              blocked
+                                ? "cursor-not-allowed bg-slate-50 opacity-70"
+                                : active
+                                  ? "bg-pink-50"
+                                  : "hover:bg-slate-50"
                             }`}
                           >
                             <div className="flex min-w-0 flex-1 items-start gap-3">
-                              <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100">
-                                <Building2 className="h-4 w-4 text-slate-500" />
+                              <div
+                                className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${
+                                  blocked ? "bg-slate-200" : "bg-slate-100"
+                                }`}
+                              >
+                                {blocked ? (
+                                  <Lock className="h-4 w-4 text-slate-500" />
+                                ) : (
+                                  <Building2 className="h-4 w-4 text-slate-500" />
+                                )}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div
                                   className={`truncate text-[14px] font-semibold ${
-                                    active ? "text-pink-700" : "text-slate-900"
+                                    blocked
+                                      ? "text-slate-500 line-through"
+                                      : active
+                                        ? "text-pink-700"
+                                        : "text-slate-900"
                                   }`}
                                 >
                                   {u.address}
@@ -267,9 +352,17 @@ export function UnitDesktop() {
                                 <div className="mt-0.5 truncate text-[12px] text-slate-500">
                                   {u.lot} · {u.building} · {u.suburb}
                                 </div>
+                                {blocked && (
+                                  <div
+                                    className="mt-1 truncate text-[11px] font-medium text-slate-600"
+                                    data-testid={`dropdown-unit-${u.id}-blocked`}
+                                  >
+                                    Already booked — {reason}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            {active && (
+                            {active && !blocked && (
                               <CheckCircle2
                                 className="mt-2 h-5 w-5 shrink-0"
                                 style={{ color: BRAND }}
@@ -283,6 +376,32 @@ export function UnitDesktop() {
                 </div>
               )}
             </div>
+
+            {/* Invoice-pending soft warning. The unit is selectable but
+                the customer needs to know an existing pending invoice
+                will be cancelled and superseded by their booking when
+                they pay. */}
+            {selected && selectedStatus?.kind === "invoice_pending" && (
+              <div
+                className="mt-3 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-[13px] leading-relaxed"
+                style={{
+                  borderColor: "#FCD34D",
+                  backgroundColor: "#FFFBEB",
+                  color: "#92400E",
+                }}
+                data-testid="warning-unit-invoice-pending"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <span className="font-semibold">
+                    There's a pending invoice for this unit.
+                  </span>{" "}
+                  Continuing and paying will supersede the existing
+                  invoice — it'll be cancelled automatically when your
+                  payment goes through.
+                </div>
+              </div>
+            )}
 
             {/* Progressive disclosure: role chooser appears once a property is picked. */}
             {selected && (

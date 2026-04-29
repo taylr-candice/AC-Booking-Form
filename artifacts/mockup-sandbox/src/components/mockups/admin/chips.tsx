@@ -55,18 +55,26 @@ export function PaymentChip({ status }: { status: PaymentStatus }) {
 }
 
 export function ServiceChip({ status }: { status: ServiceStatus }) {
-  const map: Record<ServiceStatus, { label: string; bg: string; fg: string }> = {
+  const map: Record<
+    ServiceStatus,
+    { label: string; bg: string; fg: string; strike?: boolean }
+  > = {
     scheduled: { label: "Scheduled", bg: "#E2E8F0", fg: "#334155" },
     en_route: { label: "En route", bg: "#DBEAFE", fg: "#1D4ED8" },
     on_site: { label: "On site", bg: "#E0E7FF", fg: "#3730A3" },
     complete: { label: "Complete", bg: "#DCFCE7", fg: "#166534" },
     invoice_adjusted: { label: "Invoice adjusted", bg: "#FEF3C7", fg: "#92400E" },
+    cancelled: { label: "Cancelled", bg: "#F1F5F9", fg: "#64748B", strike: true },
   };
   const m = map[status];
   return (
     <span
       className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-      style={{ backgroundColor: m.bg, color: m.fg }}
+      style={{
+        backgroundColor: m.bg,
+        color: m.fg,
+        textDecoration: m.strike ? "line-through" : undefined,
+      }}
     >
       {m.label}
     </span>

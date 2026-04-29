@@ -6,6 +6,7 @@
  */
 
 import { Plus, Search, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 
 import {
   bookerAgencyName,
@@ -79,6 +80,11 @@ export function BookingsView({
   onNewBooking: () => void;
   paymentMode: boolean;
 }) {
+  // "Show cancelled" is OFF by default — cancelled rows are an audit-trail
+  // artefact, not the day-to-day work, so we hide them unless the admin
+  // opts in. The toggle is local to this list (not lifted to AdminApp)
+  // because it doesn't need to survive a view switch.
+  const [showCancelled, setShowCancelled] = useState(false);
   const filterChips: ReadonlyArray<{
     key: "all" | ServiceStatus | PaymentStatus;
     label: string;
@@ -95,9 +101,20 @@ export function BookingsView({
         { key: "en_route", label: "En route" },
         { key: "on_site", label: "On site" },
         { key: "complete", label: "Complete" },
+        { key: "cancelled", label: "Cancelled" },
       ];
 
   const filtered = bookings.filter((b) => {
+    // Cancelled rows are hidden by default unless either the toggle is on
+    // OR the user explicitly filtered to "cancelled" via the chip set
+    // (so an admin can audit cancellations from a single click).
+    if (
+      b.serviceStatus === "cancelled" &&
+      !showCancelled &&
+      statusFilter !== "cancelled"
+    ) {
+      return false;
+    }
     if (statusFilter !== "all") {
       if (paymentMode) {
         if (b.paymentStatus !== statusFilter) return false;
@@ -164,15 +181,26 @@ export function BookingsView({
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {!paymentMode && (
-            <button
-              type="button"
-              onClick={onNewBooking}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-semibold text-white transition hover:brightness-110"
-              style={{ backgroundColor: BRAND }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New booking
-            </button>
+            <>
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[12px] font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={showCancelled}
+                  onChange={(e) => setShowCancelled(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-pink-600"
+                />
+                Show cancelled
+              </label>
+              <button
+                type="button"
+                onClick={onNewBooking}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-semibold text-white transition hover:brightness-110"
+                style={{ backgroundColor: BRAND }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New booking
+              </button>
+            </>
           )}
           {filterChips.map((chip) => {
             const active = statusFilter === chip.key;
@@ -236,7 +264,7 @@ export function BookingsView({
                     className="cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
                   >
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 font-semibold text-slate-900">
+                      <div className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
                         {b.id}
                         {b.isLive && (
                           <span
@@ -244,6 +272,15 @@ export function BookingsView({
                             style={{ backgroundColor: BRAND, color: "white" }}
                           >
                             Live
+                          </span>
+                        )}
+                        {b.supersededByBookingId && (
+                          <span
+                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                            style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+                            title={`Superseded by ${b.supersededByBookingId} — outstanding invoice should be voided`}
+                          >
+                            Invoice to cancel · superseded
                           </span>
                         )}
                       </div>

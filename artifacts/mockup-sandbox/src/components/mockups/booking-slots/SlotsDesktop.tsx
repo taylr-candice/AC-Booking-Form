@@ -19,12 +19,14 @@ import {
 } from "../../../state/accessMethodCatalog";
 import { isPastDate, unitCity } from "../../../state/bookingHelpers";
 import {
+  alreadyScheduledByOther,
   disabledReasonForStatus,
   resolveCustomerSlotData,
   WINDOW_TIME_RANGE,
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+import { Lock } from "lucide-react";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -101,6 +103,15 @@ export function SlotsDesktop() {
     [session.unit_id, jobMinutes],
   );
   const rollout = slotData.rollout;
+  // Uniqueness lock — Task #49. If another party already paid-booked
+  // this customer's unit, the picker is read-only. We still surface
+  // the booked date/window/booker so they understand *why*. Skip the
+  // lock when no unit is selected (canvas-isolated preview keeps the
+  // picker fully interactive on its own iframe).
+  const lockedByOther = useMemo(
+    () => alreadyScheduledByOther(session.unit_id),
+    [session.unit_id],
+  );
   const visibleDays = useMemo(
     () => slotData.days.filter((d) => !isPastDate(d.date)),
     [slotData.days],
@@ -279,7 +290,54 @@ export function SlotsDesktop() {
               </div>
             )}
 
-            {rollout && (<>
+            {/* Read-only "Already scheduled" panel — Task #49.
+                When another party has paid-booked this customer's unit,
+                the picker is locked. We surface the date/window and
+                booker name so the customer understands why they can't
+                pick a slot. The Continue button below is also disabled. */}
+            {rollout && lockedByOther && (
+              <div
+                className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-700"
+                data-testid="banner-locked-by-other-desktop"
+              >
+                <div className="flex items-start gap-3">
+                  <Lock className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold text-slate-900">
+                      Already scheduled for this address
+                    </div>
+                    <div className="mt-1.5 text-sm text-slate-600">
+                      <span className="font-medium text-slate-900">
+                        {lockedByOther.customerName}
+                      </span>{" "}
+                      booked the{" "}
+                      <span className="font-medium text-slate-900">
+                        {lockedByOther.serviceSlot === "morning"
+                          ? "morning"
+                          : lockedByOther.serviceSlot === "afternoon"
+                            ? "afternoon"
+                            : "service"}
+                      </span>{" "}
+                      window on{" "}
+                      <span className="font-medium text-slate-900">
+                        {lockedByOther.serviceDate ?? "a previously confirmed date"}
+                      </span>
+                      .
+                    </div>
+                    <div className="mt-3 text-sm text-slate-600">
+                      Only one confirmed booking is allowed per service
+                      run. If this looks wrong, please call{" "}
+                      <span className="font-medium" style={{ color: BRAND }}>
+                        1300 TAYLR
+                      </span>
+                      .
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {rollout && !lockedByOther && (<>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-slate-900">{monthLabel} 2026</span>
@@ -385,7 +443,7 @@ export function SlotsDesktop() {
             </button>
             <button
               type="button"
-              disabled={!selected}
+              disabled={!selected || !!lockedByOther}
               data-testid="button-continue-desktop"
               className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
               style={{ backgroundColor: BRAND }}

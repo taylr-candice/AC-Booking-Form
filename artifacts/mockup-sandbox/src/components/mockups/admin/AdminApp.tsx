@@ -16,13 +16,16 @@
  * between them.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   bookingDurationMinutes,
+  consumeBookingCapacity,
   createRollout,
   findRolloutForBooking,
+  getActiveBookingForUnit,
   liveBookingFromSession,
+  releaseBookingCapacity,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
   SEEDED_BUILDINGS,
@@ -35,8 +38,9 @@ import {
   type AdminUnit,
   type PaymentStatus,
   type ServiceStatus,
+  type TimelineEntry,
 } from "@/state/adminMockData";
-import { useBookingSession } from "@/state/bookingSession";
+import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
@@ -149,6 +153,161 @@ export function AdminApp() {
     );
   }
 
+  // ── Cancel / Reschedule (Task #49) ─────────────────────────────────────
+  //
+  // Both flows are admin-only and the live demo row is read-only here
+  // (it mirrors the customer's session — the customer is the source of
+  // truth for their own booking). We:
+  //   1. Update the booking row (status / payment / timeline patch).
+  //   2. Free / move the rollout slot capacity via the helpers in
+  //      `adminMockData` so the schedule strip + Rollouts view reflect
+  //      the change immediately.
+  //   3. Bump the rollouts refresh key so any view reading from the
+  //      module-level rollouts store re-renders.
+  function cancelBooking(id: string, note: string) {
+    if (id === "bk-live") return;
+    const booking = seededBookings.find((b) => b.id === id);
+    if (!booking) return;
+    if (booking.serviceStatus === "cancelled") return;
+    const wasPaid = booking.paymentStatus === "paid";
+    const releaseOk = releaseBookingCapacity(booking);
+    const serviceEntry: TimelineEntry = {
+      status: "cancelled",
+      label: `Cancelled · ${note}`,
+      at: "Just now",
+      by: "Mia (admin)",
+    };
+    const patch: Partial<AdminBooking> = {
+      serviceStatus: "cancelled",
+      cancelledAt: "Just now",
+      cancelledBy: "Mia (admin)",
+      cancellationNote: note,
+      serviceTimeline: [...booking.serviceTimeline, serviceEntry],
+    };
+    if (wasPaid) {
+      const paymentEntry: TimelineEntry = {
+        status: "refund_pending",
+        label: "Refund pending · cancelled by Mia (admin)",
+        at: "Just now",
+        by: "Mia (admin)",
+      };
+      patch.paymentStatus = "refund_pending";
+      patch.paymentTimeline = [...booking.paymentTimeline, paymentEntry];
+    }
+    setSeededBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    );
+    if (releaseOk) bumpRolloutsRefreshKey();
+  }
+
+  function rescheduleBooking(
+    id: string,
+    date: string,
+    window: "morning" | "afternoon",
+    note?: string,
+  ) {
+    if (id === "bk-live") return;
+    const booking = seededBookings.find((b) => b.id === id);
+    if (!booking || !booking.rolloutId) return;
+    if (booking.serviceStatus === "cancelled") return;
+    releaseBookingCapacity(booking);
+    // Build the post-reschedule shape so consumeBookingCapacity sees
+    // the booking against its new slot — duration is unchanged so this
+    // is mostly cosmetic, but it keeps the helper symmetric with
+    // release.
+    const moved: AdminBooking = {
+      ...booking,
+      serviceDate: date,
+      serviceSlot: window,
+    };
+    consumeBookingCapacity(moved, booking.rolloutId, date, window);
+    const winLabel = window === "morning" ? "morning" : "afternoon";
+    const noteSuffix = note && note.trim() ? ` — ${note.trim()}` : "";
+    const entry: TimelineEntry = {
+      status: "rescheduled",
+      label: `Rescheduled to ${date} · ${winLabel}${noteSuffix}`,
+      at: "Just now",
+      by: "Mia (admin)",
+    };
+    setSeededBookings((prev) =>
+      prev.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              serviceDate: date,
+              serviceSlot: window,
+              serviceTimeline: [...b.serviceTimeline, entry],
+            }
+          : b,
+      ),
+    );
+    bumpRolloutsRefreshKey();
+  }
+
+  // ── Customer submit-time uniqueness guard (Task #49) ───────────────────
+  //
+  // When the customer hits "Pay" in the iframed booking flow, their
+  // `submitBooking()` calls into the registered guard before promoting
+  // the session to `submitted`. The guard re-checks the unit against
+  // the current admin-side bookings, since seeded rows can change
+  // during the demo. Three outcomes:
+  //   - "paid"             → another customer paid first; reject.
+  //   - "invoice_pending"  → an admin invoice-pending row exists; we
+  //                          supersede it (cancel + free capacity +
+  //                          stamp `supersededByBookingId`) and let
+  //                          the new booking through.
+  //   - "ok"               → no conflict.
+  //
+  // The guard re-registers whenever `seededBookings` changes so it
+  // always sees the freshest list. Reset on unmount to prevent a stale
+  // closure from outliving the admin shell.
+  useEffect(() => {
+    setUniquenessGuard((sess, newBookingReference) => {
+      if (!sess.unit_id) return "ok";
+      const rollout = findRolloutForBooking("svc-ac", sess.unit_id);
+      if (!rollout) return "ok";
+      const verdict = getActiveBookingForUnit(
+        sess.unit_id,
+        seededBookings,
+        rollout.id,
+      );
+      if (verdict.kind === "paid") return "paid";
+      if (verdict.kind === "invoice_pending") {
+        const prior = verdict.booking;
+        releaseBookingCapacity(prior);
+        const supersedingName =
+          `${sess.contact_first_name} ${sess.contact_last_name}`.trim() ||
+          "the new customer";
+        const note = `Superseded by paid booking ${newBookingReference} by ${supersedingName}.`;
+        const entry: TimelineEntry = {
+          status: "cancelled",
+          label: "Cancelled · superseded by paid booking",
+          at: "Just now",
+          by: "System",
+        };
+        setSeededBookings((prev) =>
+          prev.map((b) =>
+            b.id === prior.id
+              ? {
+                  ...b,
+                  serviceStatus: "cancelled",
+                  cancelledAt: "Just now",
+                  cancelledBy: "System",
+                  cancellationNote: note,
+                  supersededByBookingId: newBookingReference,
+                  serviceTimeline: [...b.serviceTimeline, entry],
+                }
+              : b,
+          ),
+        );
+        bumpRolloutsRefreshKey();
+        return "invoice_pending";
+      }
+      return "ok";
+    });
+    return () => setUniquenessGuard(null);
+  }, [seededBookings]);
+
   function openNewBooking(buildingId: string | null) {
     setNewBookingBuildingId(buildingId);
     setNewBookingOpen(true);
@@ -238,6 +397,8 @@ export function AdminApp() {
                 agents={agents}
                 onBack={() => setSelectedBookingId(null)}
                 onUpdate={updateBooking}
+                onCancelBooking={cancelBooking}
+                onRescheduleBooking={rescheduleBooking}
               />
             ) : (
               <BookingsView
@@ -266,6 +427,8 @@ export function AdminApp() {
                 agents={agents}
                 onBack={() => setSelectedBookingId(null)}
                 onUpdate={updateBooking}
+                onCancelBooking={cancelBooking}
+                onRescheduleBooking={rescheduleBooking}
               />
             ) : (
               <AwaitingCoordinationView

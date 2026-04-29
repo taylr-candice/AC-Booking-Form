@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Info,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
@@ -18,6 +19,7 @@ import {
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
 import {
+  alreadyScheduledByOther,
   disabledReasonForStatus,
   resolveCustomerSlotData,
   type CustomerDay,
@@ -68,6 +70,10 @@ export function SlotsMobileLite() {
     [session.unit_id, jobMinutes],
   );
   const rollout = slotData.rollout;
+  const lockedByOther = useMemo(
+    () => alreadyScheduledByOther(session.unit_id),
+    [session.unit_id],
+  );
   const visibleDays = useMemo(
     () => slotData.days.filter((d) => !isPastDate(d.date)),
     [slotData.days],
@@ -224,6 +230,46 @@ export function SlotsMobileLite() {
               and we'll add you to the waitlist.
             </div>
           </div>
+        ) : lockedByOther ? (
+          <div
+            className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700"
+            data-testid="banner-locked-by-other-mobile-lite"
+          >
+            <div className="flex items-start gap-2.5">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+              <div className="flex-1">
+                <div className="text-[14px] font-semibold text-slate-900">
+                  Already scheduled for this address
+                </div>
+                <div className="mt-1 text-[12px] text-slate-600">
+                  <span className="font-medium text-slate-900">
+                    {lockedByOther.customerName}
+                  </span>{" "}
+                  booked the{" "}
+                  <span className="font-medium text-slate-900">
+                    {lockedByOther.serviceSlot === "morning"
+                      ? "morning"
+                      : lockedByOther.serviceSlot === "afternoon"
+                        ? "afternoon"
+                        : "service"}
+                  </span>{" "}
+                  window on{" "}
+                  <span className="font-medium text-slate-900">
+                    {lockedByOther.serviceDate ?? "a previously confirmed date"}
+                  </span>
+                  .
+                </div>
+                <div className="mt-2 text-[12px] text-slate-600">
+                  Only one confirmed booking is allowed per service run.
+                  Call{" "}
+                  <span className="font-medium" style={{ color: BRAND }}>
+                    1300 TAYLR
+                  </span>{" "}
+                  if this looks wrong.
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
           <>
             <div className="space-y-3">
@@ -251,7 +297,7 @@ export function SlotsMobileLite() {
       <div className="border-t border-slate-100 bg-white px-5 py-3">
         <button
           type="button"
-          disabled={!selected}
+          disabled={!selected || !!lockedByOther}
           data-testid="button-continue-mobile"
           className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
           style={{ backgroundColor: BRAND }}

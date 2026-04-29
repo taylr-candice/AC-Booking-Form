@@ -7,7 +7,7 @@
  * session) are read-only here; the customer flow is the source of truth.
  */
 
-import { ChevronLeft, TriangleAlert } from "lucide-react";
+import { CalendarClock, ChevronLeft, TriangleAlert, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -23,7 +23,9 @@ import {
 } from "@/state/adminMockData";
 
 import { Card, Field } from "./atoms";
+import { CancelBookingModal } from "./CancelBookingModal";
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
+import { RescheduleBookingModal } from "./RescheduleBookingModal";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
 export function BookingDetail({
@@ -33,6 +35,8 @@ export function BookingDetail({
   agents,
   onBack,
   onUpdate,
+  onCancelBooking,
+  onRescheduleBooking,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -40,9 +44,29 @@ export function BookingDetail({
   agents: AdminAgent[];
   onBack: () => void;
   onUpdate: (id: string, patch: Partial<AdminBooking>) => void;
+  /** Permanently mark a booking cancelled with a mandatory note.
+   *  Wired by `AdminApp` — the live demo row never reaches this. */
+  onCancelBooking: (id: string, note: string) => void;
+  /** Move a booking's slot. Reused capacity helpers ensure the rollout
+   *  view stays in sync. Note is optional. */
+  onRescheduleBooking: (
+    id: string,
+    date: string,
+    window: "morning" | "afternoon",
+    note?: string,
+  ) => void;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
+  // Modal open state — reset whenever the active booking changes so a
+  // stale modal can't end up bound to a different booking after the
+  // admin clicks back and into another row.
+  const [showCancel, setShowCancel] = useState(false);
+  const [showReschedule, setShowReschedule] = useState(false);
+  useEffect(() => {
+    setShowCancel(false);
+    setShowReschedule(false);
+  }, [bookingId]);
 
   // Whenever the selected booking changes, pull the freshest notes value.
   useEffect(() => {
@@ -74,6 +98,18 @@ export function BookingDetail({
     currentIdx >= 0 && currentIdx < SERVICE_STATUS_FLOW.length - 1
       ? SERVICE_STATUS_FLOW[currentIdx + 1]
       : null;
+  const isCancelled = booking.serviceStatus === "cancelled";
+  // Cancel + Reschedule are disabled for the live demo row (the
+  // customer flow owns it) and for already-cancelled bookings.
+  // Reschedule additionally needs a rollout + a concrete current
+  // slot — coordination bookings (`to_be_coordinated`) reschedule via
+  // the awaiting-coordination flow instead.
+  const canCancel = !booking.isLive && !isCancelled;
+  const canReschedule =
+    !booking.isLive &&
+    !isCancelled &&
+    !!booking.rolloutId &&
+    (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon");
 
   function advanceStatus() {
     if (!nextStatus || !booking) return;
@@ -114,22 +150,64 @@ export function BookingDetail({
               Live demo
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setShowReschedule(true)}
+            disabled={!canReschedule}
+            data-testid="button-open-reschedule"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              booking.isLive
+                ? "Live demo row is read-only"
+                : isCancelled
+                  ? "Cancelled bookings can't be rescheduled"
+                  : !booking.rolloutId
+                    ? "No rollout linked"
+                    : ""
+            }
+          >
+            <CalendarClock className="h-3.5 w-3.5" />
+            Reschedule
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCancel(true)}
+            disabled={!canCancel}
+            data-testid="button-open-cancel"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+            title={
+              booking.isLive
+                ? "Live demo row is read-only"
+                : isCancelled
+                  ? "Already cancelled"
+                  : ""
+            }
+          >
+            <XCircle className="h-3.5 w-3.5" />
+            Cancel
+          </button>
           {nextStatus ? (
             <button
               type="button"
               onClick={advanceStatus}
-              disabled={booking.isLive}
+              disabled={booking.isLive || isCancelled}
               className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition ${
-                booking.isLive ? "cursor-not-allowed opacity-50" : "hover:brightness-110"
+                booking.isLive || isCancelled ? "cursor-not-allowed opacity-50" : "hover:brightness-110"
               }`}
               style={{ backgroundColor: BRAND }}
-              title={booking.isLive ? "Live demo row is read-only" : ""}
+              title={
+                booking.isLive
+                  ? "Live demo row is read-only"
+                  : isCancelled
+                    ? "Cancelled bookings can't be advanced"
+                    : ""
+              }
             >
               Advance to "{nextStatusLabel(nextStatus)}"
             </button>
           ) : (
             <span className="text-[12px] font-semibold text-slate-500">
-              Service complete
+              {isCancelled ? "Cancelled" : "Service complete"}
             </span>
           )}
         </div>
@@ -266,6 +344,26 @@ export function BookingDetail({
           </Card>
         </div>
       </div>
+      {showCancel && (
+        <CancelBookingModal
+          booking={booking}
+          onConfirm={(note) => {
+            onCancelBooking(booking.id, note);
+            setShowCancel(false);
+          }}
+          onDismiss={() => setShowCancel(false)}
+        />
+      )}
+      {showReschedule && (
+        <RescheduleBookingModal
+          booking={booking}
+          onConfirm={(date, window, note) => {
+            onRescheduleBooking(booking.id, date, window, note);
+            setShowReschedule(false);
+          }}
+          onDismiss={() => setShowReschedule(false)}
+        />
+      )}
     </div>
   );
 }
@@ -359,6 +457,11 @@ function nextStatusLabel(s: ServiceStatus): string {
       return "Complete";
     case "invoice_adjusted":
       return "Invoice adjusted";
+    case "cancelled":
+      // Not reachable from the SERVICE_STATUS_FLOW walk — included so the
+      // exhaustive switch type-checks. The Cancel affordance writes its
+      // own timeline entry directly.
+      return "Cancelled";
   }
 }
 

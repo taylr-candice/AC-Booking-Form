@@ -20,17 +20,20 @@
  * starts with `bookingActions.reset()` to avoid order coupling.
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   bookingActions,
   COORDINATION_ACCESS_METHODS,
   getBookingSession,
   migratePersistedSession,
+  setUniquenessGuard,
   type AccessMethod,
   type AcDiscrepancy,
   type BookingState,
   type StepId,
+  type UniquenessGuard,
+  type UniquenessVerdict,
 } from "./bookingSession";
 
 // ─── A. migratePersistedSession ────────────────────────────────────────────
@@ -1120,5 +1123,119 @@ describe("unit-unavailable terminal state", () => {
       expect(s.payment_cancelled).toBe(true);
       expect(s.unit_unavailable).toBe(false);
     });
+  });
+});
+
+// ─── F. submit-time uniqueness guard (Task #49) ────────────────────────────
+//
+// `submitBooking()` runs the registered uniqueness guard before
+// promoting the session to `submitted`. The admin shell wires a real
+// guard; the customer-only mockup uses the default no-op. These tests
+// pin all three verdicts plus the default-no-op safety branch so a
+// future refactor can't silently drop the gate.
+
+describe("submitBooking — uniqueness guard branches (Task #49)", () => {
+  let guardCalls: Array<{ unit_id: string | null; reference: string }>;
+
+  beforeEach(() => {
+    bookingActions.reset();
+    guardCalls = [];
+  });
+  // Always reset the guard so other test files don't see this one's
+  // stub. `setUniquenessGuard(null)` restores the default no-op.
+  afterEach(() => setUniquenessGuard(null));
+
+  function withGuard(verdict: UniquenessVerdict): void {
+    const guard: UniquenessGuard = (s, ref) => {
+      guardCalls.push({ unit_id: s.unit_id, reference: ref });
+      return verdict;
+    };
+    setUniquenessGuard(guard);
+  }
+
+  function seedReadyToSubmit() {
+    bookingActions.setUnit("unit-xyz");
+    bookingActions.setRole("owner");
+    bookingActions.setContact({
+      contact_first_name: "Sam",
+      contact_last_name: "Lee",
+      contact_email: "sam@example.com",
+      contact_phone: "+15551234567",
+    });
+    bookingActions.setSystems(1);
+    bookingActions.setAdditionalIndoor(0);
+    bookingActions.setPrimaryResidence("live_in");
+    bookingActions.setAccessMethod("owner_live_at_unit");
+    bookingActions.setSchedule("2026-05-10", "morning");
+    bookingActions.setCancellationAcknowledged(true);
+    bookingActions.goToStep(5);
+  }
+
+  it("'ok' → submits and stamps a reference", () => {
+    seedReadyToSubmit();
+    withGuard("ok");
+    bookingActions.submitBooking();
+    const s = getBookingSession();
+    expect(s.submitted).toBe(true);
+    expect(s.unit_unavailable).toBe(false);
+    expect(s.reference).toBeTruthy();
+    expect(guardCalls.length).toBe(1);
+    expect(guardCalls[0].unit_id).toBe("unit-xyz");
+    // The same generated reference must have been handed to the
+    // guard so it can stamp `supersededByBookingId` correctly.
+    expect(guardCalls[0].reference).toBe(s.reference);
+  });
+
+  it("'paid' → does NOT submit, flips unit_unavailable", () => {
+    seedReadyToSubmit();
+    withGuard("paid");
+    bookingActions.submitBooking();
+    const s = getBookingSession();
+    expect(s.submitted).toBe(false);
+    expect(s.reference).toBeFalsy();
+    expect(s.unit_unavailable).toBe(true);
+    expect(guardCalls.length).toBe(1);
+  });
+
+  it("'invoice_pending' → submits normally (the guard already side-effected the prior row)", () => {
+    seedReadyToSubmit();
+    withGuard("invoice_pending");
+    bookingActions.submitBooking();
+    const s = getBookingSession();
+    expect(s.submitted).toBe(true);
+    expect(s.unit_unavailable).toBe(false);
+    expect(s.reference).toBeTruthy();
+    expect(guardCalls.length).toBe(1);
+  });
+
+  it("default no-op guard (canvas-isolated mode) submits without consulting any admin store", () => {
+    // No `setUniquenessGuard` call here — the default is a no-op
+    // that returns "ok" so the standalone customer flow still
+    // works without an admin shell wired in.
+    seedReadyToSubmit();
+    bookingActions.submitBooking();
+    const s = getBookingSession();
+    expect(s.submitted).toBe(true);
+    expect(s.unit_unavailable).toBe(false);
+    expect(s.reference).toBeTruthy();
+  });
+
+  it("guard is NOT called once the session is already submitted (terminal-state safety)", () => {
+    seedReadyToSubmit();
+    withGuard("ok");
+    bookingActions.submitBooking();
+    expect(guardCalls.length).toBe(1);
+    // Second call should short-circuit on the terminal-state check
+    // before reaching the guard.
+    bookingActions.submitBooking();
+    expect(guardCalls.length).toBe(1);
+  });
+
+  it("guard is NOT called when unit_unavailable is already set", () => {
+    bookingActions.markUnitUnavailable();
+    withGuard("ok");
+    bookingActions.submitBooking();
+    expect(guardCalls.length).toBe(0);
+    expect(getBookingSession().submitted).toBe(false);
   });
 });

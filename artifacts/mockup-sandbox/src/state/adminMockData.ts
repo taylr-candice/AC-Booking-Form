@@ -99,12 +99,22 @@ export type AdminAgent = {
 };
 
 export type PaymentStatus = "paid" | "pending" | "refund_pending" | "refunded";
+/**
+ * Service-side lifecycle of a booking.
+ *
+ * `cancelled` is a terminal off-flow state (admin-initiated cancellation
+ * via the BookingDetail "Cancel booking" affordance, or system-initiated
+ * supersede of an invoice-pending booking by a paid one). It is
+ * intentionally NOT part of {@link SERVICE_STATUS_FLOW} — the "Advance"
+ * affordance must never reach it from the normal scheduled→complete walk.
+ */
 export type ServiceStatus =
   | "scheduled"
   | "en_route"
   | "on_site"
   | "complete"
-  | "invoice_adjusted";
+  | "invoice_adjusted"
+  | "cancelled";
 
 export const SERVICE_STATUS_FLOW: readonly ServiceStatus[] = [
   "scheduled",
@@ -179,6 +189,19 @@ export type AdminBooking = {
    *  Anzac Parade — kept around so the empty-state customer flow has a
    *  realistic counterpart). */
   rolloutId: string | null;
+  /** Cancellation audit trail (set when {@link ServiceStatus} is
+   *  `"cancelled"`). All four fields are optional so seed data and the
+   *  rest of the codebase don't have to spell them out for non-cancelled
+   *  rows. */
+  cancelledAt?: string;
+  cancelledBy?: string;
+  cancellationNote?: string;
+  /** When the system auto-cancels an `invoice_pending` row because a
+   *  newer paid booking landed on the same unit, we record the winning
+   *  booking id here. Drives the "Invoice to cancel · superseded" pill
+   *  in the bookings list so an admin knows there's an outstanding
+   *  invoice they should void. */
+  supersededByBookingId?: string;
 };
 
 // ─── Seeded buildings ───────────────────────────────────────────────────────
@@ -1981,6 +2004,117 @@ export function rolloutSlotStatus(
   if (remaining <= 0) return "full";
   if (jobMinutes > 0 && remaining < jobMinutes) return "not_enough_time";
   return "available";
+}
+
+/**
+ * Return the active confirmed booking on a given unit (within the same
+ * rollout) that should block a new customer from claiming the slot.
+ *
+ * Rules:
+ *   - `serviceStatus === "cancelled"` rows never block (they're closed
+ *     out and any payment has been released / will be refunded).
+ *   - Only bookings on the same `rolloutId` count — different rollouts
+ *     are different service rounds and a unit can be re-booked for each.
+ *   - A `paid` booking is a hard block; the customer must pick another
+ *     unit or wait for the admin to cancel.
+ *   - An `invoice_pending` booking is a soft block; the new customer can
+ *     proceed and the system will supersede the old row at submit time.
+ *   - Pure / data-only — safe to call from both the customer flow and
+ *     the admin shell with the same set of bookings.
+ */
+export type ActiveBookingForUnit =
+  | { kind: "none" }
+  | { kind: "paid"; booking: AdminBooking }
+  | { kind: "invoice_pending"; booking: AdminBooking };
+
+export function getActiveBookingForUnit(
+  unitId: string,
+  bookings: readonly AdminBooking[],
+  rolloutId: string | null,
+): ActiveBookingForUnit {
+  if (!rolloutId) return { kind: "none" };
+  let paid: AdminBooking | null = null;
+  let pending: AdminBooking | null = null;
+  for (const b of bookings) {
+    if (b.unitId !== unitId) continue;
+    if (b.rolloutId !== rolloutId) continue;
+    if (b.serviceStatus === "cancelled") continue;
+    if (b.paymentStatus === "paid") {
+      // Latest paid booking wins (highest id) — see latestBookingByUnit.
+      if (!paid || b.id > paid.id) paid = b;
+    } else if (b.paymentStatus === "pending") {
+      if (!pending || b.id > pending.id) pending = b;
+    }
+  }
+  if (paid) return { kind: "paid", booking: paid };
+  if (pending) return { kind: "invoice_pending", booking: pending };
+  return { kind: "none" };
+}
+
+/**
+ * Decrement the rollout slot capacity that `booking` was consuming.
+ * No-op for coordination bookings, bookings with no rollout, bookings
+ * with no concrete date/window, or when the rollout / day / slot has
+ * since been removed. For `slots_per_window` rollouts we drop
+ * `bookedCount` by 1 (clamped at 0); for `time_budget_per_window` we
+ * subtract the booking's job duration in minutes (clamped at 0).
+ *
+ * Returns true when capacity was actually released so the caller can
+ * decide whether to bump the rollouts refresh key.
+ */
+export function releaseBookingCapacity(booking: AdminBooking): boolean {
+  if (!booking.rolloutId) return false;
+  if (!booking.serviceDate) return false;
+  if (booking.serviceSlot !== "morning" && booking.serviceSlot !== "afternoon") {
+    return false;
+  }
+  const rollout = getRolloutById(booking.rolloutId);
+  if (!rollout) return false;
+  const day = rollout.days.find((d) => d.isoDate === booking.serviceDate);
+  if (!day) return false;
+  const slot = booking.serviceSlot === "morning" ? day.morning : day.afternoon;
+  if (rollout.capacityModel === "slots_per_window") {
+    const next = Math.max(0, (slot.bookedCount ?? 0) - 1);
+    updateRolloutSlot(rollout.id, day.isoDate, booking.serviceSlot, {
+      bookedCount: next,
+    });
+  } else {
+    const jobMin = bookingDurationMinutes(booking);
+    const next = Math.max(0, slot.bookedMinutes - jobMin);
+    updateRolloutSlot(rollout.id, day.isoDate, booking.serviceSlot, {
+      bookedMinutes: next,
+    });
+  }
+  return true;
+}
+
+/**
+ * Increment the rollout slot capacity at (`rolloutId`, `date`, `window`)
+ * by the booking's footprint. Mirrors the capacity-mutation logic used
+ * by `appendBooking`. Returns true when capacity was actually consumed.
+ */
+export function consumeBookingCapacity(
+  booking: AdminBooking,
+  rolloutId: string,
+  date: string,
+  window: "morning" | "afternoon",
+): boolean {
+  const rollout = getRolloutById(rolloutId);
+  if (!rollout) return false;
+  const day = rollout.days.find((d) => d.isoDate === date);
+  if (!day) return false;
+  const slot = window === "morning" ? day.morning : day.afternoon;
+  if (rollout.capacityModel === "slots_per_window") {
+    updateRolloutSlot(rollout.id, day.isoDate, window, {
+      bookedCount: (slot.bookedCount ?? 0) + 1,
+    });
+  } else {
+    const jobMin = bookingDurationMinutes(booking);
+    updateRolloutSlot(rollout.id, day.isoDate, window, {
+      bookedMinutes: slot.bookedMinutes + jobMin,
+    });
+  }
+  return true;
 }
 
 // ── Mutators (used by the rollouts admin views) ────────────────────────────

@@ -23,7 +23,10 @@
 
 import {
   findRolloutForBooking,
+  getActiveBookingForUnit,
   rolloutSlotStatus,
+  SEEDED_BOOKINGS,
+  type AdminBooking,
   type AdminRollout,
   type RolloutSlotStatus,
 } from "../../../state/adminMockData";
@@ -120,6 +123,37 @@ export function disabledReasonForStatus(
 ): string | null {
   if (status === "available") return null;
   return "Full";
+}
+
+/**
+ * Returns the active confirmed booking on `unitId` made by another
+ * party — the customer-side equivalent of {@link getActiveBookingForUnit}.
+ *
+ * Used by the slot pickers to render a read-only "Already scheduled"
+ * panel when the customer's chosen unit was paid-booked by someone
+ * else (e.g. an agent who picked the same unit between Step 1 and
+ * Step 4). Only "paid" bookings count — invoice-pending soft blocks
+ * are handled up-front in the unit picker (Step 1) and at submit time
+ * in `bookingSession.submitBooking()`, so by the time the customer
+ * reaches the slot picker an `invoice_pending` row is just informational
+ * noise here.
+ *
+ * The customer's own in-progress booking (the live-demo session row)
+ * never appears in `SEEDED_BOOKINGS`, so we don't need to filter it
+ * out by id — the seeded list is naturally "everyone but me".
+ *
+ * Returns `null` when no unit is selected (so the canvas-isolated
+ * preview keeps working without a session) or when no rollout exists
+ * for the selected unit's building.
+ */
+export function alreadyScheduledByOther(
+  unitId: string | null,
+): AdminBooking | null {
+  if (!unitId) return null;
+  const rollout = findRolloutForBooking("svc-ac", unitId);
+  if (!rollout) return null;
+  const verdict = getActiveBookingForUnit(unitId, SEEDED_BOOKINGS, rollout.id);
+  return verdict.kind === "paid" ? verdict.booking : null;
 }
 
 /**

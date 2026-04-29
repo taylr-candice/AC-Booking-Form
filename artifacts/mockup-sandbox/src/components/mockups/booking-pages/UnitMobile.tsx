@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Briefcase,
   CheckCircle2,
   ChevronDown,
+  Lock,
   Search,
   User,
 } from "lucide-react";
@@ -20,6 +22,13 @@ import {
   DEMO_MANAGING_AGENCIES,
   isOtherAgency,
 } from "../../../state/accessMethodCatalog";
+import {
+  findRolloutForBooking,
+  getActiveBookingForUnit,
+  SEEDED_BOOKINGS,
+  type ActiveBookingForUnit,
+  type AdminBooking,
+} from "../../../state/adminMockData";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -73,6 +82,22 @@ function errorStyle(hasError: boolean): React.CSSProperties | undefined {
     : undefined;
 }
 
+/** See {@link UnitDesktop}'s `formatPaidReason` — same copy, kept in
+ *  sync between the two surfaces so the customer sees identical
+ *  reasoning on either device. */
+function formatPaidReason(b: AdminBooking): string {
+  const who = b.customerName || "another customer";
+  if (
+    b.serviceDate &&
+    (b.serviceSlot === "morning" || b.serviceSlot === "afternoon")
+  ) {
+    const window =
+      b.serviceSlot === "morning" ? "morning" : "afternoon";
+    return `${who} booked ${b.serviceDate} ${window}`;
+  }
+  return `${who} has a confirmed booking`;
+}
+
 export function UnitMobile() {
   const sessionUnitId = useBookingSelector((s) => s.unit_id);
   const role = useBookingSelector((s) => s.role);
@@ -124,7 +149,22 @@ export function UnitMobile() {
     }
   }, [showOtherInput]);
 
+  // See `UnitDesktop` — per-unit "is this unit already taken?" lookup
+  // so each row in the dropdown can be disabled (paid) or warned about
+  // (invoice_pending) inline. Same source data and helper used.
+  const unitStatuses = useMemo(() => {
+    const out = new Map<string, ActiveBookingForUnit>();
+    for (const u of UNITS) {
+      const rollout = findRolloutForBooking("svc-ac", u.id);
+      out.set(
+        u.id,
+        getActiveBookingForUnit(u.id, SEEDED_BOOKINGS, rollout?.id ?? null),
+      );
+    }
+    return out;
+  }, []);
   const selected = UNITS.find((u) => u.id === selectedId);
+  const selectedStatus = selected ? unitStatuses.get(selected.id) : undefined;
   const canContinue = canContinueStep1({
     unit_id: selectedId,
     role,
@@ -145,6 +185,7 @@ export function UnitMobile() {
   }, [query]);
 
   const selectUnit = (id: string) => {
+    if (unitStatuses.get(id)?.kind === "paid") return;
     setSelectedId(id);
     bookingActions.setUnit(id);
     setOpen(false);
@@ -254,29 +295,55 @@ export function UnitMobile() {
                 ) : (
                   filtered.map((u) => {
                     const active = u.id === selectedId;
+                    const status = unitStatuses.get(u.id);
+                    const blocked = status?.kind === "paid";
+                    const reason = blocked
+                      ? formatPaidReason(status.booking)
+                      : null;
                     return (
                       <button
                         key={u.id}
                         type="button"
+                        disabled={blocked}
                         onClick={() => selectUnit(u.id)}
                         data-testid={`dropdown-unit-${u.id}`}
+                        aria-disabled={blocked}
                         className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
-                          active ? "bg-pink-50" : "hover:bg-slate-50"
+                          blocked
+                            ? "cursor-not-allowed bg-slate-50 opacity-70"
+                            : active
+                              ? "bg-pink-50"
+                              : "hover:bg-slate-50"
                         }`}
                       >
                         <div className="min-w-0 flex-1">
                           <div
-                            className={`truncate text-[14px] font-semibold ${
-                              active ? "text-pink-700" : "text-slate-900"
+                            className={`flex items-center gap-1.5 truncate text-[14px] font-semibold ${
+                              blocked
+                                ? "text-slate-500 line-through"
+                                : active
+                                  ? "text-pink-700"
+                                  : "text-slate-900"
                             }`}
                           >
-                            {u.address}
+                            {blocked && (
+                              <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                            )}
+                            <span className="truncate">{u.address}</span>
                           </div>
                           <div className="mt-0.5 truncate text-[11px] text-slate-500">
                             {u.lot} · {u.building}
                           </div>
+                          {blocked && (
+                            <div
+                              className="mt-1 truncate text-[11px] font-medium text-slate-600"
+                              data-testid={`dropdown-unit-${u.id}-blocked`}
+                            >
+                              Already booked — {reason}
+                            </div>
+                          )}
                         </div>
-                        {active && (
+                        {active && !blocked && (
                           <CheckCircle2
                             className="mt-0.5 h-5 w-5 shrink-0"
                             style={{ color: BRAND }}
@@ -290,6 +357,29 @@ export function UnitMobile() {
             </div>
           )}
         </div>
+
+        {/* Invoice-pending soft warning. See `UnitDesktop` for spec. */}
+        {selected && selectedStatus?.kind === "invoice_pending" && (
+          <div
+            className="mt-3 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[12px] leading-snug"
+            style={{
+              borderColor: "#FCD34D",
+              backgroundColor: "#FFFBEB",
+              color: "#92400E",
+            }}
+            data-testid="warning-unit-invoice-pending"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div>
+              <span className="font-semibold">
+                There's a pending invoice for this unit.
+              </span>{" "}
+              Continuing and paying will supersede it — the existing
+              invoice is cancelled automatically when your payment goes
+              through.
+            </div>
+          </div>
+        )}
 
         {/* Progressive disclosure: role chooser appears once a property is picked. */}
         {selected && (

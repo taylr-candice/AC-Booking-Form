@@ -187,6 +187,38 @@ export type BookingState = {
   unit_unavailable: boolean;
 };
 
+// ─── Uniqueness guard ──────────────────────────────────────────────────────
+//
+// `submitBooking()` enforces "one confirmed booking per unit per service
+// rollout" by calling out to a registered guard before promoting the
+// session to `submitted`. The guard is wired by the admin shell (see
+// `AdminApp.tsx`) so it has access to seeded bookings + capacity
+// mutators; the default no-op preserves the canvas-isolated sandbox.
+//
+// Verdict semantics (mirrored in the JSDoc on `submitBooking`):
+//   - "paid"             → another customer already paid; submission is
+//                          rejected (terminal `unit_unavailable` screen).
+//   - "invoice_pending"  → an admin-created invoice-pending booking
+//                          exists and was just superseded by the guard
+//                          (it's been cancelled + capacity freed); the
+//                          new booking proceeds normally.
+//   - "ok"               → no conflict; submit normally.
+
+export type UniquenessVerdict = "paid" | "invoice_pending" | "ok";
+export type UniquenessGuard = (
+  session: BookingState,
+  newBookingReference: string,
+) => UniquenessVerdict;
+
+let uniquenessGuard: UniquenessGuard = () => "ok";
+
+/** Register a uniqueness guard called from `submitBooking()`. The admin
+ *  shell wires this on mount; tests call it to inject a stub. Pass
+ *  `null` to reset to the default no-op (used by tests in `afterEach`). */
+export function setUniquenessGuard(fn: UniquenessGuard | null): void {
+  uniquenessGuard = fn ?? (() => "ok");
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = "taylr.bookingSession.v2";
@@ -719,11 +751,34 @@ export const bookingActions = {
    *  (`payment_cancelled` or `unit_unavailable`) so a stale Pay button
    *  click can't promote a terminal booking to confirmed. The user
    *  must explicitly recover (Try again / Pick another unit) first,
-   *  which clears the flag. */
+   *  which clears the flag.
+   *
+   *  Before promoting to `submitted`, runs the registered uniqueness
+   *  guard ({@link setUniquenessGuard}) — the admin shell wires this
+   *  to enforce "one confirmed booking per unit per service rollout":
+   *
+   *   - "paid"             → another customer already paid for this
+   *                          unit; mark the session `unit_unavailable`
+   *                          and DON'T submit.
+   *   - "invoice_pending"  → an admin-created booking with a pending
+   *                          invoice exists; the guard supersedes it
+   *                          (cancel + free capacity), then we submit.
+   *   - "ok"               → no conflict, submit normally.
+   *
+   *  The default guard is a no-op so the canvas-isolated mockup
+   *  sandbox keeps working without an admin shell wired in. */
   submitBooking() {
     setState((s) => {
       if (s.submitted || s.payment_cancelled || s.unit_unavailable) return s;
-      return { ...s, submitted: true, reference: genBookingReference() };
+      const reference = genBookingReference();
+      const verdict = uniquenessGuard(s, reference);
+      if (verdict === "paid") {
+        return { ...s, unit_unavailable: true };
+      }
+      // "invoice_pending" — guard already side-effected the prior
+      // booking + freed capacity; carry on as a normal submission.
+      // "ok" — same.
+      return { ...s, submitted: true, reference };
     });
   },
 
