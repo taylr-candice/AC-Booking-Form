@@ -124,9 +124,6 @@ export function AdminApp() {
     }
     setSearch("");
     setBookingsBuildingFilter("all");
-    if (id === "awaiting_coordination") {
-      setCoordinationFilter("all");
-    }
   }
 
   /**
