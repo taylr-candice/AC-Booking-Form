@@ -16,9 +16,11 @@
  *     `ac_discrepancy.customer.type === "unsure"` — never on a "split"
  *     or "ducted" answer, and never when there's no discrepancy at all.
  *
- *  3. Disabled slot tiles render only one of the two generic, non-numeric
- *     reasons ("Not enough time left for this service" or "Full") and
- *     never the old "Won't fit your N-minute service" copy.
+ *  3. Disabled slot tiles render exactly one generic, non-numeric reason —
+ *     "Full" — and never the old "Won't fit your N-minute service" copy
+ *     nor the legacy "Not enough time left for this service" / "Not yet
+ *     open for booking" copy. The customer view is intentionally binary:
+ *     a window is either selectable or shows "Full".
  *
  * The store under `../../../state/bookingSession` is module-scoped, so
  * we reset it (and the underlying sessionStorage) between every test
@@ -259,15 +261,12 @@ describe.each(VARIANTS)("$name slot picker", ({
 
       for (const tile of disabledTiles) {
         const tileText = tile.textContent ?? "";
-        // Each disabled tile must surface ONE of the two generic, non-numeric
-        // reasons the components are allowed to show:
-        //   - "Full" when status === "full"
-        //   - "Not enough time left for this service" otherwise
-        // Both are generic and contain no minutes/hours.
-        const hasGenericReason =
-          tileText.includes("Not enough time left for this service") ||
-          tileText.includes("Full");
-        expect(hasGenericReason).toBe(true);
+        // Each disabled tile must surface exactly the generic, non-numeric
+        // reason "Full" — the customer view is binary (selectable or "Full"),
+        // and the legacy nuanced copy must never reappear.
+        expect(tileText).toContain("Full");
+        expect(tileText).not.toContain("Not enough time left for this service");
+        expect(tileText).not.toContain("Not yet open for booking");
         expect(tileText.toLowerCase()).not.toContain("won't fit");
         expect(tileText.toLowerCase()).not.toContain("minute service");
         expect(tileText).not.toMatch(NUMERIC_DURATION_RE);

@@ -22,6 +22,7 @@ import {
   resolveCustomerSlotData,
   type CustomerDay,
   type CustomerSlot,
+  WINDOW_TIME_RANGE,
 } from "./customerSlotData";
 
 const BRAND = "#ED017F";
@@ -280,7 +281,7 @@ function DayBlock({
           slot={day.morning}
           icon={<Sunrise className="h-4 w-4" />}
           label="Morning"
-          hint="8am – 12pm"
+          hint={WINDOW_TIME_RANGE.morning}
           selected={selected === day.morning.id}
           onClick={() => onSelect(day.morning.id)}
         />
@@ -288,7 +289,7 @@ function DayBlock({
           slot={day.afternoon}
           icon={<Sun className="h-4 w-4" />}
           label="Afternoon"
-          hint="12pm – 5pm"
+          hint={WINDOW_TIME_RANGE.afternoon}
           selected={selected === day.afternoon.id}
           onClick={() => onSelect(day.afternoon.id)}
         />

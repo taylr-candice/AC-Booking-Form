@@ -21,6 +21,7 @@ import { isPastDate, unitCity } from "../../../state/bookingHelpers";
 import {
   disabledReasonForStatus,
   resolveCustomerSlotData,
+  WINDOW_TIME_RANGE,
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
@@ -323,7 +324,7 @@ export function SlotsDesktop() {
                   slot={d.morning}
                   icon={<Sunrise className="h-4 w-4" />}
                   label="Morning"
-                  hint="8am – 12pm"
+                  hint={WINDOW_TIME_RANGE.morning}
                   selected={selected === d.morning.id}
                   onClick={() => setSelected(d.morning.id)}
                 />
@@ -334,7 +335,7 @@ export function SlotsDesktop() {
                   slot={d.afternoon}
                   icon={<Sun className="h-4 w-4" />}
                   label="Afternoon"
-                  hint="12pm – 5pm"
+                  hint={WINDOW_TIME_RANGE.afternoon}
                   selected={selected === d.afternoon.id}
                   onClick={() => setSelected(d.afternoon.id)}
                 />
@@ -357,9 +358,10 @@ export function SlotsDesktop() {
                     <CheckCircle2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-0.5">Selected slot</div>
+                    <div className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-0.5">Selected window</div>
                     <div className="text-sm font-semibold text-slate-900">
-                      {selectedDay.weekday} {selectedDay.day} {selectedDay.month} · <span className="capitalize">{selectedSlot.window} window</span>
+                      {selectedDay.weekday} {selectedDay.day} {selectedDay.month} · <span className="capitalize">{selectedSlot.window} window</span>{" "}
+                      <span className="text-slate-600 font-normal">({WINDOW_TIME_RANGE[selectedSlot.window]})</span>
                     </div>
                   </div>
                 </div>
@@ -413,11 +415,11 @@ function DesktopSlotCard({
   const disabled = !fits;
   const isSelected = selected && fits;
 
-  // Three distinct reasons so the customer can tell apart "the admin
-  // hasn't released this window yet" ("Not yet open for booking"),
-  // "everyone else booked it" ("Full") and "your job is too long for
-  // what's left" ("Not enough time left ..."). Centralised in
-  // `disabledReasonForStatus` so all three picker variants agree.
+  // Customer view is intentionally binary: a window is either selectable
+  // or shows "Full". Internal admin distinctions ("not yet open", "not
+  // enough time left for the job", "fully booked") are not surfaced.
+  // Centralised in `disabledReasonForStatus` so all three picker variants
+  // agree.
   const reason = disabledReasonForStatus(status);
 
   return (

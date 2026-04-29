@@ -105,20 +105,30 @@ export function resolveCustomerSlotData(
  * Map the four-state {@link RolloutSlotStatus} to the user-facing
  * disabled-reason copy that the slot tile renders below the window
  * label. Returns `null` for `available` (the tile is enabled and
- * shows no reason at all). Centralised here so all three picker
- * variants render identical copy.
+ * shows no reason at all).
+ *
+ * The customer view is intentionally binary: a window is either
+ * available to select, or it shows "Full". The internal nuance
+ * between "the day is fully booked", "your job won't fit in what's
+ * left", and "the admin hasn't released this window yet" is not
+ * surfaced to the customer — practically, none of those windows
+ * are bookable, so we just say "Full". Centralised here so all
+ * three picker variants render identical copy.
  */
 export function disabledReasonForStatus(
   status: RolloutSlotStatus,
 ): string | null {
-  switch (status) {
-    case "full":
-      return "Full";
-    case "not_enough_time":
-      return "Not enough time left for this service";
-    case "not_yet_open":
-      return "Not yet open for booking";
-    default:
-      return null;
-  }
+  if (status === "available") return null;
+  return "Full";
 }
+
+/**
+ * Customer-facing time range for each booking window. Hoisted so
+ * the slot tiles and the "Selected window" summary panel can
+ * render the same string (single source of truth — change here
+ * and every picker variant updates).
+ */
+export const WINDOW_TIME_RANGE: Record<"morning" | "afternoon", string> = {
+  morning: "8am – 12pm",
+  afternoon: "12pm – 5pm",
+};
