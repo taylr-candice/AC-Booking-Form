@@ -311,3 +311,111 @@ describe.each(VARIANTS)(
     );
   },
 );
+
+// ─── (3) Unsure mode — streamlined-view contract (Task #101 / #109) ─────────
+//
+// Task #101 streamlined the AC step in unsure mode so the UnsureCard is
+// the leading content: the page heading ("Tell us about the AC setup"),
+// the intro paragraph, and the pink OverrideBanner are all suppressed.
+// The acknowledgement checkbox, Continue button, and (on mobile) Back
+// button must still be present so the customer can finish the step.
+//
+// There are two ways the customer enters unsure mode and both must yield
+// the same streamlined view:
+//   - `override === "unsure"` — picked "Not sure" from the type picker.
+//   - `notSureCount === true` — picked a known type, then tapped
+//     "Not sure? We can confirm this on-site" under the systems stepper.
+//
+// We use the no-record unit (`u3`) for both entry points because it
+// surfaces the type picker as the leading content out of the box, so
+// each entry route can be driven entirely from inside the rendered
+// component without extra store priming.
+
+const UNSURE_ENTRIES: ReadonlyArray<{
+  label: string;
+  enter: (q: { getByTestId: (id: string) => HTMLElement }) => void;
+  /** Whether the "← I'd like to enter the count myself" undo affordance
+   *  on the UnsureCard is expected — it only renders when the customer
+   *  arrived via `notSureCount` (so they can back out to the stepper),
+   *  not when they explicitly picked "Not sure" as the AC type. */
+  expectUndo: boolean;
+}> = [
+  {
+    label: 'override === "unsure" (picked from the type picker)',
+    enter: ({ getByTestId }) => {
+      act(() => {
+        fireEvent.click(getByTestId("choice-unsure"));
+      });
+    },
+    expectUndo: false,
+  },
+  {
+    label:
+      'notSureCount (picked a known type, then "Not sure? We can confirm this on-site")',
+    enter: ({ getByTestId }) => {
+      act(() => {
+        fireEvent.click(getByTestId("choice-split"));
+      });
+      act(() => {
+        fireEvent.click(getByTestId("link-not-sure-count"));
+      });
+    },
+    expectUndo: true,
+  },
+];
+
+describe.each(VARIANTS)(
+  "$label — unsure mode streamlined-view contract",
+  ({ Component, label }) => {
+    it.each(UNSURE_ENTRIES)(
+      "entered via $label: suppresses the page heading, intro paragraph " +
+        "and pink OverrideBanner; renders the UnsureCard; and keeps the " +
+        "ack checkbox, Continue button (and on mobile, Back button)",
+      ({ enter, expectUndo }) => {
+        bookingActions.setUnit(UNIT_WITHOUT_RECORD);
+
+        const { getByTestId, queryByTestId, queryByText } = render(
+          <Component />,
+        );
+
+        enter({ getByTestId });
+
+        // Suppressed by the unsure-mode gate (Task #101).
+        expect(
+          queryByText(/Tell us about the AC setup/i),
+        ).not.toBeInTheDocument();
+        expect(
+          queryByText(/Our technician will confirm your AC setup on-site\./i),
+        ).not.toBeInTheDocument();
+
+        // The pink OverrideBanner is the only thing that renders the
+        // `button-override-reset` testid, so its absence is a reliable
+        // proxy for the banner being suppressed.
+        expect(queryByTestId("button-override-reset")).toBeNull();
+
+        // UnsureCard is the leading content in unsure mode. It has no
+        // wrapper testid so we assert via its heading copy. The undo
+        // affordance ("I'd like to enter the count myself") only shows
+        // for the `notSureCount` entry route — see UnsureCard's `onUndo`
+        // prop in AcMobile / AcDesktop.
+        expect(
+          queryByText(/confirm your setup during the service/i),
+        ).toBeInTheDocument();
+        if (expectUndo) {
+          expect(getByTestId("button-undo-not-sure")).toBeInTheDocument();
+        } else {
+          expect(queryByTestId("button-undo-not-sure")).toBeNull();
+        }
+
+        // The ack + Continue must remain available so the customer can
+        // still complete the step from the streamlined view.
+        expect(getByTestId("checkbox-ac-ack")).toBeInTheDocument();
+        expect(getByTestId("button-continue")).toBeInTheDocument();
+        // The mobile Back affordance is layout-specific.
+        if (label === "AcMobile") {
+          expect(getByTestId("button-back-mobile")).toBeInTheDocument();
+        }
+      },
+    );
+  },
+);
