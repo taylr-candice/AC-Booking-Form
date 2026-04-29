@@ -236,6 +236,7 @@ export function BookingDetail({
       label: `Logged call · ${CALL_OUTCOME_LABEL[outcome]}`,
       at: "Just now",
       by: "Mia (admin)",
+      loggedAt: nowIso,
       ...(note.trim().length > 0 ? { note: note.trim() } : {}),
     };
     onUpdate(booking.id, {
@@ -263,6 +264,7 @@ export function BookingDetail({
           : "Logged email",
       at: "Just now",
       by: "Mia (admin)",
+      loggedAt: nowIso,
       ...(note.trim().length > 0 ? { note: note.trim() } : {}),
     };
     onUpdate(booking.id, {

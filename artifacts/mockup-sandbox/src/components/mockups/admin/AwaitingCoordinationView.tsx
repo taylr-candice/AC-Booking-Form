@@ -27,6 +27,7 @@ import {
   EMAIL_TEMPLATE_CUSTOM_ID,
   EMAIL_TEMPLATE_CUSTOM_LABEL,
   EMAIL_TEMPLATES,
+  formatAttemptRecency,
   formatCoordinationWaiting,
   formatLastContacted,
   getBuildingForUnit,
@@ -160,17 +161,27 @@ function CoordinatingWithCell({
       <div className="text-[11px] text-slate-500">
         {waitingText} · {lastContactText}
       </div>
-      {latestAttempt && (
-        <div
-          className="text-[11px] text-slate-500"
-          data-testid="coordinating-with-last-attempt"
-        >
-          Last attempt:{" "}
-          <span className="font-medium text-slate-700">
-            {latestAttempt.label}
-          </span>
-        </div>
-      )}
+      {latestAttempt && (() => {
+        // Inline recency suffix ("· 2h ago") so a team lead can
+        // triage by freshness without opening the row. Sourced from
+        // the entry's own `loggedAt` (not the row-level
+        // `lastContactedAt`) so logging an email after a call shows
+        // the email's age rather than the call's. Legacy entries
+        // with no `loggedAt` simply omit the suffix.
+        const recency = formatAttemptRecency(latestAttempt.loggedAt);
+        return (
+          <div
+            className="text-[11px] text-slate-500"
+            data-testid="coordinating-with-last-attempt"
+          >
+            Last attempt:{" "}
+            <span className="font-medium text-slate-700">
+              {latestAttempt.label}
+              {recency ? ` · ${recency}` : ""}
+            </span>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -11,7 +11,7 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   AdminBooking,
@@ -149,5 +149,122 @@ describe("BookingsView last-attempt helper", () => {
     ];
     renderView(makeBooking({ id: "bk-no-touch", serviceTimeline: timeline }));
     expect(attemptText()).toBeNull();
+  });
+});
+
+/**
+ * Recency suffix on the "Last attempt: …" helper. Pulled from each
+ * call/email entry's own `loggedAt` ISO timestamp so that logging an
+ * email after a call surfaces the email's age rather than the older
+ * call's, and so that a row reads correctly as "spoke just now" /
+ * "spoke 2h ago" / "spoke yesterday" without an admin needing to
+ * open the booking.
+ *
+ * Uses fake timers so the diff between `loggedAt` and "now" is fully
+ * deterministic — the formatter buckets are h/d-grained, so any
+ * real-clock drift in CI would be enough to flip "2h ago" to
+ * "1h ago".
+ */
+describe("BookingsView last-attempt recency", () => {
+  const NOW_ISO = "2026-04-29T10:00:00+10:00";
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function callAt(loggedAtIso: string): TimelineEntry[] {
+    return [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Spoke to them",
+        at: "Just now",
+        by: "Mia (admin)",
+        loggedAt: loggedAtIso,
+      },
+    ];
+  }
+
+  it("appends 'just now' when the call landed less than an hour ago", () => {
+    // 12 minutes before "now" → "just now" bucket.
+    const loggedAt = "2026-04-29T09:48:00+10:00";
+    renderView(
+      makeBooking({ id: "bk-call-now", serviceTimeline: callAt(loggedAt) }),
+    );
+    expect(attemptText()).toBe("Last attempt: spoke · just now");
+  });
+
+  it("appends 'Xh ago' when the call landed earlier today", () => {
+    // 2h 5m before "now" → "2h ago" bucket (floored).
+    const loggedAt = "2026-04-29T07:55:00+10:00";
+    renderView(
+      makeBooking({ id: "bk-call-2h", serviceTimeline: callAt(loggedAt) }),
+    );
+    expect(attemptText()).toBe("Last attempt: spoke · 2h ago");
+  });
+
+  it("appends 'yesterday' when the call landed roughly a day ago", () => {
+    // ~26h before "now" → past the 24h boundary, still inside 48h → "yesterday".
+    const loggedAt = "2026-04-28T08:00:00+10:00";
+    renderView(
+      makeBooking({
+        id: "bk-call-yesterday",
+        serviceTimeline: callAt(loggedAt),
+      }),
+    );
+    expect(attemptText()).toBe("Last attempt: spoke · yesterday");
+  });
+
+  it("uses the latest entry's timestamp when an email follows a call", () => {
+    // A call from yesterday followed by an email logged 30 minutes ago.
+    // The recency must reflect the email (the latest touch) — not the
+    // older call — otherwise ops would re-chase a row that just got an
+    // email out the door.
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Left voicemail",
+        at: "Yesterday",
+        by: "Mia (admin)",
+        loggedAt: "2026-04-28T08:00:00+10:00",
+      },
+      {
+        kind: "email",
+        status: "logged_email",
+        label: "Logged email · Booking access — please confirm window",
+        at: "Just now",
+        by: "Mia (admin)",
+        loggedAt: "2026-04-29T09:30:00+10:00",
+      },
+    ];
+    renderView(
+      makeBooking({ id: "bk-email-after-call", serviceTimeline: timeline }),
+    );
+    expect(attemptText()).toBe(
+      'Last attempt: email · "Booking access — please confirm window" · just now',
+    );
+  });
+
+  it("omits the recency suffix when the entry has no loggedAt timestamp", () => {
+    // Legacy entries (or hand-built test fixtures) without `loggedAt`
+    // should still render the outcome — just without a misleading "·
+    // NaNh ago" suffix.
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Spoke to them",
+        at: "Just now",
+        by: "Mia (admin)",
+      },
+    ];
+    renderView(makeBooking({ id: "bk-call-legacy", serviceTimeline: timeline }));
+    expect(attemptText()).toBe("Last attempt: spoke");
   });
 });

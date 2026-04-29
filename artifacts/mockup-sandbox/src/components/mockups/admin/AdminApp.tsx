@@ -235,6 +235,7 @@ export function AdminApp() {
           label: `Logged call · ${CALL_OUTCOME_LABEL[outcome]}`,
           at: "Just now",
           by: "Mia (admin)",
+          loggedAt: nowIso,
           ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
         };
         return {

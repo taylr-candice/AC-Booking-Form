@@ -501,6 +501,11 @@ describe("AdminApp · bulkLogEmail entry shape", () => {
         label: "Logged email · Booking access — please confirm window",
         at: "Just now",
         by: "Mia (admin)",
+        // Bulk emails inherit the caller-supplied `nowIso` as their
+        // structured timestamp so the Bookings list / coordination
+        // queue can render the "· Xh ago" recency suffix off the
+        // entry itself rather than the row-level lastContactedAt.
+        loggedAt: nowIso,
         note: "Sent rebook link",
       });
     }

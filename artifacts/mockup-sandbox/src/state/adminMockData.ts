@@ -151,6 +151,16 @@ export type TimelineEntry = {
    *  ("Left voicemail", "Spoke to tenant — confirmed Wed afternoon",
    *  "Sent rebook link", etc.). Rendered beneath the entry label. */
   note?: string;
+  /** Structured ISO timestamp the entry was logged at. Carried
+   *  alongside the human-readable `at` string so the bookings list +
+   *  coordination queue can compute "spoke · 2h ago" recency from the
+   *  most recent call/email entry without having to parse `at`
+   *  (which is intentionally display-only — "Just now", "Apr 26 ·
+   *  09:14", "Yesterday", etc., none of which round-trip through
+   *  `Date.parse` reliably). Optional because the seed timeline
+   *  entries (status updates, payments) aren't surfaced through any
+   *  recency UI; only `kind: "call" | "email"` writers populate it. */
+  loggedAt?: string;
 };
 
 export type AdminBooking = {
@@ -1098,6 +1108,13 @@ export type LatestCoordinationAttempt = {
   /** When `kind === "email"`, the trimmed subject the admin captured
    *  (empty string when none was provided). `null` for calls. */
   emailSubject: string | null;
+  /** Structured ISO timestamp the underlying call/email entry was
+   *  logged at — sourced from {@link TimelineEntry.loggedAt}. The
+   *  bookings list and coordination queue feed this through
+   *  {@link formatAttemptRecency} to render "spoke · 2h ago" inline.
+   *  `null` for legacy entries that pre-date the field, in which
+   *  case the recency suffix is omitted gracefully. */
+  loggedAt: string | null;
 };
 
 /** `BookingDetail.logCall` encodes the outcome in the entry label
@@ -1140,6 +1157,7 @@ export function latestCoordinationAttempt(
     // separator only and keep the remainder verbatim.
     const sepIdx = entry.label.indexOf("·");
     const suffix = sepIdx >= 0 ? entry.label.slice(sepIdx + 1).trim() : "";
+    const loggedAt = entry.loggedAt ?? null;
     if (entry.kind === "call") {
       const outcome = CALL_OUTCOME_LABEL_TO_VALUE[suffix] ?? null;
       return {
@@ -1147,6 +1165,7 @@ export function latestCoordinationAttempt(
         callOutcome: outcome,
         emailSubject: null,
         label: outcome ? CALL_OUTCOME_DISPLAY[outcome] : "call",
+        loggedAt,
       };
     }
     return {
@@ -1154,9 +1173,45 @@ export function latestCoordinationAttempt(
       callOutcome: null,
       emailSubject: suffix,
       label: suffix.length > 0 ? `email · "${suffix}"` : "email",
+      loggedAt,
     };
   }
   return null;
+}
+
+/**
+ * Format the time elapsed since a call/email timeline entry was
+ * logged into a compact, ready-to-render suffix for the bookings
+ * list + coordination queue's "Last attempt: spoke · 2h ago" line.
+ *
+ * Buckets:
+ *   - diff &lt; 1h            → `"just now"`
+ *   - 1h ≤ diff &lt; 24h     → `"Xh ago"` (floored hours)
+ *   - 24h ≤ diff &lt; 48h    → `"yesterday"` (so a one-day-old touch
+ *                                          reads naturally)
+ *   - diff ≥ 48h            → `"Xd ago"` (floored days)
+ *
+ * Returns `null` for malformed / future-dated timestamps so the
+ * caller can omit the suffix entirely instead of showing a
+ * confusing "NaNh ago" or negative time. (A clock-skew "future"
+ * value is treated as malformed here rather than clamped — the
+ * caller already knows whether to render the line at all.)
+ */
+export function formatAttemptRecency(
+  loggedAtIso: string | null,
+  now: Date = new Date(),
+): string | null {
+  if (loggedAtIso === null) return null;
+  const logged = new Date(loggedAtIso).getTime();
+  if (!Number.isFinite(logged)) return null;
+  const diffMs = now.getTime() - logged;
+  if (diffMs < 0) return null;
+  const hours = diffMs / (1000 * 60 * 60);
+  if (hours < 1) return "just now";
+  if (hours < 24) return `${Math.floor(hours)}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 2) return "yesterday";
+  return `${days}d ago`;
 }
 
 // ─── Slot calendar (next 14 days) ──────────────────────────────────────────
@@ -3091,11 +3146,20 @@ export function buildBulkLogEmailEntry({
   note,
   by = ADMIN_USER_LABEL,
   at = "Just now",
+  loggedAt,
 }: {
   subject: string;
   note: string;
   by?: string;
   at?: string;
+  /** ISO timestamp the bulk email was logged at — surfaced through
+   *  {@link latestCoordinationAttempt} so the bookings list +
+   *  coordination queue can render the "· 2h ago" recency suffix.
+   *  Optional so existing callers (and tests asserting only on the
+   *  label / kind shape) don't have to spell out the timestamp; when
+   *  omitted, no recency line is rendered for entries built this way.
+   *  `applyBulkLogEmail` always supplies it from its `nowIso` arg. */
+  loggedAt?: string;
 }): TimelineEntry {
   const trimmedSubject = subject.trim();
   const trimmedNote = note.trim();
@@ -3108,6 +3172,7 @@ export function buildBulkLogEmailEntry({
         : "Logged email",
     at,
     by,
+    ...(loggedAt !== undefined ? { loggedAt } : {}),
     ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
   };
 }
@@ -3131,7 +3196,7 @@ export function applyBulkLogEmail(
 ): AdminBooking[] {
   if (ids.length === 0) return [...bookings];
   const idSet = new Set(ids);
-  const entry = buildBulkLogEmailEntry({ subject, note, by });
+  const entry = buildBulkLogEmailEntry({ subject, note, by, loggedAt: nowIso });
   return bookings.map((b) => {
     if (b.id === "bk-live") return b;
     if (!idSet.has(b.id)) return b;

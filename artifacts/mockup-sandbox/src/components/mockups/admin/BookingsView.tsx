@@ -10,6 +10,7 @@ import { useState } from "react";
 
 import {
   bookerAgencyName,
+  formatAttemptRecency,
   getBuildingForUnit,
   latestCoordinationAttempt,
   type AdminBooking,
@@ -451,18 +452,32 @@ export function BookingsView({
                        *  spoken to the tenant recently — without
                        *  opening the booking. Muted text keeps it from
                        *  competing with the lifecycle status chip. */}
-                      {latestAttempt && (
-                        <div
-                          className="mt-1 text-[11px] text-slate-500"
-                          data-testid="bookings-row-last-attempt"
-                          data-booking-id={b.id}
-                        >
-                          Last attempt:{" "}
-                          <span className="font-medium text-slate-700">
-                            {latestAttempt.label}
-                          </span>
-                        </div>
-                      )}
+                      {latestAttempt && (() => {
+                        // Inline recency suffix ("· 2h ago") so a team
+                        // lead can triage by freshness without opening
+                        // the row. Pulled from the entry's own
+                        // `loggedAt` (not the row-level
+                        // `lastContactedAt`) so logging an email after
+                        // a call surfaces the email's age, not the
+                        // call's. Legacy entries with no `loggedAt`
+                        // simply omit the suffix.
+                        const recency = formatAttemptRecency(
+                          latestAttempt.loggedAt,
+                        );
+                        return (
+                          <div
+                            className="mt-1 text-[11px] text-slate-500"
+                            data-testid="bookings-row-last-attempt"
+                            data-booking-id={b.id}
+                          >
+                            Last attempt:{" "}
+                            <span className="font-medium text-slate-700">
+                              {latestAttempt.label}
+                              {recency ? ` · ${recency}` : ""}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       ${b.totalAud.toFixed(2)}
