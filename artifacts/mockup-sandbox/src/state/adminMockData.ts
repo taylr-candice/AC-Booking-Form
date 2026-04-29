@@ -2810,19 +2810,27 @@ export function convertCoordinationToScheduledPatch(
  * the BookingDetail Schedule card. Mirrors
  * {@link convertCoordinationToScheduledPatch}'s label format
  * ("Coordinated · {short date} · {window}") so the audit trail reads
- * consistently across the schedule and reschedule flows. Pure /
- * data-only — safe to import anywhere, no DOM access.
+ * consistently across the schedule and reschedule flows.
+ *
+ * Accepts an optional short `note` typed by ops on the reschedule
+ * confirmation step (e.g. "tenant called back"). When present and
+ * non-empty, it is appended to the label after the window so it is
+ * visible inline on the Service timeline without requiring a
+ * separate field on TimelineEntry. Pure / data-only — safe to import
+ * anywhere, no DOM access.
  */
 export function buildRescheduledTimelineEntry(
-  schedule: { date: string; window: "morning" | "afternoon" },
+  schedule: { date: string; window: "morning" | "afternoon"; note?: string },
   by: string = ADMIN_USER_LABEL,
   at: string = "Just now",
 ): TimelineEntry {
   const windowLabel =
     schedule.window === "morning" ? "Morning" : "Afternoon";
+  const trimmedNote = schedule.note?.trim() ?? "";
+  const noteSuffix = trimmedNote.length > 0 ? ` · ${trimmedNote}` : "";
   return {
     status: "rescheduled",
-    label: `Rescheduled · ${formatBookingShortDate(schedule.date)} · ${windowLabel}`,
+    label: `Rescheduled · ${formatBookingShortDate(schedule.date)} · ${windowLabel}${noteSuffix}`,
     at,
     by,
   };

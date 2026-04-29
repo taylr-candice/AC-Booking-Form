@@ -41,4 +41,24 @@ describe("buildRescheduledTimelineEntry", () => {
     expect(entry.by).toBe("System");
     expect(entry.at).toBe("2 minutes ago");
   });
+
+  it("appends a trimmed note to the label when ops adds a reason", () => {
+    const entry = buildRescheduledTimelineEntry({
+      date: "2026-05-04",
+      window: "afternoon",
+      note: "  tenant called back  ",
+    });
+    expect(entry.label).toBe(
+      "Rescheduled · 4 May · Afternoon · tenant called back",
+    );
+  });
+
+  it("ignores a blank / whitespace-only note", () => {
+    const entry = buildRescheduledTimelineEntry({
+      date: "2026-05-04",
+      window: "morning",
+      note: "   ",
+    });
+    expect(entry.label).toBe("Rescheduled · 4 May · Morning");
+  });
 });

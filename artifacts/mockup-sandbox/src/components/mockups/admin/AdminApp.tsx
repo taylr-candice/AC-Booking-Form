@@ -480,6 +480,7 @@ export function AdminApp() {
     id: string,
     date: string,
     window: "morning" | "afternoon",
+    note?: string,
   ) {
     if (id === "bk-live") return;
     const booking = seededBookings.find((b) => b.id === id);
@@ -511,6 +512,7 @@ export function AdminApp() {
     const entry: TimelineEntry = buildRescheduledTimelineEntry({
       date,
       window,
+      note,
     });
     setSeededBookings((prev) =>
       prev.map((b) =>
@@ -792,6 +794,7 @@ export function AdminApp() {
     bookingId: string,
     date: string,
     window: "morning" | "afternoon",
+    note?: string,
   ) {
     if (!schedulingTarget) return;
     const mode = schedulingTarget.mode;
@@ -800,7 +803,7 @@ export function AdminApp() {
     // their own separate flows.
     let undo: (() => void) | undefined;
     if (mode === "reschedule") {
-      rescheduleAppointment(bookingId, date, window);
+      rescheduleAppointment(bookingId, date, window, note);
     } else if (mode === "undo") {
       undoCancelBookingAndReschedule(bookingId, date, window);
     } else {
