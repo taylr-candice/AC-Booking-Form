@@ -36,6 +36,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  EMAIL_TEMPLATES,
   SEEDED_BOOKINGS,
   type AdminAgent,
   type AdminBooking,
@@ -225,6 +226,106 @@ describe("BookingDetail · log call / log email", () => {
       "Logged email · Booking access — please confirm",
     );
     expect(newEntry.note).toBe("Sent rebook link");
+  });
+
+  it("Log email form opens with the template dropdown on Custom… so inputs start empty", () => {
+    renderDetail(makeBooking());
+    fireEvent.click(screen.getByTestId("button-log-email"));
+    const select = screen.getByTestId(
+      "select-email-template",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("custom");
+    expect(
+      (screen.getByTestId("input-email-subject") as HTMLInputElement).value,
+    ).toBe("");
+    expect(
+      (screen.getByTestId("input-email-note") as HTMLTextAreaElement).value,
+    ).toBe("");
+  });
+
+  it("picking a saved template prefills subject + note (still editable) and reports the template name to onLogEmailToast", () => {
+    const onUpdate = vi.fn();
+    const onLogEmailToast = vi.fn();
+    const tpl = EMAIL_TEMPLATES[0];
+    renderDetail(makeBooking(), { onUpdate, onLogEmailToast });
+
+    fireEvent.click(screen.getByTestId("button-log-email"));
+    fireEvent.change(screen.getByTestId("select-email-template"), {
+      target: { value: tpl.id },
+    });
+
+    const subjectInput = screen.getByTestId(
+      "input-email-subject",
+    ) as HTMLInputElement;
+    const noteInput = screen.getByTestId(
+      "input-email-note",
+    ) as HTMLTextAreaElement;
+    expect(subjectInput.value).toBe(tpl.subject);
+    expect(noteInput.value).toBe(tpl.note);
+
+    // Tweak the prefilled subject so we prove the inputs are still
+    // editable after the template prefill — same affordance as the
+    // bulk picker.
+    fireEvent.change(subjectInput, {
+      target: { value: `${tpl.subject} (Bldg A)` },
+    });
+    fireEvent.click(screen.getByTestId("button-confirm-log-email"));
+
+    // Timeline entry uses the (edited) subject — same shape as the
+    // bulk-logged entry so the Awaiting-coordination "Last attempt"
+    // cell reads consistently regardless of how the email was
+    // logged.
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [, patch] = onUpdate.mock.calls[0];
+    const newEntry = patch.serviceTimeline.at(-1);
+    expect(newEntry.label).toBe(`Logged email · ${tpl.subject} (Bldg A)`);
+    expect(newEntry.note).toBe(tpl.note);
+
+    // Toast callback receives the template's display name (not its
+    // id) so the AdminApp shell can confirm which preset landed —
+    // mirror of the bulk-log-email toast.
+    expect(onLogEmailToast).toHaveBeenCalledTimes(1);
+    expect(onLogEmailToast.mock.calls[0][0]).toBe(tpl.name);
+    expect(onLogEmailToast.mock.calls[0][1]).toBe(`${tpl.subject} (Bldg A)`);
+  });
+
+  it("switching from a template back to Custom… clears both inputs", () => {
+    const tpl = EMAIL_TEMPLATES[1] ?? EMAIL_TEMPLATES[0];
+    renderDetail(makeBooking());
+
+    fireEvent.click(screen.getByTestId("button-log-email"));
+    fireEvent.change(screen.getByTestId("select-email-template"), {
+      target: { value: tpl.id },
+    });
+    const subjectInput = screen.getByTestId(
+      "input-email-subject",
+    ) as HTMLInputElement;
+    const noteInput = screen.getByTestId(
+      "input-email-note",
+    ) as HTMLTextAreaElement;
+    expect(subjectInput.value).toBe(tpl.subject);
+    expect(noteInput.value).toBe(tpl.note);
+
+    fireEvent.change(screen.getByTestId("select-email-template"), {
+      target: { value: "custom" },
+    });
+    expect(subjectInput.value).toBe("");
+    expect(noteInput.value).toBe("");
+  });
+
+  it("Custom submit reports the Custom label to onLogEmailToast", () => {
+    const onLogEmailToast = vi.fn();
+    renderDetail(makeBooking(), { onLogEmailToast });
+
+    fireEvent.click(screen.getByTestId("button-log-email"));
+    fireEvent.change(screen.getByTestId("input-email-subject"), {
+      target: { value: "Quick nudge" },
+    });
+    fireEvent.click(screen.getByTestId("button-confirm-log-email"));
+
+    expect(onLogEmailToast).toHaveBeenCalledTimes(1);
+    expect(onLogEmailToast.mock.calls[0][0]).toBe("Custom");
+    expect(onLogEmailToast.mock.calls[0][1]).toBe("Quick nudge");
   });
 
   it("omits the optional note field when the textarea is empty", () => {

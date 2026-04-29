@@ -349,6 +349,34 @@ export function AdminApp() {
     });
   }
 
+  /**
+   * Per-row counterpart to the `bulkLogEmail` toast above. Wired to
+   * {@link BookingDetail.onLogEmailToast}, which fires after the
+   * detail screen's own `logEmail` writes the timeline entry. We
+   * intentionally re-use the same toast format as bulk (with a
+   * `1 booking` count and the same `· {Template} | · Custom · {subject}`
+   * tail) so a busy admin sees a consistent confirmation regardless
+   * of whether the email was logged from the detail screen or the
+   * Awaiting-coordination bulk action bar. The detail screen still
+   * owns the timeline write — this handler is purely the toast.
+   */
+  function logEmailToast(templateLabel: string, subject: string) {
+    const trimmedTemplate = templateLabel.trim();
+    const trimmedSubject = subject.trim();
+    const isCustom =
+      trimmedTemplate.length === 0 ||
+      trimmedTemplate.toLowerCase() === "custom";
+    const tail = isCustom
+      ? trimmedSubject.length > 0
+        ? ` · Custom · ${trimmedSubject}`
+        : ` · Custom`
+      : ` · ${trimmedTemplate}`;
+    setToast({
+      id: `log-email-${Date.now()}`,
+      message: `Logged email on 1 booking${tail}`,
+    });
+  }
+
   // ── Cancel / Reschedule (Task #49) ─────────────────────────────────────
   //
   // Both flows are admin-only and the live demo row is read-only here
@@ -987,6 +1015,7 @@ export function AdminApp() {
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
+                onLogEmailToast={logEmailToast}
               />
             ) : (
               <BookingsView
@@ -1024,6 +1053,7 @@ export function AdminApp() {
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
+                onLogEmailToast={logEmailToast}
               />
             ) : (
               <AwaitingCoordinationView

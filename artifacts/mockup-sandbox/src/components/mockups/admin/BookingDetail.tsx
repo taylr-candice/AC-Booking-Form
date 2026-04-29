@@ -27,6 +27,9 @@ import { accessOnTheDayDescription } from "@/state/accessMethodCatalog";
 import {
   bookerAgencyName,
   coordinationContactForBooking,
+  EMAIL_TEMPLATE_CUSTOM_ID,
+  EMAIL_TEMPLATE_CUSTOM_LABEL,
+  EMAIL_TEMPLATES,
   formatCoordinationWaiting,
   formatLastContacted,
   getBuildingForUnit,
@@ -83,6 +86,7 @@ export function BookingDetail({
   onUndoCancelBooking,
   onUndoCancelBookingAndReschedule,
   onAcknowledgeSupersede,
+  onLogEmailToast,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -118,6 +122,15 @@ export function BookingDetail({
    *  shown when `supersededByBookingId` is set. Optional so older
    *  call-sites that don't yet thread it remain valid. */
   onAcknowledgeSupersede?: (id: string) => void;
+  /** Mirror of the bulk-log-email toast on
+   *  {@link AwaitingCoordinationView}: fired after a per-row email
+   *  is logged so the AdminApp shell can surface a confirmation toast
+   *  reflecting which template (or `Custom`) landed. Same shape as the
+   *  bulk handler's toast so single- and batch-logged emails read
+   *  consistently in ops' bottom-right toaster. Optional so existing
+   *  call-sites and tests that don't care about the toast remain
+   *  valid — the timeline write happens regardless. */
+  onLogEmailToast?: (templateLabel: string, subject: string) => void;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
@@ -250,8 +263,18 @@ export function BookingDetail({
    * `lastContactedAt`. Subject is encoded in the entry label so the
    * timeline reads as a one-line summary; the body / context goes on
    * `note`. Same shape as {@link logCall}, just with `kind: "email"`.
+   *
+   * `templateLabel` is the human-readable name of the seeded
+   * {@link EMAIL_TEMPLATES} entry the admin picked in the Log email
+   * form (e.g. `"Sent rebook link"`), or {@link EMAIL_TEMPLATE_CUSTOM_LABEL}
+   * when they bypassed the picker. It does NOT change the timeline
+   * label — that stays `Logged email · {subject}` so per-row entries
+   * line up with bulk-logged ones in the Awaiting-coordination
+   * "Last attempt" cell. Instead it's forwarded to the optional
+   * {@link onLogEmailToast} callback so the AdminApp shell can fire
+   * the same template-aware confirmation toast the bulk action does.
    */
-  function logEmail(subject: string, note: string) {
+  function logEmail(subject: string, note: string, templateLabel: string) {
     if (!booking) return;
     const nowIso = new Date().toISOString();
     const trimmedSubject = subject.trim();
@@ -271,6 +294,7 @@ export function BookingDetail({
       lastContactedAt: nowIso,
       serviceTimeline: [...booking.serviceTimeline, newEntry],
     });
+    onLogEmailToast?.(templateLabel, trimmedSubject);
   }
 
   return (
@@ -499,8 +523,8 @@ export function BookingDetail({
                   logCall(outcome, note);
                   setShowLogCall(false);
                 }}
-                onLogEmail={(subject, note) => {
-                  logEmail(subject, note);
+                onLogEmail={(subject, note, templateLabel) => {
+                  logEmail(subject, note, templateLabel);
                   setShowLogEmail(false);
                 }}
                 onScheduleCoordination={
@@ -940,7 +964,7 @@ function CoordinationCoordinatePanel({
   onCloseLogCall: () => void;
   onCloseLogEmail: () => void;
   onLogCall: (outcome: CallOutcome, note: string) => void;
-  onLogEmail: (subject: string, note: string) => void;
+  onLogEmail: (subject: string, note: string, templateLabel: string) => void;
   onScheduleCoordination?: () => void;
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
@@ -1217,10 +1241,54 @@ function LogEmailForm({
   onSubmit,
 }: {
   onCancel: () => void;
-  onSubmit: (subject: string, note: string) => void;
+  onSubmit: (subject: string, note: string, templateLabel: string) => void;
 }) {
+  // Template picker mirrors the bulk-log-email form on
+  // `AwaitingCoordinationView` so a single-booking email logged here
+  // ends up with the same canonical subject + note (and therefore the
+  // same `Logged email · {subject}` timeline label) as one logged in
+  // bulk. Defaults to `Custom…` so opening the form lands ops in the
+  // same free-text spot they were before this picker existed.
+  // Selecting a real template prefills both inputs (still editable);
+  // selecting `Custom…` clears them. The replacement is intentional
+  // / unconditional — every change to the dropdown overwrites both
+  // inputs, matching the bulk picker's mental model: "the dropdown is
+  // the source of truth, edit it after if you need to tweak".
+  const [templateId, setTemplateId] = useState<string>(
+    EMAIL_TEMPLATE_CUSTOM_ID,
+  );
   const [subject, setSubject] = useState("");
   const [note, setNote] = useState("");
+  function handleSelectTemplate(id: string) {
+    setTemplateId(id);
+    if (id === EMAIL_TEMPLATE_CUSTOM_ID) {
+      setSubject("");
+      setNote("");
+      return;
+    }
+    const tpl = EMAIL_TEMPLATES.find((t) => t.id === id);
+    if (!tpl) {
+      // Defensive — the dropdown only renders ids from
+      // EMAIL_TEMPLATES + the Custom sentinel, but if the constant
+      // ever drifts, fall back to Custom rather than leaving the
+      // inputs in a stale, half-prefilled state.
+      setTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
+      setSubject("");
+      setNote("");
+      return;
+    }
+    setSubject(tpl.subject);
+    setNote(tpl.note);
+  }
+  function handleSubmit() {
+    // Resolve the template's display name so the AdminApp toast can
+    // confirm what landed; falls back to the Custom label whenever
+    // the dropdown is on Custom (or — defensively — pointing at an
+    // unknown id, which `handleSelectTemplate` should already prevent).
+    const tpl = EMAIL_TEMPLATES.find((t) => t.id === templateId);
+    const templateLabel = tpl ? tpl.name : EMAIL_TEMPLATE_CUSTOM_LABEL;
+    onSubmit(subject, note, templateLabel);
+  }
   return (
     <div
       className="rounded-lg border border-slate-200 bg-white p-3"
@@ -1229,6 +1297,33 @@ function LogEmailForm({
       <div className="text-[12px] font-semibold text-slate-900">
         Log an email
       </div>
+      {/* Template picker — sits above the subject input so ops can
+          grab a saved preset in one click. Defaults to Custom… so
+          opening the form lands ops in the same free-text spot they
+          were before this picker existed. Selecting a template
+          prefills subject + note (still editable); selecting Custom…
+          clears them. Mirror of the dropdown in the bulk-log-email
+          form on `AwaitingCoordinationView`. */}
+      <label
+        className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+        htmlFor="log-email-template"
+      >
+        Template
+      </label>
+      <select
+        id="log-email-template"
+        value={templateId}
+        onChange={(e) => handleSelectTemplate(e.target.value)}
+        data-testid="select-email-template"
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+      >
+        <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+        {EMAIL_TEMPLATES.map((tpl) => (
+          <option key={tpl.id} value={tpl.id}>
+            {tpl.name}
+          </option>
+        ))}
+      </select>
       <label
         className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
         htmlFor="log-email-subject"
@@ -1269,7 +1364,7 @@ function LogEmailForm({
         </button>
         <button
           type="button"
-          onClick={() => onSubmit(subject, note)}
+          onClick={handleSubmit}
           data-testid="button-confirm-log-email"
           className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
           style={{ backgroundColor: BRAND }}
