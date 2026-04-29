@@ -671,6 +671,12 @@ export function AwaitingCoordinationView({
         {OUTCOME_FILTER_CHIPS.map((chip) => {
           const active = outcomeFilter === chip.key;
           const count = outcomeCounts[chip.key];
+          // Mute + disable chips with nothing in their queue so the
+          // non-empty buckets stand out at a glance. The "Any outcome"
+          // chip is never muted — it always represents the visible
+          // total, even when that total is zero, so the toolbar still
+          // has a sensible "reset" affordance.
+          const isEmpty = chip.key !== "all" && count === 0;
           return (
             <button
               key={chip.key}
@@ -678,16 +684,25 @@ export function AwaitingCoordinationView({
               onClick={() => setOutcomeFilter(chip.key)}
               data-testid={`chip-outcome-${chip.key}`}
               aria-pressed={active}
+              disabled={isEmpty}
               className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
                 active
                   ? "text-white"
-                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  : isEmpty
+                    ? "cursor-not-allowed bg-white text-slate-400 opacity-50 ring-1 ring-slate-100"
+                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
               }`}
               style={active ? { backgroundColor: BRAND } : undefined}
             >
               {chip.label}{" "}
               <span
-                className={active ? "text-white/80" : "text-slate-500"}
+                className={
+                  active
+                    ? "text-white/80"
+                    : isEmpty
+                      ? "text-slate-400"
+                      : "text-slate-500"
+                }
                 data-testid={`chip-outcome-${chip.key}-count`}
               >
                 ({count})

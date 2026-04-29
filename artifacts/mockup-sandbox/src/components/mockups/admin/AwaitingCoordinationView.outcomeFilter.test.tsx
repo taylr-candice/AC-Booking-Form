@@ -321,8 +321,13 @@ describe("AwaitingCoordinationView outcome filter", () => {
       }),
     ];
     render(<Harness initial={bookings} />);
-    clickChip("voicemail");
-    expect(renderedBookingIds()).toEqual([]);
+    // Voicemail bucket is empty because the latest attempt was the
+    // 'spoke' call — so the chip itself is disabled and counts zero.
+    expect(chipCount("voicemail")).toBe(0);
+    expect(
+      (screen.getByTestId("chip-outcome-voicemail") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
     clickChip("spoke");
     expect(renderedBookingIds()).toEqual(["bk-voicemail-then-spoke"]);
   });
@@ -376,16 +381,21 @@ describe("AwaitingCoordinationView outcome filter", () => {
     expect(renderedBookingIds()).toEqual(["bk-email-jones"]);
   });
 
-  it("renders an empty-state when the active outcome chip matches no rows", () => {
+  it("renders an empty-state when the queue is empty under the active filters", () => {
+    // Empty-bucket chips are disabled (see the "dims and disables"
+    // case below), so the only way to land on the empty-state row is
+    // for the non-outcome filters (here: a building filter that
+    // matches nothing) to wipe the queue out entirely. The "Any
+    // outcome" chip stays clickable on purpose so this state is
+    // still reachable.
     const bookings = [
       makeBooking({
-        id: "bk-spoke-only",
-        unitId: "u-a1",
+        id: "bk-spoke-b",
+        unitId: "u-b1",
         serviceTimeline: [callEntry("Spoke to them")],
       }),
     ];
-    render(<Harness initial={bookings} />);
-    clickChip("voicemail");
+    render(<Harness initial={bookings} initialBuildingFilter="bldg-a" />);
     expect(renderedBookingIds()).toEqual([]);
     expect(
       screen.getByText(/No coordination bookings match these filters\./i),
@@ -513,6 +523,82 @@ describe("AwaitingCoordinationView outcome filter", () => {
       expect(chipCount("never_logged")).toBe(2);
       expect(chipCount("spoke")).toBe(1);
       expect(chipCount("all")).toBe(3);
+    });
+
+    it("dims and disables chips with a count of zero so empty buckets fade into the background", () => {
+      // Only voicemail rows in the queue — every other outcome chip
+      // (Spoke, No answer, Email, Never logged) should mute itself
+      // visually and refuse clicks. The "Any outcome" chip stays
+      // active styling-wise because it always represents the visible
+      // total.
+      const bookings = [
+        makeBooking({
+          id: "bk-vm-1",
+          unitId: "u-a1",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+        makeBooking({
+          id: "bk-vm-2",
+          unitId: "u-a2",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+      ];
+      render(<Harness initial={bookings} />);
+
+      // Sanity: the buckets we expect to be empty really are zero.
+      expect(chipCount("spoke")).toBe(0);
+      expect(chipCount("no_answer")).toBe(0);
+      expect(chipCount("email")).toBe(0);
+      expect(chipCount("never_logged")).toBe(0);
+      expect(chipCount("voicemail")).toBe(2);
+      expect(chipCount("all")).toBe(2);
+
+      // Empty chips: disabled + muted (lower opacity, lighter ring,
+      // muted text).
+      for (const key of ["spoke", "no_answer", "email", "never_logged"]) {
+        const chip = screen.getByTestId(`chip-outcome-${key}`) as HTMLButtonElement;
+        expect(chip.disabled).toBe(true);
+        expect(chip.className).toMatch(/opacity-50/);
+        expect(chip.className).toMatch(/cursor-not-allowed/);
+        expect(chip.className).toMatch(/text-slate-400/);
+        expect(chip.className).toMatch(/ring-slate-100/);
+      }
+
+      // Non-empty chip stays clickable and uses full-strength styling.
+      const voicemail = screen.getByTestId("chip-outcome-voicemail") as HTMLButtonElement;
+      expect(voicemail.disabled).toBe(false);
+      expect(voicemail.className).not.toMatch(/opacity-50/);
+      expect(voicemail.className).toMatch(/text-slate-700/);
+
+      // The "Any outcome" chip is never muted, even when its bucket is
+      // somehow zero — it must always be the toolbar's reset
+      // affordance.
+      const anyOutcome = screen.getByTestId("chip-outcome-all") as HTMLButtonElement;
+      expect(anyOutcome.disabled).toBe(false);
+      expect(anyOutcome.className).not.toMatch(/opacity-50/);
+      expect(anyOutcome.className).not.toMatch(/cursor-not-allowed/);
+
+      // Clicking a muted chip must not flip the active filter — the
+      // queue stays on "Any outcome".
+      clickChip("spoke");
+      expect(
+        screen.getByTestId("chip-outcome-all").getAttribute("aria-pressed"),
+      ).toBe("true");
+      expect(
+        screen.getByTestId("chip-outcome-spoke").getAttribute("aria-pressed"),
+      ).toBe("false");
+    });
+
+    it("keeps 'Any outcome' un-muted even when the queue is completely empty", () => {
+      // Building filter that matches nothing — every chip count is
+      // zero, but the "Any outcome" chip must still render as a
+      // live, clickable reset affordance.
+      const bookings: AdminBooking[] = [];
+      render(<Harness initial={bookings} initialBuildingFilter="bldg-a" />);
+      expect(chipCount("all")).toBe(0);
+      const anyOutcome = screen.getByTestId("chip-outcome-all") as HTMLButtonElement;
+      expect(anyOutcome.disabled).toBe(false);
+      expect(anyOutcome.className).not.toMatch(/opacity-50/);
     });
 
     it("counts honour the building filter so the queue mix matches the visible rows", () => {
