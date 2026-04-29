@@ -32,9 +32,17 @@ const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string; icon: LucideIcon }> 
 export function Sidebar({
   activeView,
   onNav,
+  badges,
 }: {
   activeView: ViewId;
   onNav: (id: ViewId) => void;
+  /**
+   * Optional per-view numeric badge. A `0` (or missing entry) hides
+   * the badge — used today by the invoice-void queue so admins notice
+   * outstanding voids from any view, not just Bookings/Payments
+   * where the dashboard banner lives.
+   */
+  badges?: Partial<Record<ViewId, number>>;
 }) {
   return (
     <aside className="flex w-60 flex-col border-r border-slate-200 bg-white">
@@ -56,6 +64,7 @@ export function Sidebar({
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.id;
           const Icon = item.icon;
+          const badgeCount = badges?.[item.id] ?? 0;
           return (
             <button
               key={item.id}
@@ -69,7 +78,19 @@ export function Sidebar({
               style={isActive ? { backgroundColor: BRAND } : undefined}
             >
               <Icon className="h-4 w-4" />
-              {item.label}
+              <span className="flex-1 text-left">{item.label}</span>
+              {badgeCount > 0 && (
+                <span
+                  className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none text-white"
+                  style={{ backgroundColor: BRAND, paddingTop: 3, paddingBottom: 3 }}
+                  data-testid="sidebar-badge"
+                  data-view={item.id}
+                  aria-label={`${badgeCount} ${item.label} alert${badgeCount === 1 ? "" : "s"}`}
+                  title={`${badgeCount} invoice${badgeCount === 1 ? "" : "s"} need cancelling in billing`}
+                >
+                  {badgeCount}
+                </span>
+              )}
             </button>
           );
         })}

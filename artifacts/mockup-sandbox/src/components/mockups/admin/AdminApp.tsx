@@ -61,6 +61,7 @@ import { NewBookingFlow } from "./NewBookingFlow";
 import { RolloutScheduleEditor } from "./RolloutScheduleEditor";
 import { RolloutsView } from "./RolloutsView";
 import { SchedulingModal, type SchedulingMode } from "./SchedulingModal";
+import { selectPendingInvoiceVoids } from "./InvoiceVoidAlerts";
 import { Sidebar } from "./Sidebar";
 import { Toast } from "./Toast";
 import { TopBar } from "./TopBar";
@@ -828,9 +829,22 @@ export function AdminApp() {
     });
   }
 
+  // Sidebar badges — surface the invoice-void queue from any view so
+  // an admin spending their day in Awaiting coordination, Buildings,
+  // Rollouts, or Units doesn't miss outstanding voids. Reuses the
+  // same selector the dashboard banner does so the badge count and
+  // the banner list never drift apart. Mirror the badge on Bookings
+  // and Payments — the banner currently lives at the top of both
+  // views, so both nav entries should advertise the same queue.
+  const invoiceVoidCount = selectPendingInvoiceVoids(allBookings).length;
+  const sidebarBadges: Partial<Record<ViewId, number>> = {
+    bookings: invoiceVoidCount,
+    payments: invoiceVoidCount,
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['Inter'] text-slate-900">
-      <Sidebar activeView={view} onNav={handleNav} />
+      <Sidebar activeView={view} onNav={handleNav} badges={sidebarBadges} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar
           view={view}

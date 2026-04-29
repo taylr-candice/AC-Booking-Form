@@ -31,6 +31,19 @@ import {
 
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
+/**
+ * Selector for bookings that still have an outstanding superseded
+ * invoice (i.e. the auto-cancelled prior booking hasn't been
+ * acknowledged in billing yet). Exported so the sidebar badge can
+ * reuse the exact same predicate as the dashboard banner — keeping
+ * the count and the banner list strictly in sync.
+ */
+export function selectPendingInvoiceVoids(
+  bookings: AdminBooking[],
+): AdminBooking[] {
+  return bookings.filter((b) => !!b.supersededByBookingId);
+}
+
 export function InvoiceVoidAlerts({
   bookings,
   units,
@@ -45,7 +58,7 @@ export function InvoiceVoidAlerts({
   /** Quick "I've voided it" affordance — drops the row off the list. */
   onAcknowledge: (id: string) => void;
 }) {
-  const pending = bookings.filter((b) => !!b.supersededByBookingId);
+  const pending = selectPendingInvoiceVoids(bookings);
   if (pending.length === 0) return null;
 
   return (
