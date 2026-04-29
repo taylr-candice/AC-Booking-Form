@@ -400,7 +400,12 @@ export function useAcStep({
 /** Transparent price breakdown shown in both on-file (mobile uses
  *  dense padding) and full-configuration modes. Renders the base
  *  service line with a short qualifier explaining what one $179
- *  service covers, an optional per-extras line, and a Total row. */
+ *  service covers, an optional per-extras line, and a Total row.
+ *
+ *  When `knownType` is `null` the customer is in the type-level
+ *  "unsure" state — we show the default 1 × $179 base line with a
+ *  generic "confirmed on the day" qualifier instead of the
+ *  type-specific "1 outdoor + 1 indoor unit per system" line. */
 export function PriceBlock({
   systems,
   additional,
@@ -409,13 +414,15 @@ export function PriceBlock({
 }: {
   systems: number;
   additional: number;
-  knownType: KnownType;
+  knownType: KnownType | null;
   variant: Variant;
 }) {
   const base = systems * SYSTEM_PRICE;
   const extras = additional * ADDON_PRICE;
   const total = base + extras;
-  const qualifier = baseLineQualifier(knownType);
+  const qualifier = knownType
+    ? baseLineQualifier(knownType)
+    : "Default — confirmed on the day";
   const addonNoun =
     knownType === "ducted" ? "extra return-air grille" : "extra indoor unit";
   const addonNounPlural =
@@ -629,23 +636,49 @@ export function OverrideBanner({
   );
 }
 
-export function UnsureCard({
-  onUndo,
+/**
+ * Single card shown above the price block whenever the customer is in
+ * an "unsure" state (Task #102). Replaces the old OverrideBanner +
+ * UnsureCard pair so the customer sees one clear message about the
+ * default-1-system, invoice-extras-on-the-day deal — with an inline
+ * "see terms" link to the existing AcTermsModal — and the appropriate
+ * affordance to back out:
+ *   - count-level unsure (`onUndoCount`): "← I’d like to enter the
+ *     count myself" — keeps the type context line ("Showing split
+ *     setup" / "Showing ducted setup") and returns the customer to
+ *     the systems stepper.
+ *   - type-level unsure (`onChangeType`): "Change AC type" — clears
+ *     the unsure override and reopens the type picker.
+ *
+ * The two affordances are mutually exclusive — only one is set per
+ * render based on which entry route the customer took.
+ */
+export function UnsureMergedCard({
+  contextLine,
+  onUndoCount,
+  onChangeType,
+  onViewTerms,
   variant,
 }: {
-  onUndo?: () => void;
+  contextLine?: string;
+  onUndoCount?: () => void;
+  onChangeType?: () => void;
+  onViewTerms: () => void;
   variant: Variant;
 }) {
   const isMobile = variant === "mobile";
   const padding = isMobile ? "p-4" : "p-6";
   const iconBox = isMobile ? "h-9 w-9" : "h-10 w-10";
   const headingSize = isMobile ? "text-[15px]" : "text-lg";
-  const undoMt = isMobile ? "mt-2" : "mt-3";
-  const undoSize = isMobile ? "text-[11px]" : "text-xs";
+  const bodySize = isMobile ? "text-[12px]" : "text-sm";
+  const actionMt = isMobile ? "mt-3" : "mt-3";
+  const actionSize = isMobile ? "text-[11px]" : "text-xs";
+  const contextSize = isMobile ? "text-[11px]" : "text-xs";
 
   return (
     <div
       className={`rounded-xl border border-slate-200 bg-white ${padding} shadow-sm`}
+      data-testid="card-unsure-merged"
     >
       <div className="flex items-start gap-3">
         <div
@@ -657,14 +690,50 @@ export function UnsureCard({
           <h3 className={`font-semibold text-slate-900 ${headingSize}`}>
             We’ll confirm your setup during the service
           </h3>
-          {onUndo && (
+          {contextLine && (
+            <p
+              className={`mt-1 ${contextSize} font-medium uppercase tracking-wide text-slate-500`}
+              data-testid="text-unsure-context"
+            >
+              {contextLine}
+            </p>
+          )}
+          <p
+            className={`mt-2 ${bodySize} text-slate-600 leading-relaxed`}
+          >
+            We’ll book a default of 1 system (${SYSTEM_PRICE}). If our
+            technician finds extras on the day, we’ll invoice you for
+            those —{" "}
             <button
               type="button"
-              onClick={onUndo}
+              onClick={onViewTerms}
+              data-testid="link-view-terms-unsure"
+              className="font-medium underline underline-offset-2 hover:opacity-80"
+              style={{ color: BRAND }}
+            >
+              see terms
+            </button>
+            .
+          </p>
+          {onUndoCount && (
+            <button
+              type="button"
+              onClick={onUndoCount}
               data-testid="button-undo-not-sure"
-              className={`${undoMt} ${undoSize} font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900`}
+              className={`${actionMt} ${actionSize} font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900`}
             >
               ← I’d like to enter the count myself
+            </button>
+          )}
+          {onChangeType && (
+            <button
+              type="button"
+              onClick={onChangeType}
+              data-testid="button-change-ac-type-unsure"
+              className={`${actionMt} ${actionSize} font-medium underline underline-offset-2 hover:opacity-80`}
+              style={{ color: BRAND }}
+            >
+              Change AC type
             </button>
           )}
         </div>

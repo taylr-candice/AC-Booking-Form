@@ -31,7 +31,7 @@ import {
   overrideBannerTitle,
   PriceBlock,
   SYSTEM_PRICE,
-  UnsureCard,
+  UnsureMergedCard,
   useAcOnFileSync,
   useAcStep,
 } from "./acStepShared";
@@ -440,23 +440,40 @@ function FullConfigView({
             )}
 
             {isUnsureMode && (
-              <UnsureCard
-                onUndo={
+              <UnsureMergedCard
+                contextLine={
+                  notSureCount && knownType
+                    ? `Showing ${knownType} setup`
+                    : undefined
+                }
+                onUndoCount={
                   notSureCount && override !== "unsure"
                     ? () => setNotSureCount(false)
                     : undefined
                 }
+                onChangeType={
+                  override === "unsure" ? resetOverride : undefined
+                }
+                onViewTerms={() => setTermsOpen(true)}
                 variant="desktop"
               />
             )}
 
-            {/* Price block — base + per-extras + total */}
-            {!needsTypePick && knownType && (
+            {/* Price block — base + per-extras + total. In the
+                type-level "unsure" state we deliberately drop the
+                type-specific qualifier ("1 outdoor + 1 indoor unit
+                per system") even when `acTypeFromUnit` would resolve
+                `knownType` to a real type — the customer told us
+                they're unsure, so the qualifier "Default — confirmed
+                on the day" is the honest read (Task #102). The
+                count-level unsure state keeps the type-specific
+                qualifier because the type IS known. */}
+            {!needsTypePick && (
               <div className="mt-6">
                 <PriceBlock
                   systems={displaySystems}
                   additional={displayAdditional}
-                  knownType={knownType}
+                  knownType={override === "unsure" ? null : knownType}
                   variant="desktop"
                 />
               </div>
