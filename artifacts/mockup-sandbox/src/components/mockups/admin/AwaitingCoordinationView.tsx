@@ -42,7 +42,15 @@ const FILTER_CHIPS: ReadonlyArray<{ key: Filter; label: string }> = [
   { key: "awaiting_agent", label: "Awaiting agent" },
 ];
 
-function WaitingOnChip({ kind }: { kind: CoordinationKind }) {
+function WaitingOnChip({ kind }: { kind: CoordinationKind | null }) {
+  if (kind === null) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+        <Clock className="h-2.5 w-2.5" />
+        Unassigned
+      </span>
+    );
+  }
   const label = kind === "awaiting_agent" ? "Managing agent" : "Tenant";
   return (
     <span
@@ -78,17 +86,19 @@ export function AwaitingCoordinationView({
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
 }) {
-  // Pre-compute the kind for each booking so we don't recompute it on
-  // every filter / search keystroke. Bookings without a coordination
-  // kind (i.e. anything with a confirmed slot) are dropped here.
+  // Pre-compute the kind for each coordination booking so we don't
+  // recompute it on every filter / search keystroke. We include every
+  // booking whose serviceSlot is `to_be_coordinated`; rows whose
+  // accessMethod doesn't match a known coordination bucket are kept
+  // and rendered with an "Unassigned" chip so ops never lose sight
+  // of them.
   const coordinating = bookings
-    .map((b) => ({ b, kind: coordinationKindForBooking(b) }))
-    .filter(
-      (x): x is { b: AdminBooking; kind: CoordinationKind } => x.kind !== null,
-    );
+    .filter((b) => b.serviceSlot === "to_be_coordinated")
+    .map((b) => ({ b, kind: coordinationKindForBooking(b) }));
 
   const tenantCount = coordinating.filter((x) => x.kind === "awaiting_tenant").length;
   const agentCount = coordinating.filter((x) => x.kind === "awaiting_agent").length;
+  const unassignedCount = coordinating.filter((x) => x.kind === null).length;
   const totalCount = coordinating.length;
 
   const filtered = coordinating.filter(({ b, kind }) => {
@@ -139,6 +149,17 @@ export function AwaitingCoordinationView({
               <span className="font-semibold text-slate-900">{agentCount}</span>{" "}
               awaiting agent
             </span>
+            {unassignedCount > 0 && (
+              <>
+                <span className="text-slate-400">·</span>
+                <span>
+                  <span className="font-semibold text-slate-900">
+                    {unassignedCount}
+                  </span>{" "}
+                  unassigned
+                </span>
+              </>
+            )}
           </>
         )}
       </div>
