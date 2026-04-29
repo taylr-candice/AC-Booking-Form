@@ -96,9 +96,19 @@ export function AwaitingCoordinationView({
   // accessMethod doesn't match a known coordination bucket are kept
   // and rendered with an "Unassigned" chip so ops never lose sight
   // of them.
+  //
+  // Default order is oldest `createdAt` first so the bookings that
+  // have been waiting longest (and whose `WaitingChip` is reddest)
+  // float to the top of the queue. The downstream `filtered` array
+  // preserves this order for every Tenant / Managing-agent / All
+  // filter and building / search combination.
   const coordinating = bookings
     .filter((b) => b.serviceSlot === "to_be_coordinated")
-    .map((b) => ({ b, kind: coordinationKindForBooking(b) }));
+    .map((b) => ({ b, kind: coordinationKindForBooking(b) }))
+    .sort(
+      (a, z) =>
+        new Date(a.b.createdAt).getTime() - new Date(z.b.createdAt).getTime(),
+    );
 
   const tenantCount = coordinating.filter((x) => x.kind === "awaiting_tenant").length;
   const agentCount = coordinating.filter((x) => x.kind === "awaiting_agent").length;
