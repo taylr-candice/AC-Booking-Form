@@ -48,6 +48,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyBulkLogEmail,
   buildBulkLogEmailEntry,
+  EMAIL_TEMPLATES,
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
@@ -147,7 +148,12 @@ function Harness({
     outcome: "no_answer" | "spoke" | "voicemail",
     note: string,
   ) => void;
-  onBulkLogEmail?: (ids: string[], subject: string, note: string) => void;
+  onBulkLogEmail?: (
+    ids: string[],
+    subject: string,
+    note: string,
+    templateLabel: string,
+  ) => void;
 }) {
   const [filter, setFilter] = useState<"all">("all");
   return (
@@ -240,7 +246,7 @@ describe("AwaitingCoordinationView · bulk log email", () => {
     fireEvent.click(screen.getByTestId("button-bulk-confirm-log-email"));
 
     expect(onBulkLogEmail).toHaveBeenCalledTimes(1);
-    const [ids, subject, note] = onBulkLogEmail.mock.calls[0];
+    const [ids, subject, note, templateLabel] = onBulkLogEmail.mock.calls[0];
     expect(new Set(ids)).toEqual(new Set(["bk-1", "bk-3"]));
     // The view passes the raw subject / note straight through; the
     // AdminApp handler trims them before stamping the timeline.
@@ -248,6 +254,11 @@ describe("AwaitingCoordinationView · bulk log email", () => {
     // two stays explicit.
     expect(subject).toBe("  Booking access — please confirm window  ");
     expect(note).toBe("  Sent rebook link to all stalled tenants  ");
+    // No template was picked (the dropdown defaults to Custom…), so
+    // the view reports the canonical "Custom" label up to AdminApp
+    // — which the toast surfaces so ops can confirm the batch was
+    // sent free-text rather than from a saved preset.
+    expect(templateLabel).toBe("Custom");
 
     // Selection is cleared after submit so the bar (and form) collapse.
     expect(screen.queryByTestId("bulk-action-bar-coordination")).toBeNull();
@@ -272,10 +283,96 @@ describe("AwaitingCoordinationView · bulk log email", () => {
     fireEvent.click(screen.getByTestId("button-bulk-confirm-log-email"));
 
     expect(onBulkLogEmail).toHaveBeenCalledTimes(1);
-    const [ids, subject, note] = onBulkLogEmail.mock.calls[0];
+    const [ids, subject, note, templateLabel] = onBulkLogEmail.mock.calls[0];
     expect(ids).toEqual(["bk-only"]);
     expect(subject).toBe("Quick nudge");
     expect(note).toBe("");
+    expect(templateLabel).toBe("Custom");
+  });
+
+  it("picking a saved template prefills the subject + note inputs and reports the template name to onBulkLogEmail", () => {
+    const onBulkLogEmail = vi.fn();
+    const tpl = EMAIL_TEMPLATES[0];
+    render(
+      <Harness
+        bookings={[makeBooking({ id: "bk-tpl", unitId: "u1" })]}
+        onBulkLogEmail={onBulkLogEmail}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-tpl"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+
+    // Form opens with the dropdown on Custom… so the inputs start
+    // empty — matches the historical free-text behaviour for
+    // anyone who didn't ask for a template.
+    const subjectInput = screen.getByTestId(
+      "input-bulk-email-subject",
+    ) as HTMLInputElement;
+    const noteInput = screen.getByTestId(
+      "input-bulk-email-note",
+    ) as HTMLTextAreaElement;
+    expect(subjectInput.value).toBe("");
+    expect(noteInput.value).toBe("");
+
+    // Pick the first seeded template — both inputs should snap to
+    // the template's preset values.
+    fireEvent.change(screen.getByTestId("select-bulk-email-template"), {
+      target: { value: tpl.id },
+    });
+    expect(subjectInput.value).toBe(tpl.subject);
+    expect(noteInput.value).toBe(tpl.note);
+
+    // Inputs stay editable so ops can tweak per batch — make a small
+    // edit to the subject and ensure it survives submit.
+    fireEvent.change(subjectInput, { target: { value: `${tpl.subject} (Bldg A)` } });
+
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-email"));
+
+    expect(onBulkLogEmail).toHaveBeenCalledTimes(1);
+    const [ids, subject, note, templateLabel] = onBulkLogEmail.mock.calls[0];
+    expect(ids).toEqual(["bk-tpl"]);
+    expect(subject).toBe(`${tpl.subject} (Bldg A)`);
+    expect(note).toBe(tpl.note);
+    // The template's display name (not its id) flows up so the
+    // AdminApp toast can confirm which preset landed across the
+    // batch.
+    expect(templateLabel).toBe(tpl.name);
+  });
+
+  it("switching from a template back to Custom… clears both inputs", () => {
+    const onBulkLogEmail = vi.fn();
+    const tpl = EMAIL_TEMPLATES[1] ?? EMAIL_TEMPLATES[0];
+    render(
+      <Harness
+        bookings={[makeBooking({ id: "bk-flip", unitId: "u1" })]}
+        onBulkLogEmail={onBulkLogEmail}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-flip"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+    fireEvent.change(screen.getByTestId("select-bulk-email-template"), {
+      target: { value: tpl.id },
+    });
+
+    const subjectInput = screen.getByTestId(
+      "input-bulk-email-subject",
+    ) as HTMLInputElement;
+    const noteInput = screen.getByTestId(
+      "input-bulk-email-note",
+    ) as HTMLTextAreaElement;
+    expect(subjectInput.value).toBe(tpl.subject);
+    expect(noteInput.value).toBe(tpl.note);
+
+    // Flip back to Custom… — the historical free-text entry mode —
+    // and both inputs should be wiped so ops aren't left typing on
+    // top of the previous preset.
+    fireEvent.change(screen.getByTestId("select-bulk-email-template"), {
+      target: { value: "custom" },
+    });
+    expect(subjectInput.value).toBe("");
+    expect(noteInput.value).toBe("");
   });
 
   it("Cancel collapses the form without firing onBulkLogEmail and keeps the selection", () => {

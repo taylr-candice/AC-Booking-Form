@@ -266,19 +266,38 @@ export function AdminApp() {
    * body / context. Both are trimmed before they reach the timeline so
    * stray whitespace from the form doesn't bleed into the audit trail.
    */
-  function bulkLogEmail(ids: string[], subject: string, note: string) {
+  function bulkLogEmail(
+    ids: string[],
+    subject: string,
+    note: string,
+    templateLabel: string,
+  ) {
     if (ids.length === 0) return;
     const nowIso = new Date().toISOString();
     setSeededBookings((prev) =>
       applyBulkLogEmail(prev, ids, subject, note, nowIso),
     );
     const count = ids.length;
+    // Toast format reflects which template (or "Custom") landed so
+    // ops can confirm at a glance — keeps the Awaiting-coordination
+    // "Last attempt" cell consistent across batches because the same
+    // template label that ops just acknowledged also ends up in the
+    // timeline subject. For Custom we additionally surface the
+    // free-text subject so the toast still tells ops which message
+    // they actually sent. Trimmed for parity with the audit trail.
+    const trimmedTemplate = templateLabel.trim();
     const trimmedSubject = subject.trim();
+    const isCustom =
+      trimmedTemplate.length === 0 ||
+      trimmedTemplate.toLowerCase() === "custom";
+    const tail = isCustom
+      ? trimmedSubject.length > 0
+        ? ` · Custom · ${trimmedSubject}`
+        : ` · Custom`
+      : ` · ${trimmedTemplate}`;
     setToast({
       id: `bulk-log-email-${Date.now()}`,
-      message: `Logged email on ${count} booking${count === 1 ? "" : "s"}${
-        trimmedSubject.length > 0 ? ` · ${trimmedSubject}` : ""
-      }`,
+      message: `Logged email on ${count} booking${count === 1 ? "" : "s"}${tail}`,
     });
   }
 

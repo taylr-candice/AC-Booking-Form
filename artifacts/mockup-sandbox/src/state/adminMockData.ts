@@ -1898,6 +1898,77 @@ export function formatBookingShortDate(iso: string): string {
 export const ADMIN_USER_LABEL = "Mia (admin)";
 
 /**
+ * Saved email templates for the bulk Log-email affordance on the
+ * Awaiting-coordination queue. Most bulk email-outs are templated
+ * ("Sent rebook link", "Sent parcel-locker instructions", "Sent agent
+ * intro"), so a small picker lets ops pre-fill the subject + suggested
+ * note in one click instead of retyping the same shared message every
+ * time. Selecting a template prefills both inputs but leaves them
+ * editable so ops can tweak per batch; the dropdown also exposes a
+ * `Custom…` option (id `"custom"`) which clears both inputs for a
+ * fully free-text entry — that's the default state when the form
+ * opens, so the historical free-text behaviour is preserved.
+ *
+ * Keep this list short and intention-revealing — its main job is to
+ * keep timeline labels consistent across batches so the Awaiting-
+ * coordination "Last attempt" cell stays scannable. New templates
+ * should follow the existing tone (a one-line subject + a 1-2
+ * sentence suggested body) and be added in roughly the order ops
+ * uses them.
+ */
+export type EmailTemplate = {
+  id: string;
+  /** Human-readable label shown in the dropdown and reflected in the
+   *  bulk-log toast so ops can confirm which template landed. */
+  name: string;
+  /** Pre-filled subject line. Encoded in the timeline entry label
+   *  ("Logged email · {subject}") on the booking's service timeline. */
+  subject: string;
+  /** Pre-filled shared note. Becomes the entry's `note` field on the
+   *  service timeline (omitted when blank, matching the per-row
+   *  `BookingDetail.logEmail` shape). */
+  note: string;
+};
+
+export const EMAIL_TEMPLATES: ReadonlyArray<EmailTemplate> = [
+  {
+    id: "rebook_link",
+    name: "Sent rebook link",
+    subject: "Booking access — please pick a new window",
+    note: "Sent rebook link so the tenant can grab a fresh appointment slot directly.",
+  },
+  {
+    id: "parcel_locker",
+    name: "Sent parcel-locker instructions",
+    subject: "Building access — parcel-locker instructions",
+    note: "Sent parcel-locker / building access instructions so the tech can let themselves in on the day.",
+  },
+  {
+    id: "agent_intro",
+    name: "Sent agent intro",
+    subject: "Coordinating your AC service — quick intro",
+    note: "Intro email to the managing agent with the booking summary and a request to confirm a window.",
+  },
+  {
+    id: "awaiting_confirm",
+    name: "Awaiting confirmation nudge",
+    subject: "Quick nudge — please confirm your AC service window",
+    note: "Polite nudge after no reply to the previous email — restated the proposed window and asked for a yes/no.",
+  },
+];
+
+/** Sentinel id used by the bulk-log-email dropdown for the
+ *  free-text "Custom…" option. Kept here so the view + helpers
+ *  reference the same string. */
+export const EMAIL_TEMPLATE_CUSTOM_ID = "custom";
+
+/** Toast / audit label used when the admin submits the bulk-log-email
+ *  form without picking a template (i.e. the `Custom…` dropdown
+ *  option). Kept alongside `EMAIL_TEMPLATES` so the view and the
+ *  AdminApp handler agree on what to show. */
+export const EMAIL_TEMPLATE_CUSTOM_LABEL = "Custom";
+
+/**
  * Per-system / per-extra prices used to compute `totalAud` for an
  * admin-created booking. Mirrors the customer-side total (see
  * `liveBookingFromSession` and the customer pricing card). Kept here so

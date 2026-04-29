@@ -24,6 +24,9 @@ import { ArrowDownNarrowWide, Clock, Mail, Phone, Search } from "lucide-react";
 import {
   bookerAgencyName,
   coordinationKindForBooking,
+  EMAIL_TEMPLATE_CUSTOM_ID,
+  EMAIL_TEMPLATE_CUSTOM_LABEL,
+  EMAIL_TEMPLATES,
   formatCoordinationWaiting,
   formatLastContacted,
   getBuildingForUnit,
@@ -216,8 +219,21 @@ export function AwaitingCoordinationView({
    *  carries any free-text body. Same shape as
    *  `BookingDetail.logEmail()` so timeline entries are
    *  interchangeable regardless of how they were created.
+   *
+   *  `templateLabel` is the human-readable name of the seeded
+   *  template the admin picked (e.g. `"Sent rebook link"`), or
+   *  `EMAIL_TEMPLATE_CUSTOM_LABEL` (`"Custom"`) when the admin
+   *  bypassed the picker and typed their own subject + note. The
+   *  AdminApp handler reflects this in the success toast so ops can
+   *  confirm at a glance which template landed across the batch.
+   *
    *  Optional so this view stays usable in isolation. */
-  onBulkLogEmail?: (ids: string[], subject: string, note: string) => void;
+  onBulkLogEmail?: (
+    ids: string[],
+    subject: string,
+    note: string,
+    templateLabel: string,
+  ) => void;
 }) {
   // Selection lives entirely in this view — once a bulk action fires
   // we clear it. The live demo row is excluded from selection because
@@ -240,7 +256,20 @@ export function AwaitingCoordinationView({
   // optional in the form to mirror the per-row form, but the
   // AdminApp handler will fall back to a plain "Logged email" label
   // if it's blank.
+  //
+  // The dropdown above the subject input lets ops pick from a small
+  // set of seeded `EMAIL_TEMPLATES` (subject + suggested note presets)
+  // so the common case — "Sent rebook link", "Sent parcel-locker
+  // instructions", etc. — doesn't require retyping the same shared
+  // message every time. Selecting a template prefills the subject +
+  // note inputs but leaves them editable; selecting `Custom…` clears
+  // both inputs and falls back to the historical free-text behaviour.
+  // The default is `Custom…` so opening the form lands ops in the
+  // same place they were before this picker existed.
   const [showBulkLogEmail, setShowBulkLogEmail] = useState(false);
+  const [bulkEmailTemplateId, setBulkEmailTemplateId] = useState<string>(
+    EMAIL_TEMPLATE_CUSTOM_ID,
+  );
   const [bulkEmailSubject, setBulkEmailSubject] = useState("");
   const [bulkEmailNote, setBulkEmailNote] = useState("");
 
@@ -457,6 +486,7 @@ export function AwaitingCoordinationView({
     setBulkOutcome("no_answer");
     setBulkNote("");
     setShowBulkLogEmail(false);
+    setBulkEmailTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
     setBulkEmailSubject("");
     setBulkEmailNote("");
   }
@@ -467,9 +497,60 @@ export function AwaitingCoordinationView({
     clearSelection();
   }
 
+  /**
+   * Pick (or unpick) a saved email template from the dropdown above
+   * the subject input.
+   *
+   *   - Selecting a real template id replaces both the subject and
+   *     the shared note with the template's presets so the common
+   *     case (e.g. "Sent rebook link") doesn't require any typing.
+   *     Inputs stay editable so ops can tweak per batch.
+   *   - Selecting `EMAIL_TEMPLATE_CUSTOM_ID` clears both inputs and
+   *     restores the historical free-text behaviour.
+   *
+   * The replacement is intentional / unconditional — every change
+   * to the dropdown overwrites both inputs. That keeps the picker's
+   * mental model simple: "the dropdown is the source of truth, edit
+   * it after if you need to tweak". Surprising in-place merges (only
+   * fill empty fields, etc.) would make the picker harder to reason
+   * about than just retyping.
+   */
+  function handleSelectEmailTemplate(id: string) {
+    setBulkEmailTemplateId(id);
+    if (id === EMAIL_TEMPLATE_CUSTOM_ID) {
+      setBulkEmailSubject("");
+      setBulkEmailNote("");
+      return;
+    }
+    const tpl = EMAIL_TEMPLATES.find((t) => t.id === id);
+    if (!tpl) {
+      // Shouldn't happen — the dropdown only renders ids from
+      // EMAIL_TEMPLATES + the Custom sentinel — but if the constant
+      // ever drifts, fall back to Custom rather than leaving the
+      // inputs in a stale, half-prefilled state.
+      setBulkEmailTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
+      setBulkEmailSubject("");
+      setBulkEmailNote("");
+      return;
+    }
+    setBulkEmailSubject(tpl.subject);
+    setBulkEmailNote(tpl.note);
+  }
+
   function handleSubmitBulkLogEmail() {
     if (!onBulkLogEmail || selectedCount === 0) return;
-    onBulkLogEmail(Array.from(selectedIds), bulkEmailSubject, bulkEmailNote);
+    // Resolve the template's display name so the AdminApp toast can
+    // confirm what landed; falls back to the Custom label whenever
+    // the dropdown is on Custom (or — defensively — pointing at an
+    // unknown id, which the select handler should already prevent).
+    const tpl = EMAIL_TEMPLATES.find((t) => t.id === bulkEmailTemplateId);
+    const templateLabel = tpl ? tpl.name : EMAIL_TEMPLATE_CUSTOM_LABEL;
+    onBulkLogEmail(
+      Array.from(selectedIds),
+      bulkEmailSubject,
+      bulkEmailNote,
+      templateLabel,
+    );
     clearSelection();
   }
 
@@ -895,6 +976,33 @@ export function AwaitingCoordinationView({
                 <div className="mt-0.5 text-[11px] text-slate-500">
                   Same subject and note will be added to every selected row.
                 </div>
+                {/* Template picker — sits above the subject input so
+                    ops can grab a saved preset in one click. Defaults
+                    to Custom… so opening the form lands ops in the
+                    same free-text spot they were before this picker
+                    existed. Selecting a template prefills subject +
+                    note (still editable); selecting Custom… clears
+                    them. */}
+                <label
+                  className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+                  htmlFor="bulk-log-email-template"
+                >
+                  Template
+                </label>
+                <select
+                  id="bulk-log-email-template"
+                  value={bulkEmailTemplateId}
+                  onChange={(e) => handleSelectEmailTemplate(e.target.value)}
+                  data-testid="select-bulk-email-template"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                >
+                  <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+                  {EMAIL_TEMPLATES.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.name}
+                    </option>
+                  ))}
+                </select>
                 <label
                   className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
                   htmlFor="bulk-log-email-subject"
@@ -930,6 +1038,7 @@ export function AwaitingCoordinationView({
                     type="button"
                     onClick={() => {
                       setShowBulkLogEmail(false);
+                      setBulkEmailTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
                       setBulkEmailSubject("");
                       setBulkEmailNote("");
                     }}
