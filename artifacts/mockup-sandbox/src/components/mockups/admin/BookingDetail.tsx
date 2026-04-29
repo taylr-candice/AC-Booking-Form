@@ -29,6 +29,7 @@ import {
   coordinationContactForBooking,
   EMAIL_TEMPLATE_CUSTOM_ID,
   EMAIL_TEMPLATE_CUSTOM_LABEL,
+  isCustomEmailTemplateLabel,
   EMAIL_TEMPLATES,
   formatCoordinationWaiting,
   formatLastContacted,
@@ -278,6 +279,15 @@ export function BookingDetail({
     if (!booking) return;
     const nowIso = new Date().toISOString();
     const trimmedSubject = subject.trim();
+    const trimmedTemplate = templateLabel.trim();
+    // Persist the template name on the timeline entry only when a
+    // real template was picked. Custom / blank picks skip the field
+    // (matches the bulk path) so the renderer doesn't show a
+    // redundant `Template: Custom` chip next to the free-text
+    // subject ops just typed (Task #138).
+    const persistTemplate =
+      trimmedTemplate.length > 0 &&
+      !isCustomEmailTemplateLabel(trimmedTemplate);
     const newEntry: TimelineEntry = {
       kind: "email",
       status: "logged_email",
@@ -289,6 +299,7 @@ export function BookingDetail({
       by: "Mia (admin)",
       loggedAt: nowIso,
       ...(note.trim().length > 0 ? { note: note.trim() } : {}),
+      ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
     };
     onUpdate(booking.id, {
       lastContactedAt: nowIso,
@@ -857,6 +868,14 @@ function Timeline({
               <div className="text-[12px] font-medium text-slate-900">
                 {e.label}
               </div>
+              {kind === "email" && e.templateLabel && (
+                <div
+                  className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+                  data-testid={`timeline-entry-${i}-template`}
+                >
+                  Template: {e.templateLabel}
+                </div>
+              )}
               {e.note && (
                 <div className="mt-0.5 text-[11px] text-slate-600">
                   {e.note}

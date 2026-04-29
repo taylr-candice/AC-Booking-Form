@@ -323,7 +323,15 @@ export function AdminApp() {
     if (ids.length === 0) return;
     const nowIso = new Date().toISOString();
     setSeededBookings((prev) =>
-      applyBulkLogEmail(prev, ids, subject, note, nowIso),
+      applyBulkLogEmail(
+        prev,
+        ids,
+        subject,
+        note,
+        nowIso,
+        undefined, // `by` — fall through to ADMIN_USER_LABEL default
+        templateLabel,
+      ),
     );
     const count = ids.length;
     // Toast format reflects which template (or "Custom") landed so

@@ -328,6 +328,47 @@ describe("BookingDetail · log call / log email", () => {
     expect(onLogEmailToast.mock.calls[0][1]).toBe("Quick nudge");
   });
 
+  it("persists the chosen template name on the timeline entry's templateLabel for non-Custom picks (Task #138)", () => {
+    const onUpdate = vi.fn();
+    const tpl = EMAIL_TEMPLATES[0];
+    renderDetail(makeBooking(), { onUpdate });
+
+    fireEvent.click(screen.getByTestId("button-log-email"));
+    fireEvent.change(screen.getByTestId("select-email-template"), {
+      target: { value: tpl.id },
+    });
+    fireEvent.click(screen.getByTestId("button-confirm-log-email"));
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [, patch] = onUpdate.mock.calls[0];
+    const newEntry = patch.serviceTimeline.at(-1);
+    // The template's display name lives on the timeline entry so the
+    // Service timeline can render a `Template: …` chip even after
+    // the success toast disappears (so ops can audit which preset
+    // produced the entry by glancing at the entry itself, not the
+    // ephemeral toast).
+    expect(newEntry.templateLabel).toBe(tpl.name);
+  });
+
+  it("omits templateLabel on the timeline entry for Custom submits (Task #138)", () => {
+    const onUpdate = vi.fn();
+    renderDetail(makeBooking(), { onUpdate });
+
+    fireEvent.click(screen.getByTestId("button-log-email"));
+    fireEvent.change(screen.getByTestId("input-email-subject"), {
+      target: { value: "Free-text" },
+    });
+    fireEvent.click(screen.getByTestId("button-confirm-log-email"));
+
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [, patch] = onUpdate.mock.calls[0];
+    const newEntry = patch.serviceTimeline.at(-1);
+    // Free-text picks don't carry a chip — the subject already tells
+    // the audit story, so adding `Template: Custom` would just be
+    // visual noise on the timeline.
+    expect("templateLabel" in newEntry).toBe(false);
+  });
+
   it("omits the optional note field when the textarea is empty", () => {
     const onUpdate = vi.fn();
     renderDetail(makeBooking(), { onUpdate });
@@ -454,6 +495,65 @@ describe("BookingDetail · timeline · call/email entry rendering", () => {
     const emailRow = within(screen.getByTestId("timeline-entry-1"));
     expect(emailRow.getByTitle("Logged email")).toBeTruthy();
     expect(emailRow.queryByText("Sent rebook link")).toBeNull();
+  });
+
+  it("renders the Template chip beneath the email entry label when templateLabel is set (Task #138)", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [
+          emailEntry({ templateLabel: "Sent rebook link" }),
+        ],
+      }),
+    );
+    const row = within(screen.getByTestId("timeline-entry-0"));
+    const chip = row.getByTestId("timeline-entry-0-template");
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toMatch(/template:\s*sent rebook link/i);
+    // Chip sits between the label and the note (rendered above the
+    // muted note line) so ops can see the template at a glance even
+    // when the entry has a long free-text note beneath.
+    const label = row.getByText(
+      "Logged email · Booking access — please confirm",
+    );
+    const note = row.getByText("Sent rebook link");
+    expect(
+      label.compareDocumentPosition(chip) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      chip.compareDocumentPosition(note) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("omits the Template chip when the email entry has no templateLabel (Custom + legacy entries) (Task #138)", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [
+          // Custom / pre-Task-138 entries don't carry templateLabel —
+          // the chip must not render so the timeline stays clean.
+          emailEntry({ templateLabel: undefined }),
+        ],
+      }),
+    );
+    const row = within(screen.getByTestId("timeline-entry-0"));
+    expect(row.queryByTestId("timeline-entry-0-template")).toBeNull();
+    expect(row.queryByText(/template:/i)).toBeNull();
+  });
+
+  it("never renders a Template chip for non-email entries (Task #138)", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [
+          // Same field on a call entry must be ignored — the chip is
+          // an email-only affordance because only the Log email form
+          // ever picks a template.
+          callEntry({ templateLabel: "Sent rebook link" } as never),
+        ],
+      }),
+    );
+    const row = within(screen.getByTestId("timeline-entry-0"));
+    expect(row.queryByTestId("timeline-entry-0-template")).toBeNull();
   });
 
   it("keeps generic status entries on the coloured-dot marker (no Phone/Mail icon)", () => {

@@ -161,6 +161,20 @@ export type TimelineEntry = {
    *  entries (status updates, payments) aren't surfaced through any
    *  recency UI; only `kind: "call" | "email"` writers populate it. */
   loggedAt?: string;
+  /** Human-readable name of the seeded {@link EMAIL_TEMPLATES} entry
+   *  the admin picked when logging an email (e.g. `"Sent rebook
+   *  link"`). Surfaced as a small `Template: …` chip on the Service
+   *  timeline so the audit trail stays self-describing once the
+   *  success toast disappears (Task #138).
+   *
+   *  Only set on `kind: "email"` entries that came from a real
+   *  template — both bulk and per-row writers omit the field when the
+   *  admin picked the `Custom…` option (or didn't pick anything), so
+   *  the timeline doesn't show a redundant `Template: Custom` chip
+   *  next to a free-text subject. Older seed entries that pre-date
+   *  Task #138 don't carry it either, which is fine — the renderer
+   *  just falls back to the plain label / note pair. */
+  templateLabel?: string;
 };
 
 export type AdminBooking = {
@@ -2073,6 +2087,23 @@ export const EMAIL_TEMPLATE_CUSTOM_ID = "custom";
 export const EMAIL_TEMPLATE_CUSTOM_LABEL = "Custom";
 
 /**
+ * Whether a logged-email `templateLabel` represents the free-text
+ * `Custom…` option (or an unset/blank picker). Used by both bulk and
+ * per-row writers to decide whether to persist the label on the
+ * resulting {@link TimelineEntry} — Custom emails skip it so the
+ * Service timeline doesn't show a redundant `Template: Custom` chip
+ * next to a free-text subject (Task #138). Trim + case-insensitive
+ * compare so stray whitespace from the form / a future relabel of the
+ * sentinel doesn't accidentally promote a Custom entry into a
+ * template-tagged one.
+ */
+export function isCustomEmailTemplateLabel(label: string): boolean {
+  const trimmed = label.trim();
+  if (trimmed.length === 0) return true;
+  return trimmed.toLowerCase() === EMAIL_TEMPLATE_CUSTOM_LABEL.toLowerCase();
+}
+
+/**
  * Trim a draft email template's three free-text fields. Used by both
  * the create + edit code paths in the admin "Email templates" panel
  * so stray whitespace from the form never reaches the saved list (and
@@ -3236,6 +3267,7 @@ export function buildBulkLogEmailEntry({
   by = ADMIN_USER_LABEL,
   at = "Just now",
   loggedAt,
+  templateLabel,
 }: {
   subject: string;
   note: string;
@@ -3249,9 +3281,23 @@ export function buildBulkLogEmailEntry({
    *  omitted, no recency line is rendered for entries built this way.
    *  `applyBulkLogEmail` always supplies it from its `nowIso` arg. */
   loggedAt?: string;
+  /** Human-readable name of the {@link EMAIL_TEMPLATES} entry the
+   *  admin picked in the bulk Log email form. When supplied and not
+   *  the `Custom…` sentinel, it is persisted on the resulting
+   *  {@link TimelineEntry.templateLabel} so the Service timeline can
+   *  surface a small `Template: …` chip alongside the entry note
+   *  (Task #138). Custom / blank picks omit the field — the timeline
+   *  already shows the free-text subject inline, so a redundant
+   *  `Template: Custom` chip would just add noise. Optional so
+   *  existing call-sites (and tests asserting only on the label /
+   *  kind shape) don't have to spell out the picker. */
+  templateLabel?: string;
 }): TimelineEntry {
   const trimmedSubject = subject.trim();
   const trimmedNote = note.trim();
+  const trimmedTemplate = templateLabel?.trim() ?? "";
+  const persistTemplate =
+    trimmedTemplate.length > 0 && !isCustomEmailTemplateLabel(trimmedTemplate);
   return {
     kind: "email",
     status: "logged_email",
@@ -3263,6 +3309,7 @@ export function buildBulkLogEmailEntry({
     by,
     ...(loggedAt !== undefined ? { loggedAt } : {}),
     ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
+    ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
   };
 }
 
@@ -3282,10 +3329,23 @@ export function applyBulkLogEmail(
   note: string,
   nowIso: string,
   by: string = ADMIN_USER_LABEL,
+  /** Human-readable name of the {@link EMAIL_TEMPLATES} entry the
+   *  admin picked in the bulk Log email form. Forwarded to
+   *  {@link buildBulkLogEmailEntry} so non-Custom picks land on the
+   *  resulting timeline entry's `templateLabel` (Task #138). Optional
+   *  so older callers / tests asserting only on the label shape don't
+   *  have to spell out the picker. */
+  templateLabel?: string,
 ): AdminBooking[] {
   if (ids.length === 0) return [...bookings];
   const idSet = new Set(ids);
-  const entry = buildBulkLogEmailEntry({ subject, note, by, loggedAt: nowIso });
+  const entry = buildBulkLogEmailEntry({
+    subject,
+    note,
+    by,
+    loggedAt: nowIso,
+    templateLabel,
+  });
   return bookings.map((b) => {
     if (b.id === "bk-live") return b;
     if (!idSet.has(b.id)) return b;

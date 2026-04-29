@@ -469,6 +469,44 @@ describe("AdminApp · bulkLogEmail entry shape", () => {
     expect(entry.label).toBe("Logged email");
   });
 
+  it("buildBulkLogEmailEntry persists a non-Custom templateLabel onto the entry (Task #138)", () => {
+    const entry = buildBulkLogEmailEntry({
+      subject: "Quick nudge — please confirm",
+      note: "",
+      templateLabel: "  Sent rebook link  ",
+    });
+    // Trimmed and persisted so the timeline can render a
+    // `Template: Sent rebook link` chip beneath the entry.
+    expect(entry.templateLabel).toBe("Sent rebook link");
+  });
+
+  it("buildBulkLogEmailEntry omits templateLabel for Custom / blank picks (Task #138)", () => {
+    // The free-text Custom… pick — no chip needed because the
+    // free-text subject already tells the audit story.
+    const customEntry = buildBulkLogEmailEntry({
+      subject: "Free-text subject",
+      note: "",
+      templateLabel: "Custom",
+    });
+    expect("templateLabel" in customEntry).toBe(false);
+
+    // Trimmed-empty / case-variant of the sentinel must also collapse
+    // to "no template" so a future relabel of the dropdown option
+    // doesn't accidentally surface `Template: custom` chips.
+    const blankEntry = buildBulkLogEmailEntry({
+      subject: "Subject",
+      note: "",
+      templateLabel: "  ",
+    });
+    expect("templateLabel" in blankEntry).toBe(false);
+    const lowerEntry = buildBulkLogEmailEntry({
+      subject: "Subject",
+      note: "",
+      templateLabel: "  custom  ",
+    });
+    expect("templateLabel" in lowerEntry).toBe(false);
+  });
+
   it("applyBulkLogEmail appends the typed entry to every selected booking and stamps lastContactedAt", () => {
     const bookings: AdminBooking[] = [
       timelineBooking("bk-1", ["Coordination requested"]),
@@ -562,6 +600,43 @@ describe("AdminApp · bulkLogEmail entry shape", () => {
     // Real row gets the typed email entry as expected.
     expect(realAfter.serviceTimeline.at(-1)?.kind).toBe("email");
     expect(realAfter.serviceTimeline.at(-1)?.status).toBe("logged_email");
+  });
+
+  it("applyBulkLogEmail forwards a non-Custom templateLabel onto every selected timeline entry (Task #138)", () => {
+    const bookings: AdminBooking[] = [
+      timelineBooking("bk-a"),
+      timelineBooking("bk-b"),
+    ];
+    const next = applyBulkLogEmail(
+      bookings,
+      ["bk-a", "bk-b"],
+      "Booking access — please confirm window",
+      "",
+      "2026-04-29T10:00:00.000Z",
+      undefined,
+      "Sent rebook link",
+    );
+    for (const id of ["bk-a", "bk-b"] as const) {
+      const tail = next.find((b) => b.id === id)!.serviceTimeline.at(-1)!;
+      expect(tail.kind).toBe("email");
+      expect(tail.templateLabel).toBe("Sent rebook link");
+    }
+  });
+
+  it("applyBulkLogEmail omits templateLabel on the entry for Custom picks (Task #138)", () => {
+    const bookings: AdminBooking[] = [timelineBooking("bk-c")];
+    const next = applyBulkLogEmail(
+      bookings,
+      ["bk-c"],
+      "Free-text subject",
+      "",
+      "2026-04-29T10:00:00.000Z",
+      undefined,
+      "Custom",
+    );
+    const tail = next[0].serviceTimeline.at(-1)!;
+    expect(tail.kind).toBe("email");
+    expect("templateLabel" in tail).toBe(false);
   });
 
   it("applyBulkLogEmail returns the bookings unchanged when no ids are supplied", () => {
