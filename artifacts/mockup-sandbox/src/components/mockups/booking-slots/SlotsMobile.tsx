@@ -257,90 +257,50 @@ export function SlotsMobile() {
           </div>
         ) : lockedByOther ? (
           // Read-only "Already scheduled" — Task #49.
-          (() => {
-            const blockerBooking = lockedByOther.booking;
-            const slotLabel =
-              blockerBooking.serviceSlot === "morning"
-                ? "morning"
-                : blockerBooking.serviceSlot === "afternoon"
-                  ? "afternoon"
-                  : "service";
-            const roleLabel =
-              blockerBooking.bookerRole === "agent"
-                ? "managing agent"
-                : "unit owner";
-            const statusNote =
-              lockedByOther.kind === "invoice_pending"
-                ? "Invoice awaiting payment — once paid the booking is locked in."
-                : "Their booking has been paid and confirmed.";
-            return (
-              <div
-                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700"
-                data-testid="banner-locked-by-other-mobile"
-                data-locked-kind={lockedByOther.kind}
-              >
-                <div className="flex items-start gap-2.5">
-                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
-                  <div className="flex-1">
-                    <div className="text-[14px] font-semibold text-slate-900">
-                      Already scheduled for this address
-                    </div>
-                    <div className="mt-1 text-[12px] text-slate-600">
-                      <span className="font-medium text-slate-900">
-                        {blockerBooking.customerName}
-                      </span>{" "}
-                      <span className="text-slate-500">({roleLabel})</span>{" "}
-                      booked the{" "}
-                      <span className="font-medium text-slate-900">
-                        {slotLabel}
-                      </span>{" "}
-                      window on{" "}
-                      <span className="font-medium text-slate-900">
-                        {blockerBooking.serviceDate ??
-                          "a previously confirmed date"}
-                      </span>
-                      .
-                    </div>
-                    <div className="mt-1 text-[11px] text-slate-500">
-                      {statusNote}
-                    </div>
-                    <div
-                      className="mt-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700"
-                      data-testid="panel-blocker-contact-mobile"
-                    >
-                      <div className="font-semibold text-slate-900">
-                        Reach out to {blockerBooking.customerName}
-                      </div>
-                      <div className="mt-1 flex flex-col gap-0.5">
-                        <a
-                          href={`mailto:${blockerBooking.customerEmail}`}
-                          className="font-medium underline"
-                          style={{ color: BRAND }}
-                        >
-                          {blockerBooking.customerEmail}
-                        </a>
-                        <a
-                          href={`tel:${blockerBooking.customerPhone.replace(/\s+/g, "")}`}
-                          className="font-medium underline"
-                          style={{ color: BRAND }}
-                        >
-                          {blockerBooking.customerPhone}
-                        </a>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[12px] text-slate-600">
-                      Only one confirmed booking is allowed per service
-                      run. Call{" "}
-                      <span className="font-medium" style={{ color: BRAND }}>
-                        1300 TAYLR
-                      </span>{" "}
-                      if this looks wrong.
-                    </div>
-                  </div>
+          //
+          // We deliberately do not surface ANY details of the existing
+          // booking here (no customer name, no contact details, no
+          // booked window/date, no booker role). Customer-facing
+          // surfaces should never expose another customer's data —
+          // even the booked date+window pair is identifying info about
+          // someone else. Anything beyond "this address is already
+          // scheduled, contact Taylr" should go through admin tooling.
+          <div
+            className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700"
+            data-testid="banner-locked-by-other-mobile"
+            data-locked-kind={lockedByOther.kind}
+          >
+            <div className="flex items-start gap-2.5">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+              <div className="flex-1">
+                <div className="text-[14px] font-semibold text-slate-900">
+                  Already scheduled for this address
+                </div>
+                <div className="mt-1 text-[12px] text-slate-600">
+                  There's already a confirmed service booked at this
+                  property, so it can't be booked again right now. Only
+                  one confirmed booking is allowed per service run.
+                </div>
+                <div className="mt-2 text-[12px] text-slate-600">
+                  If you have any questions or believe this is a
+                  mistake, contact Taylr at{" "}
+                  <a
+                    href="mailto:support@taylr.com.au"
+                    className="font-medium underline"
+                    style={{ color: BRAND }}
+                    data-testid="link-locked-support-email-mobile"
+                  >
+                    support@taylr.com.au
+                  </a>{" "}
+                  or call{" "}
+                  <span className="font-medium" style={{ color: BRAND }}>
+                    1300 TAYLR
+                  </span>
+                  .
                 </div>
               </div>
-            );
-          })()
+            </div>
+          </div>
         ) : (
           <>
             <div className="space-y-3">

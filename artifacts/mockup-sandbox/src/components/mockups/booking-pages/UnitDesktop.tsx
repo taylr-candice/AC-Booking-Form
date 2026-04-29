@@ -7,7 +7,6 @@ import {
   Building2,
   CheckCircle2,
   ChevronDown,
-  Lock,
   Search,
   User,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import {
   subscribeLiveBookings,
   type ActiveBookingForUnit,
 } from "../../../state/adminMockData";
+import { UnitAlreadyBookedModal } from "./UnitAlreadyBookedModal";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -76,25 +76,6 @@ function errorStyle(hasError: boolean): React.CSSProperties | undefined {
     : undefined;
 }
 
-/**
- * Build the customer-facing "Already booked" reason for a paid unit.
- * Falls back to a generic phrasing when the booking is missing a date
- * or window (coordination-only bookings rarely block a unit, but we
- * still render something useful).
- */
-function formatPaidReason(b: import("../../../state/adminMockData").AdminBooking): string {
-  const who = b.customerName || "another customer";
-  if (
-    b.serviceDate &&
-    (b.serviceSlot === "morning" || b.serviceSlot === "afternoon")
-  ) {
-    const window =
-      b.serviceSlot === "morning" ? "morning" : "afternoon";
-    return `${who} booked ${b.serviceDate} ${window}`;
-  }
-  return `${who} has a confirmed booking`;
-}
-
 export function UnitDesktop() {
   const sessionUnitId = useBookingSelector((s) => s.unit_id);
   const role = useBookingSelector((s) => s.role);
@@ -109,6 +90,11 @@ export function UnitDesktop() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [agencyOpen, setAgencyOpen] = useState(false);
+  // When a customer clicks a unit that already has a paid/confirmed
+  // service booked, we show a generic "this unit is already booked,
+  // contact Taylr" modal instead of selecting the unit. We never show
+  // any details about the existing customer/booking — privacy.
+  const [alreadyBookedOpen, setAlreadyBookedOpen] = useState(false);
   const [touched, setTouched] = useState({
     agency: false,
     agencyOther: false,
@@ -215,10 +201,15 @@ export function UnitDesktop() {
   }, [query]);
 
   const selectUnit = (id: string) => {
-    // Defensive guard — the dropdown button is already disabled for
-    // "paid" rows, but if anything ever bypasses that we still refuse
-    // to commit a paid-blocked unit to the session.
-    if (unitStatuses.get(id)?.kind === "paid") return;
+    // Already booked → don't commit it; surface a generic explainer
+    // modal that points the customer at Taylr support. We deliberately
+    // expose nothing about the existing booking (no name, no date, no
+    // contact info).
+    if (unitStatuses.get(id)?.kind === "paid") {
+      setOpen(false);
+      setAlreadyBookedOpen(true);
+      return;
+    }
     setSelectedId(id);
     bookingActions.setUnit(id);
     setOpen(false);
@@ -321,48 +312,31 @@ export function UnitDesktop() {
                     ) : (
                       filtered.map((u) => {
                         const active = u.id === selectedId;
-                        const status = unitStatuses.get(u.id);
-                        const blocked = status?.kind === "paid";
-                        const reason = blocked
-                          ? formatPaidReason(status.booking)
-                          : null;
+                        // We deliberately render every row identically
+                        // regardless of whether the unit is already
+                        // booked — no strike-through, no lock icon, no
+                        // inline "already booked by …" text. If the
+                        // customer clicks a booked unit, `selectUnit`
+                        // opens a modal pointing them at Taylr support
+                        // instead.
                         return (
                           <button
                             key={u.id}
                             type="button"
-                            disabled={blocked}
                             onClick={() => selectUnit(u.id)}
                             data-testid={`dropdown-unit-${u.id}`}
-                            aria-disabled={blocked}
-                            title={blocked ? `Already booked — ${reason}` : ""}
                             className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
-                              blocked
-                                ? "cursor-not-allowed bg-slate-50 opacity-70"
-                                : active
-                                  ? "bg-pink-50"
-                                  : "hover:bg-slate-50"
+                              active ? "bg-pink-50" : "hover:bg-slate-50"
                             }`}
                           >
                             <div className="flex min-w-0 flex-1 items-start gap-3">
-                              <div
-                                className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${
-                                  blocked ? "bg-slate-200" : "bg-slate-100"
-                                }`}
-                              >
-                                {blocked ? (
-                                  <Lock className="h-4 w-4 text-slate-500" />
-                                ) : (
-                                  <Building2 className="h-4 w-4 text-slate-500" />
-                                )}
+                              <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100">
+                                <Building2 className="h-4 w-4 text-slate-500" />
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div
                                   className={`truncate text-[14px] font-semibold ${
-                                    blocked
-                                      ? "text-slate-500 line-through"
-                                      : active
-                                        ? "text-pink-700"
-                                        : "text-slate-900"
+                                    active ? "text-pink-700" : "text-slate-900"
                                   }`}
                                 >
                                   {u.address}
@@ -370,17 +344,9 @@ export function UnitDesktop() {
                                 <div className="mt-0.5 truncate text-[12px] text-slate-500">
                                   {u.lot} · {u.building} · {u.suburb}
                                 </div>
-                                {blocked && (
-                                  <div
-                                    className="mt-1 truncate text-[11px] font-medium text-slate-600"
-                                    data-testid={`dropdown-unit-${u.id}-blocked`}
-                                  >
-                                    Already booked — {reason}
-                                  </div>
-                                )}
                               </div>
                             </div>
-                            {active && !blocked && (
+                            {active && (
                               <CheckCircle2
                                 className="mt-2 h-5 w-5 shrink-0"
                                 style={{ color: BRAND }}
@@ -678,6 +644,11 @@ export function UnitDesktop() {
 
         </div>
       </div>
+
+      <UnitAlreadyBookedModal
+        open={alreadyBookedOpen}
+        onClose={() => setAlreadyBookedOpen(false)}
+      />
     </div>
   );
 }

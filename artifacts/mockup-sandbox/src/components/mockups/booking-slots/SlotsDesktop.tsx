@@ -307,95 +307,55 @@ export function SlotsDesktop() {
 
             {/* Read-only "Already scheduled" panel — Task #49.
                 When another party has already booked this customer's
-                unit (paid OR invoice-pending), the picker is locked.
-                We surface the date/window, booker name, role, and
-                their contact details so the second tenant / co-owner
-                can reach out directly instead of being stuck. The
-                Continue button below is also disabled. */}
-            {rollout && lockedByOther && (() => {
-              const blockerBooking = lockedByOther.booking;
-              const slotLabel =
-                blockerBooking.serviceSlot === "morning"
-                  ? "morning"
-                  : blockerBooking.serviceSlot === "afternoon"
-                    ? "afternoon"
-                    : "service";
-              const roleLabel =
-                blockerBooking.bookerRole === "agent"
-                  ? "managing agent"
-                  : "unit owner";
-              const statusNote =
-                lockedByOther.kind === "invoice_pending"
-                  ? "Their invoice is awaiting payment — once it's paid the booking is locked in."
-                  : "Their booking has been paid and confirmed.";
-              return (
-                <div
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-700"
-                  data-testid="banner-locked-by-other-desktop"
-                  data-locked-kind={lockedByOther.kind}
-                >
-                  <div className="flex items-start gap-3">
-                    <Lock className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
-                    <div className="flex-1">
-                      <div className="text-base font-semibold text-slate-900">
-                        Already scheduled for this address
-                      </div>
-                      <div className="mt-1.5 text-sm text-slate-600">
-                        <span className="font-medium text-slate-900">
-                          {blockerBooking.customerName}
-                        </span>{" "}
-                        <span className="text-slate-500">({roleLabel})</span>{" "}
-                        booked the{" "}
-                        <span className="font-medium text-slate-900">
-                          {slotLabel}
-                        </span>{" "}
-                        window on{" "}
-                        <span className="font-medium text-slate-900">
-                          {blockerBooking.serviceDate ??
-                            "a previously confirmed date"}
-                        </span>
-                        .
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {statusNote}
-                      </div>
-                      <div
-                        className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700"
-                        data-testid="panel-blocker-contact-desktop"
+                unit (paid OR invoice-pending), the picker is locked
+                and Continue below is disabled.
+                We deliberately do not surface ANY details of the
+                existing booking here (no customer name, no contact
+                details, no booked window/date, no booker role).
+                Customer-facing surfaces should never expose another
+                customer's data — even the booked date+window pair is
+                identifying info about someone else. Anything beyond
+                "this address is already scheduled, contact Taylr"
+                should go through admin tooling. */}
+            {rollout && lockedByOther && (
+              <div
+                className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-slate-700"
+                data-testid="banner-locked-by-other-desktop"
+                data-locked-kind={lockedByOther.kind}
+              >
+                <div className="flex items-start gap-3">
+                  <Lock className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+                  <div className="flex-1">
+                    <div className="text-base font-semibold text-slate-900">
+                      Already scheduled for this address
+                    </div>
+                    <div className="mt-1.5 text-sm text-slate-600">
+                      There's already a confirmed service booked at
+                      this property, so it can't be booked again right
+                      now. Only one confirmed booking is allowed per
+                      service run.
+                    </div>
+                    <div className="mt-3 text-sm text-slate-600">
+                      If you have any questions or believe this is a
+                      mistake, contact Taylr at{" "}
+                      <a
+                        href="mailto:support@taylr.com.au"
+                        className="font-medium underline"
+                        style={{ color: BRAND }}
+                        data-testid="link-locked-support-email-desktop"
                       >
-                        <div className="font-semibold text-slate-900">
-                          Reach out to {blockerBooking.customerName}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                          <a
-                            href={`mailto:${blockerBooking.customerEmail}`}
-                            className="font-medium underline"
-                            style={{ color: BRAND }}
-                          >
-                            {blockerBooking.customerEmail}
-                          </a>
-                          <a
-                            href={`tel:${blockerBooking.customerPhone.replace(/\s+/g, "")}`}
-                            className="font-medium underline"
-                            style={{ color: BRAND }}
-                          >
-                            {blockerBooking.customerPhone}
-                          </a>
-                        </div>
-                      </div>
-                      <div className="mt-3 text-sm text-slate-600">
-                        Only one confirmed booking is allowed per service
-                        run. If this looks wrong, please call{" "}
-                        <span className="font-medium" style={{ color: BRAND }}>
-                          1300 TAYLR
-                        </span>
-                        .
-                      </div>
+                        support@taylr.com.au
+                      </a>{" "}
+                      or call{" "}
+                      <span className="font-medium" style={{ color: BRAND }}>
+                        1300 TAYLR
+                      </span>
+                      .
                     </div>
                   </div>
                 </div>
-              );
-            })()}
+              </div>
+            )}
 
             {rollout && !lockedByOther && (<>
             <div className="flex items-center justify-between mb-4">

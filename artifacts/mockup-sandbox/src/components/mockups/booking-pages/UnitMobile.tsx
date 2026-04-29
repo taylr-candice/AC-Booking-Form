@@ -7,7 +7,6 @@ import {
   Briefcase,
   CheckCircle2,
   ChevronDown,
-  Lock,
   Search,
   User,
 } from "lucide-react";
@@ -29,8 +28,8 @@ import {
   getLiveBookingsVersion,
   subscribeLiveBookings,
   type ActiveBookingForUnit,
-  type AdminBooking,
 } from "../../../state/adminMockData";
+import { UnitAlreadyBookedModal } from "./UnitAlreadyBookedModal";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -84,22 +83,6 @@ function errorStyle(hasError: boolean): React.CSSProperties | undefined {
     : undefined;
 }
 
-/** See {@link UnitDesktop}'s `formatPaidReason` — same copy, kept in
- *  sync between the two surfaces so the customer sees identical
- *  reasoning on either device. */
-function formatPaidReason(b: AdminBooking): string {
-  const who = b.customerName || "another customer";
-  if (
-    b.serviceDate &&
-    (b.serviceSlot === "morning" || b.serviceSlot === "afternoon")
-  ) {
-    const window =
-      b.serviceSlot === "morning" ? "morning" : "afternoon";
-    return `${who} booked ${b.serviceDate} ${window}`;
-  }
-  return `${who} has a confirmed booking`;
-}
-
 export function UnitMobile() {
   const sessionUnitId = useBookingSelector((s) => s.unit_id);
   const role = useBookingSelector((s) => s.role);
@@ -114,6 +97,11 @@ export function UnitMobile() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [agencyOpen, setAgencyOpen] = useState(false);
+  // When a customer taps a unit that already has a paid/confirmed
+  // service booked, we show a generic "this unit is already booked,
+  // contact Taylr" modal instead of selecting the unit. We never show
+  // any details about the existing customer/booking — privacy.
+  const [alreadyBookedOpen, setAlreadyBookedOpen] = useState(false);
   const [touched, setTouched] = useState({
     agency: false,
     agencyOther: false,
@@ -199,7 +187,15 @@ export function UnitMobile() {
   }, [query]);
 
   const selectUnit = (id: string) => {
-    if (unitStatuses.get(id)?.kind === "paid") return;
+    // Already booked → don't commit it; surface a generic explainer
+    // modal that points the customer at Taylr support. We deliberately
+    // expose nothing about the existing booking (no name, no date, no
+    // contact info).
+    if (unitStatuses.get(id)?.kind === "paid") {
+      setOpen(false);
+      setAlreadyBookedOpen(true);
+      return;
+    }
     setSelectedId(id);
     bookingActions.setUnit(id);
     setOpen(false);
@@ -309,55 +305,35 @@ export function UnitMobile() {
                 ) : (
                   filtered.map((u) => {
                     const active = u.id === selectedId;
-                    const status = unitStatuses.get(u.id);
-                    const blocked = status?.kind === "paid";
-                    const reason = blocked
-                      ? formatPaidReason(status.booking)
-                      : null;
+                    // We deliberately render every row identically
+                    // regardless of whether the unit is already booked
+                    // — no strike-through, no lock icon, no inline
+                    // "already booked by …" text. If the customer
+                    // taps a booked unit, `selectUnit` opens a modal
+                    // pointing them at Taylr support instead.
                     return (
                       <button
                         key={u.id}
                         type="button"
-                        disabled={blocked}
                         onClick={() => selectUnit(u.id)}
                         data-testid={`dropdown-unit-${u.id}`}
-                        aria-disabled={blocked}
                         className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
-                          blocked
-                            ? "cursor-not-allowed bg-slate-50 opacity-70"
-                            : active
-                              ? "bg-pink-50"
-                              : "hover:bg-slate-50"
+                          active ? "bg-pink-50" : "hover:bg-slate-50"
                         }`}
                       >
                         <div className="min-w-0 flex-1">
                           <div
-                            className={`flex items-center gap-1.5 truncate text-[14px] font-semibold ${
-                              blocked
-                                ? "text-slate-500 line-through"
-                                : active
-                                  ? "text-pink-700"
-                                  : "text-slate-900"
+                            className={`truncate text-[14px] font-semibold ${
+                              active ? "text-pink-700" : "text-slate-900"
                             }`}
                           >
-                            {blocked && (
-                              <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                            )}
-                            <span className="truncate">{u.address}</span>
+                            {u.address}
                           </div>
                           <div className="mt-0.5 truncate text-[11px] text-slate-500">
                             {u.lot} · {u.building}
                           </div>
-                          {blocked && (
-                            <div
-                              className="mt-1 truncate text-[11px] font-medium text-slate-600"
-                              data-testid={`dropdown-unit-${u.id}-blocked`}
-                            >
-                              Already booked — {reason}
-                            </div>
-                          )}
                         </div>
-                        {active && !blocked && (
+                        {active && (
                           <CheckCircle2
                             className="mt-0.5 h-5 w-5 shrink-0"
                             style={{ color: BRAND }}
@@ -629,6 +605,11 @@ export function UnitMobile() {
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
+
+      <UnitAlreadyBookedModal
+        open={alreadyBookedOpen}
+        onClose={() => setAlreadyBookedOpen(false)}
+      />
     </div>
   );
 }
