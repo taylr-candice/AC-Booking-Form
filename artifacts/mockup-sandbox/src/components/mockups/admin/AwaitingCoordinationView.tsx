@@ -333,15 +333,12 @@ export function AwaitingCoordinationView({
   const unassignedCount = coordinating.filter((x) => x.kind === null).length;
   const totalCount = coordinating.length;
 
-  // Predicate for everything *except* the outcome chip — used both
-  // for the visible-rows filter (combined with the outcome chip) and
-  // for the per-chip counts shown on the outcome chips themselves.
-  // Keeping it separate means the chip counts honour the active
-  // waiting-on chip, building filter, and search but stay independent
-  // of which outcome chip happens to be selected — so a team lead
-  // sees "Voicemail (3) · Spoke (0)" no matter which one is active.
-  function matchesNonOutcomeFilters(b: AdminBooking, kind: CoordinationKind | null) {
-    if (filter !== "all" && kind !== filter) return false;
+  // Predicate for the "global" filters that aren't tied to either
+  // chip row — building filter + search. Used as the shared base for
+  // both per-chip count rollups, so each chip's count answers
+  // "how many rows would survive if I clicked me?" without
+  // double-counting against its own selection.
+  function matchesBuildingAndSearch(b: AdminBooking) {
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
@@ -366,6 +363,18 @@ export function AwaitingCoordinationView({
     return true;
   }
 
+  // Predicate for everything *except* the outcome chip — used both
+  // for the visible-rows filter (combined with the outcome chip) and
+  // for the per-chip counts shown on the outcome chips themselves.
+  // Keeping it separate means the chip counts honour the active
+  // waiting-on chip, building filter, and search but stay independent
+  // of which outcome chip happens to be selected — so a team lead
+  // sees "Voicemail (3) · Spoke (0)" no matter which one is active.
+  function matchesNonOutcomeFilters(b: AdminBooking, kind: CoordinationKind | null) {
+    if (filter !== "all" && kind !== filter) return false;
+    return matchesBuildingAndSearch(b);
+  }
+
   function matchesOutcomeFilter(b: AdminBooking, key: OutcomeFilter) {
     if (key === "all") return true;
     const latest = latestCoordinationAttempt(b.serviceTimeline);
@@ -384,6 +393,29 @@ export function AwaitingCoordinationView({
       matchesNonOutcomeFilters(b, kind) &&
       matchesOutcomeFilter(b, outcomeFilter),
   );
+
+  // Pre-rollup of per-waiting-on counts. Mirror image of
+  // `outcomeCounts` below: each chip's count answers "how many rows
+  // would survive if I clicked me?", which means honouring every
+  // filter *except* the waiting-on chip itself (otherwise picking
+  // "Awaiting tenant" would always tally to itself). So the building
+  // filter, search, and the active outcome chip all flow through
+  // here — switching the outcome chip dims a now-empty waiting-on
+  // bucket so a team lead can see at a glance whether the agent
+  // queue still has anything in it under the current cut.
+  const waitingOnCounts: Record<Filter, number> = (() => {
+    const base = coordinating.filter(
+      ({ b }) =>
+        matchesBuildingAndSearch(b) && matchesOutcomeFilter(b, outcomeFilter),
+    );
+    return {
+      all: base.length,
+      awaiting_tenant: base.filter(({ kind }) => kind === "awaiting_tenant")
+        .length,
+      awaiting_agent: base.filter(({ kind }) => kind === "awaiting_agent")
+        .length,
+    };
+  })();
 
   // Pre-rollup of per-outcome counts against the same dataset the
   // chips already filter — i.e. honouring the waiting-on chip,
@@ -634,22 +666,50 @@ export function AwaitingCoordinationView({
             ))}
           </select>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          data-testid="awaiting-coordination-waiting-filter"
+        >
           {FILTER_CHIPS.map((chip) => {
             const active = filter === chip.key;
+            const count = waitingOnCounts[chip.key];
+            // Mute + disable chips with nothing in their queue so the
+            // non-empty buckets stand out at a glance — same treatment
+            // as the outcome chips above. The "All" chip is never
+            // muted; it always represents the visible total, so the
+            // toolbar still has a sensible "reset" affordance even
+            // when every specific bucket is empty.
+            const isEmpty = chip.key !== "all" && count === 0;
             return (
               <button
                 key={chip.key}
                 type="button"
                 onClick={() => onFilter(chip.key)}
+                data-testid={`chip-waiting-${chip.key}`}
+                aria-pressed={active}
+                disabled={isEmpty}
                 className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
                   active
                     ? "text-white"
-                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                    : isEmpty
+                      ? "cursor-not-allowed bg-white text-slate-400 opacity-50 ring-1 ring-slate-100"
+                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
                 }`}
                 style={active ? { backgroundColor: BRAND } : undefined}
               >
-                {chip.label}
+                {chip.label}{" "}
+                <span
+                  className={
+                    active
+                      ? "text-white/80"
+                      : isEmpty
+                        ? "text-slate-400"
+                        : "text-slate-500"
+                  }
+                  data-testid={`chip-waiting-${chip.key}-count`}
+                >
+                  ({count})
+                </span>
               </button>
             );
           })}
