@@ -13,8 +13,12 @@
  *      booker name — privacy). The block is enforced on commit
  *      rather than as a disabled row so the existing customer's
  *      identity stays hidden.
- *   2. INVOICE_PENDING unit → tap DOES commit `unit_id` (soft
- *      block) AND the supersede warning panel renders.
+ *   2. INVOICE_PENDING unit → treated identically to PAID per
+ *      Task #89: tap does NOT commit `unit_id`; the same generic
+ *      "already booked" modal opens; the legacy yellow supersede
+ *      warning panel never renders. Ops re-sends the existing
+ *      pending invoice instead of letting a fresh booking start
+ *      on top of it.
  *   3. NORMAL unit (no rollout / no live booking) → tap commits
  *      `unit_id`, no modal, no warning panel.
  *
@@ -95,10 +99,14 @@ describe.each(VARIANTS)(
       expect(getBookingSession().unit_id).toBeNull();
     });
 
-    it("soft-blocks an INVOICE_PENDING unit: commits unit_id AND shows the supersede warning panel", async () => {
+    it("hard-blocks an INVOICE_PENDING unit identically to PAID: opens the modal AND does NOT set unit_id (Task #89)", async () => {
       const user = userEvent.setup();
       render(<Picker />);
 
+      expect(getBookingSession().unit_id).toBeNull();
+      expect(
+        screen.queryByTestId("modal-unit-already-booked"),
+      ).not.toBeInTheDocument();
       expect(
         screen.queryByTestId("warning-unit-invoice-pending"),
       ).not.toBeInTheDocument();
@@ -107,18 +115,34 @@ describe.each(VARIANTS)(
       // u3 is invoice_pending (bk-1039 / rl-ac-marine, payment pending).
       await user.click(screen.getByTestId("dropdown-unit-u3"));
 
-      expect(getBookingSession().unit_id).toBe("u3");
+      // Same generic "already booked" modal as the paid case.
+      const modal = await screen.findByTestId("modal-unit-already-booked");
+      expect(modal).toBeInTheDocument();
+      expect(
+        screen.getByTestId("text-unit-already-booked-body"),
+      ).toHaveTextContent(/already a service booked at this property/i);
 
-      const warning = await screen.findByTestId(
-        "warning-unit-invoice-pending",
+      // Load-bearing: per Task #89, invoice_pending must NOT commit
+      // unit_id (no soft-block fallthrough). A regression that
+      // restored the legacy `commit + warning panel` path would
+      // resurface ops's "two bookings on one pending invoice" bug.
+      expect(getBookingSession().unit_id).toBeNull();
+
+      // The legacy yellow supersede warning panel is gone — Task #89
+      // removed it because the modal is the only surface ops want
+      // customers to see for invoice_pending units.
+      expect(
+        screen.queryByTestId("warning-unit-invoice-pending"),
+      ).not.toBeInTheDocument();
+
+      // Dismissing the modal still leaves the unit unselected.
+      await user.click(
+        screen.getByTestId("button-unit-already-booked-confirm"),
       );
-      expect(warning).toHaveTextContent(/pending invoice for this unit/i);
-      expect(warning).toHaveTextContent(/supersede/i);
-
-      // Soft block must NOT also open the hard-block modal.
       expect(
         screen.queryByTestId("modal-unit-already-booked"),
       ).not.toBeInTheDocument();
+      expect(getBookingSession().unit_id).toBeNull();
     });
 
     it("a NORMAL unit (no rollout) commits cleanly: no modal, no warning panel", async () => {

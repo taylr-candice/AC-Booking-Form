@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Briefcase,
@@ -145,8 +144,9 @@ export function UnitMobile() {
   }, [showOtherInput]);
 
   // See `UnitDesktop` — per-unit "is this unit already taken?" lookup
-  // so each row in the dropdown can be disabled (paid) or warned about
-  // (invoice_pending) inline. Same source data and helper used.
+  // so each row in the dropdown can be disabled inline. Both `paid`
+  // and `invoice_pending` count as "already booked" from the
+  // customer's POV (Task #89). Same source data and helper used.
   // Read the live bookings list (which the admin shell mutates on
   // cancel / reschedule / supersede) and re-render via
   // `useSyncExternalStore` whenever the version bumps. In
@@ -171,7 +171,6 @@ export function UnitMobile() {
     return out;
   }, [liveBookingsVersion]);
   const selected = UNITS.find((u) => u.id === selectedId);
-  const selectedStatus = selected ? unitStatuses.get(selected.id) : undefined;
   const canContinue = canContinueStep1({
     unit_id: selectedId,
     role,
@@ -192,11 +191,14 @@ export function UnitMobile() {
   }, [query]);
 
   const selectUnit = (id: string) => {
-    // Already booked → don't commit it; surface a generic explainer
-    // modal that points the customer at Taylr support. We deliberately
-    // expose nothing about the existing booking (no name, no date, no
-    // contact info).
-    if (unitStatuses.get(id)?.kind === "paid") {
+    // Already booked (paid or invoice-pending) → don't commit it;
+    // surface a generic explainer modal that points the customer at
+    // Taylr support. We deliberately expose nothing about the existing
+    // booking (no name, no date, no contact info). Pending-invoice
+    // units are treated the same as paid: ops can re-send the existing
+    // invoice, the customer doesn't get to start a fresh one on top.
+    const kind = unitStatuses.get(id)?.kind;
+    if (kind === "paid" || kind === "invoice_pending") {
       setOpen(false);
       setAlreadyBookedOpen(true);
       return;
@@ -353,29 +355,6 @@ export function UnitMobile() {
             </div>
           )}
         </div>
-
-        {/* Invoice-pending soft warning. See `UnitDesktop` for spec. */}
-        {selected && selectedStatus?.kind === "invoice_pending" && (
-          <div
-            className="mt-3 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-[12px] leading-snug"
-            style={{
-              borderColor: "#FCD34D",
-              backgroundColor: "#FFFBEB",
-              color: "#92400E",
-            }}
-            data-testid="warning-unit-invoice-pending"
-          >
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <div>
-              <span className="font-semibold">
-                There's a pending invoice for this unit.
-              </span>{" "}
-              Continuing and paying will supersede it — the existing
-              invoice is cancelled automatically when your payment goes
-              through.
-            </div>
-          </div>
-        )}
 
         {/* Progressive disclosure: role chooser appears once a property is picked. */}
         {selected && (

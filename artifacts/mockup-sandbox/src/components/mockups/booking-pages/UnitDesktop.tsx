@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
   Briefcase,
   Building2,
@@ -144,14 +143,17 @@ export function UnitDesktop() {
   // Spec: enforce "one confirmed booking per unit per service rollout"
   // across the customer flow. We compute the verdict for every unit
   // up-front (cheap — one rollout lookup + one bookings scan per unit)
-  // so the dropdown can disable/warn each row inline.
+  // so the dropdown can disable each row inline.
   //
   //   - "paid"             → unit is taken; render disabled with a
   //                          "Already booked" reason. Cannot be picked.
-  //   - "invoice_pending"  → soft block; the row stays selectable but
-  //                          a warning panel appears under the picker
-  //                          telling the customer their booking will
-  //                          supersede the existing invoice at submit.
+  //   - "invoice_pending"  → also treated as already booked from the
+  //                          customer's POV (Task #89). Selecting the
+  //                          row opens the same generic "already booked"
+  //                          modal and does not commit the unit. Ops
+  //                          can re-send the existing pending invoice
+  //                          if the customer wants to pay it; we don't
+  //                          let a fresh booking start on top of it.
   //   - "none"             → bookable as normal.
   //
   // We deliberately ignore the live-demo session row here (it never
@@ -185,7 +187,6 @@ export function UnitDesktop() {
     return out;
   }, [liveBookingsVersion]);
   const selected = UNITS.find((u) => u.id === selectedId);
-  const selectedStatus = selected ? unitStatuses.get(selected.id) : undefined;
   const canContinue = canContinueStep1({
     unit_id: selectedId,
     role,
@@ -206,11 +207,14 @@ export function UnitDesktop() {
   }, [query]);
 
   const selectUnit = (id: string) => {
-    // Already booked → don't commit it; surface a generic explainer
-    // modal that points the customer at Taylr support. We deliberately
-    // expose nothing about the existing booking (no name, no date, no
-    // contact info).
-    if (unitStatuses.get(id)?.kind === "paid") {
+    // Already booked (paid or invoice-pending) → don't commit it;
+    // surface a generic explainer modal that points the customer at
+    // Taylr support. We deliberately expose nothing about the existing
+    // booking (no name, no date, no contact info). Pending-invoice
+    // units are treated the same as paid: ops can re-send the existing
+    // invoice, the customer doesn't get to start a fresh one on top.
+    const kind = unitStatuses.get(id)?.kind;
+    if (kind === "paid" || kind === "invoice_pending") {
       setOpen(false);
       setAlreadyBookedOpen(true);
       return;
@@ -366,32 +370,6 @@ export function UnitDesktop() {
                 </div>
               )}
             </div>
-
-            {/* Invoice-pending soft warning. The unit is selectable but
-                the customer needs to know an existing pending invoice
-                will be cancelled and superseded by their booking when
-                they pay. */}
-            {selected && selectedStatus?.kind === "invoice_pending" && (
-              <div
-                className="mt-3 flex items-start gap-2.5 rounded-xl border px-4 py-3 text-[13px] leading-relaxed"
-                style={{
-                  borderColor: "#FCD34D",
-                  backgroundColor: "#FFFBEB",
-                  color: "#92400E",
-                }}
-                data-testid="warning-unit-invoice-pending"
-              >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <span className="font-semibold">
-                    There's a pending invoice for this unit.
-                  </span>{" "}
-                  Continuing and paying will supersede the existing
-                  invoice — it'll be cancelled automatically when your
-                  payment goes through.
-                </div>
-              </div>
-            )}
 
             {/* Progressive disclosure: role chooser appears once a property is picked. */}
             {selected && (
