@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { X } from "lucide-react";
 import type { AcType } from "../../../state/bookingHelpers";
+import { useModalA11y } from "../../../hooks/use-modal-a11y";
 
 const BRAND = "#ED017F";
 
@@ -26,37 +26,27 @@ export function AcTermsModal({
   onClose: () => void;
 }) {
   const noun = acType === "ducted" ? "return-air grilles" : "indoor units";
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", handler);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
+  const containerRef = useModalA11y<HTMLDivElement>({ onClose });
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ac-terms-title"
       data-testid="modal-ac-terms"
     >
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
+        tabIndex={-1}
         className="absolute inset-0 bg-slate-900/55 backdrop-blur-sm"
         data-testid="modal-terms-backdrop"
       />
       <div
-        className="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ac-terms-title"
+        className="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 pt-4 pb-3">
