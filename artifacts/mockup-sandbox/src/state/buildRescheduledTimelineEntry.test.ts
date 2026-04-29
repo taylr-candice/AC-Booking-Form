@@ -1,0 +1,44 @@
+/**
+ * Unit tests for {@link buildRescheduledTimelineEntry} — the pure
+ * helper behind the admin "Reschedule" action surfaced from the
+ * BookingDetail Schedule card. Stamps the timeline entry that
+ * accompanies a slot swap.
+ */
+
+import { describe, expect, it } from "vitest";
+
+import {
+  ADMIN_USER_LABEL,
+  buildRescheduledTimelineEntry,
+} from "./adminMockData";
+
+describe("buildRescheduledTimelineEntry", () => {
+  it("encodes the picked morning window with a short, locale-agnostic date", () => {
+    const entry = buildRescheduledTimelineEntry({
+      date: "2026-05-04",
+      window: "morning",
+    });
+    expect(entry.status).toBe("rescheduled");
+    expect(entry.label).toBe("Rescheduled · 4 May · Morning");
+    expect(entry.by).toBe(ADMIN_USER_LABEL);
+    expect(entry.at).toBe("Just now");
+  });
+
+  it("uses the Afternoon label when the window is afternoon", () => {
+    const entry = buildRescheduledTimelineEntry({
+      date: "2026-05-04",
+      window: "afternoon",
+    });
+    expect(entry.label).toBe("Rescheduled · 4 May · Afternoon");
+  });
+
+  it("respects an explicit actor + timestamp override", () => {
+    const entry = buildRescheduledTimelineEntry(
+      { date: "2026-05-06", window: "morning" },
+      "System",
+      "2 minutes ago",
+    );
+    expect(entry.by).toBe("System");
+    expect(entry.at).toBe("2 minutes ago");
+  });
+});

@@ -33,7 +33,6 @@ import {
 import { Card, Field } from "./atoms";
 import { CancelBookingModal } from "./CancelBookingModal";
 import { LastChasedChip, PaymentChip, ServiceChip, SlotCell, WaitingChip } from "./chips";
-import { RescheduleBookingModal } from "./RescheduleBookingModal";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 import { UndoConflictDialog, type UndoConflictTakenBy } from "./UndoConflictDialog";
 
@@ -68,8 +67,8 @@ export function BookingDetail({
   onBack,
   onUpdate,
   onCancelBooking,
-  onRescheduleBooking,
   onScheduleCoordination,
+  onRescheduleAppointment,
   onUndoCancelBooking,
   onUndoCancelBookingAndReschedule,
   onAcknowledgeSupersede,
@@ -83,31 +82,26 @@ export function BookingDetail({
   /** Permanently mark a booking cancelled with a mandatory note.
    *  Wired by `AdminApp` — the live demo row never reaches this. */
   onCancelBooking: (id: string, note: string) => void;
-  /** Move a booking's slot. Reused capacity helpers ensure the rollout
-   *  view stays in sync. Note is OPTIONAL per spec T007 — only cancel
-   *  (T006) requires a note. */
-  onRescheduleBooking: (
-    id: string,
-    date: string,
-    window: "morning" | "afternoon",
-    note?: string,
-  ) => void;
-  /** Open the "Schedule appointment" modal for a coordination booking.
-   *  Optional so screens that don't yet support scheduling can omit it. */
+  /** Open the shared Schedule/Reschedule modal in "schedule" mode for a
+   *  coordination booking. Optional so screens that don't yet support
+   *  scheduling can omit it. */
   onScheduleCoordination?: (id: string) => void;
+  /** Open the shared Schedule/Reschedule modal in "reschedule" mode for
+   *  an already-scheduled booking. Same picker as the new "Schedule
+   *  appointment" modal, pre-selecting the current date/window. The
+   *  AdminApp shell handles the capacity swap and timeline entry.
+   *  Optional so screens that don't yet support reschedule can omit it. */
+  onRescheduleAppointment?: (id: string) => void;
   /** Reverse a cancellation — re-runs the uniqueness check and either
    *  restores the booking on the spot or returns a "slot_taken" verdict
    *  so the UI can pivot to the reschedule picker. Optional so screens
    *  that don't expose this affordance (none currently) can omit it. */
   onUndoCancelBooking?: (id: string) => UndoCancelResult;
   /** Companion to {@link onUndoCancelBooking}: when the original slot
-   *  was given away, this restores the booking AT a freshly picked
-   *  slot in one mutation. */
-  onUndoCancelBookingAndReschedule?: (
-    id: string,
-    date: string,
-    window: "morning" | "afternoon",
-  ) => void;
+   *  was given away, this opens the shared Schedule/Reschedule modal in
+   *  "undo" mode so the admin can pick a fresh slot. The AdminApp shell
+   *  performs the atomic restore + reschedule on confirm. */
+  onUndoCancelBookingAndReschedule?: (id: string) => void;
   /** Admin-records the corresponding invoice has been voided in the
    *  billing system. Drives the prominent "void this invoice" alert
    *  shown when `supersededByBookingId` is set. Optional so older
@@ -120,21 +114,14 @@ export function BookingDetail({
   // stale modal can't end up bound to a different booking after the
   // admin clicks back and into another row.
   const [showCancel, setShowCancel] = useState(false);
-  const [showReschedule, setShowReschedule] = useState(false);
   // Undo-cancel pivot: when the original slot was given away while
   // the booking sat cancelled, we surface the conflict here so the
   // admin can choose to open the reschedule picker instead. `null`
   // means no conflict is being shown.
   const [undoConflict, setUndoConflict] = useState<UndoConflictTakenBy | null>(null);
-  // When the admin clicks "Open Reschedule" on the pivot dialog, we
-  // open the existing reschedule modal in "undo" mode so its confirm
-  // button atomically restores AND reschedules.
-  const [showUndoReschedule, setShowUndoReschedule] = useState(false);
   useEffect(() => {
     setShowCancel(false);
-    setShowReschedule(false);
     setUndoConflict(null);
-    setShowUndoReschedule(false);
   }, [bookingId]);
 
   // Whenever the selected booking changes, pull the freshest notes value.
@@ -171,8 +158,9 @@ export function BookingDetail({
   // Cancel + Reschedule are disabled for the live demo row (the
   // customer flow owns it) and for already-cancelled bookings.
   // Reschedule additionally needs a rollout + a concrete current
-  // slot — coordination bookings (`to_be_coordinated`) reschedule via
-  // the awaiting-coordination flow instead.
+  // slot — coordination bookings (`to_be_coordinated`) are handled
+  // by the "Schedule appointment" action surfaced in the Schedule
+  // card instead.
   const canCancel = !booking.isLive && !isCancelled;
   const canReschedule =
     !booking.isLive &&
@@ -184,6 +172,13 @@ export function BookingDetail({
   // expose admin-side undo for it.
   const canUndoCancel =
     !booking.isLive && isCancelled && !!onUndoCancelBooking;
+  const rescheduleDisabledReason = booking.isLive
+    ? "Live demo row is read-only"
+    : isCancelled
+      ? "Cancelled bookings can't be rescheduled"
+      : !booking.rolloutId
+        ? "No rollout linked to this unit"
+        : "";
 
   function advanceStatus() {
     if (!nextStatus || !booking) return;
@@ -274,25 +269,6 @@ export function BookingDetail({
               Undo cancellation
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowReschedule(true)}
-            disabled={!canReschedule}
-            data-testid="button-open-reschedule"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-            title={
-              booking.isLive
-                ? "Live demo row is read-only"
-                : isCancelled
-                  ? "Cancelled bookings can't be rescheduled"
-                  : !booking.rolloutId
-                    ? "No rollout linked"
-                    : ""
-            }
-          >
-            <CalendarClock className="h-3.5 w-3.5" />
-            Reschedule
-          </button>
           <button
             type="button"
             onClick={() => setShowCancel(true)}
@@ -470,12 +446,27 @@ export function BookingDetail({
                   <button
                     type="button"
                     onClick={() => onScheduleCoordination(booking.id)}
+                    data-testid="button-schedule-appointment"
                     className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
                     style={{ backgroundColor: BRAND }}
                   >
                     Schedule appointment
                   </button>
                 )}
+              </div>
+            )}
+            {canReschedule && onRescheduleAppointment && (
+              <div className="mt-3 flex items-start">
+                <button
+                  type="button"
+                  onClick={() => onRescheduleAppointment(booking.id)}
+                  data-testid="button-reschedule-appointment"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                  title={rescheduleDisabledReason}
+                >
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  Reschedule
+                </button>
               </div>
             )}
           </Card>
@@ -506,35 +497,14 @@ export function BookingDetail({
           onDismiss={() => setShowCancel(false)}
         />
       )}
-      {showReschedule && (
-        <RescheduleBookingModal
-          booking={booking}
-          onConfirm={(date, window, note) => {
-            onRescheduleBooking(booking.id, date, window, note);
-            setShowReschedule(false);
-          }}
-          onDismiss={() => setShowReschedule(false)}
-        />
-      )}
       {undoConflict && (
         <UndoConflictDialog
           takenBy={undoConflict}
           onOpenReschedule={() => {
             setUndoConflict(null);
-            setShowUndoReschedule(true);
+            onUndoCancelBookingAndReschedule?.(booking.id);
           }}
           onDismiss={() => setUndoConflict(null)}
-        />
-      )}
-      {showUndoReschedule && onUndoCancelBookingAndReschedule && (
-        <RescheduleBookingModal
-          booking={booking}
-          mode="undo"
-          onConfirm={(date, window) => {
-            onUndoCancelBookingAndReschedule(booking.id, date, window);
-            setShowUndoReschedule(false);
-          }}
-          onDismiss={() => setShowUndoReschedule(false)}
         />
       )}
     </div>

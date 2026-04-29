@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   bookingDurationMinutes,
+  buildRescheduledTimelineEntry,
   consumeBookingCapacity,
   convertCoordinationToScheduledPatch,
   createRollout,
@@ -59,7 +60,7 @@ import { BuildingsView } from "./BuildingsView";
 import { NewBookingFlow } from "./NewBookingFlow";
 import { RolloutScheduleEditor } from "./RolloutScheduleEditor";
 import { RolloutsView } from "./RolloutsView";
-import { ScheduleCoordinationModal } from "./ScheduleCoordinationModal";
+import { SchedulingModal, type SchedulingMode } from "./SchedulingModal";
 import { Sidebar } from "./Sidebar";
 import { Toast } from "./Toast";
 import { TopBar } from "./TopBar";
@@ -117,11 +118,16 @@ export function AdminApp() {
     string | null
   >(null);
 
-  // Coordination → scheduled overlay. Holds the booking id ops is
-  // scheduling. `null` means the modal is closed.
-  const [schedulingBookingId, setSchedulingBookingId] = useState<string | null>(
-    null,
-  );
+  // Shared Schedule / Reschedule modal overlay. Holds the booking id
+  // ops is scheduling and the active mode:
+  //   - "schedule"   → coordination → scheduled (from awaiting-
+  //                    coordination row or BookingDetail Schedule card)
+  //   - "reschedule" → move an already-scheduled booking to a new slot
+  //                    (from BookingDetail Schedule card)
+  // `null` means the modal is closed.
+  const [schedulingTarget, setSchedulingTarget] = useState<
+    { id: string; mode: SchedulingMode } | null
+  >(null);
 
   // Bottom-right success toast (Task #78). The `id` field gives each
   // toast a stable key so the Toast component can reset its 4s
@@ -439,20 +445,40 @@ export function AdminApp() {
     bumpRolloutsRefreshKey();
   }
 
-  function rescheduleBooking(
+  /**
+   * Move an already-scheduled booking from its current slot to
+   * (`date`, `window`). Mirrors `scheduleCoordinationBooking` but
+   * operates on bookings that already have a concrete slot:
+   *   1. Release the booking's footprint from its current slot.
+   *   2. Consume that same footprint at the new slot.
+   *   3. Append a "Rescheduled · {short date} · {window}" timeline
+   *      entry attributed to Mia (admin).
+   *   4. Bump the rollouts refresh key so any view reading from the
+   *      module-level rollouts store re-renders.
+   * No-ops on the live demo row (read-only), cancelled bookings, and
+   * bookings with no rollout linked.
+   */
+  function rescheduleAppointment(
     id: string,
     date: string,
     window: "morning" | "afternoon",
-    note?: string,
   ) {
     if (id === "bk-live") return;
-    // Per spec T007 the reschedule note is OPTIONAL — only cancel
-    // (T006) requires a note. Trim defensively so accidental
-    // whitespace doesn't leak into the audit-trail label.
-    const trimmedNote = note?.trim() ?? "";
     const booking = seededBookings.find((b) => b.id === id);
     if (!booking || !booking.rolloutId) return;
     if (booking.serviceStatus === "cancelled") return;
+    if (
+      booking.serviceSlot !== "morning" &&
+      booking.serviceSlot !== "afternoon"
+    ) {
+      return;
+    }
+    if (booking.serviceDate === date && booking.serviceSlot === window) {
+      // No-op reschedule. Modal also gates this, but keep the guard
+      // for any future caller.
+      setSchedulingTarget(null);
+      return;
+    }
     releaseBookingCapacity(booking);
     // Build the post-reschedule shape so consumeBookingCapacity sees
     // the booking against its new slot — duration is unchanged so this
@@ -464,27 +490,10 @@ export function AdminApp() {
       serviceSlot: window,
     };
     consumeBookingCapacity(moved, booking.rolloutId, date, window);
-    const winLabel = window === "morning" ? "morning" : "afternoon";
-    // Note is optional — append it only when the admin actually typed
-    // one so the audit-trail label stays clean for note-less moves.
-    const noteSuffix = trimmedNote ? ` — ${trimmedNote}` : "";
-    // Task #49 review: include the *previous* date/window in the
-    // timeline label so the audit trail reads end-to-end ("from →
-    // to"). Falls back to "an unscheduled slot" only for legacy rows
-    // that didn't have a concrete starting slot — won't happen in
-    // practice because reschedule is gated on a concrete current
-    // slot in the BookingDetail action area.
-    const fromLabel =
-      booking.serviceDate &&
-      (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon")
-        ? `${booking.serviceDate} · ${booking.serviceSlot}`
-        : "an unscheduled slot";
-    const entry: TimelineEntry = {
-      status: "rescheduled",
-      label: `Rescheduled from ${fromLabel} to ${date} · ${winLabel}${noteSuffix}`,
-      at: "Just now",
-      by: "Mia (admin)",
-    };
+    const entry: TimelineEntry = buildRescheduledTimelineEntry({
+      date,
+      window,
+    });
     setSeededBookings((prev) =>
       prev.map((b) =>
         b.id === id
@@ -498,6 +507,7 @@ export function AdminApp() {
       ),
     );
     bumpRolloutsRefreshKey();
+    setSchedulingTarget(null);
   }
 
   /** Admin acknowledges that the superseded invoice has been voided
@@ -731,24 +741,54 @@ export function AdminApp() {
         bumpRolloutsRefreshKey();
       }
     }
+  }
 
-    setSchedulingBookingId(null);
+  const schedulingBooking =
+    schedulingTarget !== null
+      ? allBookings.find((b) => b.id === schedulingTarget.id) ?? null
+      : null;
+
+  function openSchedule(id: string) {
+    setSchedulingTarget({ id, mode: "schedule" });
+  }
+  function openReschedule(id: string) {
+    setSchedulingTarget({ id, mode: "reschedule" });
+  }
+  function openUndoReschedule(id: string) {
+    setSchedulingTarget({ id, mode: "undo" });
+  }
+  function handleSchedulingConfirm(
+    bookingId: string,
+    date: string,
+    window: "morning" | "afternoon",
+  ) {
+    if (!schedulingTarget) return;
+    const mode = schedulingTarget.mode;
+    if (mode === "reschedule") {
+      rescheduleAppointment(bookingId, date, window);
+    } else if (mode === "undo") {
+      undoCancelBookingAndReschedule(bookingId, date, window);
+    } else {
+      scheduleCoordinationBooking(bookingId, date, window);
+    }
+    setSchedulingTarget(null);
 
     // Confirmation toast so ops sees the outcome even if they're
     // looking at a different list than the one this booking moved
     // into. Uses the same short-date formatter as the rollouts list
     // and timeline labels so the format is consistent across the app.
     const windowLabel = window === "morning" ? "Morning" : "Afternoon";
+    const action =
+      mode === "reschedule"
+        ? "rescheduled to"
+        : mode === "undo"
+          ? "restored to"
+          : "scheduled for";
     setToast({
-      id: `${booking.id}-${Date.now()}`,
-      message: `${booking.id} scheduled for ${formatBookingShortDate(date)} · ${windowLabel}`,
+      id: `${bookingId}-${Date.now()}`,
+      message: `${bookingId} ${action} ${formatBookingShortDate(date)} · ${windowLabel}`,
     });
   }
-
-  const schedulingBooking =
-    schedulingBookingId !== null
-      ? allBookings.find((b) => b.id === schedulingBookingId) ?? null
-      : null;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['Inter'] text-slate-900">
@@ -774,10 +814,10 @@ export function AdminApp() {
                 onBack={() => setSelectedBookingId(null)}
                 onUpdate={updateBooking}
                 onCancelBooking={cancelBooking}
-                onRescheduleBooking={rescheduleBooking}
-                onScheduleCoordination={(id) => setSchedulingBookingId(id)}
+                onScheduleCoordination={openSchedule}
+                onRescheduleAppointment={openReschedule}
                 onUndoCancelBooking={undoCancelBooking}
-                onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
+                onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
               />
             ) : (
@@ -796,7 +836,7 @@ export function AdminApp() {
                 paymentMode={view === "payments"}
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onUndoCancelBooking={undoCancelBooking}
-                onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
+                onUndoCancelBookingAndReschedule={openUndoReschedule}
               />
             )
           ) : null}
@@ -811,10 +851,10 @@ export function AdminApp() {
                 onBack={() => setSelectedBookingId(null)}
                 onUpdate={updateBooking}
                 onCancelBooking={cancelBooking}
-                onRescheduleBooking={rescheduleBooking}
-                onScheduleCoordination={(id) => setSchedulingBookingId(id)}
+                onScheduleCoordination={openSchedule}
+                onRescheduleAppointment={openReschedule}
                 onUndoCancelBooking={undoCancelBooking}
-                onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
+                onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
               />
             ) : (
@@ -829,7 +869,7 @@ export function AdminApp() {
                 search={search}
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}
-                onSchedule={(id) => setSchedulingBookingId(id)}
+                onSchedule={openSchedule}
                 onBulkMarkAsChased={bulkMarkAsChased}
               />
             )
@@ -923,12 +963,13 @@ export function AdminApp() {
           onConfirm={appendBooking}
         />
       )}
-      {schedulingBooking && (
-        <ScheduleCoordinationModal
+      {schedulingBooking && schedulingTarget && (
+        <SchedulingModal
           booking={schedulingBooking}
           units={units}
-          onCancel={() => setSchedulingBookingId(null)}
-          onConfirm={scheduleCoordinationBooking}
+          mode={schedulingTarget.mode}
+          onCancel={() => setSchedulingTarget(null)}
+          onConfirm={handleSchedulingConfirm}
         />
       )}
       {toast && (

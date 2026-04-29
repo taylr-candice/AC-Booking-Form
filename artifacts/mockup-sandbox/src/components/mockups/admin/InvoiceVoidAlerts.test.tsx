@@ -199,7 +199,6 @@ describe("BookingDetail supersede alert", () => {
         onBack={noop}
         onUpdate={noop}
         onCancelBooking={noop}
-        onRescheduleBooking={noop}
         {...handlers}
       />,
     );

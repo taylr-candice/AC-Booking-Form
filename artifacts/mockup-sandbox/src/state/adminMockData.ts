@@ -2713,3 +2713,27 @@ export function convertCoordinationToScheduledPatch(
     serviceTimeline: [...b.serviceTimeline, entry],
   };
 }
+
+/**
+ * Build the timeline entry stamped on a booking when ops moves it
+ * from one scheduled slot to another via the "Reschedule" action in
+ * the BookingDetail Schedule card. Mirrors
+ * {@link convertCoordinationToScheduledPatch}'s label format
+ * ("Coordinated · {short date} · {window}") so the audit trail reads
+ * consistently across the schedule and reschedule flows. Pure /
+ * data-only — safe to import anywhere, no DOM access.
+ */
+export function buildRescheduledTimelineEntry(
+  schedule: { date: string; window: "morning" | "afternoon" },
+  by: string = ADMIN_USER_LABEL,
+  at: string = "Just now",
+): TimelineEntry {
+  const windowLabel =
+    schedule.window === "morning" ? "Morning" : "Afternoon";
+  return {
+    status: "rescheduled",
+    label: `Rescheduled · ${formatBookingShortDate(schedule.date)} · ${windowLabel}`,
+    at,
+    by,
+  };
+}

@@ -21,7 +21,6 @@ import {
 import type { UndoCancelResult } from "./BookingDetail";
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
 import { InvoiceVoidAlerts } from "./InvoiceVoidAlerts";
-import { RescheduleBookingModal } from "./RescheduleBookingModal";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 import { UndoConflictDialog, type UndoConflictTakenBy } from "./UndoConflictDialog";
 
@@ -93,13 +92,11 @@ export function BookingsView({
    *  so callers that don't expose an inline affordance can omit it. */
   onUndoCancelBooking?: (id: string) => UndoCancelResult;
   /** Companion to {@link onUndoCancelBooking}: when the original slot
-   *  was given away, this restores the booking AT a freshly picked
-   *  slot in one mutation. */
-  onUndoCancelBookingAndReschedule?: (
-    id: string,
-    date: string,
-    window: "morning" | "afternoon",
-  ) => void;
+   *  was given away, this opens the shared SchedulingModal in "undo"
+   *  mode at the AdminApp level so the admin can pick a fresh slot.
+   *  The AdminApp shell performs the atomic restore + reschedule on
+   *  confirm. */
+  onUndoCancelBookingAndReschedule?: (id: string) => void;
 }) {
   // "Show cancelled" is OFF by default — cancelled rows are an audit-trail
   // artefact, not the day-to-day work, so we hide them unless the admin
@@ -108,15 +105,14 @@ export function BookingsView({
   const [showCancelled, setShowCancelled] = useState(false);
   // Inline-undo pivot state. When the row-level "Undo" affordance hits
   // a "slot_taken" verdict we surface the same conflict dialog the
-  // detail page uses; clicking "Open Reschedule" then opens the
-  // existing reschedule modal in `mode="undo"` so the confirm button
-  // atomically restores AND reschedules. Both pieces of state are
-  // keyed by booking id so we always know which row we're acting on
-  // even if the table re-renders behind the modal.
+  // detail page uses; clicking "Open Reschedule" then asks the
+  // AdminApp shell to open the shared SchedulingModal in "undo" mode
+  // so the confirm button atomically restores AND reschedules. The
+  // conflict state is keyed by booking id so we always know which row
+  // we're acting on even if the table re-renders behind the dialog.
   const [undoConflict, setUndoConflict] = useState<
     { bookingId: string; takenBy: UndoConflictTakenBy } | null
   >(null);
-  const [undoRescheduleId, setUndoRescheduleId] = useState<string | null>(null);
 
   function handleUndoCancel(id: string) {
     if (!onUndoCancelBooking) return;
@@ -467,37 +463,18 @@ export function BookingsView({
           onOpenReschedule={() => {
             const id = undoConflict.bookingId;
             setUndoConflict(null);
-            // Only open the picker if the caller wired the
-            // restore-and-reschedule handler — otherwise drop quietly
-            // back to the list. (Both handlers ship together in
-            // practice; this guard keeps the prop strictly optional.)
+            // Hand off to the AdminApp shell, which opens the shared
+            // SchedulingModal in "undo" mode and performs the atomic
+            // restore + reschedule when the admin confirms a new slot.
+            // Guarded so the prop stays strictly optional — without a
+            // handler we just drop quietly back to the list.
             if (onUndoCancelBookingAndReschedule) {
-              setUndoRescheduleId(id);
+              onUndoCancelBookingAndReschedule(id);
             }
           }}
           onDismiss={() => setUndoConflict(null)}
         />
       )}
-      {undoRescheduleId && onUndoCancelBookingAndReschedule && (() => {
-        const target = bookings.find((b) => b.id === undoRescheduleId);
-        if (!target) {
-          // Booking vanished between clicking "Open Reschedule" and
-          // the modal mounting — bail rather than render a broken
-          // picker.
-          return null;
-        }
-        return (
-          <RescheduleBookingModal
-            booking={target}
-            mode="undo"
-            onConfirm={(date, window) => {
-              onUndoCancelBookingAndReschedule(target.id, date, window);
-              setUndoRescheduleId(null);
-            }}
-            onDismiss={() => setUndoRescheduleId(null)}
-          />
-        );
-      })()}
     </div>
   );
 }
