@@ -31,6 +31,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -39,6 +40,7 @@ import {
   type AdminAgent,
   type AdminBooking,
   type AdminUnit,
+  type TimelineEntry,
 } from "@/state/adminMockData";
 
 import { BookingDetail } from "./BookingDetail";
@@ -248,5 +250,127 @@ describe("BookingDetail · log call / log email", () => {
     );
     expect(screen.queryByTestId("button-log-call")).toBeNull();
     expect(screen.queryByTestId("button-log-email")).toBeNull();
+  });
+});
+
+/**
+ * Render-level coverage for the timeline icons. Per-row + bulk
+ * Log call / Log email both append entries with `kind: "call"` or
+ * `kind: "email"` and an optional `note`. The Service-timeline
+ * renderer must show those entries with a distinctive Phone / Mail
+ * marker (so admins can scan call attempts vs email blasts vs
+ * generic status events at a glance) and surface the `note` text
+ * directly beneath the entry label. Plain `kind: "status"` rows
+ * keep the coloured-dot marker and never render a note row.
+ */
+describe("BookingDetail · timeline · call/email entry rendering", () => {
+  function callEntry(overrides: Partial<TimelineEntry> = {}): TimelineEntry {
+    return {
+      kind: "call",
+      status: "logged_call",
+      label: "Logged call · Spoke to them",
+      at: "Today 10:14",
+      by: "Mia (admin)",
+      note: "Confirmed Wed afternoon",
+      ...overrides,
+    };
+  }
+
+  function emailEntry(overrides: Partial<TimelineEntry> = {}): TimelineEntry {
+    return {
+      kind: "email",
+      status: "logged_email",
+      label: "Logged email · Booking access — please confirm",
+      at: "Today 11:02",
+      by: "Mia (admin)",
+      note: "Sent rebook link",
+      ...overrides,
+    };
+  }
+
+  it("renders call entries with a Phone icon and the note beneath the label", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [callEntry()],
+      }),
+    );
+    const row = screen.getByTestId("timeline-entry-0");
+    const utils = within(row);
+
+    expect(utils.getByTitle("Logged phone call")).toBeTruthy();
+    expect(utils.queryByTitle("Logged email")).toBeNull();
+
+    const label = utils.getByText("Logged call · Spoke to them");
+    const note = utils.getByText("Confirmed Wed afternoon");
+    expect(label).toBeTruthy();
+    expect(note).toBeTruthy();
+    // Note must come after the label in document order (rendered
+    // beneath it, not inline with the timestamp footer).
+    expect(
+      label.compareDocumentPosition(note) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("renders email entries with a Mail icon and the note beneath the label", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [emailEntry()],
+      }),
+    );
+    const row = screen.getByTestId("timeline-entry-0");
+    const utils = within(row);
+
+    expect(utils.getByTitle("Logged email")).toBeTruthy();
+    expect(utils.queryByTitle("Logged phone call")).toBeNull();
+
+    const label = utils.getByText(
+      "Logged email · Booking access — please confirm",
+    );
+    const note = utils.getByText("Sent rebook link");
+    expect(label).toBeTruthy();
+    expect(note).toBeTruthy();
+    expect(
+      label.compareDocumentPosition(note) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("omits the note row when the entry has no note (call + email parity)", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [
+          callEntry({ note: undefined }),
+          emailEntry({ note: undefined }),
+        ],
+      }),
+    );
+
+    const callRow = within(screen.getByTestId("timeline-entry-0"));
+    expect(callRow.getByTitle("Logged phone call")).toBeTruthy();
+    expect(callRow.queryByText("Confirmed Wed afternoon")).toBeNull();
+
+    const emailRow = within(screen.getByTestId("timeline-entry-1"));
+    expect(emailRow.getByTitle("Logged email")).toBeTruthy();
+    expect(emailRow.queryByText("Sent rebook link")).toBeNull();
+  });
+
+  it("keeps generic status entries on the coloured-dot marker (no Phone/Mail icon)", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [
+          {
+            status: "scheduled",
+            label: "Scheduled",
+            at: "Today 09:00",
+            by: "System",
+          },
+        ],
+      }),
+    );
+    const row = within(screen.getByTestId("timeline-entry-0"));
+    expect(row.queryByTitle("Logged phone call")).toBeNull();
+    expect(row.queryByTitle("Logged email")).toBeNull();
+    expect(row.getByText("Scheduled")).toBeTruthy();
   });
 });
