@@ -19,7 +19,6 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  applyBulkChase,
   bookingDurationMinutes,
   buildRescheduledTimelineEntry,
   consumeBookingCapacity,
@@ -54,7 +53,11 @@ import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
-import { BookingDetail } from "./BookingDetail";
+import {
+  BookingDetail,
+  CALL_OUTCOME_LABEL,
+  type CallOutcome,
+} from "./BookingDetail";
 import { BookingsView } from "./BookingsView";
 import { BuildingDetail } from "./BuildingDetail";
 import { BuildingsView } from "./BuildingsView";
@@ -198,29 +201,52 @@ export function AdminApp() {
   }
 
   /**
-   * Bulk-mark several bookings as chased in one go. The per-booking
-   * "Mark as chased" affordance has been replaced by structured
-   * `logCall` / `logEmail` actions on `BookingDetail`, but the bulk
-   * action in the Awaiting-coordination queue still stamps the
-   * canonical "Marked as chased" entry via {@link applyBulkChase} so
-   * ops can fast-track several rows at once. Threads every selected id
-   * through a single `setSeededBookings` so we don't race on stale
-   * state when ops checks four rows at once. The live demo row is
-   * silently skipped — same guard as `updateBooking`. Locked down by
-   * `state/lastContacted.bulkChase.test.ts`.
+   * Bulk-log a call across several coordination bookings in one go.
+   * Mirrors the per-booking `logCall()` in `BookingDetail` (same typed
+   * `kind: "call"` timeline entry, same `lastContactedAt` stamp) but
+   * threads every selected id through a single `setSeededBookings` so
+   * we don't race on stale state when ops chases four rows at once.
+   *
+   * Replaces the legacy `bulkMarkAsChased` that produced a generic
+   * `"Marked as chased"` entry — the bulk affordance now carries the
+   * same outcome (No answer / Spoke / Voicemail) and optional shared
+   * note as the per-row Log call form, so the timeline reads
+   * consistently regardless of how the entry was created. The live
+   * demo row is silently skipped — same guard as `updateBooking`.
+   *
+   * Fires a confirmation toast so a busy admin scanning a long queue
+   * sees the bulk action landed — matches the toast pattern used by
+   * cancel / reschedule / schedule-coordination. The early return
+   * above guarantees we never fire a toast for a no-op.
    */
-  function bulkMarkAsChased(ids: string[]) {
+  function bulkLogCall(ids: string[], outcome: CallOutcome, note: string) {
     if (ids.length === 0) return;
+    const idSet = new Set(ids);
     const nowIso = new Date().toISOString();
-    setSeededBookings((prev) => applyBulkChase(prev, ids, nowIso));
-    // Confirmation toast so a busy admin scanning a long queue sees
-    // the bulk chase landed — matches the toast pattern used by
-    // cancel / reschedule / schedule-coordination. The early return
-    // above guarantees we never fire a toast for a no-op.
+    const trimmedNote = note.trim();
+    setSeededBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === "bk-live") return b;
+        if (!idSet.has(b.id)) return b;
+        const newEntry: TimelineEntry = {
+          kind: "call",
+          status: "logged_call",
+          label: `Logged call · ${CALL_OUTCOME_LABEL[outcome]}`,
+          at: "Just now",
+          by: "Mia (admin)",
+          ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
+        };
+        return {
+          ...b,
+          lastContactedAt: nowIso,
+          serviceTimeline: [...b.serviceTimeline, newEntry],
+        };
+      }),
+    );
     const count = ids.length;
     setToast({
-      id: `bulk-chase-${Date.now()}`,
-      message: `Marked ${count} booking${count === 1 ? "" : "s"} as chased`,
+      id: `bulk-log-call-${Date.now()}`,
+      message: `Logged call on ${count} booking${count === 1 ? "" : "s"} · ${CALL_OUTCOME_LABEL[outcome]}`,
     });
   }
 
@@ -913,7 +939,7 @@ export function AdminApp() {
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}
                 onSchedule={openSchedule}
-                onBulkMarkAsChased={bulkMarkAsChased}
+                onBulkLogCall={bulkLogCall}
               />
             )
           ) : null}

@@ -884,15 +884,20 @@ function TimelineMarker({
 
 // ─── Coordination + access panels ───────────────────────────────────────────
 
-type CallOutcome = "no_answer" | "spoke" | "voicemail";
+/**
+ * Outcome of a logged call attempt. Shared with the bulk "Log call"
+ * affordance in `AwaitingCoordinationView` so a one-row chase and a
+ * many-row chase produce timeline entries with the exact same shape.
+ */
+export type CallOutcome = "no_answer" | "spoke" | "voicemail";
 
-const CALL_OUTCOME_LABEL: Record<CallOutcome, string> = {
+export const CALL_OUTCOME_LABEL: Record<CallOutcome, string> = {
   no_answer: "No answer",
   spoke: "Spoke to them",
   voicemail: "Left voicemail",
 };
 
-const CALL_OUTCOME_ORDER: ReadonlyArray<CallOutcome> = [
+export const CALL_OUTCOME_ORDER: ReadonlyArray<CallOutcome> = [
   "no_answer",
   "spoke",
   "voicemail",

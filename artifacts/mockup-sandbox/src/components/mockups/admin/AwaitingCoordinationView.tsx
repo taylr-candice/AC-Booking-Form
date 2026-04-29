@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownNarrowWide, CheckCircle2, Clock, Search } from "lucide-react";
+import { ArrowDownNarrowWide, Clock, Phone, Search } from "lucide-react";
 
 import {
   bookerAgencyName,
@@ -35,6 +35,11 @@ import {
   type CoordinationKind,
 } from "@/state/adminMockData";
 
+import {
+  CALL_OUTCOME_LABEL,
+  CALL_OUTCOME_ORDER,
+  type CallOutcome,
+} from "./BookingDetail";
 import { CustomerCell } from "./BookingsView";
 import { PaymentChip } from "./chips";
 import { BRAND } from "./theme";
@@ -151,7 +156,7 @@ export function AwaitingCoordinationView({
   onSearch,
   onOpen,
   onSchedule,
-  onBulkMarkAsChased,
+  onBulkLogCall,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -166,19 +171,28 @@ export function AwaitingCoordinationView({
   /** Open the "Schedule appointment" modal for a coordination booking.
    *  Optional so this view stays usable in isolation. */
   onSchedule?: (id: string) => void;
-  /** Bulk-stamp `lastContactedAt` + append a "Marked as chased" entry
-   *  to the service timeline of every supplied booking. The per-booking
-   *  chase has been replaced by structured `logCall` / `logEmail` on
-   *  BookingDetail, but the bulk path still stamps the canonical
-   *  generic entry via `applyBulkChase`. Optional so this view stays
-   *  usable in isolation. */
-  onBulkMarkAsChased?: (ids: string[]) => void;
+  /** Bulk-log a call against every supplied booking. Stamps
+   *  `lastContactedAt` and appends a typed `kind: "call"` timeline
+   *  entry whose label encodes the chosen outcome (No answer / Spoke /
+   *  Voicemail) and whose optional shared note carries any free-text
+   *  colour. Same shape as `BookingDetail.logCall()` so the timeline
+   *  reads consistently regardless of how the entry was created.
+   *  Replaces the legacy `onBulkMarkAsChased` (generic chased entry).
+   *  Optional so this view stays usable in isolation. */
+  onBulkLogCall?: (ids: string[], outcome: CallOutcome, note: string) => void;
 }) {
   // Selection lives entirely in this view — once a bulk action fires
   // we clear it. The live demo row is excluded from selection because
   // `updateBooking` is a no-op for it (mirrors the per-booking
   // affordance, which hides for live rows).
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Bulk-log-call form state — collapsed by default so the action bar
+  // stays a slim pill, expands inline above the bar when ops chooses
+  // to log a call. Outcome defaults to "no_answer" to match the
+  // per-row LogCallForm behaviour; the shared note is optional.
+  const [showBulkLogCall, setShowBulkLogCall] = useState(false);
+  const [bulkOutcome, setBulkOutcome] = useState<CallOutcome>("no_answer");
+  const [bulkNote, setBulkNote] = useState("");
   // Pre-compute the kind for each coordination booking so we don't
   // recompute it on every filter / search keystroke. We include every
   // booking whose serviceSlot is `to_be_coordinated`; rows whose
@@ -195,9 +209,9 @@ export function AwaitingCoordinationView({
   //      forgot about beat the rows ops chased a day ago.
   //   3. `fresh` rows (chased < 24h ago) last, again oldest chase
   //      first so the most-recently-chased rows sink to the bottom.
-  // Clicking "Mark as chased" flips a row from `never`/`stale` to
-  // `fresh` with `hours ≈ 0`, which naturally pushes it to the
-  // bottom of the queue.
+  // Logging a call (per-row or via the bulk action) flips a row from
+  // `never`/`stale` to `fresh` with `hours ≈ 0`, which naturally
+  // pushes it to the bottom of the queue.
   //
   // Array#sort is stable in modern JS engines, so rows with the same
   // bucket and chase-hours keep a predictable order across re-renders.
@@ -251,12 +265,13 @@ export function AwaitingCoordinationView({
   });
 
   // Live-demo rows are read-only in this mockup, and cancelled rows
-  // can't be chased (mirrors the same `!isLive && !isCancelled` guard
-  // the per-booking "Mark as chased" button uses in BookingDetail).
-  // Cancelled bookings shouldn't normally appear here — the queue
-  // filters by `serviceSlot === "to_be_coordinated"` — but we apply
-  // the same constraint defensively so the bulk path can never get
-  // out of sync with the single-row path.
+  // can't be logged against (mirrors the same `!isLive &&
+  // !isCancelled` guard the per-booking Log call / Log email buttons
+  // use in BookingDetail). Cancelled bookings shouldn't normally
+  // appear here — the queue filters by
+  // `serviceSlot === "to_be_coordinated"` — but we apply the same
+  // constraint defensively so the bulk path can never get out of
+  // sync with the single-row path.
   const selectableIds = useMemo(
     () =>
       filtered
@@ -265,8 +280,9 @@ export function AwaitingCoordinationView({
     [filtered],
   );
   // Drop any stale ids from the selection if a filter / search change
-  // hides them. This keeps "Mark N as chased" honest — the count and
-  // the action only ever refer to rows the user can actually see.
+  // hides them. This keeps the bulk "Log call for N" honest — the
+  // count and the action only ever refer to rows the user can
+  // actually see.
   useEffect(() => {
     setSelectedIds((prev) => {
       const visible = new Set(filtered.map(({ b }) => b.id));
@@ -320,11 +336,17 @@ export function AwaitingCoordinationView({
 
   function clearSelection() {
     setSelectedIds(new Set());
+    // Closing the form too keeps the bulk-action UI in a clean
+    // "nothing in flight" state — otherwise re-selecting a different
+    // set would resurface the previous outcome / note.
+    setShowBulkLogCall(false);
+    setBulkOutcome("no_answer");
+    setBulkNote("");
   }
 
-  function handleBulkChase() {
-    if (!onBulkMarkAsChased || selectedCount === 0) return;
-    onBulkMarkAsChased(Array.from(selectedIds));
+  function handleSubmitBulkLogCall() {
+    if (!onBulkLogCall || selectedCount === 0) return;
+    onBulkLogCall(Array.from(selectedIds), bulkOutcome, bulkNote);
     clearSelection();
   }
 
@@ -434,7 +456,7 @@ export function AwaitingCoordinationView({
         <table className="w-full text-left text-[13px]">
           <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
             <tr>
-              {onBulkMarkAsChased && (
+              {onBulkLogCall && (
                 <th className="w-10 px-4 py-3 font-semibold">
                   <input
                     type="checkbox"
@@ -468,7 +490,7 @@ export function AwaitingCoordinationView({
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={onBulkMarkAsChased ? 9 : 8}
+                  colSpan={onBulkLogCall ? 9 : 8}
                   className="px-4 py-10 text-center text-slate-500"
                 >
                   No coordination bookings match these filters.
@@ -497,7 +519,7 @@ export function AwaitingCoordinationView({
                       isSelected ? "bg-pink-50/60" : ""
                     }`}
                   >
-                    {onBulkMarkAsChased && (
+                    {onBulkLogCall && (
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
@@ -505,8 +527,8 @@ export function AwaitingCoordinationView({
                             b.isLive
                               ? `Booking ${b.id} is read-only and cannot be selected`
                               : b.serviceStatus === "cancelled"
-                                ? `Booking ${b.id} is cancelled and cannot be chased`
-                                : `Select booking ${b.id} for bulk chase`
+                                ? `Booking ${b.id} is cancelled and cannot be logged against`
+                                : `Select booking ${b.id} for bulk log call`
                           }
                           data-testid={`checkbox-coordination-row-${b.id}`}
                           disabled={b.isLive || b.serviceStatus === "cancelled"}
@@ -602,37 +624,119 @@ export function AwaitingCoordinationView({
 
       {/* Sticky bulk-action bar — only mounted when ops has actually
           selected something. Pinned to the viewport bottom so it's
-          reachable even while scrolling a long queue. */}
-      {onBulkMarkAsChased && selectedCount > 0 && (
+          reachable even while scrolling a long queue.
+
+          The collapsed state is a slim pill with "Log call" + "Clear".
+          Clicking "Log call" expands an inline form above the pill so
+          ops can pick a shared outcome (No answer / Spoke / Voicemail)
+          and an optional shared note before the entry is appended to
+          every selected row. Same shape as the per-row Log call form
+          on `BookingDetail` so timeline entries are interchangeable. */}
+      {onBulkLogCall && selectedCount > 0 && (
         <div
           role="region"
           aria-label="Bulk actions for selected coordination bookings"
           data-testid="bulk-action-bar-coordination"
           className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
         >
-          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-lg">
-            <span className="text-[13px] font-semibold text-slate-900">
-              {selectedCount} selected
-            </span>
-            <span className="text-slate-300">·</span>
-            <button
-              type="button"
-              onClick={handleBulkChase}
-              data-testid="button-bulk-mark-as-chased"
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
-              style={{ backgroundColor: BRAND }}
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Mark {selectedCount} as chased
-            </button>
-            <button
-              type="button"
-              onClick={clearSelection}
-              data-testid="button-bulk-clear-selection"
-              className="rounded-full px-2.5 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
-            >
-              Clear
-            </button>
+          <div className="pointer-events-auto flex w-full max-w-md flex-col gap-2">
+            {showBulkLogCall && (
+              <div
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
+                data-testid="bulk-log-call-form"
+              >
+                <div className="text-[12px] font-semibold text-slate-900">
+                  Log a call for {selectedCount} booking
+                  {selectedCount === 1 ? "" : "s"}
+                </div>
+                <div className="mt-0.5 text-[11px] text-slate-500">
+                  Same outcome and note will be added to every selected row.
+                </div>
+                <label
+                  className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+                  htmlFor="bulk-log-call-outcome"
+                >
+                  Outcome
+                </label>
+                <select
+                  id="bulk-log-call-outcome"
+                  value={bulkOutcome}
+                  onChange={(e) => setBulkOutcome(e.target.value as CallOutcome)}
+                  data-testid="select-bulk-call-outcome"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                >
+                  {CALL_OUTCOME_ORDER.map((o) => (
+                    <option key={o} value={o}>
+                      {CALL_OUTCOME_LABEL[o]}
+                    </option>
+                  ))}
+                </select>
+                <label
+                  className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+                  htmlFor="bulk-log-call-note"
+                >
+                  Shared note (optional)
+                </label>
+                <textarea
+                  id="bulk-log-call-note"
+                  value={bulkNote}
+                  onChange={(e) => setBulkNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Building-wide voicemail blast — try again Wed AM"
+                  data-testid="input-bulk-call-note"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBulkLogCall(false);
+                      setBulkOutcome("no_answer");
+                      setBulkNote("");
+                    }}
+                    data-testid="button-bulk-cancel-log-call"
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitBulkLogCall}
+                    data-testid="button-bulk-confirm-log-call"
+                    className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    Save call for {selectedCount}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-lg">
+              <span className="text-[13px] font-semibold text-slate-900">
+                {selectedCount} selected
+              </span>
+              <span className="text-slate-300">·</span>
+              <button
+                type="button"
+                onClick={() => setShowBulkLogCall((v) => !v)}
+                data-testid="button-bulk-log-call"
+                aria-expanded={showBulkLogCall}
+                aria-controls="bulk-log-call-form"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+                style={{ backgroundColor: BRAND }}
+              >
+                <Phone className="h-3.5 w-3.5" />
+                Log call
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                data-testid="button-bulk-clear-selection"
+                className="rounded-full px-2.5 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
       )}
