@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  applyBulkChase,
   bookingDurationMinutes,
   buildRescheduledTimelineEntry,
   consumeBookingCapacity,
@@ -197,34 +198,21 @@ export function AdminApp() {
   }
 
   /**
-   * Bulk-mark several bookings as chased in one go. Mirrors the
-   * per-booking `markAsChased()` in `BookingDetail` (same `chased`
-   * timeline entry shape, same `lastContactedAt` stamp) but threads
-   * every selected id through a single `setSeededBookings` so we don't
-   * race on stale state when ops checks four rows at once. The live
-   * demo row is silently skipped — same guard as `updateBooking`.
+   * Bulk-mark several bookings as chased in one go. The per-booking
+   * "Mark as chased" affordance has been replaced by structured
+   * `logCall` / `logEmail` actions on `BookingDetail`, but the bulk
+   * action in the Awaiting-coordination queue still stamps the
+   * canonical "Marked as chased" entry via {@link applyBulkChase} so
+   * ops can fast-track several rows at once. Threads every selected id
+   * through a single `setSeededBookings` so we don't race on stale
+   * state when ops checks four rows at once. The live demo row is
+   * silently skipped — same guard as `updateBooking`. Locked down by
+   * `state/lastContacted.bulkChase.test.ts`.
    */
   function bulkMarkAsChased(ids: string[]) {
     if (ids.length === 0) return;
-    const idSet = new Set(ids);
     const nowIso = new Date().toISOString();
-    setSeededBookings((prev) =>
-      prev.map((b) => {
-        if (b.id === "bk-live") return b;
-        if (!idSet.has(b.id)) return b;
-        const newEntry: TimelineEntry = {
-          status: "chased",
-          label: "Marked as chased",
-          at: "Just now",
-          by: "Mia (admin)",
-        };
-        return {
-          ...b,
-          lastContactedAt: nowIso,
-          serviceTimeline: [...b.serviceTimeline, newEntry],
-        };
-      }),
-    );
+    setSeededBookings((prev) => applyBulkChase(prev, ids, nowIso));
     // Confirmation toast so a busy admin scanning a long queue sees
     // the bulk chase landed — matches the toast pattern used by
     // cancel / reschedule / schedule-coordination. The early return

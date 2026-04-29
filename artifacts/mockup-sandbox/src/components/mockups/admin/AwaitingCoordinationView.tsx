@@ -150,8 +150,10 @@ export function AwaitingCoordinationView({
    *  Optional so this view stays usable in isolation. */
   onSchedule?: (id: string) => void;
   /** Bulk-stamp `lastContactedAt` + append a "Marked as chased" entry
-   *  to the service timeline of every supplied booking. Same shape as
-   *  `BookingDetail.markAsChased()`. Optional so this view stays
+   *  to the service timeline of every supplied booking. The per-booking
+   *  chase has been replaced by structured `logCall` / `logEmail` on
+   *  BookingDetail, but the bulk path still stamps the canonical
+   *  generic entry via `applyBulkChase`. Optional so this view stays
    *  usable in isolation. */
   onBulkMarkAsChased?: (ids: string[]) => void;
 }) {
