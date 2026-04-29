@@ -211,6 +211,18 @@ function clickChip(key: string) {
   fireEvent.click(screen.getByTestId(`chip-outcome-${key}`));
 }
 
+/** Read the count rendered inside a specific outcome chip — the
+ *  chips render as "Label (N)" so the count span carries its own
+ *  testid suffix to keep the assertion tight. */
+function chipCount(key: string): number {
+  const text = screen.getByTestId(`chip-outcome-${key}-count`).textContent ?? "";
+  const match = text.match(/\((\d+)\)/);
+  if (!match) {
+    throw new Error(`Could not parse count from chip "${key}": ${text}`);
+  }
+  return Number(match[1]);
+}
+
 describe("AwaitingCoordinationView outcome filter", () => {
   // A fixed corpus that covers every outcome bucket, so each branch
   // test below can assert exactly which rows survive its filter.
@@ -378,6 +390,163 @@ describe("AwaitingCoordinationView outcome filter", () => {
     expect(
       screen.getByText(/No coordination bookings match these filters\./i),
     ).toBeTruthy();
+  });
+
+  describe("outcome chip counts", () => {
+    // The counts surface the queue mix at a glance — "Voicemail (3),
+    // Spoke (0)" tells a team lead exactly where to focus without
+    // clicking through every chip. The cases below pin the count
+    // for each branch the task calls out (spoke / voicemail / never
+    // logged), plus the "Any outcome" total and the compose-with-
+    // other-filters guarantee.
+    it("renders a count beside every chip, including 'Any outcome' as the total visible", () => {
+      render(<Harness initial={corpus()} />);
+      // Total = 5 rows: spoke, no_answer, voicemail, email, never_logged.
+      expect(chipCount("all")).toBe(5);
+      expect(chipCount("spoke")).toBe(1);
+      expect(chipCount("no_answer")).toBe(1);
+      expect(chipCount("voicemail")).toBe(1);
+      expect(chipCount("email")).toBe(1);
+      expect(chipCount("never_logged")).toBe(1);
+    });
+
+    it("counts the 'Spoke' bucket against the latest call outcome of each row", () => {
+      // Two rows whose latest call was 'spoke', plus a voicemail
+      // row and an email row that should both stay out of the
+      // spoke count. The older voicemail on the third row must
+      // not bump the spoke count either — only the latest entry
+      // counts.
+      const bookings = [
+        makeBooking({
+          id: "bk-spoke-1",
+          unitId: "u-a1",
+          serviceTimeline: [callEntry("Spoke to them")],
+        }),
+        makeBooking({
+          id: "bk-spoke-2",
+          unitId: "u-a2",
+          serviceTimeline: [callEntry("Spoke to them")],
+        }),
+        makeBooking({
+          id: "bk-voicemail-then-spoke",
+          unitId: "u-a3",
+          serviceTimeline: [
+            callEntry("Left voicemail"),
+            callEntry("Spoke to them"),
+          ],
+        }),
+        makeBooking({
+          id: "bk-vm",
+          unitId: "u-a4",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+        makeBooking({
+          id: "bk-email",
+          unitId: "u-a5",
+          serviceTimeline: [emailEntry("Window confirmation")],
+        }),
+      ];
+      render(<Harness initial={bookings} />);
+      expect(chipCount("spoke")).toBe(3);
+      expect(chipCount("voicemail")).toBe(1);
+      expect(chipCount("email")).toBe(1);
+      expect(chipCount("all")).toBe(5);
+    });
+
+    it("counts the 'Voicemail' bucket independently of which chip is active", () => {
+      const bookings = [
+        makeBooking({
+          id: "bk-vm-1",
+          unitId: "u-a1",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+        makeBooking({
+          id: "bk-vm-2",
+          unitId: "u-a2",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+        makeBooking({
+          id: "bk-vm-3",
+          unitId: "u-a3",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+        makeBooking({
+          id: "bk-spoke",
+          unitId: "u-a4",
+          serviceTimeline: [callEntry("Spoke to them")],
+        }),
+      ];
+      render(<Harness initial={bookings} />);
+      // Default chip ("all") active — voicemail count stays at 3.
+      expect(chipCount("voicemail")).toBe(3);
+      expect(chipCount("spoke")).toBe(1);
+      // Activating Spoke must not change the voicemail tally —
+      // counts honour the *non-outcome* filters only.
+      clickChip("spoke");
+      expect(chipCount("voicemail")).toBe(3);
+      expect(chipCount("spoke")).toBe(1);
+    });
+
+    it("counts the 'Never logged' bucket against rows with no call/email entries", () => {
+      const bookings = [
+        // Two bookings that have only non-attempt entries (a status
+        // line) — these should land in the "Never logged" bucket.
+        makeBooking({
+          id: "bk-fresh-1",
+          unitId: "u-a1",
+          serviceTimeline: [
+            { status: "scheduled", label: "Scheduled", at: "Just now", by: "System" },
+          ],
+        }),
+        makeBooking({
+          id: "bk-fresh-2",
+          unitId: "u-a2",
+          serviceTimeline: [],
+        }),
+        makeBooking({
+          id: "bk-spoke",
+          unitId: "u-a3",
+          serviceTimeline: [callEntry("Spoke to them")],
+        }),
+      ];
+      render(<Harness initial={bookings} />);
+      expect(chipCount("never_logged")).toBe(2);
+      expect(chipCount("spoke")).toBe(1);
+      expect(chipCount("all")).toBe(3);
+    });
+
+    it("counts honour the building filter so the queue mix matches the visible rows", () => {
+      // bldg-a has 1 voicemail + 1 spoke + 1 never-logged; bldg-b has
+      // an extra voicemail that the building filter must hide from
+      // the chip counts as well as from the table.
+      const bookings = [
+        makeBooking({
+          id: "bk-vm-a",
+          unitId: "u-a1",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+        makeBooking({
+          id: "bk-spoke-a",
+          unitId: "u-a2",
+          serviceTimeline: [callEntry("Spoke to them")],
+        }),
+        makeBooking({
+          id: "bk-fresh-a",
+          unitId: "u-a3",
+          serviceTimeline: [],
+        }),
+        makeBooking({
+          id: "bk-vm-b",
+          unitId: "u-b1",
+          serviceTimeline: [callEntry("Left voicemail")],
+        }),
+      ];
+      render(<Harness initial={bookings} initialBuildingFilter="bldg-a" />);
+      expect(chipCount("all")).toBe(3);
+      expect(chipCount("voicemail")).toBe(1);
+      expect(chipCount("spoke")).toBe(1);
+      expect(chipCount("never_logged")).toBe(1);
+    });
   });
 
   it("clicking 'Any outcome' restores every row after a narrow filter", () => {

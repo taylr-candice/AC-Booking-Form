@@ -293,28 +293,18 @@ export function AwaitingCoordinationView({
   const unassignedCount = coordinating.filter((x) => x.kind === null).length;
   const totalCount = coordinating.length;
 
-  const filtered = coordinating.filter(({ b, kind }) => {
+  // Predicate for everything *except* the outcome chip — used both
+  // for the visible-rows filter (combined with the outcome chip) and
+  // for the per-chip counts shown on the outcome chips themselves.
+  // Keeping it separate means the chip counts honour the active
+  // waiting-on chip, building filter, and search but stay independent
+  // of which outcome chip happens to be selected — so a team lead
+  // sees "Voicemail (3) · Spoke (0)" no matter which one is active.
+  function matchesNonOutcomeFilters(b: AdminBooking, kind: CoordinationKind | null) {
     if (filter !== "all" && kind !== filter) return false;
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
-    }
-    if (outcomeFilter !== "all") {
-      const latest = latestCoordinationAttempt(b.serviceTimeline);
-      if (outcomeFilter === "never_logged") {
-        if (latest !== null) return false;
-      } else if (outcomeFilter === "email") {
-        if (!latest || latest.kind !== "email") return false;
-      } else {
-        // spoke | no_answer | voicemail
-        if (
-          !latest ||
-          latest.kind !== "call" ||
-          latest.callOutcome !== outcomeFilter
-        ) {
-          return false;
-        }
-      }
     }
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
@@ -334,7 +324,59 @@ export function AwaitingCoordinationView({
       if (!haystack.includes(q)) return false;
     }
     return true;
-  });
+  }
+
+  function matchesOutcomeFilter(b: AdminBooking, key: OutcomeFilter) {
+    if (key === "all") return true;
+    const latest = latestCoordinationAttempt(b.serviceTimeline);
+    if (key === "never_logged") return latest === null;
+    if (key === "email") return latest !== null && latest.kind === "email";
+    // spoke | no_answer | voicemail
+    return (
+      latest !== null &&
+      latest.kind === "call" &&
+      latest.callOutcome === key
+    );
+  }
+
+  const filtered = coordinating.filter(
+    ({ b, kind }) =>
+      matchesNonOutcomeFilters(b, kind) &&
+      matchesOutcomeFilter(b, outcomeFilter),
+  );
+
+  // Pre-rollup of per-outcome counts against the same dataset the
+  // chips already filter — i.e. honouring the waiting-on chip,
+  // building filter, and search but ignoring which outcome chip is
+  // active. The "Any outcome" chip shows the total visible count
+  // (every row that survives the other filters), and each specific
+  // chip shows its own bucket so ops can spot the queue mix at a
+  // glance without clicking through.
+  const outcomeCounts: Record<OutcomeFilter, number> = (() => {
+    const base = coordinating.filter(({ b, kind }) =>
+      matchesNonOutcomeFilters(b, kind),
+    );
+    const counts: Record<OutcomeFilter, number> = {
+      all: base.length,
+      spoke: 0,
+      no_answer: 0,
+      voicemail: 0,
+      email: 0,
+      never_logged: 0,
+    };
+    for (const { b } of base) {
+      const latest = latestCoordinationAttempt(b.serviceTimeline);
+      if (latest === null) {
+        counts.never_logged += 1;
+      } else if (latest.kind === "email") {
+        counts.email += 1;
+      } else if (latest.kind === "call" && latest.callOutcome) {
+        const outcome = latest.callOutcome as OutcomeFilter;
+        if (outcome in counts) counts[outcome] += 1;
+      }
+    }
+    return counts;
+  })();
 
   // Live-demo rows are read-only in this mockup, and cancelled rows
   // can't be logged against (mirrors the same `!isLive &&
@@ -536,6 +578,7 @@ export function AwaitingCoordinationView({
         </span>
         {OUTCOME_FILTER_CHIPS.map((chip) => {
           const active = outcomeFilter === chip.key;
+          const count = outcomeCounts[chip.key];
           return (
             <button
               key={chip.key}
@@ -550,7 +593,13 @@ export function AwaitingCoordinationView({
               }`}
               style={active ? { backgroundColor: BRAND } : undefined}
             >
-              {chip.label}
+              {chip.label}{" "}
+              <span
+                className={active ? "text-white/80" : "text-slate-500"}
+                data-testid={`chip-outcome-${chip.key}-count`}
+              >
+                ({count})
+              </span>
             </button>
           );
         })}
