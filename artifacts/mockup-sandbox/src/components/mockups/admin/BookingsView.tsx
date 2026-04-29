@@ -66,6 +66,7 @@ export function BookingsView({
   onOpen,
   onNewBooking,
   paymentMode,
+  onAcknowledgeSupersede,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -79,6 +80,7 @@ export function BookingsView({
   onOpen: (id: string) => void;
   onNewBooking: () => void;
   paymentMode: boolean;
+  onAcknowledgeSupersede: (id: string) => void;
 }) {
   // "Show cancelled" is OFF by default — cancelled rows are an audit-trail
   // artefact, not the day-to-day work, so we hide them unless the admin
@@ -276,11 +278,30 @@ export function BookingsView({
                         )}
                         {b.supersededByBookingId && (
                           <span
-                            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                            className="inline-flex items-center gap-1.5 rounded-full pl-2 pr-1 py-0.5 text-[10px] font-bold uppercase tracking-wider"
                             style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
                             title={`Superseded by ${b.supersededByBookingId} — outstanding invoice should be voided`}
+                            data-testid="pill-supersede"
+                            data-booking-id={b.id}
                           >
                             Invoice to cancel · superseded
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                // Stop the click from bubbling up to the
+                                // row's "open booking" handler — admins
+                                // dismissing the pill don't want to be
+                                // navigated away from the list.
+                                e.stopPropagation();
+                                onAcknowledgeSupersede(b.id);
+                              }}
+                              className="rounded-full bg-white/80 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                              style={{ color: BRAND_DEEP }}
+                              title="Mark this superseded invoice as voided in billing"
+                              data-testid="button-acknowledge-supersede"
+                            >
+                              Acknowledge
+                            </button>
                           </span>
                         )}
                       </div>

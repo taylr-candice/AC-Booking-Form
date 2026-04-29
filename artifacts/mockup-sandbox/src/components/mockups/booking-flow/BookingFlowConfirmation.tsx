@@ -51,6 +51,11 @@ import { scheduleDisplay, unitLabel } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
 
+/** Email used by the "Contact us" CTA on the unit-unavailable dead-end
+ *  screen (Task #49). Mirrors the support inbox already shown on the
+ *  customer-flow help links. */
+const SUPPORT_EMAIL = "support@taylr.example";
+
 type Variant = "scheduled" | "coordination" | "cancelled" | "unit_unavailable";
 
 export function BookingFlowConfirmation() {
@@ -97,30 +102,103 @@ export function BookingFlowConfirmation() {
       );
       break;
 
-    case "unit_unavailable":
+    case "unit_unavailable": {
+      // Task #49 review: surface the booker context the uniqueness
+      // guard handed us so the customer knows *who* won the race and
+      // when, plus a "Contact us" CTA for help. The "Pick another
+      // unit" button is kept as a secondary option.
+      const blocker = session.unit_unavailable_blocker;
+      const blockerName = blocker?.name?.trim() || null;
+      const blockerRoleLabel =
+        blocker?.role === "agent" ? "the managing agent" : "the unit owner";
+      const slotLabel =
+        blocker?.slot === "morning"
+          ? "morning"
+          : blocker?.slot === "afternoon"
+            ? "afternoon"
+            : null;
+      const subject = encodeURIComponent(
+        `Help with unit booking · ${unit.line1 ?? ""}`.trim(),
+      );
+      const mailtoBody = encodeURIComponent(
+        `Hi Taylr,\n\nI tried to book ${[unit.line1, unit.line2]
+          .filter(Boolean)
+          .join(", ")} but it shows as already booked${
+          blockerName ? ` by ${blockerName}` : ""
+        }. Can you help?\n\nThanks,`,
+      );
       icon = <XCircle className="h-7 w-7 text-rose-500" />;
-      title = "Unit unavailable";
+      title = "Unit already booked";
       body = (
         <>
           Sorry — this unit was just booked by someone else, so we
           couldn&apos;t confirm your booking. No payment has been taken.
-          Please pick another unit to continue.
+          {blockerName && (
+            <div
+              className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs text-slate-700"
+              data-testid="panel-blocker-context"
+            >
+              <div className="font-semibold text-slate-900">
+                {blockerName}{" "}
+                <span className="text-slate-500">({blockerRoleLabel})</span>
+              </div>
+              <div className="mt-0.5">
+                booked the{" "}
+                {slotLabel ? (
+                  <>
+                    <span className="font-medium text-slate-900">
+                      {slotLabel}
+                    </span>{" "}
+                    window
+                  </>
+                ) : (
+                  "service"
+                )}
+                {blocker?.date && (
+                  <>
+                    {" "}
+                    on{" "}
+                    <span className="font-medium text-slate-900">
+                      {blocker.date}
+                    </span>
+                  </>
+                )}
+                .
+              </div>
+            </div>
+          )}
           <div className="mt-3 text-xs text-slate-500">
             {[unit.line1, unit.line2].filter(Boolean).join(", ")}
+          </div>
+          <div className="mt-4 text-sm text-slate-600">
+            Think this is a mistake? Get in touch and we&apos;ll sort it
+            out for you.
           </div>
         </>
       );
       cta = (
-        <Button
-          onClick={() => bookingActions.pickAnotherUnit()}
-          className="text-white hover:opacity-90"
-          style={{ backgroundColor: BRAND }}
-          data-testid="button-pick-another-unit"
-        >
-          Pick another unit
-        </Button>
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+          <Button
+            asChild
+            className="text-white hover:opacity-90"
+            style={{ backgroundColor: BRAND }}
+            data-testid="button-contact-us"
+          >
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${mailtoBody}`}>
+              Contact us
+            </a>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => bookingActions.pickAnotherUnit()}
+            data-testid="button-pick-another-unit"
+          >
+            Pick another unit
+          </Button>
+        </div>
       );
       break;
+    }
 
     case "coordination":
       icon = <CheckCircle2 className="h-7 w-7 text-emerald-500" />;

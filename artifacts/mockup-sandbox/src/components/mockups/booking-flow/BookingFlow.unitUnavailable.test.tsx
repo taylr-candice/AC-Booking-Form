@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * UI-level regression test for the "Unit unavailable" terminal in the
+ * UI-level regression test for the "Unit already booked" terminal in the
  * iframed `BookingFlow*` wrapper (Task #56, spec §9 row "Unit
  * unavailable").
  *
@@ -14,12 +14,12 @@
  * `BookingForm.tryAgain.test.tsx`) — but that test is for the LEGACY
  * single-page `BookingForm`. The new wrapper had no end-to-end test
  * coverage for terminal transitions at all, so a silent regression
- * that broke the "Unit unavailable" terminal screen would only have
+ * that broke the "Unit already booked" terminal screen would only have
  * surfaced in manual QA.
  *
  * What this pins
  * --------------
- *  1. The wrapper renders the dedicated "Unit unavailable" terminal
+ *  1. The wrapper renders the dedicated "Unit already booked" terminal
  *     screen (title, body copy, "Pick another unit" CTA) when
  *     `unit_unavailable` flips on while the customer is sitting on
  *     Step 5 — and the active step iframe is unmounted at the same
@@ -242,7 +242,7 @@ describe.each(VARIANTS)(
         // of `BookingFlowConfirmation`.
         expect(
           await screen.findByTestId("text-terminal-title"),
-        ).toHaveTextContent("Unit unavailable");
+        ).toHaveTextContent("Unit already booked");
         expect(screen.getByTestId("text-terminal-body")).toHaveTextContent(
           /just booked by someone else/i,
         );
@@ -350,7 +350,7 @@ describe.each(VARIANTS)(
         // ── Terminal screen renders ────────────────────────────────
         expect(
           await screen.findByTestId("text-terminal-title"),
-        ).toHaveTextContent("Unit unavailable");
+        ).toHaveTextContent("Unit already booked");
         const cta = screen.getByTestId("button-pick-another-unit");
         expect(cta).toBeInTheDocument();
 

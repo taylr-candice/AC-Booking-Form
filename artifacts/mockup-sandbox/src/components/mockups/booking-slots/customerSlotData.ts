@@ -130,30 +130,38 @@ export function disabledReasonForStatus(
  * party — the customer-side equivalent of {@link getActiveBookingForUnit}.
  *
  * Used by the slot pickers to render a read-only "Already scheduled"
- * panel when the customer's chosen unit was paid-booked by someone
- * else (e.g. an agent who picked the same unit between Step 1 and
- * Step 4). Only "paid" bookings count — invoice-pending soft blocks
- * are handled up-front in the unit picker (Step 1) and at submit time
- * in `bookingSession.submitBooking()`, so by the time the customer
- * reaches the slot picker an `invoice_pending` row is just informational
- * noise here.
+ * panel when the customer's chosen unit is *already taken* by someone
+ * else (paid OR invoice-pending — both block the second tenant from
+ * picking a slot). The panel includes the booker's contact details so
+ * a co-tenant or co-owner can reach out directly instead of being
+ * stuck.
  *
  * The customer's own in-progress booking (the live-demo session row)
  * never appears in `SEEDED_BOOKINGS`, so we don't need to filter it
  * out by id — the seeded list is naturally "everyone but me".
  *
- * Returns `null` when no unit is selected (so the canvas-isolated
- * preview keeps working without a session) or when no rollout exists
- * for the selected unit's building.
+ * Task #49 review: previously this only returned paid bookings, which
+ * meant the second tenant could still walk the picker even though the
+ * unit was already invoice-pending — surfacing the lock for both
+ * states matches the requirement that any active booking on the unit
+ * makes the second tenant view read-only.
+ *
+ * Returns `{ booking, kind }` where `kind` is `"paid"` or
+ * `"invoice_pending"` so the picker can tune the copy slightly per
+ * status, or `null` when no unit is selected / no rollout exists.
  */
 export function alreadyScheduledByOther(
   unitId: string | null,
-): AdminBooking | null {
+): { booking: AdminBooking; kind: "paid" | "invoice_pending" } | null {
   if (!unitId) return null;
   const rollout = findRolloutForBooking("svc-ac", unitId);
   if (!rollout) return null;
   const verdict = getActiveBookingForUnit(unitId, SEEDED_BOOKINGS, rollout.id);
-  return verdict.kind === "paid" ? verdict.booking : null;
+  if (verdict.kind === "paid")
+    return { booking: verdict.booking, kind: "paid" };
+  if (verdict.kind === "invoice_pending")
+    return { booking: verdict.booking, kind: "invoice_pending" };
+  return null;
 }
 
 /**

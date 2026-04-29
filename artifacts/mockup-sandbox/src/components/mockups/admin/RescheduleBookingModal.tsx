@@ -12,12 +12,14 @@
  *     /bookedCount), so we whitelist it explicitly so the admin can
  *     see the row marked "Current" and isn't asked to pick a window
  *     that already belongs to this booking.
- *   - Note is optional — for reschedules the audit trail is the
- *     before/after slot pair itself, plus an optional human reason.
+ *   - Note is REQUIRED (Task #49 review): the audit trail must always
+ *     include a human reason for the reschedule, not just the
+ *     before/after slot pair. Confirm stays disabled until the
+ *     trimmed note is non-empty.
  *   - Past dates are filtered out via `isPastDate` to mirror the
  *     customer picker.
  *   - The slot id encodes "{date}__{window}", so the parent's
- *     `onConfirm(date, window, note?)` signature stays clean.
+ *     `onConfirm(date, window, note)` signature stays clean.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -41,7 +43,7 @@ export function RescheduleBookingModal({
   onConfirm: (
     date: string,
     window: "morning" | "afternoon",
-    note?: string,
+    note: string,
   ) => void;
   onDismiss: () => void;
 }) {
@@ -85,7 +87,11 @@ export function RescheduleBookingModal({
     return { date, window };
   }
   const parts = pickedToParts();
-  const canConfirm = !!parts && picked !== currentKey;
+  const trimmedNote = note.trim();
+  // Confirm gates on three things: a slot is picked, it isn't the
+  // booking's current slot, AND a non-empty trimmed note is present.
+  // The note is required for the audit trail (Task #49 review).
+  const canConfirm = !!parts && picked !== currentKey && trimmedNote.length > 0;
 
   return (
     <div
@@ -189,16 +195,22 @@ export function RescheduleBookingModal({
 
           <label className="mt-1 flex flex-col gap-1.5">
             <span className="text-[12px] font-semibold text-slate-700">
-              Note (optional)
+              Note <span className="text-rose-600">*</span>
             </span>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
+              required
+              aria-required="true"
               placeholder="Why is this being rescheduled? Saved on the timeline."
               data-testid="textarea-reschedule-note"
               className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
             />
+            <span className="text-[11px] text-slate-500">
+              A short reason is required so the timeline records why
+              this booking was moved.
+            </span>
           </label>
         </div>
 
@@ -221,9 +233,8 @@ export function RescheduleBookingModal({
               type="button"
               disabled={!canConfirm}
               onClick={() => {
-                if (!parts) return;
-                const trimmed = note.trim();
-                onConfirm(parts.date, parts.window, trimmed || undefined);
+                if (!parts || trimmedNote.length === 0) return;
+                onConfirm(parts.date, parts.window, trimmedNote);
               }}
               data-testid="button-reschedule-confirm"
               className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 hover:brightness-110"

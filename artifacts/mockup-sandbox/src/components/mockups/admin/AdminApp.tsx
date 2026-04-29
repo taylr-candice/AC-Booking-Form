@@ -166,6 +166,11 @@ export function AdminApp() {
   //      module-level rollouts store re-renders.
   function cancelBooking(id: string, note: string) {
     if (id === "bk-live") return;
+    // Mirror the reschedule guard: cancellation note is mandatory for
+    // the audit trail. The modal already enforces this in the UI; the
+    // defensive trim+empty check here protects any future caller.
+    const trimmedNote = note.trim();
+    if (trimmedNote.length === 0) return;
     const booking = seededBookings.find((b) => b.id === id);
     if (!booking) return;
     if (booking.serviceStatus === "cancelled") return;
@@ -173,7 +178,7 @@ export function AdminApp() {
     const releaseOk = releaseBookingCapacity(booking);
     const serviceEntry: TimelineEntry = {
       status: "cancelled",
-      label: `Cancelled · ${note}`,
+      label: `Cancelled · ${trimmedNote}`,
       at: "Just now",
       by: "Mia (admin)",
     };
@@ -181,7 +186,7 @@ export function AdminApp() {
       serviceStatus: "cancelled",
       cancelledAt: "Just now",
       cancelledBy: "Mia (admin)",
-      cancellationNote: note,
+      cancellationNote: trimmedNote,
       serviceTimeline: [...booking.serviceTimeline, serviceEntry],
     };
     if (wasPaid) {
@@ -204,9 +209,14 @@ export function AdminApp() {
     id: string,
     date: string,
     window: "morning" | "afternoon",
-    note?: string,
+    note: string,
   ) {
     if (id === "bk-live") return;
+    // Reschedule note is mandatory for the audit trail (Task #49
+    // review). Defensive trim+empty check at the handler too so a
+    // future caller can't bypass the modal's gate.
+    const trimmedNote = note.trim();
+    if (trimmedNote.length === 0) return;
     const booking = seededBookings.find((b) => b.id === id);
     if (!booking || !booking.rolloutId) return;
     if (booking.serviceStatus === "cancelled") return;
@@ -222,10 +232,23 @@ export function AdminApp() {
     };
     consumeBookingCapacity(moved, booking.rolloutId, date, window);
     const winLabel = window === "morning" ? "morning" : "afternoon";
-    const noteSuffix = note && note.trim() ? ` — ${note.trim()}` : "";
+    // Note is guaranteed non-empty by the trimmedNote guard above —
+    // always include it in the timeline label.
+    const noteSuffix = ` — ${trimmedNote}`;
+    // Task #49 review: include the *previous* date/window in the
+    // timeline label so the audit trail reads end-to-end ("from →
+    // to"). Falls back to "an unscheduled slot" only for legacy rows
+    // that didn't have a concrete starting slot — won't happen in
+    // practice because reschedule is gated on a concrete current
+    // slot in the BookingDetail action area.
+    const fromLabel =
+      booking.serviceDate &&
+      (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon")
+        ? `${booking.serviceDate} · ${booking.serviceSlot}`
+        : "an unscheduled slot";
     const entry: TimelineEntry = {
       status: "rescheduled",
-      label: `Rescheduled to ${date} · ${winLabel}${noteSuffix}`,
+      label: `Rescheduled from ${fromLabel} to ${date} · ${winLabel}${noteSuffix}`,
       at: "Just now",
       by: "Mia (admin)",
     };
@@ -242,6 +265,34 @@ export function AdminApp() {
       ),
     );
     bumpRolloutsRefreshKey();
+  }
+
+  /** Admin acknowledges that the superseded invoice has been voided
+   *  in the billing system. Clears `supersededByBookingId` (so the
+   *  "Invoice to cancel" pill drops off the row) and stamps a service-
+   *  timeline note for the audit trail. Live demo row + bookings that
+   *  were never superseded are no-ops. */
+  function acknowledgeSupersede(id: string) {
+    if (id === "bk-live") return;
+    const booking = seededBookings.find((b) => b.id === id);
+    if (!booking || !booking.supersededByBookingId) return;
+    const entry: TimelineEntry = {
+      status: "cancelled",
+      label: "Invoice supersede acknowledged · void recorded",
+      at: "Just now",
+      by: "Mia (admin)",
+    };
+    setSeededBookings((prev) =>
+      prev.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              supersededByBookingId: undefined,
+              serviceTimeline: [...b.serviceTimeline, entry],
+            }
+          : b,
+      ),
+    );
   }
 
   // ── Customer submit-time uniqueness guard (Task #49) ───────────────────
@@ -271,7 +322,21 @@ export function AdminApp() {
         seededBookings,
         rollout.id,
       );
-      if (verdict.kind === "paid") return "paid";
+      if (verdict.kind === "paid") {
+        // Hand the dead-end screen the booker context (Task #49
+        // review feedback) so it can show name + role + scheduled
+        // window + a "Contact us" CTA instead of a generic message.
+        const winning = verdict.booking;
+        return {
+          kind: "paid",
+          blocker: {
+            name: winning.customerName,
+            role: winning.bookerRole,
+            date: winning.serviceDate,
+            slot: winning.serviceSlot,
+          },
+        };
+      }
       if (verdict.kind === "invoice_pending") {
         const prior = verdict.booking;
         releaseBookingCapacity(prior);
@@ -414,6 +479,7 @@ export function AdminApp() {
                 onOpen={setSelectedBookingId}
                 onNewBooking={() => openNewBooking(null)}
                 paymentMode={view === "payments"}
+                onAcknowledgeSupersede={acknowledgeSupersede}
               />
             )
           ) : null}

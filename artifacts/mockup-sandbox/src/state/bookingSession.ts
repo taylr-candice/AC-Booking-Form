@@ -185,6 +185,37 @@ export type BookingState = {
   // have to re-enter their identity, AC details, etc.). Mutually
   // exclusive with `submitted` and `payment_cancelled`.
   unit_unavailable: boolean;
+
+  // Optional blocker context surfaced on the "Unit unavailable" screen
+  // (Task #49 review feedback). When the uniqueness guard rejects a
+  // submission because another paid booking already exists for the
+  // same unit, it can hand back the booker's name + role + scheduled
+  // window so the dead-end screen can show specific context ("Henrik
+  // Olsen booked the morning window on 2026-04-29") and a "Contact us"
+  // CTA the customer can use to ask for help. `null` means no blocker
+  // info is available (e.g. the legacy `markUnitUnavailable()` path
+  // used by isolated tests/canvas previews).
+  unit_unavailable_blocker: UnitUnavailableBlocker | null;
+};
+
+/** Booker context shown on the "Unit unavailable" terminal screen so
+ *  the customer knows *who* won the race and what window they took.
+ *  Carried from the uniqueness guard into the booking session via
+ *  `submitBooking()` / `markUnitUnavailable()`. */
+export type UnitUnavailableBlocker = {
+  /** Display name of the booker who won the race (e.g. "Henrik Olsen"
+   *  for owners, "Eloise Tran" for agents). */
+  name: string;
+  /** Whether the winning booker is acting as the unit's owner or as
+   *  a managing agent — drives the role-aware copy on the dead-end
+   *  screen ("the owner" vs "the managing agent"). */
+  role: "owner" | "agent";
+  /** Date string from the winning booking (`YYYY-MM-DD`). `null` for
+   *  coordination bookings where no date is set yet. */
+  date: string | null;
+  /** Window the winning booking took. `null` for coordination bookings
+   *  with `to_be_coordinated`. */
+  slot: "morning" | "afternoon" | "to_be_coordinated" | null;
 };
 
 // ─── Uniqueness guard ──────────────────────────────────────────────────────
@@ -198,19 +229,47 @@ export type BookingState = {
 // Verdict semantics (mirrored in the JSDoc on `submitBooking`):
 //   - "paid"             → another customer already paid; submission is
 //                          rejected (terminal `unit_unavailable` screen).
+//                          Carries `blocker` context so the dead-end
+//                          screen can show who won + when (Task #49).
 //   - "invoice_pending"  → an admin-created invoice-pending booking
 //                          exists and was just superseded by the guard
 //                          (it's been cancelled + capacity freed); the
 //                          new booking proceeds normally.
 //   - "ok"               → no conflict; submit normally.
+//
+// String shorthands ("ok" / "paid" / "invoice_pending") are accepted
+// for back-compat with isolated unit tests that don't have a real
+// blocker to pass — the guard layer normalises them into the object
+// form internally. New call sites should always return the object
+// form so the dead-end screen has rich context.
 
-export type UniquenessVerdict = "paid" | "invoice_pending" | "ok";
+export type UniquenessVerdict =
+  | "ok"
+  | "invoice_pending"
+  | "paid"
+  | { kind: "ok" }
+  | { kind: "invoice_pending" }
+  | { kind: "paid"; blocker: UnitUnavailableBlocker };
 export type UniquenessGuard = (
   session: BookingState,
   newBookingReference: string,
 ) => UniquenessVerdict;
 
 let uniquenessGuard: UniquenessGuard = () => "ok";
+
+/** Normalise a raw guard verdict (string shorthand or object) into
+ *  the canonical object form. Internal helper used by `submitBooking`
+ *  so its branch logic can pattern-match on `.kind` cleanly. */
+function normaliseVerdict(
+  v: UniquenessVerdict,
+): { kind: "ok" } | { kind: "invoice_pending" } | { kind: "paid"; blocker: UnitUnavailableBlocker | null } {
+  if (typeof v === "string") {
+    if (v === "paid") return { kind: "paid", blocker: null };
+    return { kind: v } as { kind: "ok" } | { kind: "invoice_pending" };
+  }
+  if (v.kind === "paid") return { kind: "paid", blocker: v.blocker };
+  return v;
+}
 
 /** Register a uniqueness guard called from `submitBooking()`. The admin
  *  shell wires this on mount; tests call it to inject a stub. Pass
@@ -268,6 +327,7 @@ const INITIAL_STATE: BookingState = {
   return_to: null,
   payment_cancelled: false,
   unit_unavailable: false,
+  unit_unavailable_blocker: null,
 };
 
 // ─── Persisted store ────────────────────────────────────────────────────────
@@ -771,9 +831,13 @@ export const bookingActions = {
     setState((s) => {
       if (s.submitted || s.payment_cancelled || s.unit_unavailable) return s;
       const reference = genBookingReference();
-      const verdict = uniquenessGuard(s, reference);
-      if (verdict === "paid") {
-        return { ...s, unit_unavailable: true };
+      const verdict = normaliseVerdict(uniquenessGuard(s, reference));
+      if (verdict.kind === "paid") {
+        return {
+          ...s,
+          unit_unavailable: true,
+          unit_unavailable_blocker: verdict.blocker,
+        };
       }
       // "invoice_pending" — guard already side-effected the prior
       // booking + freed capacity; carry on as a normal submission.
@@ -821,10 +885,14 @@ export const bookingActions = {
    *  unit-unavailable screen. The customer recovers via
    *  {@link pickAnotherUnit}, which clears the flag and returns them
    *  to Step 1. */
-  markUnitUnavailable() {
+  markUnitUnavailable(blocker?: UnitUnavailableBlocker) {
     setState((s) => {
       if (s.submitted || s.payment_cancelled || s.unit_unavailable) return s;
-      return { ...s, unit_unavailable: true };
+      return {
+        ...s,
+        unit_unavailable: true,
+        unit_unavailable_blocker: blocker ?? null,
+      };
     });
   },
 
@@ -842,6 +910,7 @@ export const bookingActions = {
         ? {
             ...s,
             unit_unavailable: false,
+            unit_unavailable_blocker: null,
             unit_id: null,
             ac_discrepancy: null,
             current_step: 1,
