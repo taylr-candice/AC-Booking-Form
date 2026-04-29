@@ -19,11 +19,12 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, Search } from "lucide-react";
+import { ArrowDownNarrowWide, CheckCircle2, Clock, Search } from "lucide-react";
 
 import {
   bookerAgencyName,
   coordinationKindForBooking,
+  formatLastContacted,
   getBuildingForUnit,
   type AdminBooking,
   type AdminBuilding,
@@ -109,18 +110,38 @@ export function AwaitingCoordinationView({
   // and rendered with an "Unassigned" chip so ops never lose sight
   // of them.
   //
-  // Default order is oldest `createdAt` first so the bookings that
-  // have been waiting longest (and whose `WaitingChip` is reddest)
-  // float to the top of the queue. The downstream `filtered` array
-  // preserves this order for every Tenant / Managing-agent / All
-  // filter and building / search combination.
+  // Default order is a composite "what needs a nudge today?" priority:
+  //   1. `never chased` rows first (no one has touched them yet),
+  //      tiebroken by oldest `createdAt` so the longest-suffering
+  //      bookings rise to the very top.
+  //   2. `stale` rows (chased ≥ 24h ago) next, oldest chase first
+  //      (largest `hours since chase` first) so the rows ops
+  //      forgot about beat the rows ops chased a day ago.
+  //   3. `fresh` rows (chased < 24h ago) last, again oldest chase
+  //      first so the most-recently-chased rows sink to the bottom.
+  // Clicking "Mark as chased" flips a row from `never`/`stale` to
+  // `fresh` with `hours ≈ 0`, which naturally pushes it to the
+  // bottom of the queue.
+  //
+  // Array#sort is stable in modern JS engines, so rows with the same
+  // bucket and chase-hours keep a predictable order across re-renders.
+  const bucketRank = { never: 0, stale: 1, fresh: 2 } as const;
   const coordinating = bookings
     .filter((b) => b.serviceSlot === "to_be_coordinated")
-    .map((b) => ({ b, kind: coordinationKindForBooking(b) }))
-    .sort(
-      (a, z) =>
-        new Date(a.b.createdAt).getTime() - new Date(z.b.createdAt).getTime(),
-    );
+    .map((b) => {
+      const chased = formatLastContacted(b.lastContactedAt);
+      return { b, kind: coordinationKindForBooking(b), chased };
+    })
+    .sort((a, z) => {
+      const bucketDiff = bucketRank[a.chased.severity] - bucketRank[z.chased.severity];
+      if (bucketDiff !== 0) return bucketDiff;
+      if (a.chased.severity === "never") {
+        // No chase yet for either — break ties by who landed first.
+        return new Date(a.b.createdAt).getTime() - new Date(z.b.createdAt).getTime();
+      }
+      // Stale + fresh: oldest chase first ⇒ larger `hours` wins.
+      return z.chased.hours - a.chased.hours;
+    });
 
   const tenantCount = coordinating.filter((x) => x.kind === "awaiting_tenant").length;
   const agentCount = coordinating.filter((x) => x.kind === "awaiting_agent").length;
@@ -315,6 +336,21 @@ export function AwaitingCoordinationView({
             );
           })}
         </div>
+      </div>
+
+      {/* Ordering hint — explains the composite priority sort so ops
+          aren't surprised that the row order doesn't match the
+          BookingsView "newest first" they're used to. */}
+      <div
+        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600"
+        data-testid="awaiting-coordination-sort-hint"
+      >
+        <ArrowDownNarrowWide className="h-3.5 w-3.5 text-slate-500" />
+        <span>
+          Sorted by priority: <span className="font-semibold text-slate-800">never chased</span>{" "}
+          first, then <span className="font-semibold text-slate-800">stale</span> (chased ≥24h
+          ago), then everything else — oldest chase first.
+        </span>
       </div>
 
       {/* Table */}
