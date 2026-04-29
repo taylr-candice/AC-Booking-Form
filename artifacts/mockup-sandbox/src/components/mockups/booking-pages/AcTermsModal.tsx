@@ -108,10 +108,12 @@ export function AcTermsModal({
               className="mt-2 text-[13px] text-slate-700 leading-relaxed"
               data-testid="terms-rebook-clause"
             >
-              If what's on-site is materially different from what was booked
-              (for example, more systems than the day's window can fit), the
-              technician may not be able to finish the service in one visit and
-              a subsequent visit or rebook may be required to complete the work.
+              The number of systems and {noun} you book here sets how long the
+              technician will need at your unit. If what's on-site is materially
+              different from what was booked (for example, more systems than the
+              day's window can fit), the technician may not be able to finish
+              the service in one visit and a subsequent visit or rebook may be
+              required to complete the work.
             </p>
           </section>
 

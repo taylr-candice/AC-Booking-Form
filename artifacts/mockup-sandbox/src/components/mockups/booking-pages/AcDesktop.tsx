@@ -432,15 +432,6 @@ function FullConfigView({
           <div className="mb-8">
             <h1 className="text-2xl font-semibold text-slate-900">{heading}</h1>
             <p className="mt-2 text-sm text-slate-500">{intro}</p>
-            <p
-              className="mt-2 text-sm font-medium"
-              style={{ color: "#9D174D" }}
-              data-testid="note-ac-accuracy-desktop"
-            >
-              Please get this right — these details set how long we'll need at
-              your unit. If they don't match what we find on-site, we may not
-              finish in one visit and could need to rebook.
-            </p>
           </div>
 
           <div className="flex-1">

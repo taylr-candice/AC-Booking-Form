@@ -465,16 +465,7 @@ function FullConfigView({
           </div>
         )}
 
-        <p className="mb-2 text-sm text-slate-500">{intro}</p>
-        <p
-          className="mb-4 text-[13px] font-medium leading-snug"
-          style={{ color: "#9D174D" }}
-          data-testid="note-ac-accuracy-mobile"
-        >
-          Please get this right — these details set how long we'll need at
-          your unit. If they don't match what we find on-site, we may not
-          finish in one visit and could need to rebook.
-        </p>
+        <p className="mb-4 text-sm text-slate-500">{intro}</p>
 
         {/* "Use what's on file" link — only when we have a record (overridden mode). */}
         {mode === "overridden" && (
