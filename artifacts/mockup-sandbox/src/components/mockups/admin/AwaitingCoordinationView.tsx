@@ -27,6 +27,7 @@ import {
   formatCoordinationWaiting,
   formatLastContacted,
   getBuildingForUnit,
+  latestCoordinationAttempt,
   SEEDED_AGENTS,
   type AdminBooking,
   type AdminBuilding,
@@ -67,6 +68,11 @@ function CoordinatingWithCell({
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
   const lastContacted = formatLastContacted(booking.lastContactedAt);
+  // Most recent structured call/email entry, if any. Renders as a
+  // separate "Last attempt: …" helper line so a team lead can tell
+  // at a glance whether the previous touch got through (spoke), hit
+  // voicemail, or was just an email — without opening the booking.
+  const latestAttempt = latestCoordinationAttempt(booking.serviceTimeline);
   const headerLabel =
     kind === "awaiting_agent"
       ? "Managing agent"
@@ -118,6 +124,17 @@ function CoordinatingWithCell({
       <div className="text-[11px] text-slate-500">
         {waitingText} · {lastContactText}
       </div>
+      {latestAttempt && (
+        <div
+          className="text-[11px] text-slate-500"
+          data-testid="coordinating-with-last-attempt"
+        >
+          Last attempt:{" "}
+          <span className="font-medium text-slate-700">
+            {latestAttempt.label}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

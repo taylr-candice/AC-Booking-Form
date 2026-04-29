@@ -1020,6 +1020,100 @@ export function formatLastContacted(
   return { label, severity, hours };
 }
 
+/**
+ * Structured outcome an admin selects when logging a phone-call
+ * attempt from `BookingDetail`. Mirrored here (rather than imported
+ * from `BookingDetail.tsx`) so non-React code paths — most notably
+ * the Awaiting-coordination queue's outcome cell — can pattern-match
+ * a call entry without pulling the detail screen into their bundle.
+ */
+export type CoordinationCallOutcome = "no_answer" | "spoke" | "voicemail";
+
+/**
+ * Compact descriptor for the most recent call/email entry in a
+ * booking's service timeline. Surfaced by the Awaiting-coordination
+ * queue so a team lead can tell at a glance whether the last attempt
+ * actually got through ("spoke") or just hit voicemail / bounced.
+ *
+ * `label` is the short, ready-to-render string the queue cell can
+ * drop straight into "Last attempt: …" — kept lowercase so it reads
+ * naturally inline ("Last attempt: voicemail", "Last attempt:
+ * email"). `callOutcome` / `emailSubject` carry the structured form
+ * for consumers (and tests) that want to assert on the underlying
+ * shape rather than the rendered string.
+ */
+export type LatestCoordinationAttempt = {
+  kind: "call" | "email";
+  label: string;
+  /** When `kind === "call"` and the entry's label was produced by
+   *  the structured `BookingDetail.logCall` flow, the outcome the
+   *  admin picked. `null` for emails or for legacy call entries
+   *  whose label can't be matched back to a known outcome. */
+  callOutcome: CoordinationCallOutcome | null;
+  /** When `kind === "email"`, the trimmed subject the admin captured
+   *  (empty string when none was provided). `null` for calls. */
+  emailSubject: string | null;
+};
+
+/** `BookingDetail.logCall` encodes the outcome in the entry label
+ *  as "Logged call · {Outcome}"; this map walks that suffix back to
+ *  the structured outcome value. Kept private to this module so the
+ *  parsing surface stays small. */
+const CALL_OUTCOME_LABEL_TO_VALUE: Record<string, CoordinationCallOutcome> = {
+  "No answer": "no_answer",
+  "Spoke to them": "spoke",
+  "Left voicemail": "voicemail",
+};
+
+const CALL_OUTCOME_DISPLAY: Record<CoordinationCallOutcome, string> = {
+  no_answer: "no answer",
+  spoke: "spoke",
+  voicemail: "voicemail",
+};
+
+/**
+ * Walk `timeline` from newest to oldest and return a descriptor for
+ * the most recent `kind: "call"` or `kind: "email"` entry, or `null`
+ * when the booking has no logged attempts yet (e.g. it's only been
+ * "Marked as chased" the old way, or hasn't been touched at all).
+ *
+ * The label of a `kind: "call"` entry is encoded as
+ * `Logged call · {Outcome}` by `BookingDetail.logCall`, and the
+ * label of a `kind: "email"` entry is `Logged email` or
+ * `Logged email · {Subject}` by `BookingDetail.logEmail`. We parse
+ * those back into structure here so the queue's "Coordinating with"
+ * cell can render a clean outcome string without having to import
+ * BookingDetail's private label maps.
+ */
+export function latestCoordinationAttempt(
+  timeline: ReadonlyArray<TimelineEntry>,
+): LatestCoordinationAttempt | null {
+  for (let i = timeline.length - 1; i >= 0; i--) {
+    const entry = timeline[i];
+    if (entry.kind !== "call" && entry.kind !== "email") continue;
+    // Subjects can themselves contain "·", so split on the first
+    // separator only and keep the remainder verbatim.
+    const sepIdx = entry.label.indexOf("·");
+    const suffix = sepIdx >= 0 ? entry.label.slice(sepIdx + 1).trim() : "";
+    if (entry.kind === "call") {
+      const outcome = CALL_OUTCOME_LABEL_TO_VALUE[suffix] ?? null;
+      return {
+        kind: "call",
+        callOutcome: outcome,
+        emailSubject: null,
+        label: outcome ? CALL_OUTCOME_DISPLAY[outcome] : "call",
+      };
+    }
+    return {
+      kind: "email",
+      callOutcome: null,
+      emailSubject: suffix,
+      label: suffix.length > 0 ? `email · "${suffix}"` : "email",
+    };
+  }
+  return null;
+}
+
 // ─── Slot calendar (next 14 days) ──────────────────────────────────────────
 
 /**

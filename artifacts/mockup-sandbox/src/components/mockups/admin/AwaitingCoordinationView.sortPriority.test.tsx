@@ -21,6 +21,7 @@ import type {
   AdminBooking,
   AdminBuilding,
   AdminUnit,
+  TimelineEntry,
 } from "@/state/adminMockData";
 
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
@@ -270,5 +271,114 @@ describe("AwaitingCoordinationView priority sort", () => {
     // After chasing: the now-fresh row drops to the bottom; the stale
     // row floats up because nothing is unchased anymore.
     expect(renderedBookingIds()).toEqual(["bk-stale", "bk-fresh", "bk-never-old"]);
+  });
+});
+
+/**
+ * The "Coordinating with" cell surfaces the most recent structured
+ * call/email entry on a row so a team lead scanning the queue can
+ * tell whether the previous touch got through, just hit voicemail,
+ * or was an email — without opening each booking. The label format
+ * matches what `BookingDetail.logCall` / `logEmail` write into the
+ * service timeline (see `latestCoordinationAttempt`).
+ */
+describe("AwaitingCoordinationView last-attempt outcome", () => {
+  /** Render a single booking and return the text of its
+   *  "Last attempt: …" cell line, or `null` when the cell didn't
+   *  render one (i.e. no logged call/email yet). */
+  function renderAttemptText(timeline: TimelineEntry[]): string | null {
+    const booking = makeBooking({
+      id: "bk-outcome",
+      unitId: "u1",
+      // A pinned `lastContactedAt` keeps the row out of the
+      // never-chased bucket and stops the test from being timing-
+      // sensitive — we only care about the outcome line here.
+      lastContactedAt: "2026-04-28T09:00:00+10:00",
+      serviceTimeline: timeline,
+    });
+    render(<Harness initial={[booking]} />);
+    const node = screen.queryByTestId("coordinating-with-last-attempt");
+    return node ? node.textContent?.replace(/\s+/g, " ").trim() ?? "" : null;
+  }
+
+  it("renders 'spoke' for a logged call whose outcome was 'spoke'", () => {
+    expect(
+      renderAttemptText([
+        {
+          kind: "call",
+          status: "logged_call",
+          label: "Logged call · Spoke to them",
+          at: "Just now",
+          by: "Mia (admin)",
+        },
+      ]),
+    ).toBe("Last attempt: spoke");
+  });
+
+  it("renders 'no answer' for a logged call whose outcome was 'no_answer'", () => {
+    expect(
+      renderAttemptText([
+        {
+          kind: "call",
+          status: "logged_call",
+          label: "Logged call · No answer",
+          at: "Just now",
+          by: "Mia (admin)",
+        },
+      ]),
+    ).toBe("Last attempt: no answer");
+  });
+
+  it("renders 'email · \"<subject>\"' for a logged email", () => {
+    expect(
+      renderAttemptText([
+        {
+          kind: "email",
+          status: "logged_email",
+          label: "Logged email · Booking access — please confirm window",
+          at: "Just now",
+          by: "Mia (admin)",
+        },
+      ]),
+    ).toBe('Last attempt: email · "Booking access — please confirm window"');
+  });
+
+  it("uses the most recent call/email entry when multiple have been logged", () => {
+    // Older voicemail ⇒ then an actual conversation: the cell must
+    // surface the conversation, not the older voicemail, otherwise
+    // ops would re-chase a row that just got through.
+    expect(
+      renderAttemptText([
+        {
+          kind: "call",
+          status: "logged_call",
+          label: "Logged call · Left voicemail",
+          at: "Yesterday",
+          by: "Mia (admin)",
+        },
+        {
+          kind: "call",
+          status: "logged_call",
+          label: "Logged call · Spoke to them",
+          at: "Just now",
+          by: "Mia (admin)",
+        },
+      ]),
+    ).toBe("Last attempt: spoke");
+  });
+
+  it("omits the line when no call or email has been logged yet", () => {
+    expect(
+      renderAttemptText([
+        // A plain status entry (e.g. "Scheduled") should not be
+        // mistaken for a coordination attempt.
+        {
+          status: "scheduled",
+          label: "Scheduled",
+          at: "Just now",
+          by: "System",
+        },
+      ]),
+    ).toBeNull();
   });
 });
