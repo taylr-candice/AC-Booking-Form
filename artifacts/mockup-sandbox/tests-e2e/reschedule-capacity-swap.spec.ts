@@ -89,19 +89,26 @@ test.describe("Admin reschedule swaps rollout capacity", () => {
     const modal = page.getByTestId("modal-reschedule-booking");
     await expect(modal).toBeVisible();
     // Header echoes the current slot so an admin can sanity-check what
-    // they're about to move.
-    await expect(modal).toContainText(
-      new RegExp(`Currently ${FROM_DATE} · ${FROM_WINDOW}`),
-    );
+    // they're about to move. The header uses the human-formatted slot
+    // label ("30 Apr · Afternoon"), not the ISO/window-key form.
+    await expect(modal).toContainText(/Currently 30 Apr · Afternoon/);
 
-    const confirm = modal.getByTestId("button-confirm-reschedule");
-    // Same-as-current is gated → confirm starts disabled until the
-    // admin picks a different slot.
-    await expect(confirm).toBeDisabled();
+    // The reschedule flow is a two-step wizard: "pick" → "confirm". On
+    // the pick step the primary CTA is "Review reschedule"; same-as-
+    // current is gated → it starts disabled until the admin picks a
+    // different slot. After Review, the modal swaps to the confirm
+    // step where the primary CTA is "Confirm reschedule" and an
+    // optional note can be added (skipped here).
+    const reviewBtn = modal.getByTestId("button-review-reschedule");
+    await expect(reviewBtn).toBeDisabled();
 
     await modal
       .getByTestId(`rollout-pick-slot-${TO_DATE}__${TO_WINDOW}`)
       .click();
+    await expect(reviewBtn).toBeEnabled();
+    await reviewBtn.click();
+
+    const confirm = modal.getByTestId("button-confirm-reschedule");
     await expect(confirm).toBeEnabled();
     await confirm.click();
     await expect(modal).toBeHidden();
