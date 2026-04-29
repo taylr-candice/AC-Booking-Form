@@ -50,6 +50,7 @@ export function Toast({
     <div
       role="status"
       aria-live="polite"
+      data-testid="toast-success"
       onClick={onDismiss}
       className="fixed bottom-6 right-6 z-50 flex cursor-pointer items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-lg"
     >
@@ -58,6 +59,7 @@ export function Toast({
       {onUndo && (
         <button
           type="button"
+          data-testid="button-toast-undo"
           onClick={(e) => {
             e.stopPropagation();
             onUndo();

@@ -141,9 +141,11 @@ describe("getBuildingBookings", () => {
       SEEDED_UNITS,
       SEEDED_BOOKINGS,
     );
-    // Marine Parade has u2 (with two bookings: bk-1041, bk-1036) and u3 (bk-1039).
+    // Marine Parade has u2 (with two bookings: bk-1041, bk-1036), u3
+    // (bk-1039) and u-marine-04 (bk-1044, the slots-per-window
+    // coordination row added for Task #108's e2e coverage).
     const ids = bookings.map((b) => b.id).sort();
-    expect(ids).toEqual(["bk-1036", "bk-1039", "bk-1041"]);
+    expect(ids).toEqual(["bk-1036", "bk-1039", "bk-1041", "bk-1044"]);
   });
 
   it("returns empty when the building has no bookings", () => {

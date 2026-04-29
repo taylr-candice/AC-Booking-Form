@@ -759,6 +759,51 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     lastContactedAt: null,
   },
   {
+    // Coordination booking on the slots-per-window Marine rollout.
+    // Seeded so the success-toast undo e2e (Task #108) can exercise
+    // the slots-per-window capacity branch in
+    // `scheduleCoordinationBooking` (the other two coordination
+    // bookings — bk-1038, bk-1043 — both live on time-budget
+    // rollouts, so without this row only one capacity model would
+    // ever get covered).
+    //
+    // u-marine-04 is currently unbooked, so adding a coordination
+    // row against it doesn't disturb the seeded slot utilisation
+    // counts that other tests assert on (rl-ac-marine 4/29 morning
+    // is still 0/6, 4/30 afternoon is still 1/6, etc.).
+    id: "bk-1044",
+    unitId: "u-marine-04",
+    customerName: "Mateo Alvarez",
+    customerEmail: "mateo.a@example.com",
+    customerPhone: "0413 661 802",
+    bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_leased_tenant",
+    tenants: [
+      { first: "Hana", last: "Ito", email: "hana.i@example.com", phone: "0455 220 117" },
+    ],
+    systems: 1,
+    additional: 0,
+    acType: "split",
+    discrepancy: null,
+    serviceDate: null, // coordination flow
+    serviceSlot: "to_be_coordinated",
+    paymentStatus: "paid",
+    serviceStatus: "scheduled",
+    totalAud: 179,
+    paymentTimeline: [
+      { status: "paid", label: "Card charged · $179.00", at: "Apr 28 · 14:05", by: "System" },
+    ],
+    serviceTimeline: [
+      { status: "scheduled", label: "Awaiting tenant coordination", at: "Apr 28 · 14:05", by: "System" },
+    ],
+    notes: "Owner asked Taylr to coordinate access with the tenant directly.",
+    rolloutId: "rl-ac-marine",
+    createdAt: "2026-04-28T14:05:00+10:00",
+    lastContactedAt: null,
+  },
+  {
     // Owner-leased + "Arrange with agent" — Taylr is now waiting on the
     // managing agent (Vantage Strata) to come back with a service window.
     // Seeded so the Awaiting-coordination view always has at least one

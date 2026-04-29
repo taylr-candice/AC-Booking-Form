@@ -36,8 +36,10 @@ import { expect, test, type Page } from "@playwright/test";
  *     no seeded bookings, on the Aspen rollout (`rl-ac-aspen`)
  *   - Aspen rollout dates: 2026-04-27 .. 2026-05-09
  *   - `nextBookingId` starts at max(1042, …) + 1; with current
- *     seed the highest id is `bk-1043`, so the freshly-created
- *     admin booking will land as `bk-1044`.
+ *     seed the highest id is `bk-1044`, so the freshly-created
+ *     admin booking will land as `bk-1045`. The test asserts on
+ *     the customer name regex rather than the id, so it stays
+ *     resilient if the seed grows again.
  */
 
 const BASE_PATH = process.env.BASE_PATH ?? "/__mockup";
