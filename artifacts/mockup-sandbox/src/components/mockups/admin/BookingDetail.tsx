@@ -24,7 +24,7 @@ import {
 
 import { Card, Field } from "./atoms";
 import { CancelBookingModal } from "./CancelBookingModal";
-import { PaymentChip, ServiceChip, SlotCell } from "./chips";
+import { PaymentChip, ServiceChip, SlotCell, WaitingChip } from "./chips";
 import { RescheduleBookingModal } from "./RescheduleBookingModal";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
@@ -327,6 +327,11 @@ export function BookingDetail({
         <div className="flex flex-col gap-4">
           <Card title="Schedule">
             <SlotCell booking={booking} />
+            {booking.serviceSlot === "to_be_coordinated" && (
+              <div className="mt-3">
+                <WaitingChip createdAt={booking.createdAt} />
+              </div>
+            )}
           </Card>
           <Card title="Payment timeline">
             <Timeline

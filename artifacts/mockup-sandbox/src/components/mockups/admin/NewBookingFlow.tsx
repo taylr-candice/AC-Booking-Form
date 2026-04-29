@@ -1206,6 +1206,7 @@ function Step4Review({
     paymentTimeline: [],
     serviceTimeline: [],
     notes: "",
+    createdAt: "",
   });
 
   const agencyLabel =

@@ -4,8 +4,11 @@
  * status pill, and the service status pill.
  */
 
+import { Clock } from "lucide-react";
+
 import {
   bookingDurationMinutes,
+  formatCoordinationWaiting,
   type AdminBooking,
   type PaymentStatus,
   type ServiceStatus,
@@ -50,6 +53,44 @@ export function PaymentChip({ status }: { status: PaymentStatus }) {
       style={{ backgroundColor: m.bg, color: m.fg }}
     >
       {m.label}
+    </span>
+  );
+}
+
+/**
+ * "Waiting Xh / Xd" chip used by the admin Awaiting-coordination queue
+ * and the booking detail Schedule card. Colour escalates as a booking
+ * sits in coordination longer:
+ *   - fresh (< 24h) — slate (calm; nothing to chase yet)
+ *   - warn  (24-48h) — amber (chase today)
+ *   - stale (≥ 48h)  — red   (escalate)
+ *
+ * Pulls the bucket + label from {@link formatCoordinationWaiting} so
+ * the thresholds stay defined in one place. The icon makes the chip
+ * read as a duration even when the row is busy.
+ */
+export function WaitingChip({ createdAt }: { createdAt: string }) {
+  const { label, severity, hours } = formatCoordinationWaiting(createdAt);
+  const map: Record<typeof severity, { bg: string; fg: string }> = {
+    fresh: { bg: "#F1F5F9", fg: "#475569" },
+    warn: { bg: "#FEF3C7", fg: "#92400E" },
+    stale: { bg: "#FEE2E2", fg: "#991B1B" },
+  };
+  const { bg, fg } = map[severity];
+  const fullText =
+    severity === "stale"
+      ? "Past 48h — escalate"
+      : severity === "warn"
+        ? "Past 24h — chase today"
+        : "Under 24h";
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      style={{ backgroundColor: bg, color: fg }}
+      title={`${fullText} · ${hours.toFixed(1)}h since booking landed`}
+    >
+      <Clock className="h-2.5 w-2.5" />
+      Waiting {label}
     </span>
   );
 }

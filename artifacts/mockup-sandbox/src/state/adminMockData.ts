@@ -202,6 +202,14 @@ export type AdminBooking = {
    *  in the bookings list so an admin knows there's an outstanding
    *  invoice they should void. */
   supersededByBookingId?: string;
+  /** ISO timestamp the booking was created (i.e. when it landed in the
+   *  system — for paid bookings this matches when the card was charged,
+   *  for pending ones it matches when the intent was created). Used by
+   *  the admin "Awaiting coordination" queue to show how long each item
+   *  has been waiting for a real slot. The string-form labels carried
+   *  on `paymentTimeline` / `serviceTimeline` are display-only and not
+   *  reliable for arithmetic, hence this dedicated field. */
+  createdAt: string;
 };
 
 // ─── Seeded buildings ───────────────────────────────────────────────────────
@@ -480,6 +488,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Buzzer on left. Lockbox code 4421.",
     rolloutId: "rl-ac-aspen",
+    createdAt: "2026-04-26T09:14:00+10:00",
   },
   {
     id: "bk-1041",
@@ -513,6 +522,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Customer reported 3 systems but we have 2 on record. Confirm head count on arrival.",
     rolloutId: "rl-ac-marine",
+    createdAt: "2026-04-25T19:02:00+10:00",
   },
   {
     id: "bk-1040",
@@ -544,6 +554,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Tenant authorised by agent. Concierge to provide trade key.",
     rolloutId: null,
+    createdAt: "2026-04-24T14:11:00+10:00",
   },
   {
     id: "bk-1039",
@@ -574,6 +585,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Customer is new — no AC record on file. Update unit catalog after first visit.",
     rolloutId: "rl-ac-marine",
+    createdAt: "2026-04-27T10:01:00+10:00",
   },
   {
     id: "bk-1038",
@@ -607,6 +619,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Tenants will provide access — Taylr to coordinate. 3 tenants on file.",
     rolloutId: "rl-ac-bourke",
+    createdAt: "2026-04-23T11:50:00+10:00",
   },
   {
     id: "bk-1037",
@@ -639,6 +652,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Customer wasn't sure of AC type — tech to confirm on arrival and update catalog.",
     rolloutId: "rl-ac-bourke",
+    createdAt: "2026-04-27T18:30:00+10:00",
   },
   {
     id: "bk-1036",
@@ -671,6 +685,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Filter replacement on system 2 — billed separately (see invoice adjustment).",
     rolloutId: "rl-ac-marine",
+    createdAt: "2026-04-18T13:00:00+10:00",
   },
   {
     id: "bk-1035",
@@ -702,6 +717,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Tech finished 25 min early; goodwill refund applied for unused time.",
     rolloutId: null,
+    createdAt: "2026-04-16T08:20:00+10:00",
   },
   {
     // Owner-leased + "Arrange with agent" — Taylr is now waiting on the
@@ -735,6 +751,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     notes: "Owner asked us to arrange access via Vantage Strata Management. Agent contacted Apr 28 — awaiting reply.",
     rolloutId: "rl-ac-aspen",
+    createdAt: "2026-04-28T09:30:00+10:00",
   },
 ];
 
@@ -770,6 +787,63 @@ export function coordinationKindForBooking(
     return "awaiting_tenant";
   }
   return null;
+}
+
+// ─── Coordination aging ────────────────────────────────────────────────────
+
+/**
+ * Severity buckets for a coordination booking's wait time. Drives the
+ * "Waiting Xh / Xd" chip styling in the admin Awaiting-coordination
+ * queue and on the booking detail. Thresholds are tuned to ops triage:
+ * everything under a working-day is `fresh`; 24-48h is `warn` (chase
+ * today); past 48h is `stale` (escalate). Pure data — no rendering.
+ */
+export type CoordinationWaitSeverity = "fresh" | "warn" | "stale";
+
+const WAIT_WARN_HOURS = 24;
+const WAIT_STALE_HOURS = 48;
+
+/**
+ * Format the time elapsed since a coordination booking landed. Used by
+ * the admin Awaiting-coordination queue (per-row chip) and by the
+ * booking detail Schedule card. Returns:
+ *   - `label`    — short human string ("just now", "Xh", "Xd")
+ *   - `severity` — bucket for chip colouring (see {@link CoordinationWaitSeverity})
+ *   - `hours`    — raw hours waited (≥ 0), useful for tests / sorting
+ *
+ * Negative diffs (createdAt in the future, e.g. clock skew) clamp to
+ * "just now" / `fresh` so the UI never shows a confusing negative time.
+ */
+export function formatCoordinationWaiting(
+  createdAtIso: string,
+  now: Date = new Date(),
+): { label: string; severity: CoordinationWaitSeverity; hours: number } {
+  const created = new Date(createdAtIso).getTime();
+  // Guard against malformed / empty timestamps (Date parsing yields NaN).
+  // Treat them as "just now / fresh" so the UI degrades gracefully instead
+  // of rendering "Waiting NaNh" in red.
+  if (!Number.isFinite(created)) {
+    return { label: "just now", severity: "fresh", hours: 0 };
+  }
+  const diffMs = Math.max(0, now.getTime() - created);
+  const hours = diffMs / (1000 * 60 * 60);
+  let label: string;
+  if (hours < 1) {
+    label = "just now";
+  } else if (hours < 24) {
+    label = `${Math.floor(hours)}h`;
+  } else {
+    label = `${Math.floor(hours / 24)}d`;
+  }
+  let severity: CoordinationWaitSeverity;
+  if (hours >= WAIT_STALE_HOURS) {
+    severity = "stale";
+  } else if (hours >= WAIT_WARN_HOURS) {
+    severity = "warn";
+  } else {
+    severity = "fresh";
+  }
+  return { label, severity, hours };
 }
 
 // ─── Slot calendar (next 14 days) ──────────────────────────────────────────
@@ -1046,6 +1120,62 @@ export function getCalendar(today: Date = new Date()): AdminCalendarDay[] {
 // ─── Live session → admin booking ──────────────────────────────────────────
 
 /**
+ * Cache key for the live booking's "created at" timestamp. We persist
+ * this separately from the BookingState so that:
+ *   - the live row's age in the admin queue stays stable across React
+ *     re-renders (otherwise `liveBookingFromSession` would re-stamp
+ *     `new Date().toISOString()` on every memo recompute and the
+ *     "Waiting Xh" chip would always read "just now");
+ *   - it survives a tab refresh (sessionStorage) but is naturally
+ *     scoped to the demo session — closing the tab clears it;
+ *   - it auto-resets when the customer starts over (no `unit_id` →
+ *     {@link clearLiveBookingCreatedAtCache} is called below).
+ */
+const LIVE_CREATED_AT_KEY = "taylr.liveBookingCreatedAt.v1";
+let cachedLiveCreatedAt: string | null = null;
+
+function readLiveCreatedAtFromStorage(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(LIVE_CREATED_AT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeLiveCreatedAtToStorage(iso: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(LIVE_CREATED_AT_KEY, iso);
+  } catch {
+    /* sessionStorage may be blocked — caller still has the in-memory copy. */
+  }
+}
+
+function clearLiveBookingCreatedAtCache(): void {
+  cachedLiveCreatedAt = null;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(LIVE_CREATED_AT_KEY);
+  } catch {
+    /* Best-effort — falling through is harmless. */
+  }
+}
+
+function getOrInitLiveBookingCreatedAt(): string {
+  if (cachedLiveCreatedAt) return cachedLiveCreatedAt;
+  const persisted = readLiveCreatedAtFromStorage();
+  if (persisted) {
+    cachedLiveCreatedAt = persisted;
+    return persisted;
+  }
+  const fresh = new Date().toISOString();
+  cachedLiveCreatedAt = fresh;
+  writeLiveCreatedAtToStorage(fresh);
+  return fresh;
+}
+
+/**
  * Synthesise an `AdminBooking` from the customer's current sessionStorage
  * state, so the demo's "live" booking shows up alongside the seeded rows.
  *
@@ -1060,7 +1190,13 @@ export function getCalendar(today: Date = new Date()): AdminCalendarDay[] {
 export function liveBookingFromSession(
   session: BookingState = getBookingSession(),
 ): AdminBooking | null {
-  if (!session.unit_id) return null;
+  if (!session.unit_id) {
+    // Customer cleared / hasn't started — drop any cached live age so
+    // the next live booking starts fresh instead of inheriting the
+    // previous one's "Waiting Xh" reading.
+    clearLiveBookingCreatedAtCache();
+    return null;
+  }
 
   const isCoordination =
     session.access_method === "owner_leased_tenant" ||
@@ -1143,6 +1279,7 @@ export function liveBookingFromSession(
       "Live demo booking sourced from the customer's current session. Refresh the customer flow to update.",
     isLive: true,
     rolloutId: resolveLiveRolloutId(session.unit_id),
+    createdAt: getOrInitLiveBookingCreatedAt(),
   };
 }
 
@@ -1505,6 +1642,10 @@ export type AdminCreatedBookingInput = {
   /** Override timestamp for the timeline entry (used by tests for
    *  determinism). Defaults to "Just now". */
   timestamp?: string;
+  /** Override ISO timestamp for the booking's `createdAt` (used by
+   *  tests for determinism). Defaults to `new Date().toISOString()`
+   *  so a real admin-created booking ages from the moment it lands. */
+  createdAtIso?: string;
 };
 
 /**
@@ -1609,6 +1750,7 @@ export function buildAdminCreatedBooking(
       },
     ],
     notes: input.notes ?? "Phone booking — captured by admin on the customer's behalf.",
+    createdAt: input.createdAtIso ?? new Date().toISOString(),
   };
 }
 
