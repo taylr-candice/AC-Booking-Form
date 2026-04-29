@@ -150,6 +150,7 @@ function RolloutSlotChoice({
       type="button"
       onClick={onPick}
       disabled={!available}
+      data-testid={`rollout-pick-slot-${day.isoDate}__${label.toLowerCase()}`}
       title={!available ? reason : capacityHint}
       className={`flex w-full flex-col gap-0.5 rounded border px-1.5 py-1 text-left transition ${
         picked
