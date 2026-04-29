@@ -170,15 +170,24 @@ function CoordinatingWithCell({
         // the email's age rather than the call's. Legacy entries
         // with no `loggedAt` simply omit the suffix.
         const recency = formatAttemptRecency(latestAttempt.loggedAt);
+        // Once the latest touch crosses LAST_ATTEMPT_STALE_HOURS the
+        // line flips into an amber warning style so an admin scanning
+        // the queue spots the worst offenders without reading every
+        // recency string — same idea the lastContactedAt severity
+        // buckets above already use.
+        const isStale = recency?.severity === "stale";
         return (
           <div
-            className="text-[11px] text-slate-500"
+            className={`text-[11px] ${isStale ? "text-amber-700" : "text-slate-500"}`}
             data-testid="coordinating-with-last-attempt"
+            data-stale={isStale ? "true" : "false"}
           >
             Last attempt:{" "}
-            <span className="font-medium text-slate-700">
+            <span
+              className={`font-medium ${isStale ? "text-amber-800" : "text-slate-700"}`}
+            >
               {latestAttempt.label}
-              {recency ? ` · ${recency}` : ""}
+              {recency ? ` · ${recency.label}` : ""}
             </span>
           </div>
         );

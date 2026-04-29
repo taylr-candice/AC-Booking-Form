@@ -1033,6 +1033,23 @@ export type LastContactedSeverity = "never" | "fresh" | "stale";
 const CONTACT_STALE_HOURS = 24;
 
 /**
+ * Threshold for the row-level "Last attempt: …" recency line on the
+ * bookings list and Awaiting-coordination queue. When the most recent
+ * call/email entry is older than this, {@link formatAttemptRecency}
+ * flags the recency as `"stale"` so the renderer can switch to a
+ * warning style — the visual analogue of `CONTACT_STALE_HOURS`'
+ * "stale" bucket above, but for the per-row last-touch line rather
+ * than the chase chip.
+ *
+ * Set to 48h (vs. 24h for {@link CONTACT_STALE_HOURS}) on purpose:
+ * this line shows up on every booking row, not just the coordination
+ * queue, so the bar to flip into a warning colour should be a touch
+ * higher — otherwise routine "called yesterday" rows would yell at
+ * an admin scanning the main list.
+ */
+export const LAST_ATTEMPT_STALE_HOURS = 48;
+
+/**
  * Format the time elapsed since a coordination booking was last
  * "chased" (an admin clicked Mark as chased). Used by the admin
  * Awaiting-coordination queue (per-row chip) and the booking detail
@@ -1180,16 +1197,29 @@ export function latestCoordinationAttempt(
 }
 
 /**
+ * Severity bucket for the row-level "Last attempt: …" recency line.
+ * Drives whether the renderer switches to a warning style once the
+ * most recent call/email touch crosses {@link LAST_ATTEMPT_STALE_HOURS}.
+ */
+export type AttemptRecencySeverity = "fresh" | "stale";
+
+/**
  * Format the time elapsed since a call/email timeline entry was
  * logged into a compact, ready-to-render suffix for the bookings
  * list + coordination queue's "Last attempt: spoke · 2h ago" line.
  *
- * Buckets:
+ * Buckets (label):
  *   - diff &lt; 1h            → `"just now"`
  *   - 1h ≤ diff &lt; 24h     → `"Xh ago"` (floored hours)
  *   - 24h ≤ diff &lt; 48h    → `"yesterday"` (so a one-day-old touch
  *                                          reads naturally)
  *   - diff ≥ 48h            → `"Xd ago"` (floored days)
+ *
+ * Severity:
+ *   - diff &lt; LAST_ATTEMPT_STALE_HOURS → `"fresh"` (default text)
+ *   - diff ≥ LAST_ATTEMPT_STALE_HOURS → `"stale"` (warning style;
+ *                                                  caller renders
+ *                                                  amber text / chip)
  *
  * Returns `null` for malformed / future-dated timestamps so the
  * caller can omit the suffix entirely instead of showing a
@@ -1200,18 +1230,25 @@ export function latestCoordinationAttempt(
 export function formatAttemptRecency(
   loggedAtIso: string | null,
   now: Date = new Date(),
-): string | null {
+): { label: string; severity: AttemptRecencySeverity } | null {
   if (loggedAtIso === null) return null;
   const logged = new Date(loggedAtIso).getTime();
   if (!Number.isFinite(logged)) return null;
   const diffMs = now.getTime() - logged;
   if (diffMs < 0) return null;
   const hours = diffMs / (1000 * 60 * 60);
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${Math.floor(hours)}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 2) return "yesterday";
-  return `${days}d ago`;
+  const severity: AttemptRecencySeverity =
+    hours >= LAST_ATTEMPT_STALE_HOURS ? "stale" : "fresh";
+  let label: string;
+  if (hours < 1) {
+    label = "just now";
+  } else if (hours < 24) {
+    label = `${Math.floor(hours)}h ago`;
+  } else {
+    const days = Math.floor(hours / 24);
+    label = days < 2 ? "yesterday" : `${days}d ago`;
+  }
+  return { label, severity };
 }
 
 // ─── Slot calendar (next 14 days) ──────────────────────────────────────────

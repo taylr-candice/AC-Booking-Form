@@ -382,3 +382,61 @@ describe("AwaitingCoordinationView last-attempt outcome", () => {
     ).toBeNull();
   });
 });
+
+/**
+ * Stale-vs-fresh styling on the queue's "Last attempt: …" cell line.
+ * Mirrors the same switch covered for `BookingsView` in
+ * `BookingsView.lastAttempt.test.tsx` so both row renderers stay
+ * locked to the shared `LAST_ATTEMPT_STALE_HOURS` (48h) threshold —
+ * if either view stops applying the warning style, this test will
+ * catch it before an admin's queue starts under-flagging stale rows.
+ */
+describe("AwaitingCoordinationView last-attempt staleness", () => {
+  function renderAttemptCell(loggedAtIso: string | undefined): HTMLElement {
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Spoke to them",
+        at: "Earlier",
+        by: "Mia (admin)",
+        ...(loggedAtIso ? { loggedAt: loggedAtIso } : {}),
+      },
+    ];
+    const booking = makeBooking({
+      id: "bk-staleness",
+      unitId: "u1",
+      // Pin lastContactedAt so the row's bucket placement is
+      // deterministic — we only care about the "Last attempt" cell
+      // styling here.
+      lastContactedAt: "2026-04-28T09:00:00+10:00",
+      serviceTimeline: timeline,
+    });
+    render(<Harness initial={[booking]} />);
+    return screen.getByTestId("coordinating-with-last-attempt");
+  }
+
+  it("renders muted slate text when the latest touch is fresh (< 48h)", () => {
+    // 2h before "now" → fresh.
+    const loggedAt = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const node = renderAttemptCell(loggedAt);
+    expect(node.dataset.stale).toBe("false");
+    expect(node.className).toContain("text-slate-500");
+    expect(node.className).not.toContain("text-amber-700");
+  });
+
+  it("flips to amber warning text once the latest touch is stale (≥ 48h)", () => {
+    // 72h before "now" → past the 48h threshold.
+    const loggedAt = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+    const node = renderAttemptCell(loggedAt);
+    expect(node.dataset.stale).toBe("true");
+    expect(node.className).toContain("text-amber-700");
+    expect(node.className).not.toContain("text-slate-500");
+  });
+
+  it("falls back to fresh styling when the entry has no loggedAt timestamp", () => {
+    const node = renderAttemptCell(undefined);
+    expect(node.dataset.stale).toBe("false");
+    expect(node.className).toContain("text-slate-500");
+  });
+});

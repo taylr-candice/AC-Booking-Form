@@ -268,3 +268,90 @@ describe("BookingsView last-attempt recency", () => {
     expect(attemptText()).toBe("Last attempt: spoke");
   });
 });
+
+/**
+ * Stale-vs-fresh styling. The row's "Last attempt: …" line flips into
+ * an amber warning style once the most recent call/email entry crosses
+ * `LAST_ATTEMPT_STALE_HOURS` (48h) — same idea the existing
+ * `lastContactedAt` severity buckets already use, applied to the
+ * per-row last-attempt line. The threshold lives in
+ * `adminMockData.ts` so all admin-side staleness rules stay in one
+ * place.
+ */
+describe("BookingsView last-attempt staleness", () => {
+  const NOW_ISO = "2026-04-29T10:00:00+10:00";
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(NOW_ISO));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function callAt(loggedAtIso: string): TimelineEntry[] {
+    return [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Spoke to them",
+        at: "Earlier",
+        by: "Mia (admin)",
+        loggedAt: loggedAtIso,
+      },
+    ];
+  }
+
+  function lastAttemptNode(): HTMLElement {
+    return screen.getByTestId("bookings-row-last-attempt");
+  }
+
+  it("renders the line in muted slate when the latest touch is still fresh (< 48h)", () => {
+    // 2h before "now" → well inside the fresh window.
+    const loggedAt = "2026-04-29T08:00:00+10:00";
+    renderView(
+      makeBooking({ id: "bk-fresh", serviceTimeline: callAt(loggedAt) }),
+    );
+    const node = lastAttemptNode();
+    expect(node.dataset.stale).toBe("false");
+    expect(node.className).toContain("text-slate-500");
+    expect(node.className).not.toContain("text-amber-700");
+  });
+
+  it("flips the line into amber warning text when the latest touch is stale (≥ 48h)", () => {
+    // 3 days before "now" → past the 48h staleness threshold.
+    const loggedAt = "2026-04-26T10:00:00+10:00";
+    renderView(
+      makeBooking({ id: "bk-stale", serviceTimeline: callAt(loggedAt) }),
+    );
+    const node = lastAttemptNode();
+    expect(node.dataset.stale).toBe("true");
+    expect(node.className).toContain("text-amber-700");
+    expect(node.className).not.toContain("text-slate-500");
+    // Label still reads naturally — only the colour changes.
+    expect(attemptText()).toBe("Last attempt: spoke · 3d ago");
+  });
+
+  it("treats a row whose latest entry has no loggedAt as fresh (no warning style)", () => {
+    // Without a structured timestamp we can't decide staleness, so the
+    // safe fallback is to leave the line in its default muted style
+    // rather than yelling at an admin for a row we just don't have
+    // recency data for.
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Spoke to them",
+        at: "Just now",
+        by: "Mia (admin)",
+      },
+    ];
+    renderView(
+      makeBooking({ id: "bk-no-logged-at", serviceTimeline: timeline }),
+    );
+    const node = lastAttemptNode();
+    expect(node.dataset.stale).toBe("false");
+    expect(node.className).toContain("text-slate-500");
+  });
+});

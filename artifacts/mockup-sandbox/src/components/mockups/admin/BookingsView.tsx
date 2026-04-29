@@ -558,16 +558,27 @@ export function BookingsView({
                         const recency = formatAttemptRecency(
                           latestAttempt.loggedAt,
                         );
+                        // Once the latest touch crosses
+                        // LAST_ATTEMPT_STALE_HOURS the line flips into
+                        // an amber warning style so an admin scanning
+                        // the queue sees the worst offenders pop —
+                        // same idea the existing `lastContactedAt`
+                        // severity buckets use, but applied to the
+                        // per-row last-attempt line.
+                        const isStale = recency?.severity === "stale";
                         return (
                           <div
-                            className="mt-1 text-[11px] text-slate-500"
+                            className={`mt-1 text-[11px] ${isStale ? "text-amber-700" : "text-slate-500"}`}
                             data-testid="bookings-row-last-attempt"
                             data-booking-id={b.id}
+                            data-stale={isStale ? "true" : "false"}
                           >
                             Last attempt:{" "}
-                            <span className="font-medium text-slate-700">
+                            <span
+                              className={`font-medium ${isStale ? "text-amber-800" : "text-slate-700"}`}
+                            >
                               {latestAttempt.label}
-                              {recency ? ` · ${recency}` : ""}
+                              {recency ? ` · ${recency.label}` : ""}
                             </span>
                           </div>
                         );
