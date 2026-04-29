@@ -2827,3 +2827,25 @@ export function buildRescheduledTimelineEntry(
     by,
   };
 }
+
+/**
+ * Inverse of {@link convertCoordinationToScheduledPatch} — given the
+ * booking *as it was before* it was scheduled, return the patch that
+ * restores its prior shape.
+ *
+ * Used by the success-toast "Undo" affordance (Task #92) so ops can
+ * revert a misclick without digging back into the booking detail. The
+ * caller is responsible for the matching rollout-capacity rollback
+ * (mirror of the consume in `AdminApp.scheduleCoordinationBooking`).
+ *
+ * Pure / data-only — safe to import anywhere, no DOM access.
+ */
+export function revertScheduledToCoordinationPatch(
+  prior: AdminBooking,
+): Pick<AdminBooking, "serviceDate" | "serviceSlot" | "serviceTimeline"> {
+  return {
+    serviceDate: prior.serviceDate,
+    serviceSlot: prior.serviceSlot,
+    serviceTimeline: prior.serviceTimeline,
+  };
+}

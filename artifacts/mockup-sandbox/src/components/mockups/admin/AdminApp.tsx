@@ -27,12 +27,12 @@ import {
   findRolloutForBooking,
   formatBookingShortDate,
   getActiveBookingForUnit,
-  getRolloutById,
   liveBookingFromSession,
   notifyLiveBookingsChanged,
   notifyLiveUnitsChanged,
   priorServiceStatusFromTimeline,
   releaseBookingCapacity,
+  revertScheduledToCoordinationPatch,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
   SEEDED_BUILDINGS,
@@ -133,9 +133,17 @@ export function AdminApp() {
   // toast a stable key so the Toast component can reset its 4s
   // auto-dismiss timer when a second scheduling lands while the
   // previous toast is still visible.
-  const [toast, setToast] = useState<{ id: string; message: string } | null>(
-    null,
-  );
+  //
+  // The optional `undo` callback (Task #92) wires the success toast to
+  // a one-click revert of the scheduling that just happened — flips
+  // the booking back to "to_be_coordinated", restores its prior date,
+  // drops the freshly-appended timeline entry, and releases the
+  // rollout slot capacity that was consumed.
+  const [toast, setToast] = useState<{
+    id: string;
+    message: string;
+    undo?: () => void;
+  } | null>(null);
 
   // When jumping to Payments, default the bookings list to the payments filter.
   const [bookingsStatusFilter, setBookingsStatusFilter] =
@@ -709,9 +717,9 @@ export function AdminApp() {
     bookingId: string,
     date: string,
     window: "morning" | "afternoon",
-  ) {
+  ): (() => void) | undefined {
     const booking = allBookings.find((b) => b.id === bookingId);
-    if (!booking || booking.isLive) return;
+    if (!booking || booking.isLive) return undefined;
 
     const patch = convertCoordinationToScheduledPatch(booking, {
       date,
@@ -719,28 +727,41 @@ export function AdminApp() {
     });
     updateBooking(bookingId, patch);
 
-    const rollout = getRolloutById(booking.rolloutId);
-    if (rollout) {
-      const day = rollout.days.find((d) => d.isoDate === date);
-      const slot = day
-        ? window === "morning"
-          ? day.morning
-          : day.afternoon
-        : null;
-      if (slot) {
-        if (rollout.capacityModel === "slots_per_window") {
-          updateRolloutSlot(rollout.id, date, window, {
-            bookedCount: (slot.bookedCount ?? 0) + 1,
-          });
-        } else {
-          const jobMin = bookingDurationMinutes(booking);
-          updateRolloutSlot(rollout.id, date, window, {
-            bookedMinutes: slot.bookedMinutes + jobMin,
-          });
-        }
-        bumpRolloutsRefreshKey();
-      }
+    // Track whether capacity was actually consumed so the undo can
+    // decide whether to release. Only `consumeBookingCapacity` knows
+    // (it returns false when the rollout / day / slot can't be
+    // resolved — defensive only). Coordination bookings always have a
+    // rolloutId, but we null-guard for type safety.
+    const consumedCapacity =
+      booking.rolloutId !== null &&
+      consumeBookingCapacity(booking, booking.rolloutId, date, window);
+    if (consumedCapacity) {
+      bumpRolloutsRefreshKey();
     }
+
+    // Inverse of everything we just did, captured at call time so the
+    // undo doesn't need to re-derive the prior shape from the
+    // post-patch booking row. `releaseBookingCapacity` reads the
+    // *current* slot from the rollouts store — important because
+    // `updateRolloutSlot` is immutable, so any rollout reference
+    // closed over here would be a stale pre-consume snapshot. We pass
+    // the post-schedule shape (date + window we just consumed
+    // against) so it knows which slot to release.
+    return () => {
+      const revertPatch = revertScheduledToCoordinationPatch(booking);
+      updateBooking(bookingId, revertPatch);
+
+      if (consumedCapacity) {
+        const released = releaseBookingCapacity({
+          ...booking,
+          serviceDate: date,
+          serviceSlot: window,
+        });
+        if (released) {
+          bumpRolloutsRefreshKey();
+        }
+      }
+    };
   }
 
   const schedulingBooking =
@@ -764,12 +785,16 @@ export function AdminApp() {
   ) {
     if (!schedulingTarget) return;
     const mode = schedulingTarget.mode;
+    // Only the "schedule" path exposes Undo on the toast — that's the
+    // only mode Task #92 covers. Reschedule and undo-cancel go through
+    // their own separate flows.
+    let undo: (() => void) | undefined;
     if (mode === "reschedule") {
       rescheduleAppointment(bookingId, date, window);
     } else if (mode === "undo") {
       undoCancelBookingAndReschedule(bookingId, date, window);
     } else {
-      scheduleCoordinationBooking(bookingId, date, window);
+      undo = scheduleCoordinationBooking(bookingId, date, window);
     }
     setSchedulingTarget(null);
 
@@ -777,6 +802,9 @@ export function AdminApp() {
     // looking at a different list than the one this booking moved
     // into. Uses the same short-date formatter as the rollouts list
     // and timeline labels so the format is consistent across the app.
+    // The Undo affordance disappears with the toast (4-second
+    // auto-dismiss) — matches the existing inline undo pattern in
+    // RolloutScheduleEditor.
     const windowLabel = window === "morning" ? "Morning" : "Afternoon";
     const action =
       mode === "reschedule"
@@ -787,6 +815,7 @@ export function AdminApp() {
     setToast({
       id: `${bookingId}-${Date.now()}`,
       message: `${bookingId} ${action} ${formatBookingShortDate(date)} · ${windowLabel}`,
+      undo,
     });
   }
 
@@ -976,6 +1005,7 @@ export function AdminApp() {
         <Toast
           id={toast.id}
           message={toast.message}
+          onUndo={toast.undo}
           onDismiss={() => setToast(null)}
         />
       )}
