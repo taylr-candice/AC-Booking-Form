@@ -39,6 +39,7 @@ import {
 import { useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
+import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
 import { BookingDetail } from "./BookingDetail";
 import { BookingsView } from "./BookingsView";
 import { BuildingDetail } from "./BuildingDetail";
@@ -49,6 +50,7 @@ import { RolloutsView } from "./RolloutsView";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { UnitsView } from "./UnitsView";
+import type { CoordinationKind } from "@/state/adminMockData";
 import type { ViewId } from "./types";
 
 export function AdminApp() {
@@ -104,6 +106,11 @@ export function AdminApp() {
   // Active building filter on the Bookings list ("all" = no filter).
   const [bookingsBuildingFilter, setBookingsBuildingFilter] =
     useState<string>("all");
+  // Awaiting-coordination view filter — independent from the bookings
+  // status filter so an admin can flip between views without losing
+  // their coordination grouping. "all" shows both queues at once.
+  const [coordinationFilter, setCoordinationFilter] =
+    useState<"all" | CoordinationKind>("all");
 
   function handleNav(id: ViewId) {
     setView(id);
@@ -117,6 +124,9 @@ export function AdminApp() {
     }
     setSearch("");
     setBookingsBuildingFilter("all");
+    if (id === "awaiting_coordination") {
+      setCoordinationFilter("all");
+    }
   }
 
   /**
@@ -246,6 +256,32 @@ export function AdminApp() {
                 onOpen={setSelectedBookingId}
                 onNewBooking={() => openNewBooking(null)}
                 paymentMode={view === "payments"}
+              />
+            )
+          ) : null}
+
+          {view === "awaiting_coordination" ? (
+            selectedBookingId ? (
+              <BookingDetail
+                bookingId={selectedBookingId}
+                bookings={allBookings}
+                units={units}
+                agents={agents}
+                onBack={() => setSelectedBookingId(null)}
+                onUpdate={updateBooking}
+              />
+            ) : (
+              <AwaitingCoordinationView
+                bookings={allBookings}
+                units={units}
+                buildings={buildings}
+                filter={coordinationFilter}
+                onFilter={setCoordinationFilter}
+                buildingFilter={bookingsBuildingFilter}
+                onBuildingFilter={setBookingsBuildingFilter}
+                search={search}
+                onSearch={setSearch}
+                onOpen={setSelectedBookingId}
               />
             )
           ) : null}

@@ -8,6 +8,7 @@ import {
   Building2,
   Calendar,
   CalendarRange,
+  Clock,
   CreditCard,
   Home,
   Snowflake,
@@ -21,6 +22,7 @@ import type { ViewId } from "./types";
 const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string; icon: LucideIcon }> = [
   { id: "bookings", label: "Bookings", icon: Calendar },
   { id: "payments", label: "Payments", icon: CreditCard },
+  { id: "awaiting_coordination", label: "Awaiting coordination", icon: Clock },
   { id: "rollouts", label: "Rollouts", icon: CalendarRange },
   { id: "buildings", label: "Buildings", icon: Building2 },
   { id: "units", label: "Units", icon: Home },

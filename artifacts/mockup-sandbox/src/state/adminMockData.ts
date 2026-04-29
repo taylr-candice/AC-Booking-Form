@@ -680,7 +680,74 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Tech finished 25 min early; goodwill refund applied for unused time.",
     rolloutId: null,
   },
+  {
+    // Owner-leased + "Arrange with agent" — Taylr is now waiting on the
+    // managing agent (Vantage Strata) to come back with a service window.
+    // Seeded so the Awaiting-coordination view always has at least one
+    // awaiting-agent example alongside the awaiting-tenant ones.
+    id: "bk-1043",
+    unitId: "u-aspen-05",
+    customerName: "Priya Kapoor",
+    customerEmail: "priya.kapoor@example.com",
+    customerPhone: "0407 314 502",
+    bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_leased_agent",
+    tenants: [],
+    systems: 1,
+    additional: 1,
+    acType: "ducted",
+    discrepancy: null,
+    serviceDate: null, // coordination flow
+    serviceSlot: "to_be_coordinated",
+    paymentStatus: "paid",
+    serviceStatus: "scheduled",
+    totalAud: 218,
+    paymentTimeline: [
+      { status: "paid", label: "Card charged · $218.00", at: "Apr 28 · 09:30", by: "System" },
+    ],
+    serviceTimeline: [
+      { status: "scheduled", label: "Awaiting agent coordination", at: "Apr 28 · 09:30", by: "System" },
+    ],
+    notes: "Owner asked us to arrange access via Vantage Strata Management. Agent contacted Apr 28 — awaiting reply.",
+    rolloutId: "rl-ac-aspen",
+  },
 ];
+
+// ─── Coordination kind ─────────────────────────────────────────────────────
+
+/**
+ * Who Taylr is currently waiting on for a coordination booking — used by
+ * the admin "Awaiting coordination" view to group / filter the list.
+ *
+ *  - `"awaiting_agent"`  — owner asked us to arrange access through
+ *                          their managing agent (`owner_leased_agent`).
+ *  - `"awaiting_tenant"` — owner or agent asked us to coordinate the
+ *                          appointment with the tenant directly
+ *                          (`owner_leased_tenant`, `agent_tenant_taylr`).
+ *  - `null`              — booking isn't in coordination (slot already
+ *                          confirmed, or access method doesn't route
+ *                          through coordination at all).
+ *
+ * Derived from the booking's access method rather than stored on the
+ * row, so seed data and the live session row can never drift.
+ */
+export type CoordinationKind = "awaiting_agent" | "awaiting_tenant";
+
+export function coordinationKindForBooking(
+  b: AdminBooking,
+): CoordinationKind | null {
+  if (b.serviceSlot !== "to_be_coordinated") return null;
+  if (b.accessMethod === "owner_leased_agent") return "awaiting_agent";
+  if (
+    b.accessMethod === "owner_leased_tenant" ||
+    b.accessMethod === "agent_tenant_taylr"
+  ) {
+    return "awaiting_tenant";
+  }
+  return null;
+}
 
 // ─── Slot calendar (next 14 days) ──────────────────────────────────────────
 

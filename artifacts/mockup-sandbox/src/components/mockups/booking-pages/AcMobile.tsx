@@ -44,7 +44,7 @@ type Copy = {
 
 const COPY: Record<KnownType, Copy> = {
   ducted: {
-    heading: "Confirm your ducted AC setup",
+    heading: "Confirm your AC setup",
     intro:
       "Please confirm the number of systems and any extra return-air grilles so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
@@ -62,7 +62,7 @@ const COPY: Record<KnownType, Copy> = {
     addonUnitPlural: "extra return-air grilles",
   },
   split: {
-    heading: "Confirm your split AC setup",
+    heading: "Confirm your AC setup",
     intro:
       "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",

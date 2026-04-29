@@ -5,6 +5,7 @@
 export type ViewId =
   | "bookings"
   | "payments"
+  | "awaiting_coordination"
   | "rollouts"
   | "buildings"
   | "units"

@@ -51,6 +51,14 @@ export function TopBar({
     crumb = selectedBookingId
       ? `Payments / ${building ? `${building.name} · ` : ""}${selectedBookingId}`
       : "Bookings filtered by payment status";
+  } else if (view === "awaiting_coordination") {
+    title = selectedBookingId ? "Booking detail" : "Awaiting coordination";
+    const b = bookings.find((x) => x.id === selectedBookingId);
+    const unit = b ? units.find((u) => u.id === b.unitId) ?? null : null;
+    const building = getBuildingForUnit(unit);
+    crumb = selectedBookingId
+      ? `Awaiting coordination / ${building ? `${building.name} · ` : ""}${selectedBookingId}`
+      : "Bookings without a confirmed slot — grouped by who we're waiting on";
   } else if (view === "rollouts") {
     const rollout = getRolloutById(selectedRolloutId);
     title = rollout ? rollout.name : "Rollouts";

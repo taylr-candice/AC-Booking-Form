@@ -1,110 +1,98 @@
 /**
- * Bookings list — drives both the "Bookings" view (all statuses, filter
- * by service status) and the "Payments" view (same table, filter by
- * payment status, status chips swapped). Selecting a row tells the
- * `AdminApp` shell to mount `BookingDetail`.
+ * Bookings whose service slot is `to_be_coordinated` — the queue Taylr
+ * ops works through to nail down a real appointment time.
+ *
+ * Bookings here come from three access-method branches (see
+ * {@link coordinationKindForBooking}): owner-leased + tenant
+ * coordination, owner-leased + managing-agent coordination, and the
+ * agent-side "Tenants will provide access · Taylr coordinates" path.
+ * The view groups them by who we're waiting on so an admin can scan
+ * the tenant queue and the agent queue separately.
+ *
+ * Reuses the bookings-list visual language: same toolbar (search +
+ * filter chips), same row markup (Booking / Customer / Unit / AC),
+ * same `PaymentChip`. The "Slot" column is replaced by a "Waiting on"
+ * column whose chip flips between Tenant and Managing agent.
+ *
+ * Selecting a row tells the `AdminApp` shell to mount `BookingDetail`
+ * — exactly the same click-through as the bookings list.
  */
 
-import { Plus, Search, TriangleAlert } from "lucide-react";
+import { Clock, Search } from "lucide-react";
 
 import {
   bookerAgencyName,
+  coordinationKindForBooking,
   getBuildingForUnit,
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
-  type PaymentStatus,
-  type ServiceStatus,
+  type CoordinationKind,
 } from "@/state/adminMockData";
 
-import { PaymentChip, ServiceChip, SlotCell } from "./chips";
+import { CustomerCell } from "./BookingsView";
+import { PaymentChip } from "./chips";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
-/**
- * Customer column cell.
- *
- * Owners are listed by their own name (they are the customer); agents
- * are listed by their agency, with the contact name shown beneath, so
- * an admin can scan the table by company and still know who to call.
- * If an agent booking has no agency captured we fall back to the
- * contact name to avoid showing "—".
- */
-export function CustomerCell({ booking }: { booking: AdminBooking }) {
-  if (booking.bookerRole === "agent") {
-    const agency = bookerAgencyName(booking);
-    return (
-      <>
-        <div className="font-medium text-slate-900">
-          {agency ?? booking.customerName}
-        </div>
-        <div className="text-[11px] text-slate-500">
-          {agency ? `${booking.customerName} · ` : ""}
-          {booking.customerEmail}
-        </div>
-      </>
-    );
-  }
+type Filter = "all" | CoordinationKind;
+
+const FILTER_CHIPS: ReadonlyArray<{ key: Filter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "awaiting_tenant", label: "Awaiting tenant" },
+  { key: "awaiting_agent", label: "Awaiting agent" },
+];
+
+function WaitingOnChip({ kind }: { kind: CoordinationKind }) {
+  const label = kind === "awaiting_agent" ? "Managing agent" : "Tenant";
   return (
-    <>
-      <div className="font-medium text-slate-900">{booking.customerName}</div>
-      <div className="text-[11px] text-slate-500">{booking.customerEmail}</div>
-    </>
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+    >
+      <Clock className="h-2.5 w-2.5" />
+      {label}
+    </span>
   );
 }
 
-export function BookingsView({
+export function AwaitingCoordinationView({
   bookings,
   units,
   buildings,
-  statusFilter,
-  onStatusFilter,
+  filter,
+  onFilter,
   buildingFilter,
   onBuildingFilter,
   search,
   onSearch,
   onOpen,
-  onNewBooking,
-  paymentMode,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
   buildings: AdminBuilding[];
-  statusFilter: "all" | ServiceStatus | PaymentStatus;
-  onStatusFilter: (s: "all" | ServiceStatus | PaymentStatus) => void;
+  filter: Filter;
+  onFilter: (f: Filter) => void;
   buildingFilter: string;
   onBuildingFilter: (id: string) => void;
   search: string;
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
-  onNewBooking: () => void;
-  paymentMode: boolean;
 }) {
-  const filterChips: ReadonlyArray<{
-    key: "all" | ServiceStatus | PaymentStatus;
-    label: string;
-  }> = paymentMode
-    ? [
-        { key: "all", label: "All payments" },
-        { key: "paid", label: "Paid" },
-        { key: "pending", label: "Pending" },
-        { key: "refund_pending", label: "Refund pending" },
-      ]
-    : [
-        { key: "all", label: "All statuses" },
-        { key: "scheduled", label: "Scheduled" },
-        { key: "en_route", label: "En route" },
-        { key: "on_site", label: "On site" },
-        { key: "complete", label: "Complete" },
-      ];
+  // Pre-compute the kind for each booking so we don't recompute it on
+  // every filter / search keystroke. Bookings without a coordination
+  // kind (i.e. anything with a confirmed slot) are dropped here.
+  const coordinating = bookings
+    .map((b) => ({ b, kind: coordinationKindForBooking(b) }))
+    .filter(
+      (x): x is { b: AdminBooking; kind: CoordinationKind } => x.kind !== null,
+    );
 
-  const filtered = bookings.filter((b) => {
-    if (statusFilter !== "all") {
-      if (paymentMode) {
-        if (b.paymentStatus !== statusFilter) return false;
-      } else {
-        if (b.serviceStatus !== statusFilter) return false;
-      }
-    }
+  const tenantCount = coordinating.filter((x) => x.kind === "awaiting_tenant").length;
+  const agentCount = coordinating.filter((x) => x.kind === "awaiting_agent").length;
+  const totalCount = coordinating.length;
+
+  const filtered = coordinating.filter(({ b, kind }) => {
+    if (filter !== "all" && kind !== filter) return false;
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
@@ -112,10 +100,6 @@ export function BookingsView({
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
       const unit = units.find((u) => u.id === b.unitId);
-      // Include the resolved agency name + the raw "Other / not listed"
-      // free-text so admins can search by company in the same field
-      // they see in the Customer column. (Without this, agent rows whose
-      // visible label is the agency name would silently fail a search.)
       const agency = bookerAgencyName(b);
       const haystack = [
         b.id,
@@ -135,6 +119,30 @@ export function BookingsView({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Summary */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[13px] text-slate-700">
+        <Clock className="h-4 w-4 text-slate-500" />
+        {totalCount === 0 ? (
+          <span>Nothing in coordination right now.</span>
+        ) : (
+          <>
+            <span className="font-semibold text-slate-900">
+              {totalCount} booking{totalCount === 1 ? "" : "s"} in coordination
+            </span>
+            <span className="text-slate-400">·</span>
+            <span>
+              <span className="font-semibold text-slate-900">{tenantCount}</span>{" "}
+              awaiting tenant
+            </span>
+            <span className="text-slate-400">·</span>
+            <span>
+              <span className="font-semibold text-slate-900">{agentCount}</span>{" "}
+              awaiting agent
+            </span>
+          </>
+        )}
+      </div>
+
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-1 items-center gap-2">
@@ -163,24 +171,13 @@ export function BookingsView({
           </select>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {!paymentMode && (
-            <button
-              type="button"
-              onClick={onNewBooking}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-semibold text-white transition hover:brightness-110"
-              style={{ backgroundColor: BRAND }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New booking
-            </button>
-          )}
-          {filterChips.map((chip) => {
-            const active = statusFilter === chip.key;
+          {FILTER_CHIPS.map((chip) => {
+            const active = filter === chip.key;
             return (
               <button
                 key={chip.key}
                 type="button"
-                onClick={() => onStatusFilter(chip.key)}
+                onClick={() => onFilter(chip.key)}
                 className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
                   active
                     ? "text-white"
@@ -204,22 +201,22 @@ export function BookingsView({
               <th className="px-4 py-3 font-semibold">Customer</th>
               <th className="px-4 py-3 font-semibold">Unit</th>
               <th className="px-4 py-3 font-semibold">AC</th>
-              <th className="px-4 py-3 font-semibold">Slot</th>
+              <th className="px-4 py-3 font-semibold">Waiting on</th>
               <th className="px-4 py-3 font-semibold">Payment</th>
-              <th className="px-4 py-3 font-semibold">Service</th>
               <th className="px-4 py-3 font-semibold">Total</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
-                  No bookings match these filters.
+                <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                  No coordination bookings match these filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((b) => {
+              filtered.map(({ b, kind }) => {
                 const unit = units.find((u) => u.id === b.unitId);
+                const building = getBuildingForUnit(unit ?? null);
                 return (
                   <tr
                     key={b.id}
@@ -259,29 +256,15 @@ export function BookingsView({
                         {unit?.addressLine1 ?? b.unitId}
                       </div>
                       <div className="text-[11px] text-slate-500">{unit?.addressLine2}</div>
-                      {(() => {
-                        const building = getBuildingForUnit(unit ?? null);
-                        if (!building) return null;
-                        return (
-                          <div className="mt-0.5 text-[11px] font-medium text-slate-600">
-                            {building.name}
-                          </div>
-                        );
-                      })()}
+                      {building && (
+                        <div className="mt-0.5 text-[11px] font-medium text-slate-600">
+                          {building.name}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 font-medium text-slate-900">
-                        <span className="capitalize">{b.acType}</span>
-                        {b.discrepancy && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                            style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
-                            title="Customer override differs from records"
-                          >
-                            <TriangleAlert className="h-2.5 w-2.5" />
-                            Mismatch
-                          </span>
-                        )}
+                      <div className="font-medium text-slate-900 capitalize">
+                        {b.acType}
                       </div>
                       <div className="text-[11px] text-slate-500">
                         {b.systems} system{b.systems === 1 ? "" : "s"}
@@ -289,13 +272,10 @@ export function BookingsView({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <SlotCell booking={b} />
+                      <WaitingOnChip kind={kind} />
                     </td>
                     <td className="px-4 py-3">
                       <PaymentChip status={b.paymentStatus} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <ServiceChip status={b.serviceStatus} />
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       ${b.totalAud.toFixed(2)}
@@ -308,12 +288,8 @@ export function BookingsView({
         </table>
       </div>
       <div className="text-[11px] text-slate-500">
-        Showing {filtered.length} of {bookings.length} booking
-        {bookings.length === 1 ? "" : "s"}
-        {bookings.some((b) => b.isLive) && (
-          <> · Live row reflects the customer's current session</>
-        )}
-        .
+        Showing {filtered.length} of {totalCount} coordination booking
+        {totalCount === 1 ? "" : "s"}.
       </div>
     </div>
   );
