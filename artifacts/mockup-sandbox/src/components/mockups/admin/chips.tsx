@@ -17,7 +17,7 @@ import { BRAND_DEEP, BRAND_SOFT } from "./theme";
 export function SlotCell({ booking }: { booking: AdminBooking }) {
   if (booking.serviceSlot === "to_be_coordinated" || !booking.serviceDate) {
     return (
-      <div>
+      <div data-testid="slot-cell">
         <div className="font-medium text-slate-900">To be coordinated</div>
         <div className="text-[11px] text-slate-500">Tenant / agent flow</div>
       </div>
@@ -27,7 +27,7 @@ export function SlotCell({ booking }: { booking: AdminBooking }) {
     ? `${booking.serviceSlot.charAt(0).toUpperCase()}${booking.serviceSlot.slice(1)}`
     : "—";
   return (
-    <div>
+    <div data-testid="slot-cell">
       <div className="font-medium text-slate-900">{booking.serviceDate}</div>
       <div className="text-[11px] text-slate-500">
         {slotLabel} · ~{formatDurationMinutes(bookingDurationMinutes(booking))}
