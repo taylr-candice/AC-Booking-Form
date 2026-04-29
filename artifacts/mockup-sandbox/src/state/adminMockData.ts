@@ -2380,6 +2380,38 @@ export function getLiveUnitsVersion(): number {
   return liveUnitsVersion;
 }
 
+/**
+ * Pick the service status a cancelled booking should be restored to
+ * when an admin reverses the cancellation. Walks the booking's
+ * service timeline backwards looking for the most recent entry whose
+ * status isn't `cancelled` / `rescheduled` and returns that. Falls
+ * back to `"scheduled"` when the booking was cancelled before any
+ * other lifecycle event landed (the common case — most cancellations
+ * happen straight after booking).
+ *
+ * Kept as a pure helper so the undo handler in `AdminApp` can call
+ * it without spreading status-derivation logic across the UI layer.
+ */
+export function priorServiceStatusFromTimeline(
+  booking: AdminBooking,
+): ServiceStatus {
+  for (let i = booking.serviceTimeline.length - 1; i >= 0; i--) {
+    const status = booking.serviceTimeline[i].status;
+    if (status === "cancelled") continue;
+    if (status === "rescheduled") continue;
+    if (
+      status === "scheduled" ||
+      status === "en_route" ||
+      status === "on_site" ||
+      status === "complete" ||
+      status === "invoice_adjusted"
+    ) {
+      return status;
+    }
+  }
+  return "scheduled";
+}
+
 export function getActiveBookingForUnit(
   unitId: string,
   bookings: readonly AdminBooking[],

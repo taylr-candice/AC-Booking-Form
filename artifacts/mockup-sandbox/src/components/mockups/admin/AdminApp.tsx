@@ -30,6 +30,7 @@ import {
   liveBookingFromSession,
   notifyLiveBookingsChanged,
   notifyLiveUnitsChanged,
+  priorServiceStatusFromTimeline,
   releaseBookingCapacity,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
@@ -240,6 +241,171 @@ export function AdminApp() {
     } else {
       notifyLiveBookingsChanged();
     }
+  }
+
+  /**
+   * Reverse a cancellation. Re-runs the same uniqueness check the
+   * customer flow uses (`getActiveBookingForUnit`) against the
+   * booking's unit + rollout. Three outcomes:
+   *   - "no_op"      → booking missing, live, or not actually cancelled
+   *                    (button shouldn't have been clickable; defensive).
+   *   - "restored"   → the slot is still free, so the booking is put
+   *                    back at its original date/window, capacity is
+   *                    re-consumed, refund-pending payments flip back
+   *                    to "paid", and an "Undo · {note}" entry is
+   *                    appended to the service timeline. The original
+   *                    cancellation note is reused so the audit trail
+   *                    stays explicit about *what* was undone.
+   *   - "slot_taken" → another booking grabbed the unit while this
+   *                    row was cancelled; we leave the cancellation
+   *                    intact and hand the caller enough context to
+   *                    pivot to the reschedule modal.
+   *
+   * The combined "undo + reschedule" path is intentionally separate
+   * (`undoCancelBookingAndReschedule` below) — it lets the user pick a
+   * fresh slot atomically with the restore so we never leave the
+   * booking in a half-restored state with no slot.
+   */
+  function undoCancelBooking(
+    id: string,
+  ):
+    | { kind: "no_op" }
+    | { kind: "restored" }
+    | {
+        kind: "slot_taken";
+        takenBy: {
+          name: string;
+          role: AdminBooking["bookerRole"];
+          // `serviceDate` may be null for awaiting-coordination winners
+          // — we surface the null through to the dialog which softens
+          // the copy when there's no concrete date to show.
+          date: AdminBooking["serviceDate"];
+          slot: AdminBooking["serviceSlot"];
+        };
+      } {
+    if (id === "bk-live") return { kind: "no_op" };
+    const booking = seededBookings.find((b) => b.id === id);
+    if (!booking) return { kind: "no_op" };
+    if (booking.serviceStatus !== "cancelled") return { kind: "no_op" };
+    // Uniqueness check against the unit + rollout — this skips
+    // cancelled rows (i.e. it ignores the booking we're trying to
+    // restore, which is still in the list with status "cancelled").
+    const verdict = getActiveBookingForUnit(
+      booking.unitId,
+      seededBookings,
+      booking.rolloutId,
+    );
+    if (verdict.kind === "paid" || verdict.kind === "invoice_pending") {
+      const winning = verdict.booking;
+      return {
+        kind: "slot_taken",
+        takenBy: {
+          name: winning.customerName,
+          role: winning.bookerRole,
+          date: winning.serviceDate,
+          slot: winning.serviceSlot,
+        },
+      };
+    }
+    // Restore in place. Re-consume capacity if the booking had a
+    // concrete slot — coordination bookings never consumed capacity
+    // in the first place so there's nothing to put back.
+    if (
+      booking.rolloutId &&
+      booking.serviceDate &&
+      (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon")
+    ) {
+      consumeBookingCapacity(
+        booking,
+        booking.rolloutId,
+        booking.serviceDate,
+        booking.serviceSlot,
+      );
+    }
+    const restoredStatus = priorServiceStatusFromTimeline(booking);
+    const note = booking.cancellationNote ?? "";
+    const undoEntry: TimelineEntry = {
+      status: restoredStatus,
+      label: note ? `Undo · ${note}` : "Undo · cancellation reversed",
+      at: "Just now",
+      by: "Mia (admin)",
+    };
+    const patch: Partial<AdminBooking> = {
+      serviceStatus: restoredStatus,
+      cancelledAt: undefined,
+      cancelledBy: undefined,
+      cancellationNote: undefined,
+      serviceTimeline: [...booking.serviceTimeline, undoEntry],
+    };
+    if (booking.paymentStatus === "refund_pending") {
+      const paymentEntry: TimelineEntry = {
+        status: "paid",
+        label: "Refund cancelled · booking restored by Mia (admin)",
+        at: "Just now",
+        by: "Mia (admin)",
+      };
+      patch.paymentStatus = "paid";
+      patch.paymentTimeline = [...booking.paymentTimeline, paymentEntry];
+    }
+    setSeededBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    );
+    bumpRolloutsRefreshKey();
+    return { kind: "restored" };
+  }
+
+  /**
+   * Pivot path for {@link undoCancelBooking}: the original slot is
+   * gone, so the admin picks a new one in the reschedule modal and we
+   * restore + reschedule atomically. Capacity is consumed at the new
+   * slot only — the booking's old slot was already freed by the
+   * original cancellation, so there's nothing to release.
+   */
+  function undoCancelBookingAndReschedule(
+    id: string,
+    date: string,
+    window: "morning" | "afternoon",
+  ) {
+    if (id === "bk-live") return;
+    const booking = seededBookings.find((b) => b.id === id);
+    if (!booking || !booking.rolloutId) return;
+    if (booking.serviceStatus !== "cancelled") return;
+    consumeBookingCapacity(booking, booking.rolloutId, date, window);
+    const restoredStatus = priorServiceStatusFromTimeline(booking);
+    const note = booking.cancellationNote ?? "";
+    const winLabel = window === "morning" ? "morning" : "afternoon";
+    const undoLabel = note
+      ? `Undo · ${note} — restored to ${date} · ${winLabel}`
+      : `Undo · cancellation reversed — restored to ${date} · ${winLabel}`;
+    const undoEntry: TimelineEntry = {
+      status: restoredStatus,
+      label: undoLabel,
+      at: "Just now",
+      by: "Mia (admin)",
+    };
+    const patch: Partial<AdminBooking> = {
+      serviceStatus: restoredStatus,
+      serviceDate: date,
+      serviceSlot: window,
+      cancelledAt: undefined,
+      cancelledBy: undefined,
+      cancellationNote: undefined,
+      serviceTimeline: [...booking.serviceTimeline, undoEntry],
+    };
+    if (booking.paymentStatus === "refund_pending") {
+      const paymentEntry: TimelineEntry = {
+        status: "paid",
+        label: "Refund cancelled · booking restored by Mia (admin)",
+        at: "Just now",
+        by: "Mia (admin)",
+      };
+      patch.paymentStatus = "paid";
+      patch.paymentTimeline = [...booking.paymentTimeline, paymentEntry];
+    }
+    setSeededBookings((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    );
+    bumpRolloutsRefreshKey();
   }
 
   function rescheduleBooking(
@@ -579,6 +745,8 @@ export function AdminApp() {
                 onCancelBooking={cancelBooking}
                 onRescheduleBooking={rescheduleBooking}
                 onScheduleCoordination={(id) => setSchedulingBookingId(id)}
+                onUndoCancelBooking={undoCancelBooking}
+                onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
               />
             ) : (
               <BookingsView
@@ -611,6 +779,8 @@ export function AdminApp() {
                 onCancelBooking={cancelBooking}
                 onRescheduleBooking={rescheduleBooking}
                 onScheduleCoordination={(id) => setSchedulingBookingId(id)}
+                onUndoCancelBooking={undoCancelBooking}
+                onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
               />
             ) : (
               <AwaitingCoordinationView

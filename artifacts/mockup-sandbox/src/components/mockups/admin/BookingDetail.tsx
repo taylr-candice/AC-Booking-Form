@@ -7,7 +7,7 @@
  * session) are read-only here; the customer flow is the source of truth.
  */
 
-import { CalendarClock, ChevronLeft, PhoneOutgoing, TriangleAlert, XCircle } from "lucide-react";
+import { CalendarClock, ChevronLeft, PhoneOutgoing, RotateCcw, TriangleAlert, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -28,6 +28,29 @@ import { LastChasedChip, PaymentChip, ServiceChip, SlotCell, WaitingChip } from 
 import { RescheduleBookingModal } from "./RescheduleBookingModal";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
+/**
+ * Outcome of {@link AdminApp.undoCancelBooking} — re-declared here as
+ * a structural type so {@link BookingDetail} doesn't have to import
+ * the helper. `restored` is silent (the row updates in place) and
+ * `slot_taken` opens the pivot dialog with the conflicting booker's
+ * details so the admin knows who's holding the slot now.
+ */
+export type UndoCancelResult =
+  | { kind: "no_op" }
+  | { kind: "restored" }
+  | {
+      kind: "slot_taken";
+      takenBy: {
+        name: string;
+        role: AdminBooking["bookerRole"];
+        /** May be `null` when the winning booking is itself an
+         *  awaiting-coordination row that doesn't yet have a concrete
+         *  date — the pivot dialog handles the missing-slot copy. */
+        date: AdminBooking["serviceDate"];
+        slot: AdminBooking["serviceSlot"];
+      };
+    };
+
 export function BookingDetail({
   bookingId,
   bookings,
@@ -38,6 +61,8 @@ export function BookingDetail({
   onCancelBooking,
   onRescheduleBooking,
   onScheduleCoordination,
+  onUndoCancelBooking,
+  onUndoCancelBookingAndReschedule,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -60,6 +85,19 @@ export function BookingDetail({
   /** Open the "Schedule appointment" modal for a coordination booking.
    *  Optional so screens that don't yet support scheduling can omit it. */
   onScheduleCoordination?: (id: string) => void;
+  /** Reverse a cancellation — re-runs the uniqueness check and either
+   *  restores the booking on the spot or returns a "slot_taken" verdict
+   *  so the UI can pivot to the reschedule picker. Optional so screens
+   *  that don't expose this affordance (none currently) can omit it. */
+  onUndoCancelBooking?: (id: string) => UndoCancelResult;
+  /** Companion to {@link onUndoCancelBooking}: when the original slot
+   *  was given away, this restores the booking AT a freshly picked
+   *  slot in one mutation. */
+  onUndoCancelBookingAndReschedule?: (
+    id: string,
+    date: string,
+    window: "morning" | "afternoon",
+  ) => void;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
@@ -68,9 +106,22 @@ export function BookingDetail({
   // admin clicks back and into another row.
   const [showCancel, setShowCancel] = useState(false);
   const [showReschedule, setShowReschedule] = useState(false);
+  // Undo-cancel pivot: when the original slot was given away while
+  // the booking sat cancelled, we surface the conflict here so the
+  // admin can choose to open the reschedule picker instead. `null`
+  // means no conflict is being shown.
+  const [undoConflict, setUndoConflict] = useState<
+    Extract<UndoCancelResult, { kind: "slot_taken" }>["takenBy"] | null
+  >(null);
+  // When the admin clicks "Open Reschedule" on the pivot dialog, we
+  // open the existing reschedule modal in "undo" mode so its confirm
+  // button atomically restores AND reschedules.
+  const [showUndoReschedule, setShowUndoReschedule] = useState(false);
   useEffect(() => {
     setShowCancel(false);
     setShowReschedule(false);
+    setUndoConflict(null);
+    setShowUndoReschedule(false);
   }, [bookingId]);
 
   // Whenever the selected booking changes, pull the freshest notes value.
@@ -115,6 +166,11 @@ export function BookingDetail({
     !isCancelled &&
     !!booking.rolloutId &&
     (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon");
+  // Undo cancellation is only relevant for cancelled rows. The live
+  // demo row's lifecycle is owned by the customer flow, so we never
+  // expose admin-side undo for it.
+  const canUndoCancel =
+    !booking.isLive && isCancelled && !!onUndoCancelBooking;
 
   function advanceStatus() {
     if (!nextStatus || !booking) return;
@@ -176,6 +232,28 @@ export function BookingDetail({
             >
               Live demo
             </span>
+          )}
+          {canUndoCancel && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!onUndoCancelBooking) return;
+                const result = onUndoCancelBooking(booking.id);
+                if (result.kind === "slot_taken") {
+                  setUndoConflict(result.takenBy);
+                }
+                // "restored" + "no_op" need no further UI — the row
+                // re-renders and the button drops off (or stays
+                // disabled) on its own.
+              }}
+              data-testid="button-undo-cancel"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition hover:brightness-95"
+              style={{ borderColor: BRAND, color: BRAND_DEEP, backgroundColor: BRAND_SOFT }}
+              title="Reverse this cancellation if the slot is still free"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Undo cancellation
+            </button>
           )}
           <button
             type="button"
@@ -419,6 +497,133 @@ export function BookingDetail({
           onDismiss={() => setShowReschedule(false)}
         />
       )}
+      {undoConflict && (
+        <UndoConflictDialog
+          takenBy={undoConflict}
+          onOpenReschedule={() => {
+            setUndoConflict(null);
+            setShowUndoReschedule(true);
+          }}
+          onDismiss={() => setUndoConflict(null)}
+        />
+      )}
+      {showUndoReschedule && onUndoCancelBookingAndReschedule && (
+        <RescheduleBookingModal
+          booking={booking}
+          mode="undo"
+          onConfirm={(date, window) => {
+            onUndoCancelBookingAndReschedule(booking.id, date, window);
+            setShowUndoReschedule(false);
+          }}
+          onDismiss={() => setShowUndoReschedule(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Pivot dialog shown when "Undo cancellation" detects the original
+ * slot has been given away. Tells the admin who's holding the slot
+ * now (so they have a defensible answer if the customer calls in)
+ * and lets them open the reschedule picker to put the booking back
+ * on the calendar somewhere else.
+ *
+ * Kept inline (rather than a separate file) because it only exists
+ * to support the undo flow on this screen and has no reusable
+ * surface area.
+ */
+function UndoConflictDialog({
+  takenBy,
+  onOpenReschedule,
+  onDismiss,
+}: {
+  takenBy: Extract<UndoCancelResult, { kind: "slot_taken" }>["takenBy"];
+  onOpenReschedule: () => void;
+  onDismiss: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onDismiss();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
+
+  // Coordination bookings can win the slot too, in which case they
+  // don't have a real date / window — fall back to a softer phrase
+  // so the admin still gets the actionable info.
+  const slotLabel =
+    takenBy.slot === "morning" || takenBy.slot === "afternoon"
+      ? `${takenBy.date} · ${takenBy.slot}`
+      : "an awaiting-coordination booking";
+  const roleLabel = takenBy.role === "agent" ? "agent" : "owner";
+
+  return (
+    <div
+      className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/40 p-6"
+      data-testid="modal-undo-conflict"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="undo-conflict-title"
+    >
+      <div className="flex w-full max-w-md flex-col rounded-2xl bg-white shadow-xl">
+        <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-start gap-2.5">
+            <div
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full"
+              style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+            >
+              <TriangleAlert className="h-4 w-4" />
+            </div>
+            <div>
+              <div
+                id="undo-conflict-title"
+                className="text-[15px] font-semibold text-slate-900"
+              >
+                That slot was given away
+              </div>
+              <div className="mt-0.5 text-[12px] text-slate-500">
+                Original slot is no longer available
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 px-5 py-4 text-[13px] leading-relaxed text-slate-600">
+          <p>
+            <span className="font-semibold text-slate-900">{takenBy.name}</span>{" "}
+            ({roleLabel}) has booked{" "}
+            <span className="font-semibold text-slate-900">{slotLabel}</span>{" "}
+            on the unit while this booking sat cancelled, so the original
+            slot can't be reclaimed.
+          </p>
+          <p>
+            Open the reschedule picker to restore this booking on a different
+            date or window — capacity will be consumed at the new slot only.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+          <button
+            type="button"
+            onClick={onDismiss}
+            data-testid="button-undo-conflict-dismiss"
+            className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            Leave cancelled
+          </button>
+          <button
+            type="button"
+            onClick={onOpenReschedule}
+            data-testid="button-undo-conflict-open-reschedule"
+            className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
+            style={{ backgroundColor: BRAND }}
+          >
+            Open Reschedule
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

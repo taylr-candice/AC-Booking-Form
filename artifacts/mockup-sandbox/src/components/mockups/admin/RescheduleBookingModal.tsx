@@ -37,6 +37,7 @@ export function RescheduleBookingModal({
   booking,
   onConfirm,
   onDismiss,
+  mode = "reschedule",
 }: {
   booking: AdminBooking;
   onConfirm: (
@@ -45,7 +46,22 @@ export function RescheduleBookingModal({
     note?: string,
   ) => void;
   onDismiss: () => void;
+  /**
+   * `"reschedule"` (default) — admin moving an active booking. Note
+   * field is shown, the booking's existing slot is highlighted as
+   * "Current" and disabled.
+   *
+   * `"undo"` — pivot path from the undo-cancellation flow. The
+   * original slot was given away, so there's no "Current" to mark
+   * (the booking has no live slot right now), the note field is
+   * hidden (the audit trail already carries the cancellation note
+   * the undo handler reuses), and the confirm button reads "Restore
+   * here" so it's obvious this is a restore + pick-a-new-slot in one
+   * step.
+   */
+  mode?: "reschedule" | "undo";
 }) {
+  const isUndoMode = mode === "undo";
   const jobMinutes = bookingDurationMinutes(booking);
   const slotData = useMemo(
     () => resolveCustomerSlotData(booking.unitId, jobMinutes),
@@ -70,7 +86,11 @@ export function RescheduleBookingModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onDismiss]);
 
+  // In undo mode the booking has no live slot to mark as "Current"
+  // (the original slot was given away), so we skip the highlight
+  // entirely and don't gate the confirm button on it.
   const currentKey =
+    !isUndoMode &&
     booking.serviceDate &&
     (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon")
       ? `${booking.serviceDate}__${booking.serviceSlot}`
@@ -114,7 +134,7 @@ export function RescheduleBookingModal({
                 id="reschedule-booking-title"
                 className="text-[15px] font-semibold text-slate-900"
               >
-                Reschedule booking
+                {isUndoMode ? "Restore booking — pick a new slot" : "Reschedule booking"}
               </div>
               <div className="mt-0.5 text-[12px] text-slate-500">
                 {booking.customerName} · {booking.id}
@@ -192,30 +212,43 @@ export function RescheduleBookingModal({
             </ul>
           )}
 
-          <label className="mt-1 flex flex-col gap-1.5">
-            <span className="text-[12px] font-semibold text-slate-700">
-              Note (optional)
-            </span>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={2}
-              placeholder="Why is this being rescheduled? Saved on the timeline."
-              data-testid="textarea-reschedule-note"
-              className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
-            />
-            <span className="text-[11px] text-slate-500">
-              Optional — leave blank if there's no extra context to
-              record on the timeline.
-            </span>
-          </label>
+          {isUndoMode ? (
+            <div
+              className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[12px] text-slate-600"
+              data-testid="undo-reschedule-explainer"
+            >
+              The original cancellation note will be reused on the
+              service timeline alongside the new slot, so the audit
+              trail stays end-to-end.
+            </div>
+          ) : (
+            <label className="mt-1 flex flex-col gap-1.5">
+              <span className="text-[12px] font-semibold text-slate-700">
+                Note (optional)
+              </span>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="Why is this being rescheduled? Saved on the timeline."
+                data-testid="textarea-reschedule-note"
+                className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+              />
+              <span className="text-[11px] text-slate-500">
+                Optional — leave blank if there's no extra context to
+                record on the timeline.
+              </span>
+            </label>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-3">
           <div className="text-[11px] text-slate-500">
-            {currentKey
-              ? `Currently ${booking.serviceDate} · ${booking.serviceSlot}`
-              : "No slot currently set"}
+            {isUndoMode
+              ? "Original slot was given away"
+              : currentKey
+                ? `Currently ${booking.serviceDate} · ${booking.serviceSlot}`
+                : "No slot currently set"}
           </div>
           <div className="flex gap-2">
             <button
@@ -234,14 +267,16 @@ export function RescheduleBookingModal({
                 onConfirm(
                   parts.date,
                   parts.window,
-                  trimmedNote.length > 0 ? trimmedNote : undefined,
+                  isUndoMode || trimmedNote.length === 0
+                    ? undefined
+                    : trimmedNote,
                 );
               }}
               data-testid="button-reschedule-confirm"
               className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 hover:brightness-110"
               style={{ backgroundColor: BRAND }}
             >
-              Reschedule
+              {isUndoMode ? "Restore here" : "Reschedule"}
             </button>
           </div>
         </div>
