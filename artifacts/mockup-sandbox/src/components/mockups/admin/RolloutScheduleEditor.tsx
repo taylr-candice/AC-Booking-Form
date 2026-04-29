@@ -352,6 +352,7 @@ function DayCell({
 }) {
   return (
     <div
+      data-testid={`rollout-day-${day.isoDate}`}
       className={`flex flex-col gap-1.5 rounded-lg border p-2 ${
         day.open
           ? "border-slate-200 bg-white"
@@ -374,6 +375,8 @@ function DayCell({
       {day.open ? (
         <>
           <SlotCell
+            isoDate={day.isoDate}
+            window="morning"
             label="AM"
             slot={day.morning}
             mode={mode}
@@ -382,6 +385,8 @@ function DayCell({
             onReset={() => onReset("morning")}
           />
           <SlotCell
+            isoDate={day.isoDate}
+            window="afternoon"
             label="PM"
             slot={day.afternoon}
             mode={mode}
@@ -400,6 +405,8 @@ function DayCell({
 }
 
 function SlotCell({
+  isoDate,
+  window,
   label,
   slot,
   mode,
@@ -407,6 +414,8 @@ function SlotCell({
   onEdit,
   onReset,
 }: {
+  isoDate: string;
+  window: "morning" | "afternoon";
   label: string;
   slot: RolloutSlot;
   mode: "time_budget_per_window" | "slots_per_window";
@@ -424,6 +433,7 @@ function SlotCell({
   const accent = BRAND;
   return (
     <div
+      data-testid={`rollout-slot-${isoDate}-${window}`}
       className={`rounded border px-1.5 py-1 ${
         isOpen && hasBookings
           ? ""
@@ -454,6 +464,7 @@ function SlotCell({
       <button
         type="button"
         onClick={onEdit}
+        data-testid={`rollout-slot-${isoDate}-${window}-utilization`}
         className="mt-1 flex w-full items-center justify-between gap-1 rounded px-1 py-0.5 text-left text-[10px] text-slate-700 hover:bg-white"
         title="Edit capacity"
       >
