@@ -795,6 +795,8 @@ export function AdminApp() {
                 onNewBooking={() => openNewBooking(null)}
                 paymentMode={view === "payments"}
                 onAcknowledgeSupersede={acknowledgeSupersede}
+                onUndoCancelBooking={undoCancelBooking}
+                onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
               />
             )
           ) : null}

@@ -5,7 +5,7 @@
  * `AdminApp` shell to mount `BookingDetail`.
  */
 
-import { Plus, Search, TriangleAlert } from "lucide-react";
+import { Plus, RotateCcw, Search, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -18,9 +18,12 @@ import {
   type ServiceStatus,
 } from "@/state/adminMockData";
 
+import type { UndoCancelResult } from "./BookingDetail";
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
 import { InvoiceVoidAlerts } from "./InvoiceVoidAlerts";
+import { RescheduleBookingModal } from "./RescheduleBookingModal";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+import { UndoConflictDialog, type UndoConflictTakenBy } from "./UndoConflictDialog";
 
 /**
  * Customer column cell.
@@ -68,6 +71,8 @@ export function BookingsView({
   onNewBooking,
   paymentMode,
   onAcknowledgeSupersede,
+  onUndoCancelBooking,
+  onUndoCancelBookingAndReschedule,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -82,12 +87,46 @@ export function BookingsView({
   onNewBooking: () => void;
   paymentMode: boolean;
   onAcknowledgeSupersede: (id: string) => void;
+  /** Reverse a cancellation from the row directly. Same handler the
+   *  detail page uses — returns "restored" / "slot_taken" / "no_op"
+   *  so the UI can pivot to the reschedule modal on conflict. Optional
+   *  so callers that don't expose an inline affordance can omit it. */
+  onUndoCancelBooking?: (id: string) => UndoCancelResult;
+  /** Companion to {@link onUndoCancelBooking}: when the original slot
+   *  was given away, this restores the booking AT a freshly picked
+   *  slot in one mutation. */
+  onUndoCancelBookingAndReschedule?: (
+    id: string,
+    date: string,
+    window: "morning" | "afternoon",
+  ) => void;
 }) {
   // "Show cancelled" is OFF by default — cancelled rows are an audit-trail
   // artefact, not the day-to-day work, so we hide them unless the admin
   // opts in. The toggle is local to this list (not lifted to AdminApp)
   // because it doesn't need to survive a view switch.
   const [showCancelled, setShowCancelled] = useState(false);
+  // Inline-undo pivot state. When the row-level "Undo" affordance hits
+  // a "slot_taken" verdict we surface the same conflict dialog the
+  // detail page uses; clicking "Open Reschedule" then opens the
+  // existing reschedule modal in `mode="undo"` so the confirm button
+  // atomically restores AND reschedules. Both pieces of state are
+  // keyed by booking id so we always know which row we're acting on
+  // even if the table re-renders behind the modal.
+  const [undoConflict, setUndoConflict] = useState<
+    { bookingId: string; takenBy: UndoConflictTakenBy } | null
+  >(null);
+  const [undoRescheduleId, setUndoRescheduleId] = useState<string | null>(null);
+
+  function handleUndoCancel(id: string) {
+    if (!onUndoCancelBooking) return;
+    const result = onUndoCancelBooking(id);
+    if (result.kind === "slot_taken") {
+      setUndoConflict({ bookingId: id, takenBy: result.takenBy });
+    }
+    // "restored" + "no_op" need no further UI — the row updates in
+    // place (or, if "Show cancelled" is off, drops out of the list).
+  }
   const filterChips: ReadonlyArray<{
     key: "all" | ServiceStatus | PaymentStatus;
     label: string;
@@ -111,10 +150,18 @@ export function BookingsView({
     // Cancelled rows are hidden by default unless either the toggle is on
     // OR the user explicitly filtered to "cancelled" via the chip set
     // (so an admin can audit cancellations from a single click).
+    //
+    // Payments mode is the exception: cancellations naturally flip the
+    // payment status to "refund_pending", so the cancelled row IS the
+    // refund queue's day-to-day work — hiding it would hide the very
+    // rows ops needs to act on (and would also strand the new inline
+    // "Undo" affordance behind a filter that doesn't exist in payments
+    // view, where the "Show cancelled" toggle isn't rendered).
     if (
       b.serviceStatus === "cancelled" &&
       !showCancelled &&
-      statusFilter !== "cancelled"
+      statusFilter !== "cancelled" &&
+      !paymentMode
     ) {
       return false;
     }
@@ -363,7 +410,38 @@ export function BookingsView({
                       <PaymentChip status={b.paymentStatus} />
                     </td>
                     <td className="px-4 py-3">
-                      <ServiceChip status={b.serviceStatus} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ServiceChip status={b.serviceStatus} />
+                        {/* Inline "Undo" affordance for accidental
+                         *  cancellations — reuses the same handler the
+                         *  detail page calls so the uniqueness check,
+                         *  capacity restore, refund flip and timeline
+                         *  entry are identical. Live demo row is owned
+                         *  by the customer flow so we hide it there. */}
+                        {b.serviceStatus === "cancelled" &&
+                          !b.isLive &&
+                          onUndoCancelBooking && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUndoCancel(b.id);
+                              }}
+                              data-testid="button-undo-cancel-row"
+                              data-booking-id={b.id}
+                              className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                              style={{
+                                borderColor: BRAND,
+                                color: BRAND_DEEP,
+                                backgroundColor: BRAND_SOFT,
+                              }}
+                              title="Reverse this cancellation if the slot is still free"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              Undo
+                            </button>
+                          )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       ${b.totalAud.toFixed(2)}
@@ -383,6 +461,43 @@ export function BookingsView({
         )}
         .
       </div>
+      {undoConflict && (
+        <UndoConflictDialog
+          takenBy={undoConflict.takenBy}
+          onOpenReschedule={() => {
+            const id = undoConflict.bookingId;
+            setUndoConflict(null);
+            // Only open the picker if the caller wired the
+            // restore-and-reschedule handler — otherwise drop quietly
+            // back to the list. (Both handlers ship together in
+            // practice; this guard keeps the prop strictly optional.)
+            if (onUndoCancelBookingAndReschedule) {
+              setUndoRescheduleId(id);
+            }
+          }}
+          onDismiss={() => setUndoConflict(null)}
+        />
+      )}
+      {undoRescheduleId && onUndoCancelBookingAndReschedule && (() => {
+        const target = bookings.find((b) => b.id === undoRescheduleId);
+        if (!target) {
+          // Booking vanished between clicking "Open Reschedule" and
+          // the modal mounting — bail rather than render a broken
+          // picker.
+          return null;
+        }
+        return (
+          <RescheduleBookingModal
+            booking={target}
+            mode="undo"
+            onConfirm={(date, window) => {
+              onUndoCancelBookingAndReschedule(target.id, date, window);
+              setUndoRescheduleId(null);
+            }}
+            onDismiss={() => setUndoRescheduleId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
