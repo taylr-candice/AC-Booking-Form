@@ -58,6 +58,30 @@ export function CustomerCell({ booking }: { booking: AdminBooking }) {
   );
 }
 
+/**
+ * Pull the structured `loggedAt` of a booking's most recent
+ * call/email entry as a numeric timestamp suitable for sorting.
+ *
+ * Returns `null` when the booking has no structured coordination
+ * touch at all (no call/email entry on `serviceTimeline`) OR when
+ * the latest entry pre-dates the `loggedAt` field (legacy entries
+ * created before structured timestamps were captured). The sort
+ * uses this `null` to pin those rows to the bottom in either
+ * direction — there's no recency signal to compare them by.
+ *
+ * Returning `null` for an unparseable `loggedAt` (rather than
+ * silently returning 0) avoids accidentally sorting malformed rows
+ * to the very top of "stalest first" — which would be the most
+ * misleading possible position for a row whose timestamp is
+ * actually unknown.
+ */
+function attemptTimestamp(booking: AdminBooking): number | null {
+  const latest = latestCoordinationAttempt(booking.serviceTimeline);
+  if (latest === null || latest.loggedAt === null) return null;
+  const ms = new Date(latest.loggedAt).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 export function BookingsView({
   bookings,
   units,
@@ -105,6 +129,25 @@ export function BookingsView({
   // opts in. The toggle is local to this list (not lifted to AdminApp)
   // because it doesn't need to survive a view switch.
   const [showCancelled, setShowCancelled] = useState(false);
+  // Optional "Last attempt" ordering. The Awaiting-coordination queue
+  // already prioritises stale touches in its own composite sort, but
+  // the broader bookings list previously had no equivalent — so a
+  // freshly emailed-in customer would sit wherever their `createdAt`
+  // happened to put them. Surfacing the same recency signal here as
+  // an opt-in sort lets a team lead float the stalest touches to the
+  // top in one click without having to scan every row.
+  //
+  // Rows that have NEVER had a structured call/email logged against
+  // them are kept at the bottom in BOTH directions: they have no
+  // recency signal, so sorting them in with timestamped rows would
+  // be misleading either way. (Treating them as "infinitely stale"
+  // would shove brand-new bookings to the very top of "stalest
+  // first"; treating them as "infinitely fresh" would do the same
+  // for "freshest first". Pinning them to the bottom keeps both
+  // sort modes about the rows that actually have a touch to compare.)
+  const [attemptSort, setAttemptSort] = useState<
+    "default" | "stalest_first" | "freshest_first"
+  >("default");
   // Inline-undo pivot state. When the row-level "Undo" affordance hits
   // a "slot_taken" verdict we surface the same conflict dialog the
   // detail page uses; clicking "Open Reschedule" then asks the
@@ -197,6 +240,36 @@ export function BookingsView({
     return true;
   });
 
+  // Apply the optional "Last attempt" ordering after filtering so the
+  // visible row count is independent of sort mode. We compute each
+  // row's `loggedAt` once via the same helper the row uses to render
+  // the "Last attempt" line, so the sort key and the visible suffix
+  // can never disagree.
+  //
+  // `Array#sort` mutates in place, so we slice first to keep the
+  // upstream `bookings` array untouched (the parent passes it down
+  // and may rely on its ordering elsewhere). When `attemptSort` is
+  // `"default"` we skip sorting entirely so existing callers that
+  // depend on the source order still work.
+  const sorted =
+    attemptSort === "default"
+      ? filtered
+      : filtered.slice().sort((a, z) => {
+          const aTs = attemptTimestamp(a);
+          const zTs = attemptTimestamp(z);
+          // Never-touched rows (or rows whose latest entry has no
+          // structured `loggedAt`) sink to the bottom in BOTH
+          // directions — see the comment on `attemptSort` state for
+          // the rationale.
+          if (aTs === null && zTs === null) return 0;
+          if (aTs === null) return 1;
+          if (zTs === null) return -1;
+          // Stalest first ⇒ smallest timestamp wins (oldest touch on
+          // top); freshest first ⇒ largest timestamp wins (newest
+          // touch on top).
+          return attemptSort === "stalest_first" ? aTs - zTs : zTs - aTs;
+        });
+
   return (
     <div className="flex flex-col gap-4">
       {/* Invoice-void alerts — sit above the toolbar so admins notice
@@ -233,6 +306,27 @@ export function BookingsView({
                 {b.name}
               </option>
             ))}
+          </select>
+          {/* "Last attempt" sort. Lives next to the building filter
+              (rather than amongst the status chips) so it reads as a
+              modifier on the *order* of rows, not the *set* of rows
+              shown. Default keeps the upstream order intact so admins
+              who never engage with the control see no behaviour
+              change. */}
+          <select
+            value={attemptSort}
+            onChange={(e) =>
+              setAttemptSort(
+                e.target.value as "default" | "stalest_first" | "freshest_first",
+              )
+            }
+            aria-label="Sort by last attempt"
+            data-testid="bookings-sort-last-attempt"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+          >
+            <option value="default">Sort: default</option>
+            <option value="stalest_first">Last attempt: stalest first</option>
+            <option value="freshest_first">Last attempt: freshest first</option>
           </select>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -295,14 +389,14 @@ export function BookingsView({
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
                   No bookings match these filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((b) => {
+              sorted.map((b) => {
                 const unit = units.find((u) => u.id === b.unitId);
                 // Most recent structured call/email entry, if any.
                 // Mirrors the helper used in the Awaiting-coordination
