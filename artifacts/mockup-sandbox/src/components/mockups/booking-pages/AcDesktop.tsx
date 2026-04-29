@@ -289,7 +289,14 @@ function FullConfigView({
   const knownType: KnownType | null =
     effectiveType === "split" || effectiveType === "ducted" ? effectiveType : null;
 
-  const needsTypePick = acTypeFromUnit === "unknown" && override === null;
+  // The type picker shows when (a) we genuinely don't know the type
+  // and the customer hasn't picked one yet, or (b) the customer
+  // explicitly opened it via "Change AC type" (`openPanel === "type"`).
+  // Branch (b) is what lets a customer in overridden mode change the
+  // recorded type — Task #50 acceptance criteria require type editing
+  // in overridden / no-record modes, not just for unknown units.
+  const needsTypePick =
+    (acTypeFromUnit === "unknown" && override === null) || openPanel === "type";
   const isUnsureMode = override === "unsure" || notSureCount;
   const hasOverride = override !== null;
 
@@ -465,8 +472,36 @@ function FullConfigView({
                   if (choice === "ducted") setOverride("ducted");
                   else if (choice === "split") setOverride("split");
                   else setOverride("unsure");
+                  setOpenPanel(null);
                 }}
+                onClose={
+                  // Allow closing the picker when it was opened via
+                  // "Change AC type" — but never when we genuinely have
+                  // no type yet, because in that case the customer must
+                  // pick something.
+                  acTypeFromUnit === "unknown" && override === null
+                    ? undefined
+                    : () => setOpenPanel(null)
+                }
               />
+            )}
+
+            {/* "Change AC type" affordance — visible whenever we have a
+                known effective type, the type picker isn't already open,
+                and the customer isn't currently in "unsure" mode.
+                Available in both overridden and no-record modes. */}
+            {!needsTypePick && knownType && !isUnsureMode && (
+              <div className="mb-5">
+                <button
+                  type="button"
+                  onClick={() => setOpenPanel("type")}
+                  data-testid="link-change-ac-type"
+                  className="text-[13px] font-medium underline underline-offset-2 hover:opacity-80"
+                  style={{ color: BRAND }}
+                >
+                  Change AC type
+                </button>
+              </div>
             )}
 
             {hasOverride && (
@@ -788,10 +823,18 @@ function PriceBlock({
       className="rounded-xl border border-slate-200 bg-slate-50 p-6"
       data-testid="block-price"
     >
-      <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+      <div className="mb-3 border-b border-slate-200 pb-3">
         <h2 className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
           Price
         </h2>
+        <p
+          className="mt-1.5 text-[11px] text-slate-500 leading-snug"
+          data-testid="text-price-anchor"
+        >
+          Each AC system is ${SYSTEM_PRICE}, so your total reflects the number
+          of systems on-site, plus ${ADDON_PRICE} for each extra unit beyond
+          what's included.
+        </p>
       </div>
       <div className="space-y-2 text-sm text-slate-600">
         <div className="flex items-start justify-between gap-3" data-testid="row-price-base">
