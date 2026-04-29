@@ -136,6 +136,55 @@ describe("CSV unit edits flow through to customer AC pre-fill", () => {
   );
 
   it(
+    "CSV import that ADDS a brand-new unit (blank id row) is also " +
+      "visible to the customer's on-file summary once selected",
+    () => {
+      // Append a single brand-new unit row (blank id ⇒ "new" status)
+      // to the exported CSV. The applyUnitsImport step assigns the id
+      // via our nextId() generator, so we read it back from the result
+      // before driving the customer flow.
+      const exported = formatUnitsCsv(SEEDED_UNITS);
+      const newRowCsv =
+        exported +
+        ",7B / 901 Sunrise Drive,Bondi NSW 2026,split,2,1,ag-002\n";
+
+      const preview = parseUnitsImport(newRowCsv, SEEDED_UNITS, SEEDED_AGENTS);
+      expect(preview.fatal).toBeUndefined();
+      expect(preview.counts.error).toBe(0);
+      expect(preview.counts.new).toBe(1);
+
+      const updatedUnits = applyUnitsImport(
+        SEEDED_UNITS,
+        preview,
+        () => "csv-added-unit-1",
+      );
+      const added = updatedUnits.find((u) => u.id === "csv-added-unit-1");
+      expect(added).toBeDefined();
+      expect(added!.ac).toEqual({
+        type: "split",
+        systems: 2,
+        additional: 1,
+      });
+
+      setLiveUnitsSource(() => updatedUnits);
+      notifyLiveUnitsChanged();
+
+      bookingActions.setUnit("csv-added-unit-1");
+
+      const { getByTestId } = render(<AcMobile />);
+
+      // Brand-new units don't exist in SEEDED_UNITS or in the legacy
+      // fallback table, so without the live-source wiring the page
+      // would have fallen all the way through to the default "split,
+      // unknown counts" no-record view. Seeing the on-file summary
+      // card with the imported counts is direct proof.
+      const summary = getByTestId("card-on-file-summary-mobile");
+      expect(summary).toHaveTextContent(/2\s+split systems/i);
+      expect(summary).toHaveTextContent(/\+\s*1\s+extra indoor unit/i);
+    },
+  );
+
+  it(
     "single-unit editor edits (in-memory unit list mutation) flow " +
       "through to the customer's on-file summary the same way",
     () => {
