@@ -17,6 +17,7 @@ import {
   type Role,
 } from "./bookingSession";
 import { isCoordinationFlow } from "./bookingDerived";
+import { getLiveUnits } from "./adminMockData";
 
 // ─── Pricing ───────────────────────────────────────────────────────────────
 
@@ -150,21 +151,36 @@ export type AcRecord = {
 
 type UnitAcCatalogEntry = AcRecord | { type: "unknown" };
 
+/**
+ * Legacy fallback table — used only when a unit id is NOT present in the
+ * admin shell's live units list (`getLiveUnits()` from `adminMockData`).
+ * The admin units list is the source of truth: when an admin edits a
+ * unit's AC config (single editor or bulk CSV import) the customer's
+ * Step 3 pre-fill should reflect that immediately. This fallback exists
+ * to keep the legacy alias `unit-g01-335-aspen` working for old demo
+ * deep-links and to keep tests of the customer flow green when the
+ * admin shell isn't mounted.
+ */
 const UNIT_AC_CATALOG: Readonly<Record<string, UnitAcCatalogEntry>> = {
-  // G01 / 335 Aspen Village — ducted, 1 system, 1 extra grille on file.
-  u1: { type: "ducted", systems: 1, additional: 1 },
+  // G01 / 335 Aspen Village (legacy alias for u1).
   "unit-g01-335-aspen": { type: "ducted", systems: 1, additional: 1 },
-  // 12 / 88 Marine Parade — split, 2 systems on file.
-  u2: { type: "split", systems: 2, additional: 0 },
-  // No records on file.
-  u3: { type: "unknown" },
-  u4: { type: "unknown" },
-  // 18 / 142 Anzac Parade — ducted, 2 systems on file.
-  u5: { type: "ducted", systems: 2, additional: 0 },
 };
+
+function lookupLiveUnitAc(unit_id: string): UnitAcCatalogEntry | null {
+  const live = getLiveUnits().find((u) => u.id === unit_id);
+  if (!live) return null;
+  if (live.ac.type === "unknown") return { type: "unknown" };
+  return {
+    type: live.ac.type,
+    systems: live.ac.systems,
+    additional: live.ac.additional,
+  };
+}
 
 export function getAcType(unit_id: string | null): AcType {
   if (!unit_id) return "split";
+  const fromLive = lookupLiveUnitAc(unit_id);
+  if (fromLive) return fromLive.type;
   return UNIT_AC_CATALOG[unit_id]?.type ?? "split";
 }
 
@@ -175,6 +191,8 @@ export function getAcType(unit_id: string | null): AcType {
  *  and (c) compute the discrepancy snapshot. */
 export function getAcRecord(unit_id: string | null): AcRecord | null {
   if (!unit_id) return null;
+  const fromLive = lookupLiveUnitAc(unit_id);
+  if (fromLive) return fromLive.type === "unknown" ? null : fromLive;
   const entry = UNIT_AC_CATALOG[unit_id];
   if (!entry || entry.type === "unknown") return null;
   return entry;

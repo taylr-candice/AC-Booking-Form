@@ -2234,6 +2234,62 @@ export function getLiveBookingsVersion(): number {
   return liveBookingsVersion;
 }
 
+/**
+ * Live-units source registration — same pattern as live-bookings above.
+ *
+ * Customer-side helpers (`getAcRecord`, `getAcType` in `bookingHelpers.ts`)
+ * used to read a hardcoded AC catalog. That made admin-side unit edits
+ * (single-unit editor + bulk CSV import) invisible to the customer's
+ * AC step pre-fill, so an admin who fixed a unit's AC config never saw
+ * that fix flow through to the customer flow.
+ *
+ * `setLiveUnitsSource(getter)` lets the admin shell register a getter
+ * that returns its current `units` React state. The default returns
+ * `SEEDED_UNITS` so the canvas-isolated mode (no admin shell mounted,
+ * e.g. unit tests of the customer flow) keeps working unchanged.
+ *
+ * Callers re-register on every mutation; the getter is cheap because
+ * `units` is just the array reference.
+ */
+export type LiveUnitsSource = () => readonly AdminUnit[];
+let liveUnitsSource: LiveUnitsSource = () => SEEDED_UNITS;
+let liveUnitsVersion = 0;
+const liveUnitsListeners = new Set<() => void>();
+
+export function setLiveUnitsSource(source: LiveUnitsSource | null): void {
+  liveUnitsSource = source ?? (() => SEEDED_UNITS);
+  notifyLiveUnitsChanged();
+}
+export function getLiveUnits(): readonly AdminUnit[] {
+  return liveUnitsSource();
+}
+/**
+ * Bump the live-units version and notify subscribers. Called by the
+ * admin shell after every unit edit (single-unit editor + bulk CSV
+ * import apply) so customer-side components reading `getLiveUnits()`
+ * re-render.
+ *
+ * Safe to call from canvas-isolated mode — there are no listeners and
+ * the version counter is harmless.
+ */
+export function notifyLiveUnitsChanged(): void {
+  liveUnitsVersion += 1;
+  for (const fn of liveUnitsListeners) fn();
+}
+/**
+ * Subscribe to live-units change notifications. Returns the unsubscribe
+ * function. Designed to plug straight into React's `useSyncExternalStore`.
+ */
+export function subscribeLiveUnits(listener: () => void): () => void {
+  liveUnitsListeners.add(listener);
+  return () => {
+    liveUnitsListeners.delete(listener);
+  };
+}
+export function getLiveUnitsVersion(): number {
+  return liveUnitsVersion;
+}
+
 export function getActiveBookingForUnit(
   unitId: string,
   bookings: readonly AdminBooking[],

@@ -28,12 +28,14 @@ import {
   getRolloutById,
   liveBookingFromSession,
   notifyLiveBookingsChanged,
+  notifyLiveUnitsChanged,
   releaseBookingCapacity,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
   SEEDED_BUILDINGS,
   SEEDED_UNITS,
   setLiveBookingsSource,
+  setLiveUnitsSource,
   updateRolloutSlot,
   type AdminAgent,
   type AdminBooking,
@@ -343,6 +345,8 @@ export function AdminApp() {
     // shells are mounted in the same React tree.
     setLiveBookingsSource(() => seededBookings);
     notifyLiveBookingsChanged();
+    setLiveUnitsSource(() => units);
+    notifyLiveUnitsChanged();
     setUniquenessGuard((sess, newBookingReference) => {
       if (!sess.unit_id) return "ok";
       const rollout = findRolloutForBooking("svc-ac", sess.unit_id);
@@ -403,8 +407,9 @@ export function AdminApp() {
     return () => {
       setUniquenessGuard(null);
       setLiveBookingsSource(null);
+      setLiveUnitsSource(null);
     };
-  }, [seededBookings]);
+  }, [seededBookings, units]);
 
   function openNewBooking(buildingId: string | null) {
     setNewBookingBuildingId(buildingId);
