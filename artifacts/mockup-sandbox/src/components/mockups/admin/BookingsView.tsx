@@ -186,6 +186,69 @@ export function BookingsView({
         { key: "cancelled", label: "Cancelled" },
       ];
 
+  // Predicate for the "global" filters that aren't tied to the
+  // status chip row — building filter + search. Mirrors the helper
+  // on AwaitingCoordinationView so each chip's count answers
+  // "how many rows would survive if I clicked me?" without
+  // double-counting against its own selection.
+  function matchesBuildingAndSearch(b: AdminBooking) {
+    if (buildingFilter !== "all") {
+      const unit = units.find((u) => u.id === b.unitId);
+      if (!unit || unit.buildingId !== buildingFilter) return false;
+    }
+    if (search.trim().length > 0) {
+      const q = search.trim().toLowerCase();
+      const unit = units.find((u) => u.id === b.unitId);
+      const agency = bookerAgencyName(b);
+      const haystack = [
+        b.id,
+        b.customerName,
+        b.customerEmail,
+        agency ?? "",
+        b.bookerAgencyOtherName,
+        unit?.addressLine1 ?? "",
+        unit?.addressLine2 ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  }
+
+  // Pre-rollup of per-chip counts. Each chip's count answers "how
+  // many rows would survive if I clicked me?" — i.e. apply the
+  // global building + search filters AND the cancelled-hiding rule
+  // *as it would behave with this chip active*, then narrow by the
+  // chip's own status. Critically the cancelled-hiding rule is
+  // re-evaluated per chip, so the "Cancelled" chip's count reflects
+  // the cancelled rows it would surface even when "Show cancelled"
+  // is off (otherwise the bucket would always read 0 until toggled).
+  const chipCounts: Record<string, number> = (() => {
+    const counts: Record<string, number> = {};
+    for (const chip of filterChips) {
+      counts[chip.key] = bookings.filter((b) => {
+        if (
+          b.serviceStatus === "cancelled" &&
+          !showCancelled &&
+          chip.key !== "cancelled" &&
+          !paymentMode
+        ) {
+          return false;
+        }
+        if (chip.key !== "all") {
+          if (paymentMode) {
+            if (b.paymentStatus !== chip.key) return false;
+          } else {
+            if (b.serviceStatus !== chip.key) return false;
+          }
+        }
+        return matchesBuildingAndSearch(b);
+      }).length;
+    }
+    return counts;
+  })();
+
   const filtered = bookings.filter((b) => {
     // Cancelled rows are hidden by default unless either the toggle is on
     // OR the user explicitly filtered to "cancelled" via the chip set
@@ -354,19 +417,53 @@ export function BookingsView({
           )}
           {filterChips.map((chip) => {
             const active = statusFilter === chip.key;
+            const count = chipCounts[chip.key] ?? 0;
+            // Mute + disable chips with nothing in their bucket so the
+            // non-empty queues stand out at a glance — same treatment
+            // as the Awaiting-coordination toolbar. The "All" chip is
+            // never muted; it always represents the visible total, so
+            // the toolbar still has a sensible "reset" affordance even
+            // when every specific bucket is empty.
+            //
+            // `isEmpty` takes precedence over `active` for styling:
+            // an already-selected chip whose bucket later drains
+            // (e.g. after changing the search or building filter)
+            // should drop into the muted treatment rather than stay
+            // in its brand-coloured "active" pill — otherwise the
+            // toolbar would lie about which buckets currently hold
+            // rows. The chip is `disabled` either way, so this only
+            // affects the visual.
+            const isEmpty = chip.key !== "all" && count === 0;
             return (
               <button
                 key={chip.key}
                 type="button"
                 onClick={() => onStatusFilter(chip.key)}
+                data-testid={`chip-bookings-${chip.key}`}
+                aria-pressed={active}
+                disabled={isEmpty}
                 className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
-                  active
-                    ? "text-white"
-                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  isEmpty
+                    ? "cursor-not-allowed bg-white text-slate-400 opacity-50 ring-1 ring-slate-100"
+                    : active
+                      ? "text-white"
+                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
                 }`}
-                style={active ? { backgroundColor: BRAND } : undefined}
+                style={!isEmpty && active ? { backgroundColor: BRAND } : undefined}
               >
-                {chip.label}
+                {chip.label}{" "}
+                <span
+                  className={
+                    isEmpty
+                      ? "text-slate-400"
+                      : active
+                        ? "text-white/80"
+                        : "text-slate-500"
+                  }
+                  data-testid={`chip-bookings-${chip.key}-count`}
+                >
+                  ({count})
+                </span>
               </button>
             );
           })}
