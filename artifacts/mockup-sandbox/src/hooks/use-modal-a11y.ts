@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -48,14 +48,24 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
  * On unmount / disable it tears the listeners down, restores body
  * scrolling, and returns focus to the previously focused element.
  *
+ * If `restoreFocusRef` is supplied and points at an element still
+ * connected to the document when the dialog closes, focus is sent
+ * there instead of the previously-focused element. This is needed
+ * when the trigger control is removed from the DOM while the dialog
+ * is open (e.g. the modal is opened from a row inside a dropdown
+ * that closes in the same action) — without an explicit fallback
+ * focus would land on `<body>`.
+ *
  * Attach the returned ref to the dialog's content container.
  */
 export function useModalA11y<T extends HTMLElement = HTMLDivElement>({
   enabled = true,
   onClose,
+  restoreFocusRef,
 }: {
   enabled?: boolean;
   onClose: () => void;
+  restoreFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const containerRef = useRef<T | null>(null);
 
@@ -113,15 +123,22 @@ export function useModalA11y<T extends HTMLElement = HTMLDivElement>({
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       document.body.style.overflow = prevOverflow;
-      if (
-        previouslyFocused &&
-        typeof previouslyFocused.focus === "function" &&
-        document.contains(previouslyFocused)
-      ) {
-        previouslyFocused.focus();
+      const explicitTarget = restoreFocusRef?.current ?? null;
+      const target =
+        explicitTarget &&
+        typeof explicitTarget.focus === "function" &&
+        document.contains(explicitTarget)
+          ? explicitTarget
+          : previouslyFocused &&
+              typeof previouslyFocused.focus === "function" &&
+              document.contains(previouslyFocused)
+            ? previouslyFocused
+            : null;
+      if (target) {
+        target.focus();
       }
     };
-  }, [enabled, onClose]);
+  }, [enabled, onClose, restoreFocusRef]);
 
   return containerRef;
 }

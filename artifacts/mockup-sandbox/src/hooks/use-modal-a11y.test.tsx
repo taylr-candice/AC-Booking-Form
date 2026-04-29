@@ -15,13 +15,19 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { useModalA11y } from "./use-modal-a11y";
 
-function Dialog({ onClose }: { onClose: () => void }) {
-  const ref = useModalA11y<HTMLDivElement>({ onClose });
+function Dialog({
+  onClose,
+  restoreFocusRef,
+}: {
+  onClose: () => void;
+  restoreFocusRef?: RefObject<HTMLElement | null>;
+}) {
+  const ref = useModalA11y<HTMLDivElement>({ onClose, restoreFocusRef });
   return (
     <div
       ref={ref}
@@ -139,4 +145,71 @@ describe("useModalA11y", () => {
 
     expect(document.activeElement).toBe(trigger);
   });
+
+  it(
+    "uses restoreFocusRef as the close target when the original trigger is " +
+      "removed from the DOM while the dialog is open",
+    async () => {
+      // Mirrors the unit-already-booked flow: the modal is opened
+      // from a button inside a dropdown; opening the dialog also
+      // collapses the dropdown, so the row that triggered it is
+      // unmounted while the dialog is open. The dropdown's stable
+      // trigger button (rendered outside the dropdown) is the
+      // intended fallback focus target.
+      function FlowHarness() {
+        const [open, setOpen] = useState(false);
+        const [dialog, setDialog] = useState(false);
+        const fallbackRef = useRef<HTMLButtonElement | null>(null);
+        return (
+          <div>
+            <button
+              ref={fallbackRef}
+              type="button"
+              data-testid="dropdown-toggle"
+              onClick={() => setOpen((v) => !v)}
+            >
+              Toggle
+            </button>
+            {open && (
+              <button
+                type="button"
+                data-testid="row-trigger"
+                onClick={() => {
+                  setOpen(false);
+                  setDialog(true);
+                }}
+              >
+                Row
+              </button>
+            )}
+            {dialog && (
+              <Dialog
+                onClose={() => setDialog(false)}
+                restoreFocusRef={fallbackRef}
+              />
+            )}
+          </div>
+        );
+      }
+
+      render(<FlowHarness />);
+      fireEvent.click(screen.getByTestId("dropdown-toggle"));
+      const row = screen.getByTestId("row-trigger");
+      row.focus();
+      expect(document.activeElement).toBe(row);
+
+      fireEvent.click(row);
+      await flushFocus();
+      // Row is unmounted (dropdown collapsed) and focus moved into
+      // the dialog.
+      expect(screen.queryByTestId("row-trigger")).toBeNull();
+      expect(document.activeElement).toBe(screen.getByTestId("first"));
+
+      fireEvent.keyDown(window, { key: "Escape" });
+      await flushFocus();
+
+      // Falls back to the dropdown trigger rather than the body.
+      expect(document.activeElement).toBe(screen.getByTestId("dropdown-toggle"));
+    },
+  );
 });

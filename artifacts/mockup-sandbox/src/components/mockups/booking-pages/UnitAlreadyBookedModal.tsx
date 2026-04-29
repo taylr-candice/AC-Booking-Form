@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import type { RefObject } from "react";
 import { CalendarCheck, X } from "lucide-react";
+import { useModalA11y } from "../../../hooks/use-modal-a11y";
 
 const BRAND = "#ED017F";
 const SUPPORT_EMAIL = "support@taylr.com.au";
@@ -19,43 +20,47 @@ const SUPPORT_EMAIL = "support@taylr.com.au";
 export function UnitAlreadyBookedModal({
   open,
   onClose,
+  restoreFocusRef,
 }: {
   open: boolean;
   onClose: () => void;
+  /**
+   * Optional fallback element to focus when the dialog closes. The
+   * modal is opened from a row inside the unit dropdown, and the
+   * dropdown closes in the same action — so the row that triggered
+   * the modal is unmounted by the time the dialog closes. Pass the
+   * dropdown's stable trigger button ref so focus lands somewhere
+   * sensible instead of `<body>`.
+   */
+  restoreFocusRef?: RefObject<HTMLElement | null>;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", handler);
-      document.body.style.overflow = prev;
-    };
-  }, [open, onClose]);
+  const containerRef = useModalA11y<HTMLDivElement>({
+    enabled: open,
+    onClose,
+    restoreFocusRef,
+  });
 
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="unit-already-booked-title"
       data-testid="modal-unit-already-booked"
     >
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
+        tabIndex={-1}
         className="absolute inset-0 bg-slate-900/55 backdrop-blur-sm"
         data-testid="modal-unit-already-booked-backdrop"
       />
       <div
-        className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unit-already-booked-title"
+        className="relative z-10 flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 pt-4 pb-3">

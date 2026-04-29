@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -102,6 +102,11 @@ export function UnitMobile() {
   // contact Taylr" modal instead of selecting the unit. We never show
   // any details about the existing customer/booking — privacy.
   const [alreadyBookedOpen, setAlreadyBookedOpen] = useState(false);
+  // Stable target for restoring focus when the already-booked modal
+  // closes: the dropdown trigger button (the row that opened the
+  // modal is unmounted because we collapse the dropdown in the same
+  // action that opens the modal).
+  const unitDropdownTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [touched, setTouched] = useState({
     agency: false,
     agencyOther: false,
@@ -252,6 +257,7 @@ export function UnitMobile() {
       <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
         <div className="relative">
           <button
+            ref={unitDropdownTriggerRef}
             type="button"
             onClick={() => setOpen((o) => !o)}
             data-testid="dropdown-unit-trigger"
@@ -609,6 +615,7 @@ export function UnitMobile() {
       <UnitAlreadyBookedModal
         open={alreadyBookedOpen}
         onClose={() => setAlreadyBookedOpen(false)}
+        restoreFocusRef={unitDropdownTriggerRef}
       />
     </div>
   );
