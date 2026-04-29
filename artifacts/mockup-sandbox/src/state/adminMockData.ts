@@ -1560,6 +1560,15 @@ function formatShortDate(iso: string): string {
   return `${day} ${month}`;
 }
 
+/**
+ * Public re-export of the short-date formatter so view code can format
+ * a chosen ISO date the same way the rollout list does (e.g. timeline
+ * entries, modal summaries). Pure / locale-agnostic.
+ */
+export function formatBookingShortDate(iso: string): string {
+  return formatShortDate(iso);
+}
+
 // ─── Admin-created bookings (phone bookings) ───────────────────────────────
 
 /**
@@ -2436,4 +2445,43 @@ function isWeekend(iso: string): boolean {
   const [y, m, d] = iso.split("-").map((s) => parseInt(s, 10));
   const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   return day === 0 || day === 6;
+}
+
+// ─── Coordination → scheduled conversion ──────────────────────────────────
+
+/**
+ * Build the patch that flips a coordination booking
+ * (`serviceSlot === "to_be_coordinated"`) into a real scheduled
+ * appointment. Used by the "Schedule appointment" action surfaced in
+ * the awaiting-coordination queue and the booking detail's Schedule
+ * card after ops has confirmed the date/window with the tenant or
+ * managing agent.
+ *
+ * Returns the field-level patch only (`serviceDate`, `serviceSlot`, an
+ * appended `serviceTimeline` entry). The caller is responsible for
+ * actually applying the patch to the bookings store and for bumping
+ * the matching rollout's per-window capacity (mirrors how
+ * `appendBooking` handles a freshly-created phone booking).
+ *
+ * Pure / data-only — safe to import anywhere, no DOM access.
+ */
+export function convertCoordinationToScheduledPatch(
+  b: AdminBooking,
+  schedule: { date: string; window: "morning" | "afternoon" },
+  by: string = ADMIN_USER_LABEL,
+  at: string = "Just now",
+): Pick<AdminBooking, "serviceDate" | "serviceSlot" | "serviceTimeline"> {
+  const windowLabel =
+    schedule.window === "morning" ? "Morning" : "Afternoon";
+  const entry: TimelineEntry = {
+    status: "scheduled",
+    label: `Coordinated · ${formatBookingShortDate(schedule.date)} · ${windowLabel}`,
+    at,
+    by,
+  };
+  return {
+    serviceDate: schedule.date,
+    serviceSlot: schedule.window,
+    serviceTimeline: [...b.serviceTimeline, entry],
+  };
 }

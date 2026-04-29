@@ -37,6 +37,7 @@ export function BookingDetail({
   onUpdate,
   onCancelBooking,
   onRescheduleBooking,
+  onScheduleCoordination,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -56,6 +57,9 @@ export function BookingDetail({
     window: "morning" | "afternoon",
     note?: string,
   ) => void;
+  /** Open the "Schedule appointment" modal for a coordination booking.
+   *  Optional so screens that don't yet support scheduling can omit it. */
+  onScheduleCoordination?: (id: string) => void;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
@@ -328,8 +332,18 @@ export function BookingDetail({
           <Card title="Schedule">
             <SlotCell booking={booking} />
             {booking.serviceSlot === "to_be_coordinated" && (
-              <div className="mt-3">
+              <div className="mt-3 flex flex-col items-start gap-2">
                 <WaitingChip createdAt={booking.createdAt} />
+                {!booking.isLive && onScheduleCoordination && (
+                  <button
+                    type="button"
+                    onClick={() => onScheduleCoordination(booking.id)}
+                    className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    Schedule appointment
+                  </button>
+                )}
               </div>
             )}
           </Card>

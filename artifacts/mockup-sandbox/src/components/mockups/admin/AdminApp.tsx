@@ -21,9 +21,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   bookingDurationMinutes,
   consumeBookingCapacity,
+  convertCoordinationToScheduledPatch,
   createRollout,
   findRolloutForBooking,
   getActiveBookingForUnit,
+  getRolloutById,
   liveBookingFromSession,
   notifyLiveBookingsChanged,
   releaseBookingCapacity,
@@ -53,6 +55,7 @@ import { BuildingsView } from "./BuildingsView";
 import { NewBookingFlow } from "./NewBookingFlow";
 import { RolloutScheduleEditor } from "./RolloutScheduleEditor";
 import { RolloutsView } from "./RolloutsView";
+import { ScheduleCoordinationModal } from "./ScheduleCoordinationModal";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { UnitsView } from "./UnitsView";
@@ -108,6 +111,12 @@ export function AdminApp() {
   const [newBookingBuildingId, setNewBookingBuildingId] = useState<
     string | null
   >(null);
+
+  // Coordination → scheduled overlay. Holds the booking id ops is
+  // scheduling. `null` means the modal is closed.
+  const [schedulingBookingId, setSchedulingBookingId] = useState<string | null>(
+    null,
+  );
 
   // When jumping to Payments, default the bookings list to the payments filter.
   const [bookingsStatusFilter, setBookingsStatusFilter] =
@@ -463,6 +472,62 @@ export function AdminApp() {
     setBookingsBuildingFilter("all");
   }
 
+  /**
+   * Convert a coordination booking into a scheduled appointment. Flips
+   * the booking's serviceSlot from "to_be_coordinated" to a real
+   * window, appends a "Coordinated · {date} · {window}" timeline
+   * entry, and bumps the matching rollout's per-window capacity using
+   * the same logic `appendBooking` uses for freshly-created phone
+   * bookings (slot-count or time-budget, depending on the rollout).
+   *
+   * No-ops on the live demo row (read-only) and when the booking can't
+   * be found.
+   */
+  function scheduleCoordinationBooking(
+    bookingId: string,
+    date: string,
+    window: "morning" | "afternoon",
+  ) {
+    const booking = allBookings.find((b) => b.id === bookingId);
+    if (!booking || booking.isLive) return;
+
+    const patch = convertCoordinationToScheduledPatch(booking, {
+      date,
+      window,
+    });
+    updateBooking(bookingId, patch);
+
+    const rollout = getRolloutById(booking.rolloutId);
+    if (rollout) {
+      const day = rollout.days.find((d) => d.isoDate === date);
+      const slot = day
+        ? window === "morning"
+          ? day.morning
+          : day.afternoon
+        : null;
+      if (slot) {
+        if (rollout.capacityModel === "slots_per_window") {
+          updateRolloutSlot(rollout.id, date, window, {
+            bookedCount: (slot.bookedCount ?? 0) + 1,
+          });
+        } else {
+          const jobMin = bookingDurationMinutes(booking);
+          updateRolloutSlot(rollout.id, date, window, {
+            bookedMinutes: slot.bookedMinutes + jobMin,
+          });
+        }
+        bumpRolloutsRefreshKey();
+      }
+    }
+
+    setSchedulingBookingId(null);
+  }
+
+  const schedulingBooking =
+    schedulingBookingId !== null
+      ? allBookings.find((b) => b.id === schedulingBookingId) ?? null
+      : null;
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['Inter'] text-slate-900">
       <Sidebar activeView={view} onNav={handleNav} />
@@ -488,6 +553,7 @@ export function AdminApp() {
                 onUpdate={updateBooking}
                 onCancelBooking={cancelBooking}
                 onRescheduleBooking={rescheduleBooking}
+                onScheduleCoordination={(id) => setSchedulingBookingId(id)}
               />
             ) : (
               <BookingsView
@@ -519,6 +585,7 @@ export function AdminApp() {
                 onUpdate={updateBooking}
                 onCancelBooking={cancelBooking}
                 onRescheduleBooking={rescheduleBooking}
+                onScheduleCoordination={(id) => setSchedulingBookingId(id)}
               />
             ) : (
               <AwaitingCoordinationView
@@ -532,6 +599,7 @@ export function AdminApp() {
                 search={search}
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}
+                onSchedule={(id) => setSchedulingBookingId(id)}
               />
             )
           ) : null}
@@ -622,6 +690,14 @@ export function AdminApp() {
           presetBuildingId={newBookingBuildingId}
           onCancel={closeNewBooking}
           onConfirm={appendBooking}
+        />
+      )}
+      {schedulingBooking && (
+        <ScheduleCoordinationModal
+          booking={schedulingBooking}
+          units={units}
+          onCancel={() => setSchedulingBookingId(null)}
+          onConfirm={scheduleCoordinationBooking}
         />
       )}
     </div>

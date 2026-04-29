@@ -74,6 +74,7 @@ export function AwaitingCoordinationView({
   search,
   onSearch,
   onOpen,
+  onSchedule,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -85,6 +86,9 @@ export function AwaitingCoordinationView({
   search: string;
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
+  /** Open the "Schedule appointment" modal for a coordination booking.
+   *  Optional so this view stays usable in isolation. */
+  onSchedule?: (id: string) => void;
 }) {
   // Pre-compute the kind for each coordination booking so we don't
   // recompute it on every filter / search keystroke. We include every
@@ -225,12 +229,13 @@ export function AwaitingCoordinationView({
               <th className="px-4 py-3 font-semibold">Waiting on</th>
               <th className="px-4 py-3 font-semibold">Payment</th>
               <th className="px-4 py-3 font-semibold">Total</th>
+              <th className="px-4 py-3 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
                   No coordination bookings match these filters.
                 </td>
               </tr>
@@ -303,6 +308,23 @@ export function AwaitingCoordinationView({
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       ${b.totalAud.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {onSchedule && !b.isLive ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSchedule(b.id);
+                          }}
+                          className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+                          style={{ backgroundColor: BRAND }}
+                        >
+                          Schedule
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">—</span>
+                      )}
                     </td>
                   </tr>
                 );
