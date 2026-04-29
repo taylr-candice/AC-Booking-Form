@@ -11,6 +11,7 @@ import { useState } from "react";
 import {
   bookerAgencyName,
   getBuildingForUnit,
+  latestCoordinationAttempt,
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
@@ -302,6 +303,12 @@ export function BookingsView({
             ) : (
               filtered.map((b) => {
                 const unit = units.find((u) => u.id === b.unitId);
+                // Most recent structured call/email entry, if any.
+                // Mirrors the helper used in the Awaiting-coordination
+                // queue so a row's last touch reads identically across
+                // both views (spoke / no answer / voicemail / email
+                // subject) without ops having to open the booking.
+                const latestAttempt = latestCoordinationAttempt(b.serviceTimeline);
                 return (
                   <tr
                     key={b.id}
@@ -437,6 +444,25 @@ export function BookingsView({
                             </button>
                           )}
                       </div>
+                      {/* Mirror the Awaiting-coordination queue's
+                       *  "Last attempt: …" helper so ops scanning the
+                       *  bookings list for a customer who just emailed
+                       *  in can see at a glance whether anyone has
+                       *  spoken to the tenant recently — without
+                       *  opening the booking. Muted text keeps it from
+                       *  competing with the lifecycle status chip. */}
+                      {latestAttempt && (
+                        <div
+                          className="mt-1 text-[11px] text-slate-500"
+                          data-testid="bookings-row-last-attempt"
+                          data-booking-id={b.id}
+                        >
+                          Last attempt:{" "}
+                          <span className="font-medium text-slate-700">
+                            {latestAttempt.label}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       ${b.totalAud.toFixed(2)}
