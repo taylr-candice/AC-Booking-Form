@@ -1414,7 +1414,7 @@ export const ADMIN_USER_LABEL = "Mia (admin)";
  * admin-created booking. Mirrors the customer-side total (see
  * `liveBookingFromSession` and the customer pricing card). Kept here so
  * the admin "Create booking" flow can quote the same total a customer
- * would have seen on Step 6.
+ * would have seen on Step 5.
  */
 export const PRICE_PER_SYSTEM_AUD = 179;
 export const PRICE_PER_ADDITIONAL_INDOOR_AUD = 39;

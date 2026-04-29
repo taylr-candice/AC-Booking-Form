@@ -4,15 +4,15 @@
  *
  * The bug: `readFromStorage` was unconditionally running
  * `migratePersistedSession` on every call. Because the legacy migration
- * shifts step values down by 1 (legacy 7-step → new 6-step), a wrapper
- * write of e.g. `current_step=5` was being read back as `current_step=4`
- * by the next iframe that re-mounted, then written back as 4, then read
- * as 3, and so on — silently corrupting the booking flow whenever the
- * iframe re-mounted (which is the entire wrapper navigation model).
+ * shifts step values down by 1, a wrapper write of e.g. `current_step=5`
+ * was being read back as `current_step=4` by the next iframe that
+ * re-mounted, then written back as 4, then read as 3, and so on —
+ * silently corrupting the booking flow whenever the iframe re-mounted
+ * (which is the entire wrapper navigation model).
  *
  * The fix stamps a `__schema` version marker on every write so the
  * migrator can tell already-normalized state apart from a raw legacy
- * 7-step blob and skip the one-time migration on every subsequent read.
+ * blob and skip the one-time migration on every subsequent read.
  *
  * These tests deliberately exercise the public surface (`bookingActions`
  * + `getBookingSession`) instead of reaching into private helpers,
@@ -39,7 +39,7 @@ describe("booking session storage round-trip stability", () => {
 
     // Inspect what we actually persisted: the schema version marker
     // MUST be present (otherwise the next reader would treat the blob
-    // as legacy 7-step and shift current_step down to 4).
+    // as legacy and shift current_step down to 4).
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw as string) as {
@@ -47,7 +47,7 @@ describe("booking session storage round-trip stability", () => {
       __schema?: number;
     };
     expect(parsed.current_step).toBe(5);
-    expect(parsed.__schema).toBe(2);
+    expect(parsed.__schema).toBe(3);
   });
 
   it("does not drift current_step across many bookingAction writes", () => {
@@ -76,10 +76,10 @@ describe("booking session storage round-trip stability", () => {
     // Simulate the cross-iframe sync path: another window writes a
     // versioned blob and dispatches a `storage` event. The receiver's
     // listener calls readFromStorage, which MUST trust the persisted
-    // current_step (since `__schema === 2`) and not shift it.
+    // current_step (since `__schema === 3`) and not shift it.
     bookingActions.goToStep(1); // start somewhere known
     const remote = {
-      __schema: 2,
+      __schema: 3,
       ...getBookingSession(),
       current_step: 4,
     };
@@ -94,7 +94,7 @@ describe("booking session storage round-trip stability", () => {
     expect(getBookingSession().current_step).toBe(4);
   });
 
-  it("still applies the legacy 7-step migration to UNVERSIONED persisted blobs", () => {
+  it("still applies the legacy step migration to UNVERSIONED persisted blobs", () => {
     // A returning user with legacy state in sessionStorage should still
     // be migrated correctly on first load: legacy step 5 → new step 4.
     // (The schema marker only short-circuits future reads of state

@@ -3,18 +3,18 @@
  *
  * Two independent concerns are pinned here:
  *
- *   A. `migratePersistedSession` — the booking flow shrunk from 7 steps
- *      to 6 steps. `readFromStorage` silently rewrites any persisted
- *      `current_step` so returning users land on the right page instead
- *      of being thrown back to Step 1. Exposed as a pure helper so we
- *      can drive it without spinning up a DOM.
+ *   A. `migratePersistedSession` — the booking flow shrunk from 6 steps
+ *      to 5 steps (Booker merged into Unit). `readFromStorage` silently
+ *      rewrites any persisted `current_step` so returning users land on
+ *      the right page instead of being thrown back to Step 1. Exposed as
+ *      a pure helper so we can drive it without spinning up a DOM.
  *
- *   B. Step 5 cascade-clearing — switching access method or primary
- *      residence MUST wipe stale follow-up fields (key holder, return
- *      method, managing agency, tenants, signature) so we don't ship
- *      wrong data downstream. Picking a coordination method while sitting
- *      on Step 5 must also auto-advance the wrapper to Step 6 so the
- *      user never lingers on a now-hidden step.
+ *   B. Step 3 (Access) cascade-clearing — switching access method or
+ *      primary residence MUST wipe stale follow-up fields (key holder,
+ *      return method, managing agency, tenants, signature) so we don't
+ *      ship wrong data downstream. Picking a coordination method while
+ *      sitting on Step 4 (Slots) must also auto-advance the wrapper to
+ *      Step 5 (Pay) so the user never lingers on a now-hidden step.
  *
  * The store is a module-level singleton, so each cascade-clear test
  * starts with `bookingActions.reset()` to avoid order coupling.
@@ -40,10 +40,11 @@ function persisted(blob: Record<string, unknown>): string {
   return JSON.stringify(blob);
 }
 
-describe("migratePersistedSession — legacy 7-step → new 6-step mapping", () => {
+describe("migratePersistedSession — legacy → new 5-step mapping", () => {
   // Spec from bookingSession.ts:
-  //   old Step 2 (standalone "Your role") → new Step 1
-  //   old Steps 3..7 shift down by one → new Steps 2..6
+  //   old Step 2 (standalone "Your details") → new Step 1
+  //   old Steps 3..6 shift down by one → new Steps 2..5
+  //   anything outside the new 1..5 window clamps to Step 1
   const cases: Array<{ legacy: number; expected: StepId }> = [
     { legacy: 1, expected: 1 },
     { legacy: 2, expected: 1 },
@@ -51,7 +52,10 @@ describe("migratePersistedSession — legacy 7-step → new 6-step mapping", () 
     { legacy: 4, expected: 3 },
     { legacy: 5, expected: 4 },
     { legacy: 6, expected: 5 },
-    { legacy: 7, expected: 6 },
+    // legacy 7 (would have been new Step 6) is now beyond the 5-step
+    // window — the migrator clamps it back to Step 1 rather than leaving
+    // the wrapper on a hidden page.
+    { legacy: 7, expected: 1 },
   ];
 
   for (const { legacy, expected } of cases) {
@@ -63,7 +67,7 @@ describe("migratePersistedSession — legacy 7-step → new 6-step mapping", () 
 });
 
 describe("migratePersistedSession — clamping out-of-range steps", () => {
-  // Anything that doesn't land in the new 1..6 window after migration must
+  // Anything that doesn't land in the new 1..5 window after migration must
   // fall back to Step 1 rather than leaving the wrapper on a hidden page.
   const outOfRange: Array<number | string | boolean | null> = [
     0,
@@ -121,7 +125,7 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
   it("keeps unit_id, role, and contact info while remapping the step", () => {
     const out = migratePersistedSession(
       persisted({
-        current_step: 4, // legacy → new Step 3 (Contact)
+        current_step: 4, // legacy → new Step 3 (Property access)
         unit_id: "unit-123",
         role: "owner",
         contact_first_name: "Sam",
@@ -140,10 +144,10 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
     expect(out.contact_phone).toBe("+15551234");
   });
 
-  it("keeps Step 5 (access) details when migrating from legacy Step 6 → new Step 5", () => {
+  it("keeps access details when migrating from legacy Step 4 (Access) → new Step 3 (Access)", () => {
     const out = migratePersistedSession(
       persisted({
-        current_step: 6,
+        current_step: 4,
         primary_residence: "leased_out",
         access_method: "owner_leased_tenant",
         tenants: [
@@ -154,7 +158,7 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
       }),
     );
 
-    expect(out.current_step).toBe(5);
+    expect(out.current_step).toBe(3);
     expect(out.primary_residence).toBe("leased_out");
     expect(out.access_method).toBe("owner_leased_tenant");
     expect(out.tenants).toHaveLength(1);
@@ -183,12 +187,12 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
   });
 });
 
-// The 7→6 step migration must NOT keep down-shifting blobs that the
-// store itself just wrote. Without a schema marker, every read of a
-// freshly-persisted `current_step >= 3` would shift it down by 1
-// (because the migration treats anything >2 as legacy 7-step data).
+// The legacy → current step migration must NOT keep down-shifting blobs
+// that the store itself just wrote. Without a schema marker, every read
+// of a freshly-persisted `current_step >= 3` would shift it down by 1
+// (because the migration treats anything >2 as legacy data).
 // `getBookingSession()` re-reads storage on every call (for cross-iframe
-// sync), so a customer reaching Step 5 would silently regress to Step 4
+// sync), so a customer reaching Step 4 would silently regress to Step 3
 // the next time any handler peeked at the session — which would in turn
 // break Task #46's "Update AC info" → slot-picker short-circuit. The
 // fix is a `__schema` version field on every write that the migrator
@@ -196,15 +200,15 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
 describe("migratePersistedSession — current-schema blobs (__schema marker)", () => {
   it("does not down-shift current_step when __schema >= current version", () => {
     const out = migratePersistedSession(
-      persisted({ __schema: 2, current_step: 5 }),
+      persisted({ __schema: 3, current_step: 5 }),
     );
     expect(out.current_step).toBe(5);
   });
 
   it("trusts every in-range step verbatim when __schema is set", () => {
-    for (const step of [1, 2, 3, 4, 5, 6] as const) {
+    for (const step of [1, 2, 3, 4, 5] as const) {
       const out = migratePersistedSession(
-        persisted({ __schema: 2, current_step: step }),
+        persisted({ __schema: 3, current_step: step }),
       );
       expect(out.current_step).toBe(step);
     }
@@ -212,19 +216,19 @@ describe("migratePersistedSession — current-schema blobs (__schema marker)", (
 
   it("still clamps out-of-range steps to Step 1 even with __schema set", () => {
     const out = migratePersistedSession(
-      persisted({ __schema: 2, current_step: 99 }),
+      persisted({ __schema: 3, current_step: 99 }),
     );
     expect(out.current_step).toBe(1);
   });
 
   it("does not leak the __schema marker into the returned BookingState", () => {
     const out = migratePersistedSession(
-      persisted({ __schema: 2, current_step: 3 }),
+      persisted({ __schema: 3, current_step: 3 }),
     ) as Record<string, unknown>;
     expect(out.__schema).toBeUndefined();
   });
 
-  it("falls back to legacy 7→6 down-shift when __schema is missing", () => {
+  it("falls back to the legacy down-shift when __schema is missing", () => {
     // Sanity check that the marker is what gates the behavior — a blob
     // without it must still walk the legacy migration path so old
     // sessionStorage payloads from before the marker existed stay
@@ -235,15 +239,15 @@ describe("migratePersistedSession — current-schema blobs (__schema marker)", (
 
   it("falls back to legacy down-shift when __schema is older than current", () => {
     const out = migratePersistedSession(
-      persisted({ __schema: 1, current_step: 5 }),
+      persisted({ __schema: 2, current_step: 5 }),
     );
     expect(out.current_step).toBe(4);
   });
 });
 
-// ─── B. Step 5 cascade-clearing in bookingActions ──────────────────────────
+// ─── B. Step 3 (Access) cascade-clearing in bookingActions ────────────────
 
-describe("Step 5 cascade clears (bookingActions)", () => {
+describe("Step 3 (Access) cascade clears (bookingActions)", () => {
   beforeEach(() => {
     bookingActions.reset();
   });
@@ -429,7 +433,7 @@ describe("Step 5 cascade clears (bookingActions)", () => {
   describe("setRole — cascade clears role-dependent fields", () => {
     // `clearRoleDownstream` runs a much wider cascade than the access-method
     // ones above: switching role wipes the agency, primary_residence, the
-    // chosen access_method, every Step 5 follow-up, and the schedule slot.
+    // chosen access_method, every Step 3 follow-up, and the schedule slot.
     // If a regression leaves any of those behind when a user toggles between
     // Owner and Agent mid-session, we silently send mismatched data
     // downstream (e.g. an agent booking still carrying a primary_residence).
@@ -478,7 +482,7 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       expect(s.service_slot).toBeNull();
     }
 
-    it("owner → agent: clears agency, primary_residence, access_method, every Step 5 follow-up, and the schedule slot", () => {
+    it("owner → agent: clears agency, primary_residence, access_method, every Step 3 follow-up, and the schedule slot", () => {
       bookingActions.setRole("owner");
       populateRoleDownstream({
         primary_residence: "leased_out",
@@ -537,8 +541,8 @@ describe("Step 5 cascade clears (bookingActions)", () => {
     });
   });
 
-  describe("setAccessMethod — auto-advances away from a now-hidden Step 5", () => {
-    it("advances current_step from 5 → 6 when switching INTO any coordination method while on Step 5", () => {
+  describe("setAccessMethod — auto-advances away from a now-hidden Step 4", () => {
+    it("advances current_step from 4 → 5 when switching INTO any coordination method while on Step 4", () => {
       const coordinationMethods: AccessMethod[] = Array.from(
         COORDINATION_ACCESS_METHODS,
       );
@@ -550,39 +554,39 @@ describe("Step 5 cascade clears (bookingActions)", () => {
         if (!method.startsWith("agent")) {
           bookingActions.setPrimaryResidence("leased_out");
         }
-        bookingActions.goToStep(5);
-        expect(getBookingSession().current_step).toBe(5);
+        bookingActions.goToStep(4);
+        expect(getBookingSession().current_step).toBe(4);
 
         bookingActions.setAccessMethod(method);
 
         const s = getBookingSession();
         expect(s.access_method).toBe(method);
-        expect(s.current_step).toBe(6);
+        expect(s.current_step).toBe(5);
       }
     });
 
-    it("does NOT advance when switching to a non-coordination method while on Step 5", () => {
+    it("does NOT advance when switching to a non-coordination method while on Step 4", () => {
       bookingActions.setRole("owner");
       bookingActions.setPrimaryResidence("live_in");
-      bookingActions.goToStep(5);
+      bookingActions.goToStep(4);
 
       bookingActions.setAccessMethod("owner_live_at_unit");
 
       const s = getBookingSession();
       expect(s.access_method).toBe("owner_live_at_unit");
-      expect(s.current_step).toBe(5);
+      expect(s.current_step).toBe(4);
     });
 
-    it("does NOT change current_step when switching INTO a coordination method while NOT on Step 5", () => {
+    it("does NOT change current_step when switching INTO a coordination method while NOT on Step 4", () => {
       bookingActions.setRole("agent");
-      bookingActions.goToStep(4);
+      bookingActions.goToStep(3);
 
       bookingActions.setAccessMethod("agent_tenant_taylr");
 
       const s = getBookingSession();
       expect(s.access_method).toBe("agent_tenant_taylr");
-      // Auto-advance only protects users who would otherwise linger on Step 5.
-      expect(s.current_step).toBe(4);
+      // Auto-advance only protects users who would otherwise linger on Step 4.
+      expect(s.current_step).toBe(3);
     });
   });
 
@@ -704,7 +708,7 @@ describe("Step 5 cascade clears (bookingActions)", () => {
 
   // ─── D. AC discrepancy snapshot ────────────────────────────────────────
   //
-  // The Step 4 AC page records the gap between Taylr's records and what
+  // The Step 2 AC page records the gap between Taylr's records and what
   // the customer actually has on-site so the admin mockup can act on it.
   // This block covers:
   //   1. Default state — no discrepancy on a fresh session.
@@ -816,7 +820,7 @@ describe("Step 5 cascade clears (bookingActions)", () => {
   // The AC step's "you came back to confirm AC details" banner reads
   // `ac_step_origin === "slot_picker"`. The origin is set by the slot
   // picker's "Update/Edit AC info" affordance via `editAcFromSlotPicker`,
-  // and cleared by every other entry path into Step 3 (NAV_FORWARD,
+  // and cleared by every other entry path into Step 2 (NAV_FORWARD,
   // NAV_BACK, step-dot click — all of which funnel through `goToStep`).
   // It can also be cleared manually by the banner's dismiss button.
   describe("E. AC step origin hint", () => {
@@ -828,14 +832,14 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       expect(getBookingSession().ac_step_origin).toBeNull();
     });
 
-    it("editAcFromSlotPicker atomically jumps to Step 3 and records the origin", () => {
-      // Pretend the customer is on Step 5 (Schedule) about to tap Edit AC.
-      bookingActions.goToStep(5);
+    it("editAcFromSlotPicker atomically jumps to Step 2 and records the origin", () => {
+      // Pretend the customer is on Step 4 (Schedule) about to tap Edit AC.
+      bookingActions.goToStep(4);
       expect(getBookingSession().ac_step_origin).toBeNull();
 
       bookingActions.editAcFromSlotPicker();
       const s = getBookingSession();
-      expect(s.current_step).toBe(3);
+      expect(s.current_step).toBe(2);
       expect(s.ac_step_origin).toBe("slot_picker");
     });
 
@@ -843,31 +847,31 @@ describe("Step 5 cascade clears (bookingActions)", () => {
       bookingActions.editAcFromSlotPicker();
       expect(getBookingSession().ac_step_origin).toBe("slot_picker");
 
-      // Forward (continue) past Step 3 — origin must clear so a later
+      // Forward (continue) past Step 2 — origin must clear so a later
       // back-then-forward arrival doesn't re-show the banner.
-      bookingActions.goToStep(4);
+      bookingActions.goToStep(3);
       expect(getBookingSession().ac_step_origin).toBeNull();
 
-      // Re-set, then prove a step-dot click TO Step 3 also clears it.
+      // Re-set, then prove a step-dot click TO Step 2 also clears it.
       bookingActions.editAcFromSlotPicker();
       expect(getBookingSession().ac_step_origin).toBe("slot_picker");
-      bookingActions.goToStep(3);
+      bookingActions.goToStep(2);
       expect(getBookingSession().ac_step_origin).toBeNull();
     });
 
     it("setAcStepOrigin(null) clears the hint without changing the step", () => {
       bookingActions.editAcFromSlotPicker();
       const before = getBookingSession();
-      expect(before.current_step).toBe(3);
+      expect(before.current_step).toBe(2);
       expect(before.ac_step_origin).toBe("slot_picker");
 
       bookingActions.setAcStepOrigin(null);
       const after = getBookingSession();
-      expect(after.current_step).toBe(3);
+      expect(after.current_step).toBe(2);
       expect(after.ac_step_origin).toBeNull();
     });
 
-    it("editAcFromSlotPicker is a no-op when already on Step 3 with the origin set", () => {
+    it("editAcFromSlotPicker is a no-op when already on Step 2 with the origin set", () => {
       bookingActions.editAcFromSlotPicker();
       const ref = getBookingSession();
       bookingActions.editAcFromSlotPicker();
@@ -913,55 +917,55 @@ describe("return_to — short-circuit hint for the booking flow wrapper", () => 
   });
 
   it("setReturnTo stores the StepId so the wrapper can read it back", () => {
-    bookingActions.setReturnTo(5);
-    expect(getBookingSession().return_to).toBe(5);
+    bookingActions.setReturnTo(4);
+    expect(getBookingSession().return_to).toBe(4);
   });
 
   it("setReturnTo(null) clears the hint", () => {
-    bookingActions.setReturnTo(5);
+    bookingActions.setReturnTo(4);
     bookingActions.setReturnTo(null);
     expect(getBookingSession().return_to).toBeNull();
   });
 
   it("setReturnTo no-ops when the value is unchanged", () => {
-    bookingActions.setReturnTo(5);
+    bookingActions.setReturnTo(4);
     const ref = getBookingSession();
-    bookingActions.setReturnTo(5);
+    bookingActions.setReturnTo(4);
     expect(getBookingSession()).toBe(ref);
   });
 
   it("goToStep clears return_to when the customer arrives at the hinted step", () => {
-    // Simulate the wrapper: customer was on the slot picker (Step 5),
-    // tapped "Update AC info", which jumps to AC (Step 3) and stashes
-    // the hint. After confirming, the wrapper jumps to Step 5 — at
+    // Simulate the wrapper: customer was on the slot picker (Step 4),
+    // tapped "Update AC info", which jumps to AC (Step 2) and stashes
+    // the hint. After confirming, the wrapper jumps to Step 4 — at
     // which point the hint must clear so it never affects later
     // forward navigation.
-    bookingActions.goToStep(5);
-    bookingActions.setReturnTo(5);
-    bookingActions.goToStep(3);
-    expect(getBookingSession().return_to).toBe(5);
+    bookingActions.goToStep(4);
+    bookingActions.setReturnTo(4);
+    bookingActions.goToStep(2);
+    expect(getBookingSession().return_to).toBe(4);
 
-    bookingActions.goToStep(5);
-    expect(getBookingSession().current_step).toBe(5);
+    bookingActions.goToStep(4);
+    expect(getBookingSession().current_step).toBe(4);
     expect(getBookingSession().return_to).toBeNull();
   });
 
   it("goToStep keeps return_to intact when stepping to a different step", () => {
-    bookingActions.setReturnTo(5);
+    bookingActions.setReturnTo(4);
     bookingActions.goToStep(2);
-    expect(getBookingSession().return_to).toBe(5);
-    bookingActions.goToStep(4);
-    expect(getBookingSession().return_to).toBe(5);
+    expect(getBookingSession().return_to).toBe(4);
+    bookingActions.goToStep(3);
+    expect(getBookingSession().return_to).toBe(4);
   });
 
   it("reset wipes return_to back to null", () => {
-    bookingActions.setReturnTo(5);
+    bookingActions.setReturnTo(4);
     bookingActions.reset();
     expect(getBookingSession().return_to).toBeNull();
   });
 
   it("bookAnother wipes return_to back to null", () => {
-    bookingActions.setReturnTo(5);
+    bookingActions.setReturnTo(4);
     bookingActions.bookAnother();
     expect(getBookingSession().return_to).toBeNull();
   });
@@ -984,7 +988,7 @@ describe("unit-unavailable terminal state", () => {
    *  prove `pickAnotherUnit` preserves everything except the unit
    *  selection (and the unit-derived discrepancy snapshot). Mirrors
    *  the seeding pattern used by `bookingSession.bookAnother.test.ts`. */
-  function seedFullSessionOnStep6() {
+  function seedFullSessionOnStep5() {
     bookingActions.setUnit("unit-123");
     bookingActions.setRole("owner");
     bookingActions.setAgency("agency-1");
@@ -1004,7 +1008,7 @@ describe("unit-unavailable terminal state", () => {
     bookingActions.setAccessMethod("owner_live_at_unit");
     bookingActions.setSchedule("2026-05-10", "morning");
     bookingActions.setCancellationAcknowledged(true);
-    bookingActions.goToStep(6);
+    bookingActions.goToStep(5);
   }
 
   it("markUnitUnavailable flips the flag from a fresh session", () => {
@@ -1022,14 +1026,14 @@ describe("unit-unavailable terminal state", () => {
   });
 
   it("pickAnotherUnit clears the flag, wipes unit_id + ac_discrepancy, returns to Step 1, and preserves everything else", () => {
-    seedFullSessionOnStep6();
+    seedFullSessionOnStep5();
     bookingActions.markUnitUnavailable();
 
     const before = getBookingSession();
     expect(before.unit_unavailable).toBe(true);
     expect(before.unit_id).toBe("unit-123");
     expect(before.ac_discrepancy).not.toBeNull();
-    expect(before.current_step).toBe(6);
+    expect(before.current_step).toBe(5);
 
     bookingActions.pickAnotherUnit();
 
@@ -1058,7 +1062,7 @@ describe("unit-unavailable terminal state", () => {
   });
 
   it("pickAnotherUnit is a no-op when the flag is not set", () => {
-    seedFullSessionOnStep6();
+    seedFullSessionOnStep5();
     const before = getBookingSession();
     bookingActions.pickAnotherUnit();
     // Same reference — store skipped the write entirely.

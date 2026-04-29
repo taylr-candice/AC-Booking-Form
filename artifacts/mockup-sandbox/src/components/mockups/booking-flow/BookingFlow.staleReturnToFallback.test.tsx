@@ -5,23 +5,23 @@
  * branch in the iframed BookingFlow click bridge.
  *
  * Background:
- *   The "Change access method" affordance on the slot picker (Step 5)
- *   stashes a `return_to=5` hint and jumps the customer to Step 4 so
+ *   The "Change access method" affordance on the slot picker (Step 4)
+ *   stashes a `return_to=4` hint and jumps the customer to Step 3 so
  *   they can swap their access method, then short-circuits Continue
- *   on Step 4 straight back to Step 5 — that happy path is pinned in
+ *   on Step 3 straight back to Step 4 — that happy path is pinned in
  *   `BookingFlow.changeAccessShortCircuit.test.tsx`.
  *
- *   But there's a third behaviour: if the customer arrives on Step 4
- *   with `return_to=5` and then picks a *coordination* access method
+ *   But there's a third behaviour: if the customer arrives on Step 3
+ *   with `return_to=4` and then picks a *coordination* access method
  *   (`agent_tenant_taylr`, `owner_leased_tenant`, `owner_leased_agent`)
- *   — one that hides Step 5 from `visibleSteps` — the hint is now
+ *   — one that hides Step 4 from `visibleSteps` — the hint is now
  *   pointing at a step that no longer exists in the customer's flow.
- *   Flinging them back to a hidden Step 5 would be wrong.
+ *   Flinging them back to a hidden Step 4 would be wrong.
  *
  *   The bridge handles this by gating the short-circuit on
  *   `visible.includes(fresh.return_to)`: when the hint is stale it
  *   clears `return_to` and falls through to normal forward navigation
- *   (`nextStepId`), landing the customer on Step 6 (Review & pay) —
+ *   (`nextStepId`), landing the customer on Step 5 (Review & pay) —
  *   the correct next visible step.
  *
  *   That branch lives only in the wrapper — store-level tests don't
@@ -108,22 +108,22 @@ const VARIANTS: ReadonlyArray<{ label: string; Wrapper: ComponentType }> = [
 ];
 
 describe.each(VARIANTS)(
-  "$label — stale return_to fallback when Step 5 is no longer visible",
+  "$label — stale return_to fallback when Step 4 is no longer visible",
   ({ Wrapper }) => {
     it(
-      "with return_to=5 + current_step=4, swapping to a coordination access " +
-        "method (which hides Step 5) makes Continue clear return_to and walk " +
-        "forward to Step 6 instead of flinging back to a now-hidden Step 5",
+      "with return_to=4 + current_step=3, swapping to a coordination access " +
+        "method (which hides Step 4) makes Continue clear return_to and walk " +
+        "forward to Step 5 instead of flinging back to a now-hidden Step 4",
       async () => {
         // ── Pre-seed the booking session ────────────────────────────
         // Simulate the state the bridge would have left behind after
         // the customer:
-        //   1. Reached Step 5 (slot picker) on a non-coordination flow.
+        //   1. Reached Step 4 (slot picker) on a non-coordination flow.
         //   2. Tapped "Change access method" → bridge stashed
-        //      return_to=5 and jumped to Step 4.
-        //   3. On Step 4 swapped to a coordination access method
+        //      return_to=4 and jumped to Step 3.
+        //   3. On Step 3 swapped to a coordination access method
         //      (`agent_tenant_taylr` — Taylr coordinates with the
-        //      tenant), which removes Step 5 from `visibleSteps`.
+        //      tenant), which removes Step 4 from `visibleSteps`.
         // We assemble that state directly via `bookingActions` rather
         // than driving it through the affordance click — this test is
         // about the fallback branch that fires on the *next* Continue,
@@ -132,8 +132,8 @@ describe.each(VARIANTS)(
         bookingActions.setUnit("u2");
         bookingActions.setRole("agent");
         bookingActions.setAccessMethod("agent_tenant_taylr");
-        bookingActions.goToStep(4);
-        bookingActions.setReturnTo(5);
+        bookingActions.goToStep(3);
+        bookingActions.setReturnTo(4);
 
         // Sanity: the seeded state really is the precondition for the
         // stale-hint branch. If a future refactor changes either of
@@ -142,17 +142,17 @@ describe.each(VARIANTS)(
         // dance muddies the failure.
         {
           const s = getBookingSession();
-          expect(s.current_step).toBe(4);
-          expect(s.return_to).toBe(5);
+          expect(s.current_step).toBe(3);
+          expect(s.return_to).toBe(4);
           expect(s.access_method).toBe("agent_tenant_taylr");
         }
 
         // ── Render the wrapper ──────────────────────────────────────
         const { findByTestId } = render(<Wrapper />);
 
-        // ── Step 4: access iframe + click "Continue" ────────────────
+        // ── Step 3: access iframe + click "Continue" ────────────────
         const iframe = (await findByTestId(
-          "flow-iframe-4",
+          "flow-iframe-3",
         )) as HTMLIFrameElement;
         const doc = await bootstrapIframeWithButton(iframe, "button-continue");
 
@@ -165,27 +165,27 @@ describe.each(VARIANTS)(
         expect(continueBtn.disabled).toBe(false);
         await clickIn(doc, continueBtn);
 
-        // ── Final assertion: forward to Step 6, NOT back to Step 5 ──
-        // The wrapper saw `return_to=5` + `current_step=4` but the
-        // hinted step (5) is no longer in `visibleSteps` (the
+        // ── Final assertion: forward to Step 5, NOT back to Step 4 ──
+        // The wrapper saw `return_to=4` + `current_step=3` but the
+        // hinted step (4) is no longer in `visibleSteps` (the
         // coordination access method hides it). It must therefore
         // clear `return_to` and fall through to `nextStepId`, which
-        // returns Step 6 (the next visible step after 4 when 5 is
+        // returns Step 5 (the next visible step after 3 when 4 is
         // hidden). A regression that took the short-circuit branch
-        // unconditionally would land on Step 5 here.
+        // unconditionally would land on Step 4 here.
         await waitFor(() => {
           const s = getBookingSession();
-          expect(s.current_step).toBe(6);
+          expect(s.current_step).toBe(5);
           expect(s.return_to).toBeNull();
         });
 
         // Belt-and-braces: confirm the wrapper actually re-mounted
-        // the Review & pay iframe (Step 6) and did NOT mount the
-        // slot-picker iframe (Step 5). If the short-circuit fired
-        // anyway, `flow-iframe-5` would be present here.
-        await findByTestId("flow-iframe-6");
+        // the Review & pay iframe (Step 5) and did NOT mount the
+        // slot-picker iframe (Step 4). If the short-circuit fired
+        // anyway, `flow-iframe-4` would be present here.
+        await findByTestId("flow-iframe-5");
         expect(
-          document.querySelector('[data-testid="flow-iframe-5"]'),
+          document.querySelector('[data-testid="flow-iframe-4"]'),
         ).toBeNull();
       },
     );

@@ -1,9 +1,9 @@
 /**
  * Display + pricing helpers for the booking flow.
  *
- * These are pure functions of state, used by Step 7 (Review & Pay) to
+ * These are pure functions of state, used by Step 5 (Review & Pay) to
  * render its dynamic summary and by other surfaces that need the same
- * labels (e.g. Step 5's own summary block).
+ * labels (e.g. Step 4's own summary block).
  *
  * Authoritative spec: attached_assets/replit_logic_v2_*.md
  */
@@ -51,7 +51,7 @@ export function labelForResidence(r: PrimaryResidence | null): string {
 
 /**
  * Short, summary-friendly label for an access method.
- * Used by both the Step 5 inline summary and the Step 7 review summary.
+ * Used by both the Step 4 (Slots) inline summary and the Step 5 (Review) summary.
  */
 export function labelForAccessMethod(m: AccessMethod | null): string {
   switch (m) {
@@ -221,7 +221,7 @@ export function acSummary(
 }
 
 /**
- * How the schedule should be displayed at Step 7.
+ * How the schedule should be displayed at Step 5 (Review & Pay).
  *
  * Coordination flows return `{ primary: "To be coordinated" }` regardless
  * of any service_date already in state — spec §8.1.
@@ -242,10 +242,10 @@ export function scheduleDisplay(
   return { primary: s.service_date, secondary: slotLabel };
 }
 
-// ─── Step 7 copy blocks ────────────────────────────────────────────────────
+// ─── Step 5 (Review & Pay) copy blocks ────────────────────────────────────
 
 /**
- * Explainer note shown above (or beside) the summary on Step 7 when the
+ * Explainer note shown above (or beside) the summary on Step 5 when the
  * booking is in a coordination flow. Spec §8.1.
  */
 export const COORDINATION_NOTE =
@@ -253,7 +253,7 @@ export const COORDINATION_NOTE =
   "service time. You'll be emailed with the confirmed date once agreed.";
 
 /**
- * Cancellation policy shown to all bookers on Step 7 above the acknowledgement
+ * Cancellation policy shown to all bookers on Step 5 above the acknowledgement
  * tickbox. Spec §8.2 + §10.
  */
 export const CANCELLATION_POLICY_PARAGRAPHS: readonly string[] = [
@@ -318,15 +318,15 @@ export const INVOICE_REFERENCE_NOTE =
 export const BILLING_EMAIL_HELPER =
   "Leave blank to receive the invoice only at your contact email above.";
 
-// ─── Step 7 validation ─────────────────────────────────────────────────────
+// ─── Step 5 (Review & Pay) validation ─────────────────────────────────────
 
 /**
  * Spec §14: Pay is enabled only when the cancellation tickbox is ticked.
- * For non-coordination flows, a date + slot must also be set (Step 6 was
- * shown). For coordination flows, scheduling is irrelevant (Step 6 was
+ * For non-coordination flows, a date + slot must also be set (Step 4 was
+ * shown). For coordination flows, scheduling is irrelevant (Step 4 was
  * skipped).
  */
-export function isStep7PayEnabled(s: BookingState): boolean {
+export function isPayStepEnabled(s: BookingState): boolean {
   if (!s.cancellation_acknowledged) return false;
   if (isCoordinationFlow(s)) return true;
   return Boolean(s.service_date && s.service_slot);

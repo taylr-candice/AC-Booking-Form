@@ -28,7 +28,7 @@ import {
   INVOICE_PREPAYMENT_TITLE,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
-  isStep7PayEnabled,
+  isPayStepEnabled,
   labelForAccessMethod,
   labelForRole,
   PAY_NOW_LABEL,
@@ -59,7 +59,7 @@ export function PayMobile() {
     if (!isAgent && method === "invoice") setMethod(null);
   }, [isAgent, method]);
 
-  const payEnabled = isStep7PayEnabled(session) && method !== null;
+  const payEnabled = isPayStepEnabled(session) && method !== null;
   const ctaLabel =
     method === "invoice"
       ? "Submit booking"
@@ -92,7 +92,7 @@ export function PayMobile() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 pb-6">
-        {/* Coordination explainer (only when Step 6 was skipped) */}
+        {/* Coordination explainer (only when Step 4 — Slots — was skipped) */}
         {isCoordination && (
           <div
             className="mb-4 mt-4 flex items-start gap-3 rounded-xl border p-3.5 text-[12.5px] leading-snug"

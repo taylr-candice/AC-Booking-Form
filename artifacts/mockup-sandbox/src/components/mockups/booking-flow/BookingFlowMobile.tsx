@@ -42,21 +42,21 @@ const TESTID_EDIT_AC = "button-edit-ac";
 // affordance — only shown when the customer picked an "I'll be
 // there" option. Same edit-jump pattern as `TESTID_EDIT_AC`: stash a
 // `return_to` hint so confirming the new access method flings them
-// straight back to the slot picker, then jump to Step 4.
+// straight back to the slot picker, then jump to Step 3.
 const TESTID_CHANGE_ACCESS = "button-change-access";
 // Step ids the wrapper should remember as "where the customer came
 // from" when an edit-jump affordance fires from that step. Used to
 // short-circuit the next "Continue" tap on the destination step so
 // the customer is flung straight back instead of walked through the
-// steps in between. Today only the slot picker (Step 5) uses these
+// steps in between. Today only the slot picker (Step 4) uses these
 // affordances.
-const NAV_GOTO_RETURN_FROM: ReadonlySet<StepId> = new Set<StepId>([5]);
+const NAV_GOTO_RETURN_FROM: ReadonlySet<StepId> = new Set<StepId>([4]);
 // Destination steps for the edit-jump short-circuit on Continue. When
 // the customer hits Continue on one of these steps with `return_to`
 // set, the wrapper flings them back to `return_to` instead of taking
-// the normal forward path. Step 3 covers the AC edit-jump; Step 4
+// the normal forward path. Step 2 covers the AC edit-jump; Step 3
 // covers the access-method edit-jump.
-const NAV_GOTO_RETURN_TO_DESTS: ReadonlySet<StepId> = new Set<StepId>([3, 4]);
+const NAV_GOTO_RETURN_TO_DESTS: ReadonlySet<StepId> = new Set<StepId>([2, 3]);
 
 type Step = {
   id: StepId;
@@ -66,11 +66,10 @@ type Step = {
 
 const STEPS: readonly Step[] = [
   { id: 1, label: "Pick a unit",     url: "/__mockup/preview/booking-pages/UnitMobile" },
-  { id: 2, label: "Your details",    url: "/__mockup/preview/booking-pages/BookerMobile" },
-  { id: 3, label: "Your AC",         url: "/__mockup/preview/booking-pages/AcMobile" },
-  { id: 4, label: "Property access", url: "/__mockup/preview/booking-pages/AccessMobile" },
-  { id: 5, label: "Pick a slot",     url: "/__mockup/preview/booking-slots/SlotsMobile" },
-  { id: 6, label: "Review & pay",    url: "/__mockup/preview/booking-pages/PayMobile" },
+  { id: 2, label: "Your AC",         url: "/__mockup/preview/booking-pages/AcMobile" },
+  { id: 3, label: "Property access", url: "/__mockup/preview/booking-pages/AccessMobile" },
+  { id: 4, label: "Pick a slot",     url: "/__mockup/preview/booking-slots/SlotsMobile" },
+  { id: 5, label: "Review & pay",    url: "/__mockup/preview/booking-pages/PayMobile" },
 ];
 
 export function BookingFlowMobile() {
@@ -114,11 +113,11 @@ export function BookingFlowMobile() {
         ) {
           // Only honour the hint if the hinted step is still in the
           // customer's visible flow. Otherwise the hint is stale —
-          // e.g. they tapped "Change access method" from Step 5
-          // (return_to=5), then on Step 4 swapped to a coordination
-          // method that hides Step 5. In that case clear the hint
+          // e.g. they tapped "Change access method" from Step 4
+          // (return_to=4), then on Step 3 swapped to a coordination
+          // method that hides Step 4. In that case clear the hint
           // and fall through to normal forward navigation, which
-          // takes them to the correct next visible step (Step 6).
+          // takes them to the correct next visible step (Step 5).
           const visible = visibleSteps({ access_method: fresh.access_method });
           if (visible.includes(fresh.return_to)) {
             bookingActions.goToStep(fresh.return_to);
@@ -147,7 +146,7 @@ export function BookingFlowMobile() {
         if (NAV_GOTO_RETURN_FROM.has(fresh.current_step)) {
           bookingActions.setReturnTo(fresh.current_step);
         }
-        bookingActions.goToStep(4);
+        bookingActions.goToStep(3);
       }
     };
     doc.addEventListener("click", handler);

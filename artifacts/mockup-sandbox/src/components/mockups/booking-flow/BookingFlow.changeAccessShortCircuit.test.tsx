@@ -10,14 +10,14 @@
  *   "Update AC info" — the "Change access method" affordance, only
  *   shown when the customer picked an "I'll be there" option. Tapping
  *   it makes the wrapper's click bridge:
- *     1. Stash a `return_to` hint pointing back to Step 5 (via
- *        `bookingActions.setReturnTo(5)`).
- *     2. Jump straight to Step 4 (Property access) via
- *        `bookingActions.goToStep(4)`.
- *   Then, when the customer hits Continue on Step 4, the wrapper
+ *     1. Stash a `return_to` hint pointing back to Step 4 (via
+ *        `bookingActions.setReturnTo(4)`).
+ *     2. Jump straight to Step 3 (Property access) via
+ *        `bookingActions.goToStep(3)`.
+ *   Then, when the customer hits Continue on Step 3, the wrapper
  *   short-circuits the normal `nextStepId` walk and flings them
- *   straight back to the hinted return step (5) instead of walking
- *   them forward to Step 6 (Review & pay).
+ *   straight back to the hinted return step (4) instead of walking
+ *   them forward to Step 5 (Review & pay).
  *
  *   Sister test of `BookingFlow.editAcShortCircuit.test.tsx` (which
  *   pins down the AC edit-jump). Same shape; different testid +
@@ -115,26 +115,26 @@ describe.each(VARIANTS)(
   "$label — one-tap return from access fix to slot picker",
   ({ Wrapper }) => {
     it(
-      "stashes return_to=5 on 'Change access method', then short-circuits " +
+      "stashes return_to=4 on 'Change access method', then short-circuits " +
         "Continue on the access step straight back to the slot picker " +
-        "(skipping Step 6)",
+        "(skipping Step 5)",
       async () => {
         // ── Pre-seed the booking session ────────────────────────────
         // Pick a unit + role so the wrapper's visibleSteps gate doesn't
-        // hide Step 5; then land directly on Step 5 (the slot picker)
+        // hide Step 4; then land directly on Step 4 (the slot picker)
         // — this is the entry point for the affordance under test.
         // `access_method` stays null (the default), which is treated
-        // as a non-coordination flow so Step 5 stays visible.
+        // as a non-coordination flow so Step 4 stays visible.
         bookingActions.setUnit("u2");
         bookingActions.setRole("owner");
-        bookingActions.goToStep(5);
+        bookingActions.goToStep(4);
 
         // ── Render the wrapper ──────────────────────────────────────
         const { findByTestId } = render(<Wrapper />);
 
-        // ── Step 5: slot picker iframe + click "Change access" ──────
+        // ── Step 4: slot picker iframe + click "Change access" ──────
         let iframe = (await findByTestId(
-          "flow-iframe-5",
+          "flow-iframe-4",
         )) as HTMLIFrameElement;
         let doc = await bootstrapIframeWithButton(
           iframe,
@@ -148,21 +148,21 @@ describe.each(VARIANTS)(
 
         // ── State assertions: bridge fired both writes atomically ──
         // The handler must have:
-        //   - read current_step=5, recognised it as a NAV_GOTO_RETURN_FROM
-        //     step, and called setReturnTo(5)
-        //   - called goToStep(4), jumping to the access page
+        //   - read current_step=4, recognised it as a NAV_GOTO_RETURN_FROM
+        //     step, and called setReturnTo(4)
+        //   - called goToStep(3), jumping to the access page
         // Unlike the AC edit-jump there's no contextual origin marker
         // to assert: the access page already explains itself, so the
         // bridge intentionally doesn't stamp anything analogous to
         // `ac_step_origin` here.
         await waitFor(() => {
           const s = getBookingSession();
-          expect(s.current_step).toBe(4);
-          expect(s.return_to).toBe(5);
+          expect(s.current_step).toBe(3);
+          expect(s.return_to).toBe(4);
         });
 
-        // ── Step 4: access iframe + click "Continue" ────────────────
-        iframe = (await findByTestId("flow-iframe-4")) as HTMLIFrameElement;
+        // ── Step 3: access iframe + click "Continue" ────────────────
+        iframe = (await findByTestId("flow-iframe-3")) as HTMLIFrameElement;
         doc = await bootstrapIframeWithButton(iframe, "button-continue");
 
         const continueBtn = doc.querySelector(
@@ -174,25 +174,25 @@ describe.each(VARIANTS)(
         expect(continueBtn.disabled).toBe(false);
         await clickIn(doc, continueBtn);
 
-        // ── Final assertion: short-circuit back to Step 5, NOT 6 ────
-        // The wrapper saw `return_to=5` + `current_step=4` and called
-        // `goToStep(5)` instead of walking forward through `nextStepId`
-        // (which would have landed on Step 6 — Review & pay). The
+        // ── Final assertion: short-circuit back to Step 4, NOT 5 ────
+        // The wrapper saw `return_to=4` + `current_step=3` and called
+        // `goToStep(4)` instead of walking forward through `nextStepId`
+        // (which would have landed on Step 5 — Review & pay). The
         // store also clears `return_to` once the customer arrives at
         // the hinted step, so we pin both invariants here.
         await waitFor(() => {
           const s = getBookingSession();
-          expect(s.current_step).toBe(5);
+          expect(s.current_step).toBe(4);
           expect(s.return_to).toBeNull();
         });
 
         // Belt-and-braces: confirm the wrapper actually re-mounted
-        // the slot-picker iframe (not Step 6's Review-and-pay
+        // the slot-picker iframe (not Step 5's Review-and-pay
         // iframe). A regression that skipped the short-circuit and
-        // ran `nextStepId` instead would render `flow-iframe-6` here.
-        await findByTestId("flow-iframe-5");
+        // ran `nextStepId` instead would render `flow-iframe-5` here.
+        await findByTestId("flow-iframe-4");
         expect(
-          document.querySelector('[data-testid="flow-iframe-6"]'),
+          document.querySelector('[data-testid="flow-iframe-5"]'),
         ).toBeNull();
       },
     );

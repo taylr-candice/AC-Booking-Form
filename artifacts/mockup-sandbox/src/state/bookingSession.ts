@@ -48,7 +48,7 @@ export type AccessMethod =
   // "Tenants will provide access" card — splits into who coordinates the appointment.
   | "agent_tenant_self"   // Agent will arrange the appointment with the tenant directly
   | "agent_tenant_taylr"  // Taylr will contact the tenant on the agent's behalf (coordination)
-  | "agent_tenant_pending" // Agent picked "Tenants will provide access" but hasn't chosen who coordinates yet (transient — invalid for Step 5)
+  | "agent_tenant_pending" // Agent picked "Tenants will provide access" but hasn't chosen who coordinates yet (transient — invalid for Step 4)
   | "agent_trade_key";
 
 export type ReturnMethod = "locker" | "hand_delivery";
@@ -61,7 +61,7 @@ export type Tenant = {
 };
 
 /**
- * Snapshot of how the customer's AC selection on Step 4 differs from
+ * Snapshot of how the customer's AC selection on Step 2 differs from
  * what Taylr has on record for their unit. Captured purely so the admin
  * mockup can surface the discrepancy after the booking — the customer
  * is never blocked, prompted, or warned about it.
@@ -81,17 +81,17 @@ export type AcDiscrepancy = {
   customer: AcDiscrepancyCustomer;
 };
 
-/** Step ids in canonical order — Step 5 may be skipped at runtime. */
-export type StepId = 1 | 2 | 3 | 4 | 5 | 6;
+/** Step ids in canonical order — Step 4 may be skipped at runtime. */
+export type StepId = 1 | 2 | 3 | 4 | 5;
 
 /**
- * How the customer landed on Step 3 (AC). Today the only non-default
+ * How the customer landed on Step 2 (AC). Today the only non-default
  * origin is `"slot_picker"`, set when they tap the "Update/Edit AC info"
  * affordance on the slot picker. The AC step reads this hint to decide
  * whether to show a contextual "you came back to confirm AC details"
- * banner; without the hint they're either entering Step 3 for the first
+ * banner; without the hint they're either entering Step 2 for the first
  * time or arriving via normal forward/back navigation, neither of which
- * needs the extra framing. Cleared by every other path into Step 3
+ * needs the extra framing. Cleared by every other path into Step 2
  * (forward, back, step-dot click) via `goToStep`, so the banner can
  * never linger past the visit it was set for.
  */
@@ -100,15 +100,13 @@ export type AcStepOrigin = "slot_picker" | null;
 export type BookingState = {
   /** Wrapper navigation. */
   current_step: StepId;
-  /** Origin hint for the most recent entry into Step 3. See
+  /** Origin hint for the most recent entry into Step 2. See
    *  {@link AcStepOrigin}. */
   ac_step_origin: AcStepOrigin;
 
-  // Step 1
+  // Step 1 — unit + role + (agency if agent) + contact details
   unit_id: string | null;
-  // Step 2
   role: Role | null;
-  // Step 3
   agency_id: string | null;
   /** Free-text company name when an agent picks the "Other / not listed"
    *  agency option. Empty string when the user has not provided one
@@ -118,15 +116,15 @@ export type BookingState = {
   contact_last_name: string;
   contact_email: string;
   contact_phone: string;
-  // Step 4
+  // Step 2 — AC
   num_systems: number;
   num_additional_indoor: number;
-  /** Snapshot of how the customer's selection on Step 4 differs from
+  /** Snapshot of how the customer's selection on Step 2 differs from
    *  Taylr's records. Null while it matches (or the unit has no AC
    *  record to compare against). Read by the admin mockup to surface
    *  the discrepancy after the booking. */
   ac_discrepancy: AcDiscrepancy | null;
-  // Step 5 — primary residence + access method + follow-ups
+  // Step 3 — primary residence + access method + follow-ups
   primary_residence: PrimaryResidence | null;
   access_method: AccessMethod | null;
   key_holder_name: string;
@@ -138,14 +136,14 @@ export type BookingState = {
   signature_acknowledged: boolean;
   signature_name: string;
   access_notes: string;
-  // Step 6
+  // Step 4 — schedule
   service_date: string | null;
   service_slot: string | null;
-  // Step 7
+  // Step 5 — review & pay
   cancellation_acknowledged: boolean;
 
   // Terminal — set by `submitBooking()` after the user clicks Pay on
-  // Step 6. The wrapper renders the confirmation screen instead of the
+  // Step 5. The wrapper renders the confirmation screen instead of the
   // step iframe whenever `submitted === true`. `reference` is the
   // human-friendly booking reference shown on that screen. Both are
   // wiped by `bookAnother()` (and by `reset()`) so a fresh booking
@@ -156,7 +154,7 @@ export type BookingState = {
   /** Short-circuit hint for the booking flow wrapper.
    *
    *  When non-null, the wrapper takes the customer straight to this
-   *  step the next time they tap "Continue" on the AC step (Step 3),
+   *  step the next time they tap "Continue" on the AC step (Step 2),
    *  bypassing the usual sequential walk. Set by the wrapper itself
    *  when the customer jumps back to the AC step from the slot picker
    *  via "Update AC info", so that confirming AC details takes them
@@ -171,7 +169,7 @@ export type BookingState = {
   // Terminal — set by `cancelPayment()` when the customer cancels (or
   // Stripe rejects) the checkout flow. Spec §9 row "Payment cancelled":
   // the customer is shown a dedicated screen with a "Try again" CTA
-  // that returns them to Step 6 (Review & pay) with their answers
+  // that returns them to Step 5 (Review & pay) with their answers
   // intact. `submitted`, `payment_cancelled` and `unit_unavailable`
   // are mutually exclusive — at most one terminal flag is true at any
   // time. All three are wiped by `bookAnother()` and by `reset()`.
@@ -193,7 +191,7 @@ export type BookingState = {
 
 const STORAGE_KEY = "taylr.bookingSession.v2";
 
-/** Access methods that skip Step 5 (Schedule).
+/** Access methods that skip Step 4 (Schedule).
  *
  * `agent_tenant_self` is intentionally NOT here — the agent is arranging
  * the slot directly with the tenant, so they still need to pick one.
@@ -247,21 +245,21 @@ const isBrowser = typeof window !== "undefined";
 /**
  * Schema version stamped on every persisted blob this module writes.
  *
- * The 7-step → 6-step migration in {@link migratePersistedSession} is
+ * The legacy → current migration in {@link migratePersistedSession} is
  * lossy by design: it shifts any persisted `current_step > 2` down by
- * one. That's correct for legacy blobs (the old Step 5 is the new
- * Step 4) but catastrophic to apply to a freshly-written current-schema
- * blob — `getBookingSession()` re-reads storage on every call (for
- * cross-iframe sync), so a customer who reaches Step 5 would have
- * their step silently rewritten to 4 the next time any handler peeked
- * at the session.
+ * one (collapsing the old Booker step into the Unit page). That's
+ * correct for legacy blobs but catastrophic to apply to a freshly-
+ * written current-schema blob — `getBookingSession()` re-reads storage
+ * on every call (for cross-iframe sync), so a customer who reaches
+ * Step 4 would have their step silently rewritten to 3 the next time
+ * any handler peeked at the session.
  *
  * Bumping this constant is how we tell the migrator "this blob has
  * already been rewritten in current-schema shape — leave the step
- * alone." Legacy blobs (no `__schema` field) keep getting the
- * down-shift treatment exactly once.
+ * alone." Legacy blobs (older `__schema`, or missing entirely) keep
+ * getting the down-shift treatment exactly once.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /**
  * Migrate a raw persisted session blob (as stored in sessionStorage under
@@ -270,12 +268,15 @@ const SCHEMA_VERSION = 2;
  * Pure function — no DOM access — so unit tests can drive it directly
  * without spinning up a browser environment.
  *
- * Migrates legacy persisted state from the 7-step flow (only when the
- * blob is missing `__schema` — current-schema blobs are passed through
- * untouched):
- *  - Old Step 2 (standalone "Your role") → new Step 1 (role lives on Unit page)
- *  - Old Steps 3..7 shift down by one to new Steps 2..6
- * Anything outside the new 1..6 range gets clamped to a safe value (Step 1).
+ * Migrates legacy persisted state into the current 5-step flow (only
+ * when the persisted `__schema` is older than {@link SCHEMA_VERSION} —
+ * current-schema blobs are passed through untouched):
+ *  - Old Step 2 (standalone "Your details" / Booker) → new Step 1
+ *    (contact + agency live on the Unit page)
+ *  - Old Steps 3..6 shift down by one to new Steps 2..5
+ * Anything outside the new 1..5 range gets clamped to a safe value
+ * (Step 1). Older 7-step blobs run through the same down-shift and
+ * naturally clamp anything past Step 5 back to Step 1.
  *
  * Invalid / missing input always returns {@link INITIAL_STATE}.
  *
@@ -298,7 +299,9 @@ export function migratePersistedSession(raw: string | null): BookingState {
     let step: StepId = 1;
     if (typeof rawStep === "number" && Number.isInteger(rawStep)) {
       // Current-schema blobs trust the persisted step verbatim (subject
-      // to the 1..6 range clamp). Legacy blobs get the 7→6 down-shift.
+      // to the 1..5 range clamp). Legacy blobs get the down-shift:
+      // step 2 (Booker) collapses into step 1 (Unit), and any step > 2
+      // shifts down by one.
       const candidate =
         schema >= SCHEMA_VERSION
           ? rawStep
@@ -307,7 +310,7 @@ export function migratePersistedSession(raw: string | null): BookingState {
             : rawStep > 2
               ? rawStep - 1
               : rawStep;
-      if (candidate >= 1 && candidate <= 6) step = candidate as StepId;
+      if (candidate >= 1 && candidate <= 5) step = candidate as StepId;
     }
     return { ...INITIAL_STATE, ...rest, current_step: step };
   } catch {
@@ -329,7 +332,7 @@ function writeToStorage(state: BookingState) {
   if (!isBrowser) return;
   try {
     // Stamp the current schema version so the next read can skip the
-    // legacy 7→6 down-shift. See {@link SCHEMA_VERSION}.
+    // legacy down-shift. See {@link SCHEMA_VERSION}.
     window.sessionStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ __schema: SCHEMA_VERSION, ...state }),
@@ -407,7 +410,7 @@ export function getBookingSession(): BookingState {
 
 // ─── Cascade-clearing helpers ──────────────────────────────────────────────
 
-/** Clear all per-method follow-up fields for Step 5. */
+/** Clear all per-method follow-up fields for Step 3 (Access). */
 function clearAccessFollowUps(s: BookingState): BookingState {
   return {
     ...s,
@@ -495,13 +498,13 @@ export const bookingActions = {
       // The wrapper sets `return_to` when the customer jumps back to
       // the AC step from the slot picker so that confirming AC details
       // brings them straight back. The hint is consumed the moment
-      // they actually arrive at the hinted step (typically Step 5),
+      // they actually arrive at the hinted step (typically Step 4 — Slots),
       // so it never lingers and influences normal forward navigation
       // on a subsequent pass through the flow.
       const nextReturnTo =
         s.return_to !== null && step === s.return_to ? null : s.return_to;
       // `ac_step_origin` is always cleared by `goToStep` because every
-      // entry path into Step 3 other than the slot picker's dedicated
+      // entry path into Step 2 other than the slot picker's dedicated
       // affordance funnels through here (NAV_FORWARD, NAV_BACK,
       // step-dot click). The slot-picker affordance bypasses
       // `goToStep` and uses {@link editAcFromSlotPicker}, which sets
@@ -531,7 +534,7 @@ export const bookingActions = {
   },
 
   /** Atomic action for the slot picker's "Update/Edit AC info" affordance.
-   *  Jumps to Step 3 AND records that the customer arrived from the slot
+   *  Jumps to Step 2 AND records that the customer arrived from the slot
    *  picker, so the AC step can render its contextual "you came back to
    *  confirm AC details" banner. Atomic so the banner can't briefly flicker
    *  on/off if a render reads state between two separate writes. Leaves
@@ -540,9 +543,9 @@ export const bookingActions = {
    *  navigation. */
   editAcFromSlotPicker() {
     setState((s) =>
-      s.current_step === 3 && s.ac_step_origin === "slot_picker"
+      s.current_step === 2 && s.ac_step_origin === "slot_picker"
         ? s
-        : { ...s, current_step: 3, ac_step_origin: "slot_picker" },
+        : { ...s, current_step: 2, ac_step_origin: "slot_picker" },
     );
   },
 
@@ -554,7 +557,7 @@ export const bookingActions = {
     );
   },
 
-  // Step 1
+  // Step 1 — unit
   setUnit(unit_id: string | null) {
     setState((s) =>
       s.unit_id === unit_id
@@ -562,7 +565,7 @@ export const bookingActions = {
         : {
             ...s,
             unit_id,
-            // Spec §13.3: changing unit re-loads AC pre-fill (handled by Step 4).
+            // Spec §13.3: changing unit re-loads AC pre-fill (handled by Step 2 — AC).
             // The discrepancy snapshot refers to the previous unit's record
             // and would be misleading once the unit changes — wipe it so the
             // AC step starts from a clean slate when the customer revisits it.
@@ -571,12 +574,12 @@ export const bookingActions = {
     );
   },
 
-  // Step 2
+  // Step 1 — role
   setRole(role: Role | null) {
     setState((s) => (s.role === role ? s : clearRoleDownstream({ ...s, role })));
   },
 
-  // Step 3
+  // Step 1 — agency + contact
   setAgency(agency_id: string | null) {
     setState((s) => {
       if (s.agency_id === agency_id) return s;
@@ -611,7 +614,7 @@ export const bookingActions = {
     setState((s) => ({ ...s, ...fields }));
   },
 
-  // Step 4
+  // Step 2 — AC
   setSystems(n: number) {
     const clamped = Math.max(1, Math.min(10, Math.round(n)));
     setState((s) => (s.num_systems === clamped ? s : { ...s, num_systems: clamped }));
@@ -635,7 +638,7 @@ export const bookingActions = {
     );
   },
 
-  // Step 5
+  // Step 3 — access method + follow-ups
   setPrimaryResidence(residence: PrimaryResidence | null) {
     setState((s) =>
       s.primary_residence === residence
@@ -664,11 +667,11 @@ export const bookingActions = {
         next.service_date = null;
         next.service_slot = null;
       }
-      // If the user is currently sitting on Step 5 (Schedule) and the new
-      // method makes Step 5 hidden, jump forward to Step 6 so the wrapper
+      // If the user is currently sitting on Step 4 (Schedule) and the new
+      // method makes Step 4 hidden, jump forward to Step 5 so the wrapper
       // never lingers on a hidden step.
-      if (isCoordination && next.current_step === 5) {
-        next.current_step = 6;
+      if (isCoordination && next.current_step === 4) {
+        next.current_step = 5;
       }
       return next;
     });
@@ -695,12 +698,12 @@ export const bookingActions = {
     setState((s) => ({ ...s, access_notes: value }));
   },
 
-  // Step 6
+  // Step 4 — schedule
   setSchedule(date: string | null, slot: string | null) {
     setState((s) => ({ ...s, service_date: date, service_slot: slot }));
   },
 
-  // Step 7
+  // Step 5 — review & pay
   setCancellationAcknowledged(value: boolean) {
     setState((s) => ({ ...s, cancellation_acknowledged: value }));
   },
@@ -728,7 +731,7 @@ export const bookingActions = {
    *  checkout. The wrapper renders the dedicated cancellation screen
    *  whenever `payment_cancelled === true`. All non-terminal answers
    *  are preserved so the customer can hit "Try again" and land back
-   *  on Step 6 with their selections intact.
+   *  on Step 5 with their selections intact.
    *
    *  No-op when any other terminal flag is set — once a real payment
    *  has gone through, or the unit was already taken, a stray cancel
@@ -742,13 +745,13 @@ export const bookingActions = {
   },
 
   /** Spec §9 row "Payment cancelled": the "Try again" CTA on the
-   *  cancellation screen returns the customer to Step 6 (Review &
+   *  cancellation screen returns the customer to Step 5 (Review &
    *  pay). Clears the terminal flag without touching any of the
    *  customer's answers. */
   tryAgainAfterCancel() {
     setState((s) =>
       s.payment_cancelled
-        ? { ...s, payment_cancelled: false, current_step: 6 }
+        ? { ...s, payment_cancelled: false, current_step: 5 }
         : s,
     );
   },

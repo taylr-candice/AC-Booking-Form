@@ -3,15 +3,17 @@
  *
  * Three actions in `bookingActions` mutate state in non-obvious ways:
  *   - `setRole`              clears agency, residence, access method,
- *                            schedule, AND every Step-5 follow-up.
+ *                            schedule, AND every Step-3 (Access)
+ *                            follow-up.
  *   - `setPrimaryResidence`  clears access method, schedule, AND every
- *                            Step-5 follow-up.
- *   - `setAccessMethod`      clears every Step-5 follow-up; clears the
- *                            schedule when the new method crosses the
- *                            coordination boundary; auto-advances the
- *                            wrapper from Step 5 → Step 6 when the new
- *                            method is a coordination flow (Step 5 is
- *                            hidden in that case).
+ *                            Step-3 (Access) follow-up.
+ *   - `setAccessMethod`      clears every Step-3 (Access) follow-up;
+ *                            clears the schedule when the new method
+ *                            crosses the coordination boundary;
+ *                            auto-advances the wrapper from Step 4
+ *                            (Slots) → Step 5 (Pay) when the new method
+ *                            is a coordination flow (Step 4 is hidden in
+ *                            that case).
  *
  * These rules are the only thing stopping a returning user from
  * submitting answers from a previous selection (e.g. the tenants array
@@ -44,14 +46,14 @@ const SAMPLE_TENANT: Tenant = {
 };
 
 /**
- * Drive the store into a fully-populated state — every Step-5 follow-up
- * filled, plus a schedule selection — so we can prove that subsequent
- * cascade-clearing actually removes them rather than coincidentally
- * leaving them empty.
+ * Drive the store into a fully-populated state — every Step-3 (Access)
+ * follow-up filled, plus a schedule selection — so we can prove that
+ * subsequent cascade-clearing actually removes them rather than
+ * coincidentally leaving them empty.
  */
 function seedFullSession(opts: {
   access_method: AccessMethod;
-  current_step?: 1 | 2 | 3 | 4 | 5 | 6;
+  current_step?: 1 | 2 | 3 | 4 | 5;
 }) {
   bookingActions.setUnit("unit-123");
   bookingActions.setRole("owner");
@@ -85,7 +87,7 @@ function seedFullSession(opts: {
   }
 }
 
-/** Assert every Step-5 follow-up is back to its empty / null default. */
+/** Assert every Step-3 (Access) follow-up is back to its empty / null default. */
 function expectAccessFollowUpsCleared() {
   const s = getBookingSession();
   expect(s.key_holder_name).toBe("");
@@ -109,7 +111,7 @@ afterEach(() => {
 // ─── setRole ───────────────────────────────────────────────────────────────
 
 describe("bookingActions.setRole — cascade clearing", () => {
-  it("wipes agency, residence, access method, schedule, and every Step-5 follow-up when the role changes", () => {
+  it("wipes agency, residence, access method, schedule, and every Step-3 follow-up when the role changes", () => {
     seedFullSession({ access_method: "owner_leased_tenant" });
 
     bookingActions.setRole("agent");
@@ -160,18 +162,18 @@ describe("bookingActions.setRole — cascade clearing", () => {
   });
 
   it("does not change the wrapper's current_step (the role page itself decides where to go next)", () => {
-    seedFullSession({ access_method: "owner_leased_tenant", current_step: 4 });
+    seedFullSession({ access_method: "owner_leased_tenant", current_step: 3 });
 
     bookingActions.setRole("agent");
 
-    expect(getBookingSession().current_step).toBe(4);
+    expect(getBookingSession().current_step).toBe(3);
   });
 });
 
 // ─── setPrimaryResidence ───────────────────────────────────────────────────
 
 describe("bookingActions.setPrimaryResidence — cascade clearing", () => {
-  it("clears access method, schedule, and every Step-5 follow-up when residence changes", () => {
+  it("clears access method, schedule, and every Step-3 follow-up when residence changes", () => {
     seedFullSession({ access_method: "owner_leased_tenant" });
 
     bookingActions.setPrimaryResidence("vacant");
@@ -215,7 +217,7 @@ describe("bookingActions.setPrimaryResidence — cascade clearing", () => {
 // ─── setAccessMethod ───────────────────────────────────────────────────────
 
 describe("bookingActions.setAccessMethod — cascade clearing", () => {
-  it("clears every Step-5 follow-up when the access method changes", () => {
+  it("clears every Step-3 follow-up when the access method changes", () => {
     seedFullSession({ access_method: "owner_leased_leave_key" });
 
     bookingActions.setAccessMethod("owner_leased_be_there");
@@ -258,7 +260,7 @@ describe("bookingActions.setAccessMethod — cascade clearing", () => {
 
   it("clears the schedule when switching from a coordination method back to a non-coordination method", () => {
     seedFullSession({ access_method: "owner_leased_tenant" });
-    // Coordination flow skips Step 5, but a returning user could still
+    // Coordination flow skips Step 4, but a returning user could still
     // have a stale schedule selection — re-add one to prove it's cleared.
     bookingActions.setSchedule("2026-05-10", "morning");
 
@@ -304,48 +306,10 @@ describe("bookingActions.setAccessMethod — cascade clearing", () => {
   });
 });
 
-// ─── setAccessMethod: auto-jump Step 5 → Step 6 ───────────────────────────
+// ─── setAccessMethod: auto-jump Step 4 → Step 5 ───────────────────────────
 
-describe("bookingActions.setAccessMethod — auto-advance from Step 5 to Step 6", () => {
-  it("jumps the wrapper from Step 5 to Step 6 when the new method is a coordination flow (Step 5 becomes hidden)", () => {
-    seedFullSession({
-      access_method: "owner_leased_leave_key",
-      current_step: 5,
-    });
-
-    bookingActions.setAccessMethod("owner_leased_tenant");
-
-    expect(getBookingSession().current_step).toBe(6);
-  });
-
-  it("jumps to Step 6 for every coordination access method when the user is on Step 5", () => {
-    for (const method of COORDINATION_ACCESS_METHODS) {
-      bookingActions.reset();
-      seedFullSession({
-        access_method: "owner_leased_leave_key",
-        current_step: 5,
-      });
-
-      bookingActions.setAccessMethod(method);
-
-      expect(getBookingSession().current_step).toBe(6);
-    }
-  });
-
-  it("does NOT change the wrapper step when switching to a non-coordination method on Step 5", () => {
-    seedFullSession({
-      access_method: "owner_leased_leave_key",
-      current_step: 5,
-    });
-
-    bookingActions.setAccessMethod("owner_leased_be_there");
-
-    expect(getBookingSession().current_step).toBe(5);
-  });
-
-  it("does NOT auto-jump when the user is not on Step 5, even if switching into a coordination method", () => {
-    // E.g. user is editing access details from the Step 5 page that wraps
-    // the access-method picker (Step 4 in some flows, Step 6 review, etc.).
+describe("bookingActions.setAccessMethod — auto-advance from Step 4 to Step 5", () => {
+  it("jumps the wrapper from Step 4 to Step 5 when the new method is a coordination flow (Step 4 becomes hidden)", () => {
     seedFullSession({
       access_method: "owner_leased_leave_key",
       current_step: 4,
@@ -353,28 +317,66 @@ describe("bookingActions.setAccessMethod — auto-advance from Step 5 to Step 6"
 
     bookingActions.setAccessMethod("owner_leased_tenant");
 
+    expect(getBookingSession().current_step).toBe(5);
+  });
+
+  it("jumps to Step 5 for every coordination access method when the user is on Step 4", () => {
+    for (const method of COORDINATION_ACCESS_METHODS) {
+      bookingActions.reset();
+      seedFullSession({
+        access_method: "owner_leased_leave_key",
+        current_step: 4,
+      });
+
+      bookingActions.setAccessMethod(method);
+
+      expect(getBookingSession().current_step).toBe(5);
+    }
+  });
+
+  it("does NOT change the wrapper step when switching to a non-coordination method on Step 4", () => {
+    seedFullSession({
+      access_method: "owner_leased_leave_key",
+      current_step: 4,
+    });
+
+    bookingActions.setAccessMethod("owner_leased_be_there");
+
     expect(getBookingSession().current_step).toBe(4);
   });
 
-  it("does NOT auto-jump when current_step is already past Step 5 (e.g. user on Step 6 swaps to a coordination method)", () => {
+  it("does NOT auto-jump when the user is not on Step 4, even if switching into a coordination method", () => {
+    // E.g. user is editing access details from the Step 4 page that wraps
+    // the access-method picker (Step 3 in some flows, Step 5 review, etc.).
     seedFullSession({
       access_method: "owner_leased_leave_key",
-      current_step: 6,
+      current_step: 3,
     });
 
     bookingActions.setAccessMethod("owner_leased_tenant");
 
-    expect(getBookingSession().current_step).toBe(6);
+    expect(getBookingSession().current_step).toBe(3);
   });
 
-  it("does NOT auto-jump when the new method is null (even if user is on Step 5)", () => {
+  it("does NOT auto-jump when current_step is already past Step 4 (e.g. user on Step 5 swaps to a coordination method)", () => {
     seedFullSession({
       access_method: "owner_leased_leave_key",
       current_step: 5,
     });
 
-    bookingActions.setAccessMethod(null);
+    bookingActions.setAccessMethod("owner_leased_tenant");
 
     expect(getBookingSession().current_step).toBe(5);
+  });
+
+  it("does NOT auto-jump when the new method is null (even if user is on Step 4)", () => {
+    seedFullSession({
+      access_method: "owner_leased_leave_key",
+      current_step: 4,
+    });
+
+    bookingActions.setAccessMethod(null);
+
+    expect(getBookingSession().current_step).toBe(4);
   });
 });

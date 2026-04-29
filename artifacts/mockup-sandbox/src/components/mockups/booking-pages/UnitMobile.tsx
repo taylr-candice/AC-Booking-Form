@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Briefcase,
@@ -9,10 +10,20 @@ import {
   User,
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
-import { canContinueStep1 } from "../../../state/bookingDerived";
+import {
+  canContinueStep1,
+  validateEmail,
+  validatePhone,
+  validateRequired,
+} from "../../../state/bookingDerived";
+import {
+  DEMO_MANAGING_AGENCIES,
+  isOtherAgency,
+} from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
+const ERROR_PURPLE = "#9747FF";
 
 type Unit = {
   id: string;
@@ -31,12 +42,62 @@ const UNITS: Unit[] = [
   { id: "u5", address: "18 / 142 Anzac Parade",     lot: "Lot 18",  building: "Anzac Gardens · Kensington NSW 2033" },
 ];
 
+function FieldError({ id, message }: { id: string; message: string | null }) {
+  if (!message) return null;
+  return (
+    <div
+      id={id}
+      role="alert"
+      aria-live="polite"
+      className="mt-1.5 flex items-start gap-1.5 text-[12px] font-medium"
+      style={{ color: ERROR_PURPLE }}
+    >
+      <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" aria-hidden="true" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+const baseInputClass =
+  "w-full rounded-xl border bg-white px-3 py-2.5 text-[15px] text-slate-900 outline-none";
+
+function inputClassFor(hasError: boolean) {
+  return `${baseInputClass} ${
+    hasError ? "" : "border-slate-200 focus:border-slate-400"
+  }`;
+}
+
+function errorStyle(hasError: boolean): React.CSSProperties | undefined {
+  return hasError
+    ? { borderColor: ERROR_PURPLE, boxShadow: `0 0 0 1px ${ERROR_PURPLE}` }
+    : undefined;
+}
+
 export function UnitMobile() {
   const sessionUnitId = useBookingSelector((s) => s.unit_id);
   const role = useBookingSelector((s) => s.role);
+  const agencyId = useBookingSelector((s) => s.agency_id);
+  const agencyOtherName = useBookingSelector((s) => s.agency_other_name);
+  const firstName = useBookingSelector((s) => s.contact_first_name);
+  const lastName = useBookingSelector((s) => s.contact_last_name);
+  const email = useBookingSelector((s) => s.contact_email);
+  const mobile = useBookingSelector((s) => s.contact_phone);
+
   const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [agencyOpen, setAgencyOpen] = useState(false);
+  const [touched, setTouched] = useState({
+    agency: false,
+    agencyOther: false,
+    firstName: false,
+    lastName: false,
+    email: false,
+    mobile: false,
+  });
+
+  const isAgent = role === "agent";
+  const showOtherInput = isAgent && isOtherAgency(agencyId);
 
   useEffect(() => {
     if (sessionUnitId !== selectedId) setSelectedId(sessionUnitId);
@@ -48,8 +109,32 @@ export function UnitMobile() {
     if (!open) setQuery("");
   }, [open]);
 
+  useEffect(() => {
+    if (!isAgent) {
+      setTouched((t) =>
+        t.agency || t.agencyOther ? { ...t, agency: false, agencyOther: false } : t,
+      );
+      setAgencyOpen(false);
+    }
+  }, [isAgent]);
+
+  useEffect(() => {
+    if (!showOtherInput) {
+      setTouched((t) => (t.agencyOther ? { ...t, agencyOther: false } : t));
+    }
+  }, [showOtherInput]);
+
   const selected = UNITS.find((u) => u.id === selectedId);
-  const canContinue = canContinueStep1({ unit_id: selectedId, role });
+  const canContinue = canContinueStep1({
+    unit_id: selectedId,
+    role,
+    agency_id: agencyId,
+    agency_other_name: agencyOtherName,
+    contact_first_name: firstName,
+    contact_last_name: lastName,
+    contact_email: email,
+    contact_phone: mobile,
+  });
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -64,6 +149,32 @@ export function UnitMobile() {
     bookingActions.setUnit(id);
     setOpen(false);
   };
+
+  const errors = {
+    agency: isAgent && !agencyId ? "Please select your agency" : null,
+    agencyOther:
+      showOtherInput && !agencyOtherName.trim()
+        ? "Please tell us your agency name"
+        : null,
+    firstName: validateRequired(firstName, "First name"),
+    lastName: validateRequired(lastName, "Last name"),
+    email: validateEmail(email),
+    mobile: validatePhone(mobile),
+  };
+  const showErr = (field: keyof typeof touched) =>
+    touched[field] && !!errors[field];
+  const markTouched = (field: keyof typeof touched) =>
+    setTouched((t) => ({ ...t, [field]: true }));
+  const errorIds = {
+    agency: "step1-agency-mobile-error",
+    agencyOther: "step1-agency-other-mobile-error",
+    firstName: "step1-first-mobile-error",
+    lastName: "step1-last-mobile-error",
+    email: "step1-email-mobile-error",
+    mobile: "step1-mobile-mobile-error",
+  } as const;
+
+  const selectedAgency = DEMO_MANAGING_AGENCIES.find((a) => a.id === agencyId);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -206,6 +317,197 @@ export function UnitMobile() {
                 description="I manage this unit for the owner"
                 id="agent"
               />
+            </div>
+          </div>
+        )}
+
+        {/* Progressive disclosure: contact + agency form appears once a role is picked. */}
+        {selected && role && (
+          <div className="mt-7 space-y-7">
+            {isAgent && (
+              <div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Your agency
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAgencyOpen((o) => !o)}
+                    onBlur={() => markTouched("agency")}
+                    data-testid="select-agency"
+                    aria-haspopup="listbox"
+                    aria-expanded={agencyOpen}
+                    aria-invalid={showErr("agency")}
+                    aria-describedby={showErr("agency") ? errorIds.agency : undefined}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl border bg-white px-4 py-3.5 text-left shadow-sm transition ${
+                      showErr("agency") ? "" : "border-slate-300 hover:border-slate-400"
+                    }`}
+                    style={errorStyle(showErr("agency"))}
+                  >
+                    <div className="min-w-0 flex-1">
+                      {selectedAgency ? (
+                        <div className="truncate text-[15px] font-semibold text-slate-900">
+                          {selectedAgency.name}
+                        </div>
+                      ) : (
+                        <span className="text-[15px] text-slate-400">Select your agency…</span>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${
+                        agencyOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {agencyOpen && (
+                    <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                      {DEMO_MANAGING_AGENCIES.map((a) => {
+                        const active = a.id === agencyId;
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              bookingActions.setAgency(a.id);
+                              setAgencyOpen(false);
+                              markTouched("agency");
+                            }}
+                            data-testid={`dropdown-agency-${a.id}`}
+                            className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${
+                              active ? "bg-pink-50" : "hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div
+                                className={`truncate text-[14px] font-semibold ${
+                                  active ? "text-pink-700" : "text-slate-900"
+                                }`}
+                              >
+                                {a.name}
+                              </div>
+                            </div>
+                            {active && (
+                              <CheckCircle2
+                                className="mt-0.5 h-5 w-5 shrink-0"
+                                style={{ color: BRAND }}
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                {showErr("agency") && <FieldError id={errorIds.agency} message={errors.agency} />}
+
+                {showOtherInput && (
+                  <div className="mt-4 space-y-1.5">
+                    <label htmlFor="step1-agency-other-mobile" className="text-sm font-medium text-slate-700">
+                      Your agency / company name
+                    </label>
+                    <input
+                      id="step1-agency-other-mobile"
+                      type="text"
+                      value={agencyOtherName}
+                      onChange={(e) => bookingActions.setAgencyOtherName(e.target.value)}
+                      onBlur={() => markTouched("agencyOther")}
+                      placeholder="e.g. Westside Property Co."
+                      aria-invalid={showErr("agencyOther")}
+                      aria-describedby={
+                        showErr("agencyOther") ? errorIds.agencyOther : undefined
+                      }
+                      className={inputClassFor(showErr("agencyOther"))}
+                      style={errorStyle(showErr("agencyOther"))}
+                      data-testid="input-agency-other"
+                    />
+                    {showErr("agencyOther") && (
+                      <FieldError id={errorIds.agencyOther} message={errors.agencyOther} />
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Your contact details
+              </div>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="step1-first-mobile" className="text-sm font-medium text-slate-700">First name</label>
+                    <input
+                      id="step1-first-mobile"
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => bookingActions.setContact({ contact_first_name: e.target.value })}
+                      onBlur={() => markTouched("firstName")}
+                      aria-invalid={showErr("firstName")}
+                      aria-describedby={showErr("firstName") ? errorIds.firstName : undefined}
+                      className={inputClassFor(showErr("firstName"))}
+                      style={errorStyle(showErr("firstName"))}
+                      data-testid="input-firstname"
+                    />
+                    {showErr("firstName") && <FieldError id={errorIds.firstName} message={errors.firstName} />}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="step1-last-mobile" className="text-sm font-medium text-slate-700">Last name</label>
+                    <input
+                      id="step1-last-mobile"
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => bookingActions.setContact({ contact_last_name: e.target.value })}
+                      onBlur={() => markTouched("lastName")}
+                      aria-invalid={showErr("lastName")}
+                      aria-describedby={showErr("lastName") ? errorIds.lastName : undefined}
+                      className={inputClassFor(showErr("lastName"))}
+                      style={errorStyle(showErr("lastName"))}
+                      data-testid="input-lastname"
+                    />
+                    {showErr("lastName") && <FieldError id={errorIds.lastName} message={errors.lastName} />}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="step1-email-mobile" className="text-sm font-medium text-slate-700">Email</label>
+                  <input
+                    id="step1-email-mobile"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => bookingActions.setContact({ contact_email: e.target.value })}
+                    onBlur={() => markTouched("email")}
+                    aria-invalid={showErr("email")}
+                    aria-describedby={showErr("email") ? errorIds.email : undefined}
+                    className={inputClassFor(showErr("email"))}
+                    style={errorStyle(showErr("email"))}
+                    data-testid="input-email"
+                  />
+                  {showErr("email") && <FieldError id={errorIds.email} message={errors.email} />}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="step1-mobile-mobile" className="text-sm font-medium text-slate-700">Mobile</label>
+                  <input
+                    id="step1-mobile-mobile"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={mobile}
+                    onChange={(e) => bookingActions.setContact({ contact_phone: e.target.value })}
+                    onBlur={() => markTouched("mobile")}
+                    aria-invalid={showErr("mobile")}
+                    aria-describedby={showErr("mobile") ? errorIds.mobile : undefined}
+                    className={inputClassFor(showErr("mobile"))}
+                    style={errorStyle(showErr("mobile"))}
+                    data-testid="input-mobile"
+                  />
+                  {showErr("mobile") && <FieldError id={errorIds.mobile} message={errors.mobile} />}
+                </div>
+              </div>
             </div>
           </div>
         )}

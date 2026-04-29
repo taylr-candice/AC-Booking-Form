@@ -2,8 +2,8 @@
  * Derived selectors for the booking session — pure functions of state.
  *
  * Step skipping logic per spec §7.1: three "coordination" access methods
- * cause Step 5 (Schedule) to be skipped, so the visible-step list goes
- * 1-2-3-4-6 and the progress indicator shows "Step X of 5".
+ * cause Step 4 (Schedule) to be skipped, so the visible-step list goes
+ * 1-2-3-5 and the progress indicator shows "Step X of 4".
  */
 
 import {
@@ -12,23 +12,24 @@ import {
   type BookingState,
   type StepId,
 } from "./bookingSession";
+import { isOtherAgency } from "./accessMethodCatalog";
 
 export function isCoordinationFlow(s: Pick<BookingState, "access_method">): boolean {
   return s.access_method ? COORDINATION_ACCESS_METHODS.has(s.access_method) : false;
 }
 
-/** Canonical 6-step order. */
-const ALL_STEPS: readonly StepId[] = [1, 2, 3, 4, 5, 6];
+/** Canonical 5-step order. */
+const ALL_STEPS: readonly StepId[] = [1, 2, 3, 4, 5];
 
 /** The step ids the user should walk through, given current state. */
 export function visibleSteps(s: Pick<BookingState, "access_method">): StepId[] {
   if (isCoordinationFlow(s)) {
-    return ALL_STEPS.filter((id) => id !== 5);
+    return ALL_STEPS.filter((id) => id !== 4);
   }
   return [...ALL_STEPS];
 }
 
-/** Total steps to display in the progress indicator (5 or 6). */
+/** Total steps to display in the progress indicator (4 or 5). */
 export function totalSteps(s: Pick<BookingState, "access_method">): number {
   return visibleSteps(s).length;
 }
@@ -39,15 +40,15 @@ export function visibleIndex(
   step: StepId,
 ): number {
   const idx = visibleSteps(s).indexOf(step);
-  // If `step` isn't visible (e.g. step 5 in a coordination flow), fall back
-  // to the position of step 6 — the place the user would actually be.
+  // If `step` isn't visible (e.g. step 4 in a coordination flow), fall back
+  // to the position of step 5 — the place the user would actually be.
   if (idx === -1) return visibleSteps(s).length;
   return idx + 1;
 }
 
 /** Next step id given the current one (skips hidden steps).
  *
- * If `current` is itself hidden (e.g. step 5 in a coordination flow that
+ * If `current` is itself hidden (e.g. step 4 in a coordination flow that
  * was just enabled), snap forward to the next visible step rather than
  * returning a no-op.
  */
@@ -83,18 +84,68 @@ export function prevStepId(
   return ids[idx - 1];
 }
 
+// ─── Field validation helpers (shared by Step 1 page + canContinueStep1) ──
+
+/** Email-shape check used by the Step 1 contact form. Returns an error
+ *  message string, or null when the value is valid. */
+export function validateEmail(v: string): string | null {
+  const t = v.trim();
+  if (!t) return "Email address is required";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) {
+    return "Please enter a valid email address";
+  }
+  return null;
+}
+
+/** Mobile-number check used by the Step 1 contact form. Strips
+ *  non-digits and requires at least 10 of them. */
+export function validatePhone(v: string): string | null {
+  const digits = v.replace(/\D/g, "");
+  if (!digits) return "Mobile number is required";
+  if (digits.length < 10) return "Mobile number must be at least 10 digits";
+  return null;
+}
+
+/** Generic "must not be blank" check for first/last name. */
+export function validateRequired(v: string, label: string): string | null {
+  if (!v.trim()) return `${label} is required`;
+  return null;
+}
+
 /**
  * Step 1 gate: the "Continue" button stays disabled until the user has
- * picked BOTH a property (`unit_id`) and a role.
+ * picked a property (`unit_id`), a role, and filled in valid contact
+ * details. Agents must additionally pick an agency from the dropdown
+ * (and provide a free-text company name when "Other / not listed" is
+ * selected).
  *
  * Kept as a pure selector so it can be unit-tested without mounting the
  * Step 1 page, and so the mobile and desktop variants share one source
  * of truth for the rule.
  */
 export function canContinueStep1(
-  s: Pick<BookingState, "unit_id" | "role">,
+  s: Pick<
+    BookingState,
+    | "unit_id"
+    | "role"
+    | "agency_id"
+    | "agency_other_name"
+    | "contact_first_name"
+    | "contact_last_name"
+    | "contact_email"
+    | "contact_phone"
+  >,
 ): boolean {
-  return !!s.unit_id && !!s.role;
+  if (!s.unit_id || !s.role) return false;
+  if (validateRequired(s.contact_first_name, "First name")) return false;
+  if (validateRequired(s.contact_last_name, "Last name")) return false;
+  if (validateEmail(s.contact_email)) return false;
+  if (validatePhone(s.contact_phone)) return false;
+  if (s.role === "agent") {
+    if (!s.agency_id) return false;
+    if (isOtherAgency(s.agency_id) && !s.agency_other_name.trim()) return false;
+  }
+  return true;
 }
 
 // ─── Booking duration (time-budget model) ──────────────────────────────────

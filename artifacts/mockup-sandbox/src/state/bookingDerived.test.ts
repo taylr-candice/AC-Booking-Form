@@ -1,12 +1,13 @@
 /**
- * Regression checks for the new Step 1 behavior.
+ * Regression checks for the new 5-step flow's derived selectors.
  *
- * These two rules are easy to break by accident; lock them in:
+ * These rules are easy to break by accident; lock them in:
  *
- *   1. The Step 1 "Continue" button stays disabled until BOTH a property
- *      and a role have been picked. (`canContinueStep1`)
+ *   1. The Step 1 "Continue" button stays disabled until property + role
+ *      + complete contact details (and agency for agents) are provided.
+ *      (`canContinueStep1`)
  *   2. Picking a coordination access method makes the on-page step
- *      counter switch to "of 5" and skips the Schedule step.
+ *      counter switch to "of 4" and skips the Slots step (Step 4).
  *      (`totalSteps` / `visibleSteps`)
  */
 
@@ -32,48 +33,142 @@ import {
   type AccessMethod,
   type StepId,
 } from "./bookingSession";
+import { OTHER_AGENCY_ID } from "./accessMethodCatalog";
+
+/** Baseline of valid contact details so each test only has to express
+ *  what it cares about (the field under test) rather than re-spelling
+ *  the full happy-path payload. */
+const validContact = {
+  contact_first_name: "Ada",
+  contact_last_name: "Lovelace",
+  contact_email: "ada@example.com",
+  contact_phone: "0412345678",
+};
+
+/** Step 1 args for an owner with valid contact (no agency required). */
+const ownerComplete = {
+  unit_id: "u1",
+  role: "owner" as const,
+  agency_id: null,
+  agency_other_name: "",
+  ...validContact,
+};
+
+/** Step 1 args for an agent with valid contact + a real (non-Other) agency. */
+const agentComplete = {
+  unit_id: "u1",
+  role: "agent" as const,
+  agency_id: "agency-001",
+  agency_other_name: "",
+  ...validContact,
+};
 
 describe("canContinueStep1 — Step 1 Continue gate", () => {
   it("is disabled when neither property nor role have been picked", () => {
-    expect(canContinueStep1({ unit_id: null, role: null })).toBe(false);
+    expect(
+      canContinueStep1({
+        unit_id: null,
+        role: null,
+        agency_id: null,
+        agency_other_name: "",
+        ...validContact,
+      }),
+    ).toBe(false);
   });
 
-  it("is disabled when only a property is picked", () => {
-    expect(canContinueStep1({ unit_id: "u1", role: null })).toBe(false);
+  it("is disabled when only a property is picked (no role)", () => {
+    expect(
+      canContinueStep1({
+        unit_id: "u1",
+        role: null,
+        agency_id: null,
+        agency_other_name: "",
+        ...validContact,
+      }),
+    ).toBe(false);
   });
 
-  it("is disabled when only a role is picked", () => {
-    expect(canContinueStep1({ unit_id: null, role: "owner" })).toBe(false);
-    expect(canContinueStep1({ unit_id: null, role: "agent" })).toBe(false);
+  it("is disabled when only a role is picked (no property)", () => {
+    expect(
+      canContinueStep1({
+        unit_id: null,
+        role: "owner",
+        agency_id: null,
+        agency_other_name: "",
+        ...validContact,
+      }),
+    ).toBe(false);
   });
 
   it("is disabled when the property id is the empty string", () => {
     // Defensive: empty strings are falsy and must not satisfy the gate.
-    expect(canContinueStep1({ unit_id: "", role: "owner" })).toBe(false);
+    expect(canContinueStep1({ ...ownerComplete, unit_id: "" })).toBe(false);
   });
 
-  it("becomes enabled only once BOTH a property and a role are picked", () => {
-    expect(canContinueStep1({ unit_id: "u1", role: "owner" })).toBe(true);
-    expect(canContinueStep1({ unit_id: "u2", role: "agent" })).toBe(true);
+  it("is enabled for an owner once unit + role + valid contact are filled", () => {
+    expect(canContinueStep1(ownerComplete)).toBe(true);
+  });
+
+  it("is enabled for an agent once unit + role + valid contact + real agency are filled", () => {
+    expect(canContinueStep1(agentComplete)).toBe(true);
+  });
+
+  it("is disabled for an agent who hasn't picked an agency yet", () => {
+    expect(canContinueStep1({ ...agentComplete, agency_id: null })).toBe(false);
+  });
+
+  it("is disabled for an agent who picked 'Other' but hasn't typed a company name", () => {
+    expect(
+      canContinueStep1({
+        ...agentComplete,
+        agency_id: OTHER_AGENCY_ID,
+        agency_other_name: "",
+      }),
+    ).toBe(false);
+  });
+
+  it("is enabled for an agent who picked 'Other' and provided a company name", () => {
+    expect(
+      canContinueStep1({
+        ...agentComplete,
+        agency_id: OTHER_AGENCY_ID,
+        agency_other_name: "Westside Property Co.",
+      }),
+    ).toBe(true);
+  });
+
+  it("is disabled when any required contact field is blank", () => {
+    expect(canContinueStep1({ ...ownerComplete, contact_first_name: "" })).toBe(false);
+    expect(canContinueStep1({ ...ownerComplete, contact_last_name: "" })).toBe(false);
+    expect(canContinueStep1({ ...ownerComplete, contact_email: "" })).toBe(false);
+    expect(canContinueStep1({ ...ownerComplete, contact_phone: "" })).toBe(false);
+  });
+
+  it("is disabled when the email looks malformed", () => {
+    expect(canContinueStep1({ ...ownerComplete, contact_email: "ada-at-example" })).toBe(false);
+  });
+
+  it("is disabled when the mobile has fewer than 10 digits", () => {
+    expect(canContinueStep1({ ...ownerComplete, contact_phone: "12345" })).toBe(false);
   });
 });
 
-describe("step counter / Schedule skipping for coordination flows", () => {
-  it("shows 6 visible steps including Schedule for a non-coordination flow", () => {
+describe("step counter / Slots skipping for coordination flows", () => {
+  it("shows 5 visible steps including Slots for a non-coordination flow", () => {
     const s = { access_method: null };
-    expect(totalSteps(s)).toBe(6);
-    expect(visibleSteps(s)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(totalSteps(s)).toBe(5);
+    expect(visibleSteps(s)).toEqual([1, 2, 3, 4, 5]);
     expect(isCoordinationFlow(s)).toBe(false);
   });
 
-  it("still shows 6 visible steps for non-coordination access methods (e.g. agent_be_there)", () => {
+  it("still shows 5 visible steps for non-coordination access methods (e.g. agent_be_there)", () => {
     const s = { access_method: "agent_be_there" as const };
-    expect(totalSteps(s)).toBe(6);
-    expect(visibleSteps(s)).toContain(5);
+    expect(totalSteps(s)).toBe(5);
+    expect(visibleSteps(s)).toContain(4);
     expect(isCoordinationFlow(s)).toBe(false);
   });
 
-  it("drops to 5 visible steps and skips Schedule (step 5) for every coordination access method", () => {
+  it("drops to 4 visible steps and skips Slots (step 4) for every coordination access method", () => {
     // Drives every entry of the canonical coordination set so the test
     // automatically covers any future additions to the set.
     const coordinationMethods: AccessMethod[] = Array.from(
@@ -84,24 +179,24 @@ describe("step counter / Schedule skipping for coordination flows", () => {
     for (const access_method of coordinationMethods) {
       const s = { access_method };
       expect(isCoordinationFlow(s)).toBe(true);
-      expect(totalSteps(s)).toBe(5);
-      expect(visibleSteps(s)).toEqual([1, 2, 3, 4, 6]);
-      expect(visibleSteps(s)).not.toContain(5);
+      expect(totalSteps(s)).toBe(4);
+      expect(visibleSteps(s)).toEqual([1, 2, 3, 5]);
+      expect(visibleSteps(s)).not.toContain(4);
     }
   });
 
-  it("the agent_tenant_self method is intentionally NOT a coordination flow (Schedule still required)", () => {
+  it("the agent_tenant_self method is intentionally NOT a coordination flow (Slots still required)", () => {
     // Spec note from bookingSession.ts: agent_tenant_self means the agent
     // arranges the slot directly with the tenant, so they still pick a slot.
     const s = { access_method: "agent_tenant_self" as const };
     expect(isCoordinationFlow(s)).toBe(false);
-    expect(totalSteps(s)).toBe(6);
-    expect(visibleSteps(s)).toContain(5);
+    expect(totalSteps(s)).toBe(5);
+    expect(visibleSteps(s)).toContain(4);
   });
 });
 
 describe("visibleIndex — progress-bar pill position", () => {
-  it("returns the natural 1..6 position for every step in a non-coordination flow", () => {
+  it("returns the natural 1..5 position for every step in a non-coordination flow", () => {
     const s = { access_method: null };
     const expected: Array<[StepId, number]> = [
       [1, 1],
@@ -109,7 +204,6 @@ describe("visibleIndex — progress-bar pill position", () => {
       [3, 3],
       [4, 4],
       [5, 5],
-      [6, 6],
     ];
     for (const [step, pos] of expected) {
       expect(visibleIndex(s, step)).toBe(pos);
@@ -118,76 +212,72 @@ describe("visibleIndex — progress-bar pill position", () => {
 
   it("treats a non-coordination access method (agent_be_there) the same as a null one", () => {
     const s = { access_method: "agent_be_there" as const };
+    expect(visibleIndex(s, 4)).toBe(4);
     expect(visibleIndex(s, 5)).toBe(5);
-    expect(visibleIndex(s, 6)).toBe(6);
   });
 
-  it("compresses positions to 1..5 in a coordination flow, with step 6 sliding into slot 5", () => {
-    // Schedule (step 5) is hidden, so the visible order is 1-2-3-4-6 and the
-    // progress-bar pill for step 6 must read "Step 5 of 5".
+  it("compresses positions to 1..4 in a coordination flow, with step 5 sliding into slot 4", () => {
+    // Slots (step 4) is hidden, so the visible order is 1-2-3-5 and the
+    // progress-bar pill for step 5 must read "Step 4 of 4".
     const s = { access_method: "agent_tenant_taylr" as const };
     expect(visibleIndex(s, 1)).toBe(1);
     expect(visibleIndex(s, 2)).toBe(2);
     expect(visibleIndex(s, 3)).toBe(3);
-    expect(visibleIndex(s, 4)).toBe(4);
-    expect(visibleIndex(s, 6)).toBe(5);
+    expect(visibleIndex(s, 5)).toBe(4);
   });
 
-  it("falls back to the last visible position when asked for a hidden step (step 5 in a coordination flow)", () => {
+  it("falls back to the last visible position when asked for a hidden step (step 4 in a coordination flow)", () => {
     // This guards the wrapper when it's mid-transition: the user sat on
-    // step 5, then picked a coordination method. The pill must not show
-    // "Step 0 of 5" or crash — it should read as if they're on step 6.
+    // step 4, then picked a coordination method. The pill must not show
+    // "Step 0 of 4" or crash — it should read as if they're on step 5.
     for (const access_method of COORDINATION_ACCESS_METHODS) {
       const s = { access_method };
-      expect(visibleIndex(s, 5)).toBe(totalSteps(s));
-      expect(visibleIndex(s, 5)).toBe(5);
+      expect(visibleIndex(s, 4)).toBe(totalSteps(s));
+      expect(visibleIndex(s, 4)).toBe(4);
     }
   });
 });
 
 describe("nextStepId — forward navigation that respects hidden steps", () => {
-  it("walks 1→2→3→4→5→6 in a non-coordination flow", () => {
+  it("walks 1→2→3→4→5 in a non-coordination flow", () => {
     const s = { access_method: null };
     expect(nextStepId(s, 1)).toBe(2);
     expect(nextStepId(s, 2)).toBe(3);
     expect(nextStepId(s, 3)).toBe(4);
     expect(nextStepId(s, 4)).toBe(5);
-    expect(nextStepId(s, 5)).toBe(6);
   });
 
   it("returns the same step when called from the last step (no next)", () => {
     // No-op at the end of the flow — the wrapper relies on this so the
     // "Continue" button can't push the user past the final step.
-    expect(nextStepId({ access_method: null }, 6)).toBe(6);
-    expect(nextStepId({ access_method: "agent_tenant_taylr" as const }, 6)).toBe(6);
+    expect(nextStepId({ access_method: null }, 5)).toBe(5);
+    expect(nextStepId({ access_method: "agent_tenant_taylr" as const }, 5)).toBe(5);
   });
 
-  it("skips Schedule (step 5) when going forward in a coordination flow", () => {
+  it("skips Slots (step 4) when going forward in a coordination flow", () => {
     for (const access_method of COORDINATION_ACCESS_METHODS) {
       const s = { access_method };
-      // 4 is the last visible step before Schedule, so next must jump to 6.
-      expect(nextStepId(s, 4)).toBe(6);
+      // 3 is the last visible step before Slots, so next must jump to 5.
+      expect(nextStepId(s, 3)).toBe(5);
       // Earlier steps still march forward one slot at a time.
       expect(nextStepId(s, 1)).toBe(2);
       expect(nextStepId(s, 2)).toBe(3);
-      expect(nextStepId(s, 3)).toBe(4);
     }
   });
 
   it("snaps forward to the next visible step when called from a hidden current step", () => {
-    // Edge case: user was on step 5 when they switched to a coordination
-    // access method. nextStepId(state, 5) must land on 6, not stall.
+    // Edge case: user was on step 4 when they switched to a coordination
+    // access method. nextStepId(state, 4) must land on 5, not stall.
     for (const access_method of COORDINATION_ACCESS_METHODS) {
       const s = { access_method };
-      expect(nextStepId(s, 5)).toBe(6);
+      expect(nextStepId(s, 4)).toBe(5);
     }
   });
 });
 
 describe("prevStepId — backward navigation that respects hidden steps", () => {
-  it("walks 6→5→4→3→2→1 in a non-coordination flow", () => {
+  it("walks 5→4→3→2→1 in a non-coordination flow", () => {
     const s = { access_method: null };
-    expect(prevStepId(s, 6)).toBe(5);
     expect(prevStepId(s, 5)).toBe(4);
     expect(prevStepId(s, 4)).toBe(3);
     expect(prevStepId(s, 3)).toBe(2);
@@ -201,13 +291,12 @@ describe("prevStepId — backward navigation that respects hidden steps", () => 
     expect(prevStepId({ access_method: "agent_tenant_taylr" as const }, 1)).toBe(1);
   });
 
-  it("skips Schedule (step 5) when going backward in a coordination flow", () => {
+  it("skips Slots (step 4) when going backward in a coordination flow", () => {
     for (const access_method of COORDINATION_ACCESS_METHODS) {
       const s = { access_method };
-      // From 6 we should jump straight back over the hidden Schedule step.
-      expect(prevStepId(s, 6)).toBe(4);
+      // From 5 we should jump straight back over the hidden Slots step.
+      expect(prevStepId(s, 5)).toBe(3);
       // Earlier steps still walk back one slot at a time.
-      expect(prevStepId(s, 4)).toBe(3);
       expect(prevStepId(s, 3)).toBe(2);
       expect(prevStepId(s, 2)).toBe(1);
     }
@@ -215,10 +304,10 @@ describe("prevStepId — backward navigation that respects hidden steps", () => 
 
   it("snaps backward to the previous visible step when called from a hidden current step", () => {
     // Mirror of the nextStepId hidden-current edge case: a user mid-switch
-    // sitting on step 5 in a coordination flow should be sent back to step 4.
+    // sitting on step 4 in a coordination flow should be sent back to step 3.
     for (const access_method of COORDINATION_ACCESS_METHODS) {
       const s = { access_method };
-      expect(prevStepId(s, 5)).toBe(4);
+      expect(prevStepId(s, 4)).toBe(3);
     }
   });
 });

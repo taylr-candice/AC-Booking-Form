@@ -22,7 +22,7 @@
  *  1. The wrapper renders the dedicated "Unit unavailable" terminal
  *     screen (title, body copy, "Pick another unit" CTA) when
  *     `unit_unavailable` flips on while the customer is sitting on
- *     Step 6 — and the active step iframe is unmounted at the same
+ *     Step 5 — and the active step iframe is unmounted at the same
  *     time (no dual-render).
  *  2. Tapping "Pick another unit" returns the customer to Step 1 with
  *     `unit_id` and `ac_discrepancy` cleared and the terminal flag
@@ -116,7 +116,7 @@ async function neutralizeIframe(iframe: HTMLIFrameElement): Promise<void> {
   });
 }
 
-/** Drive `bookingActions` to the same end-state the iframed Step 1..6
+/** Drive `bookingActions` to the same end-state the iframed Step 1..5
  *  pages would produce when the user fills them in by hand. The test
  *  can't tap the per-step buttons directly — happy-dom won't fetch
  *  the iframe sources, so the page UIs aren't reachable from inside
@@ -124,7 +124,7 @@ async function neutralizeIframe(iframe: HTMLIFrameElement): Promise<void> {
  *  iframed pages write to, so populating the store this way is
  *  observably indistinguishable from the user walking the wizard
  *  click-by-click. */
-function driveOwnerScheduledFlowToStep6() {
+function driveOwnerScheduledFlowToStep5() {
   bookingActions.setUnit("u1");
   bookingActions.setRole("owner");
   bookingActions.setContact({
@@ -146,14 +146,14 @@ function driveOwnerScheduledFlowToStep6() {
   bookingActions.setPrimaryResidence("live_in");
   bookingActions.setAccessMethod("owner_live_at_unit");
   bookingActions.setSchedule("2026-05-04", "am");
-  bookingActions.goToStep(6);
+  bookingActions.goToStep(5);
 }
 
 /** Same shape as the owner helper but for the agent / coordination
  *  flow: agency is set, access method is a coordination one (so
- *  Step 5 is hidden and there is no schedule to preserve). Used by
+ *  Step 4 is hidden and there is no schedule to preserve). Used by
  *  the second test to pin agency preservation. */
-function driveAgentCoordinationFlowToStep6() {
+function driveAgentCoordinationFlowToStep5() {
   bookingActions.setUnit("u3");
   bookingActions.setRole("agent");
   bookingActions.setAgency(AGENT_AGENCY_ID);
@@ -173,9 +173,9 @@ function driveAgentCoordinationFlowToStep6() {
     customer: { type: "unsure" },
   });
   // Coordination flow: Taylr arranges with the tenant. This hides
-  // Step 5 (Schedule) — there is no slot to preserve.
+  // Step 4 (Schedule) — there is no slot to preserve.
   bookingActions.setAccessMethod("agent_tenant_taylr");
-  bookingActions.goToStep(6);
+  bookingActions.goToStep(5);
 }
 
 // ─── Setup / teardown ──────────────────────────────────────────────────────
@@ -207,21 +207,21 @@ describe.each(VARIANTS)(
       async () => {
         const user = userEvent.setup();
 
-        // Populate the store as if the customer had walked Step 1..6
+        // Populate the store as if the customer had walked Step 1..5
         // by hand. (Why this can't go through the iframe UI: see the
         // file header.)
-        driveOwnerScheduledFlowToStep6();
+        driveOwnerScheduledFlowToStep5();
 
         const { findByTestId } = render(<Wrapper />);
 
-        // Pre-bounce sanity: the wrapper is showing the Step 6 iframe
+        // Pre-bounce sanity: the wrapper is showing the Step 5 iframe
         // (NOT the terminal yet). Without this, a regression that
         // always rendered the terminal would still pass the
         // post-flip assertions below.
-        const step6Iframe = (await findByTestId(
-          "flow-iframe-6",
+        const step5Iframe = (await findByTestId(
+          "flow-iframe-5",
         )) as HTMLIFrameElement;
-        await neutralizeIframe(step6Iframe);
+        await neutralizeIframe(step5Iframe);
         expect(
           screen.queryByTestId("text-terminal-title"),
         ).not.toBeInTheDocument();
@@ -270,7 +270,7 @@ describe.each(VARIANTS)(
         // left the iframe mounted alongside the terminal would still
         // pass the visual-content checks above; this pins the
         // wrapper's either/or contract.)
-        expect(screen.queryByTestId("flow-iframe-6")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("flow-iframe-5")).not.toBeInTheDocument();
 
         // ── Click the CTA under test ───────────────────────────────
         await user.click(cta);
@@ -329,17 +329,17 @@ describe.each(VARIANTS)(
       async () => {
         const user = userEvent.setup();
 
-        driveAgentCoordinationFlowToStep6();
+        driveAgentCoordinationFlowToStep5();
 
         const { findByTestId } = render(<Wrapper />);
 
-        // Coordination flow hides Step 5, so Step 6's iframe is the
-        // one mounted (visibleSteps: [1,2,3,4,6]). Pin that we're on
+        // Coordination flow hides Step 4, so Step 5's iframe is the
+        // one mounted (visibleSteps: [1,2,3,5]). Pin that we're on
         // the iframe before the terminal flips.
-        const step6Iframe = (await findByTestId(
-          "flow-iframe-6",
+        const step5Iframe = (await findByTestId(
+          "flow-iframe-5",
         )) as HTMLIFrameElement;
-        await neutralizeIframe(step6Iframe);
+        await neutralizeIframe(step5Iframe);
         expect(
           screen.queryByTestId("text-terminal-title"),
         ).not.toBeInTheDocument();

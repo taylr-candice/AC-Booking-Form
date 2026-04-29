@@ -15,7 +15,7 @@ import {
   INVOICE_PREPAYMENT_TITLE,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
-  isStep7PayEnabled,
+  isPayStepEnabled,
   labelForAccessMethod,
   labelForRole,
   PAY_NOW_LABEL,
@@ -46,7 +46,7 @@ export function PayDesktop() {
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
 
-  const payEnabled = isStep7PayEnabled(session) && method !== null;
+  const payEnabled = isPayStepEnabled(session) && method !== null;
   const ctaLabel =
     method === "invoice"
       ? "Submit booking"

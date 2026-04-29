@@ -9,10 +9,10 @@
  *   - contact_first_name / _last_name / _email / _phone
  *
  * Everything else is wiped back to {@link INITIAL_STATE} defaults — unit,
- * AC counts, primary residence, access method, every Step-5 follow-up,
- * the schedule, the cancellation acknowledgement, the AC discrepancy
- * snapshot — and `current_step` returns to 1 so the wrapper reopens on
- * the unit page.
+ * AC counts, primary residence, access method, every Step-3 (Access)
+ * follow-up, the schedule, the cancellation acknowledgement, the AC
+ * discrepancy snapshot — and `current_step` returns to 1 so the wrapper
+ * reopens on the unit page.
  *
  * This rule has no UI surface (the store enforces it on its own), so a
  * silent regression here would let stale unit / residence / access /
@@ -56,7 +56,7 @@ const SAMPLE_TENANT: Tenant = {
 function seedFullSession(opts: {
   agency_id?: string;
   access_method?: AccessMethod;
-  current_step?: 1 | 2 | 3 | 4 | 5 | 6;
+  current_step?: 1 | 2 | 3 | 4 | 5;
 } = {}) {
   bookingActions.setUnit("unit-123");
   bookingActions.setRole("owner");
@@ -216,7 +216,7 @@ describe("bookingActions.bookAnother — wipes non-identity fields", () => {
     expect(s.access_method).toBeNull();
   });
 
-  it("clears every Step-5 follow-up field (key holder, collection, return, managing agency, tenants, signature, notes)", () => {
+  it("clears every Step-3 (Access) follow-up field (key holder, collection, return, managing agency, tenants, signature, notes)", () => {
     seedFullSession();
 
     bookingActions.bookAnother();
@@ -259,7 +259,7 @@ describe("bookingActions.bookAnother — wipes non-identity fields", () => {
 
 describe("bookingActions.bookAnother — wrapper navigation", () => {
   it("returns current_step to 1 from the post-submission step", () => {
-    seedFullSession({ current_step: 6 });
+    seedFullSession({ current_step: 5 });
 
     bookingActions.bookAnother();
 
@@ -267,7 +267,7 @@ describe("bookingActions.bookAnother — wrapper navigation", () => {
   });
 
   it("returns current_step to 1 from any intermediate step", () => {
-    for (const step of [1, 2, 3, 4, 5, 6] as const) {
+    for (const step of [1, 2, 3, 4, 5] as const) {
       bookingActions.reset();
       seedFullSession({ current_step: step });
 

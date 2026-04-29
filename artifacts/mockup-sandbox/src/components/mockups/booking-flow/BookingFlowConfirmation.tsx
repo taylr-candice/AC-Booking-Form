@@ -9,7 +9,7 @@
  *   - Coordination: "Payment received" — explains who Taylr will
  *     contact next (tenant / managing agent) instead of a slot.
  *   - Cancelled: "Payment cancelled" — confirms no payment was taken
- *     and offers a "Try again" CTA back to Step 6 (spec §9 row
+ *     and offers a "Try again" CTA back to Step 5 (spec §9 row
  *     "Payment cancelled").
  *   - Unit unavailable: "Unit unavailable" — explains the unit was
  *     just booked by someone else and offers a "Pick another unit"
@@ -25,7 +25,7 @@
  *
  * The cancelled variant has no reference (no booking exists yet) and
  * its CTA calls `bookingActions.tryAgainAfterCancel()` which clears
- * the cancelled flag and points the wrapper at Step 6 with all of the
+ * the cancelled flag and points the wrapper at Step 5 with all of the
  * customer's answers intact.
  *
  * The unit-unavailable variant similarly has no reference. Its CTA
