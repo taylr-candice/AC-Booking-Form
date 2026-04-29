@@ -8,18 +8,27 @@
  */
 
 import {
+  Building2,
   CalendarClock,
   ChevronLeft,
-  PhoneOutgoing,
+  Circle,
+  KeyRound,
+  Mail,
+  Phone,
   ReceiptText,
   RotateCcw,
   TriangleAlert,
+  Users,
   XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { accessOnTheDayDescription } from "@/state/accessMethodCatalog";
 import {
   bookerAgencyName,
+  coordinationContactForBooking,
+  formatCoordinationWaiting,
+  formatLastContacted,
   getBuildingForUnit,
   getRolloutById,
   requiresTenantCoordination,
@@ -27,12 +36,14 @@ import {
   type AdminAgent,
   type AdminBooking,
   type AdminUnit,
+  type CoordinationContact,
   type ServiceStatus,
+  type TimelineEntry,
 } from "@/state/adminMockData";
 
 import { Card, Field } from "./atoms";
 import { CancelBookingModal } from "./CancelBookingModal";
-import { LastChasedChip, PaymentChip, ServiceChip, SlotCell, WaitingChip } from "./chips";
+import { PaymentChip, ServiceChip, SlotCell } from "./chips";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 import { UndoConflictDialog, type UndoConflictTakenBy } from "./UndoConflictDialog";
 
@@ -119,9 +130,17 @@ export function BookingDetail({
   // admin can choose to open the reschedule picker instead. `null`
   // means no conflict is being shown.
   const [undoConflict, setUndoConflict] = useState<UndoConflictTakenBy | null>(null);
+  // Log-call / Log-email popovers — small inline forms anchored under
+  // the right-column action buttons. Closed automatically when the
+  // user navigates to a different booking so a stale draft can't end
+  // up appended to the wrong row's timeline.
+  const [showLogCall, setShowLogCall] = useState(false);
+  const [showLogEmail, setShowLogEmail] = useState(false);
   useEffect(() => {
     setShowCancel(false);
     setUndoConflict(null);
+    setShowLogCall(false);
+    setShowLogEmail(false);
   }, [bookingId]);
 
   // Whenever the selected booking changes, pull the freshest notes value.
@@ -200,20 +219,51 @@ export function BookingDetail({
   }
 
   /**
-   * Record a chase: stamp `lastContactedAt` with the current ISO time
-   * and append a service-timeline marker so the audit trail captures
-   * who chased and when. Called from the Schedule card affordance —
-   * disabled for the live demo row (read-only) and for cancelled rows
-   * (no point chasing a closed booking).
+   * Append a "Logged call" entry to the service timeline and stamp
+   * `lastContactedAt` with the current ISO time so the booking's
+   * coordination-aging signals stay accurate. Outcome is encoded in
+   * the entry label ("Logged call · No answer" / "Spoke to tenant"
+   * / "Left voicemail"); free-text colour goes on the `note` field
+   * so the timeline can render it inline. Replaces the previous
+   * "Mark as chased" button — every chase now has structure.
    */
-  function markAsChased() {
+  function logCall(outcome: CallOutcome, note: string) {
     if (!booking) return;
     const nowIso = new Date().toISOString();
-    const newEntry = {
-      status: "chased",
-      label: "Marked as chased",
+    const newEntry: TimelineEntry = {
+      kind: "call",
+      status: "logged_call",
+      label: `Logged call · ${CALL_OUTCOME_LABEL[outcome]}`,
       at: "Just now",
       by: "Mia (admin)",
+      ...(note.trim().length > 0 ? { note: note.trim() } : {}),
+    };
+    onUpdate(booking.id, {
+      lastContactedAt: nowIso,
+      serviceTimeline: [...booking.serviceTimeline, newEntry],
+    });
+  }
+
+  /**
+   * Append a "Logged email" entry to the service timeline and stamp
+   * `lastContactedAt`. Subject is encoded in the entry label so the
+   * timeline reads as a one-line summary; the body / context goes on
+   * `note`. Same shape as {@link logCall}, just with `kind: "email"`.
+   */
+  function logEmail(subject: string, note: string) {
+    if (!booking) return;
+    const nowIso = new Date().toISOString();
+    const trimmedSubject = subject.trim();
+    const newEntry: TimelineEntry = {
+      kind: "email",
+      status: "logged_email",
+      label:
+        trimmedSubject.length > 0
+          ? `Logged email · ${trimmedSubject}`
+          : "Logged email",
+      at: "Just now",
+      by: "Mia (admin)",
+      ...(note.trim().length > 0 ? { note: note.trim() } : {}),
     };
     onUpdate(booking.id, {
       lastContactedAt: nowIso,
@@ -422,38 +472,46 @@ export function BookingDetail({
           </Card>
         </div>
 
-        {/* Right column: timelines */}
+        {/* Right column: schedule + access + timelines */}
         <div className="flex flex-col gap-4">
           <Card title="Schedule">
             <SlotCell booking={booking} />
-            {booking.serviceSlot === "to_be_coordinated" && (
-              <div className="mt-3 flex flex-col items-start gap-2">
-                <WaitingChip createdAt={booking.createdAt} />
-                <LastChasedChip lastContactedAt={booking.lastContactedAt} />
-                {!booking.isLive && !isCancelled && (
-                  <button
-                    type="button"
-                    onClick={markAsChased}
-                    data-testid="button-mark-chased"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-                    title="Stamp 'last contacted' with the current time and add a marker to the service timeline."
-                  >
-                    <PhoneOutgoing className="h-3.5 w-3.5" />
-                    Mark as chased
-                  </button>
-                )}
-                {!booking.isLive && onScheduleCoordination && (
-                  <button
-                    type="button"
-                    onClick={() => onScheduleCoordination(booking.id)}
-                    data-testid="button-schedule-appointment"
-                    className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
-                    style={{ backgroundColor: BRAND }}
-                  >
-                    Schedule appointment
-                  </button>
-                )}
-              </div>
+            {booking.serviceSlot === "to_be_coordinated" ? (
+              <CoordinationCoordinatePanel
+                booking={booking}
+                contact={coordinationContactForBooking(booking, unit, agents)}
+                isCancelled={isCancelled}
+                showLogCall={showLogCall}
+                showLogEmail={showLogEmail}
+                onOpenLogCall={() => {
+                  setShowLogEmail(false);
+                  setShowLogCall(true);
+                }}
+                onOpenLogEmail={() => {
+                  setShowLogCall(false);
+                  setShowLogEmail(true);
+                }}
+                onCloseLogCall={() => setShowLogCall(false)}
+                onCloseLogEmail={() => setShowLogEmail(false)}
+                onLogCall={(outcome, note) => {
+                  logCall(outcome, note);
+                  setShowLogCall(false);
+                }}
+                onLogEmail={(subject, note) => {
+                  logEmail(subject, note);
+                  setShowLogEmail(false);
+                }}
+                onScheduleCoordination={
+                  onScheduleCoordination
+                    ? () => onScheduleCoordination(booking.id)
+                    : undefined
+                }
+              />
+            ) : (
+              <AccessOnTheDayPanel
+                booking={booking}
+                contact={coordinationContactForBooking(booking, unit, agents)}
+              />
             )}
             {canReschedule && onRescheduleAppointment && (
               <div className="mt-3 flex items-start">
@@ -652,8 +710,6 @@ function nextStatusLabel(s: ServiceStatus): string {
   switch (s) {
     case "scheduled":
       return "Scheduled";
-    case "en_route":
-      return "En route";
     case "on_site":
       return "On site";
     case "complete":
@@ -738,11 +794,22 @@ function AcDiscrepancyBlock({
   );
 }
 
+/**
+ * Service / payment timeline. Renders a coloured-dot rail with one
+ * entry per row. Per-entry icon and accent are derived from
+ * {@link TimelineEntry.kind}: `"status"` (default) keeps the stack's
+ * accent colour and a filled dot; `"call"` and `"email"` flip to a
+ * neutral icon so the audit trail can show "Logged call …" /
+ * "Logged email …" rows distinct from the lifecycle dots above and
+ * below them. Optional `note` text is rendered in muted slate beneath
+ * the entry label so a Taylr admin can record context inline ("Spoke
+ * to tenant — confirmed Wed afternoon", "Sent rebook link", etc.).
+ */
 function Timeline({
   entries,
   accent,
 }: {
-  entries: { status: string; label: string; at: string; by: string }[];
+  entries: ReadonlyArray<TimelineEntry>;
   accent: string;
 }) {
   if (entries.length === 0) {
@@ -750,25 +817,459 @@ function Timeline({
   }
   return (
     <ol className="flex flex-col gap-3">
-      {entries.map((e, i) => (
-        <li key={i} className="flex gap-3">
-          <div className="flex flex-col items-center">
-            <span
-              className="block h-2 w-2 rounded-full"
-              style={{ backgroundColor: accent }}
-            />
-            {i < entries.length - 1 && (
-              <span className="mt-0.5 flex-1 w-px bg-slate-200" />
-            )}
-          </div>
-          <div className="-mt-0.5 flex-1 pb-1">
-            <div className="text-[12px] font-medium text-slate-900">{e.label}</div>
-            <div className="text-[11px] text-slate-500">
-              {e.at} · {e.by}
+      {entries.map((e, i) => {
+        const kind = e.kind ?? "status";
+        return (
+          <li key={i} className="flex gap-3" data-testid={`timeline-entry-${i}`}>
+            <div className="flex flex-col items-center">
+              <TimelineMarker kind={kind} accent={accent} />
+              {i < entries.length - 1 && (
+                <span className="mt-0.5 flex-1 w-px bg-slate-200" />
+              )}
             </div>
-          </div>
-        </li>
-      ))}
+            <div className="-mt-0.5 flex-1 pb-1">
+              <div className="text-[12px] font-medium text-slate-900">
+                {e.label}
+              </div>
+              {e.note && (
+                <div className="mt-0.5 text-[11px] text-slate-600">
+                  {e.note}
+                </div>
+              )}
+              <div className="mt-0.5 text-[11px] text-slate-500">
+                {e.at} · {e.by}
+              </div>
+            </div>
+          </li>
+        );
+      })}
     </ol>
+  );
+}
+
+function TimelineMarker({
+  kind,
+  accent,
+}: {
+  kind: NonNullable<TimelineEntry["kind"]>;
+  accent: string;
+}) {
+  if (kind === "call") {
+    return (
+      <span
+        className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-slate-600"
+        title="Logged phone call"
+      >
+        <Phone className="h-2.5 w-2.5" />
+      </span>
+    );
+  }
+  if (kind === "email") {
+    return (
+      <span
+        className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-slate-600"
+        title="Logged email"
+      >
+        <Mail className="h-2.5 w-2.5" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="block h-2 w-2 rounded-full"
+      style={{ backgroundColor: accent }}
+    />
+  );
+}
+
+// ─── Coordination + access panels ───────────────────────────────────────────
+
+type CallOutcome = "no_answer" | "spoke" | "voicemail";
+
+const CALL_OUTCOME_LABEL: Record<CallOutcome, string> = {
+  no_answer: "No answer",
+  spoke: "Spoke to them",
+  voicemail: "Left voicemail",
+};
+
+const CALL_OUTCOME_ORDER: ReadonlyArray<CallOutcome> = [
+  "no_answer",
+  "spoke",
+  "voicemail",
+];
+
+/**
+ * Right-column "Coordinating with" panel for `to_be_coordinated`
+ * bookings. Replaces the older WaitingChip / LastChasedChip / "Mark as
+ * chased" stack with a structured Who/How summary plus three explicit
+ * follow-up affordances: Log call, Log email, Schedule appointment.
+ *
+ * The waiting + last-contacted strings are rendered as muted helper
+ * text rather than coloured pills — the urgency now lives in the
+ * Awaiting-coordination queue's sort order, not in chip styling on
+ * the detail screen.
+ */
+function CoordinationCoordinatePanel({
+  booking,
+  contact,
+  isCancelled,
+  showLogCall,
+  showLogEmail,
+  onOpenLogCall,
+  onOpenLogEmail,
+  onCloseLogCall,
+  onCloseLogEmail,
+  onLogCall,
+  onLogEmail,
+  onScheduleCoordination,
+}: {
+  booking: AdminBooking;
+  contact: CoordinationContact | null;
+  isCancelled: boolean;
+  showLogCall: boolean;
+  showLogEmail: boolean;
+  onOpenLogCall: () => void;
+  onOpenLogEmail: () => void;
+  onCloseLogCall: () => void;
+  onCloseLogEmail: () => void;
+  onLogCall: (outcome: CallOutcome, note: string) => void;
+  onLogEmail: (subject: string, note: string) => void;
+  onScheduleCoordination?: () => void;
+}) {
+  const waiting = formatCoordinationWaiting(booking.createdAt);
+  const lastContacted = formatLastContacted(booking.lastContactedAt);
+  const canLog = !booking.isLive && !isCancelled;
+  return (
+    <div
+      className="mt-3 flex flex-col gap-3"
+      data-testid="coordination-panel"
+    >
+      <div
+        className="rounded-lg border p-3"
+        style={{ borderColor: BRAND_SOFT, backgroundColor: "#FCFAFD" }}
+      >
+        <div
+          className="text-[10px] uppercase tracking-wider"
+          style={{ color: BRAND_DEEP }}
+        >
+          Coordinating with
+        </div>
+        <ContactBlock contact={contact} />
+        <div className="mt-2 flex items-start gap-1.5 text-[11px] text-slate-600">
+          <KeyRound className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" />
+          <span data-testid="access-method-summary">
+            {accessOnTheDayDescription(booking.accessMethod)}
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="text-[11px] text-slate-500"
+        data-testid="coordination-waiting-text"
+      >
+        Waiting{waiting.label === "just now" ? " just now" : ` ${waiting.label}`}
+        {" · "}
+        {lastContacted.severity === "never"
+          ? "never contacted"
+          : `last contact ${lastContacted.label}`}
+      </div>
+
+      {canLog && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenLogCall}
+            data-testid="button-log-call"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+            title="Log a phone call attempt to the tenant or agent"
+          >
+            <Phone className="h-3.5 w-3.5" />
+            Log call
+          </button>
+          <button
+            type="button"
+            onClick={onOpenLogEmail}
+            data-testid="button-log-email"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+            title="Log an outbound email to the tenant or agent"
+          >
+            <Mail className="h-3.5 w-3.5" />
+            Log email
+          </button>
+          {onScheduleCoordination && (
+            <button
+              type="button"
+              onClick={onScheduleCoordination}
+              data-testid="button-schedule-coordination"
+              className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+              style={{ backgroundColor: BRAND }}
+            >
+              Schedule appointment
+            </button>
+          )}
+        </div>
+      )}
+
+      {showLogCall && canLog && (
+        <LogCallForm onCancel={onCloseLogCall} onSubmit={onLogCall} />
+      )}
+      {showLogEmail && canLog && (
+        <LogEmailForm onCancel={onCloseLogEmail} onSubmit={onLogEmail} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Right-column "Access on the day" panel for bookings that already have
+ * a concrete slot. Mirrors {@link CoordinationCoordinatePanel}'s
+ * Who/How structure so a Taylr admin reading either booking type sees
+ * the same shape — the difference is just whether we're still
+ * coordinating or the access plan is already locked in.
+ */
+function AccessOnTheDayPanel({
+  booking,
+  contact,
+}: {
+  booking: AdminBooking;
+  contact: CoordinationContact | null;
+}) {
+  return (
+    <div
+      className="mt-3 rounded-lg border p-3"
+      style={{ borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" }}
+      data-testid="access-on-the-day-panel"
+    >
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">
+        Access on the day
+      </div>
+      <ContactBlock contact={contact} />
+      <div className="mt-2 flex items-start gap-1.5 text-[11px] text-slate-600">
+        <KeyRound className="mt-0.5 h-3 w-3 shrink-0 text-slate-500" />
+        <span data-testid="access-method-summary">
+          {accessOnTheDayDescription(booking.accessMethod)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Renders the structured Who block for either panel. `tenant` shows
+ * each tenant on its own line with phone + email; `agent` shows the
+ * managing agency name; `booker` shows the contact captured on the
+ * booking itself (owner or agent), prefixed with the agency name when
+ * the booker is an agent.
+ */
+function ContactBlock({ contact }: { contact: CoordinationContact | null }) {
+  if (contact === null) {
+    return (
+      <div className="mt-1 text-[12px] text-slate-500">
+        Access method not yet confirmed.
+      </div>
+    );
+  }
+  if (contact.kind === "tenant") {
+    if (contact.tenants.length === 0) {
+      return (
+        <div className="mt-1 text-[12px] text-slate-500">
+          Tenant — details not captured yet.
+        </div>
+      );
+    }
+    return (
+      <div className="mt-1 flex flex-col gap-1.5" data-testid="contact-tenant">
+        {contact.tenants.map((t, i) => {
+          const fullName = `${t.first} ${t.last}`.trim() || `Tenant ${i + 1}`;
+          return (
+            <div key={`${t.email}-${i}`}>
+              <div className="flex items-center gap-1.5 text-[12px] font-medium text-slate-900">
+                <Users className="h-3 w-3 text-slate-500" />
+                Tenant — {fullName}
+              </div>
+              <div className="mt-0.5 pl-[18px] text-[11px] text-slate-600">
+                {t.phone || "—"} · {t.email || "—"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  if (contact.kind === "agent") {
+    return (
+      <div className="mt-1" data-testid="contact-agent">
+        <div className="flex items-center gap-1.5 text-[12px] font-medium text-slate-900">
+          <Building2 className="h-3 w-3 text-slate-500" />
+          Managing agent
+        </div>
+        <div className="mt-0.5 pl-[18px] text-[11px] text-slate-600">
+          {contact.agency ?? "Agency not on file"}
+        </div>
+      </div>
+    );
+  }
+  // booker
+  const role = contact.role === "agent" ? "Agent" : "Owner";
+  return (
+    <div className="mt-1" data-testid="contact-booker">
+      <div className="flex items-center gap-1.5 text-[12px] font-medium text-slate-900">
+        {contact.role === "agent" ? (
+          <Building2 className="h-3 w-3 text-slate-500" />
+        ) : (
+          <Circle className="h-3 w-3 text-slate-500" />
+        )}
+        {role}
+        {contact.agency ? ` — ${contact.agency}` : ""}
+      </div>
+      <div className="mt-0.5 pl-[18px] text-[11px] text-slate-600">
+        {contact.name}
+      </div>
+      <div className="pl-[18px] text-[11px] text-slate-600">
+        {contact.phone} · {contact.email}
+      </div>
+    </div>
+  );
+}
+
+function LogCallForm({
+  onCancel,
+  onSubmit,
+}: {
+  onCancel: () => void;
+  onSubmit: (outcome: CallOutcome, note: string) => void;
+}) {
+  const [outcome, setOutcome] = useState<CallOutcome>("no_answer");
+  const [note, setNote] = useState("");
+  return (
+    <div
+      className="rounded-lg border border-slate-200 bg-white p-3"
+      data-testid="log-call-form"
+    >
+      <div className="text-[12px] font-semibold text-slate-900">
+        Log a call
+      </div>
+      <label
+        className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+        htmlFor="log-call-outcome"
+      >
+        Outcome
+      </label>
+      <select
+        id="log-call-outcome"
+        value={outcome}
+        onChange={(e) => setOutcome(e.target.value as CallOutcome)}
+        data-testid="select-call-outcome"
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+      >
+        {CALL_OUTCOME_ORDER.map((o) => (
+          <option key={o} value={o}>
+            {CALL_OUTCOME_LABEL[o]}
+          </option>
+        ))}
+      </select>
+      <label
+        className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+        htmlFor="log-call-note"
+      >
+        Note (optional)
+      </label>
+      <textarea
+        id="log-call-note"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={2}
+        placeholder="e.g. Left voicemail, will try again Wed AM"
+        data-testid="input-call-note"
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+      />
+      <div className="mt-2 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onSubmit(outcome, note)}
+          data-testid="button-confirm-log-call"
+          className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+          style={{ backgroundColor: BRAND }}
+        >
+          Save call
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LogEmailForm({
+  onCancel,
+  onSubmit,
+}: {
+  onCancel: () => void;
+  onSubmit: (subject: string, note: string) => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [note, setNote] = useState("");
+  return (
+    <div
+      className="rounded-lg border border-slate-200 bg-white p-3"
+      data-testid="log-email-form"
+    >
+      <div className="text-[12px] font-semibold text-slate-900">
+        Log an email
+      </div>
+      <label
+        className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+        htmlFor="log-email-subject"
+      >
+        Subject
+      </label>
+      <input
+        id="log-email-subject"
+        type="text"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        placeholder="e.g. Booking access — please confirm window"
+        data-testid="input-email-subject"
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+      />
+      <label
+        className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+        htmlFor="log-email-note"
+      >
+        Note (optional)
+      </label>
+      <textarea
+        id="log-email-note"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={2}
+        placeholder="e.g. Sent rebook link + parcel-locker instructions"
+        data-testid="input-email-note"
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+      />
+      <div className="mt-2 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onSubmit(subject, note)}
+          data-testid="button-confirm-log-email"
+          className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+          style={{ backgroundColor: BRAND }}
+        >
+          Save email
+        </button>
+      </div>
+    </div>
   );
 }

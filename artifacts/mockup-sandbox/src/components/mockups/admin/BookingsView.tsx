@@ -136,7 +136,6 @@ export function BookingsView({
     : [
         { key: "all", label: "All statuses" },
         { key: "scheduled", label: "Scheduled" },
-        { key: "en_route", label: "En route" },
         { key: "on_site", label: "On site" },
         { key: "complete", label: "Complete" },
         { key: "cancelled", label: "Cancelled" },

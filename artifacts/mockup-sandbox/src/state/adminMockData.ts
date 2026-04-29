@@ -107,10 +107,13 @@ export type PaymentStatus = "paid" | "pending" | "refund_pending" | "refunded";
  * supersede of an invoice-pending booking by a paid one). It is
  * intentionally NOT part of {@link SERVICE_STATUS_FLOW} — the "Advance"
  * affordance must never reach it from the normal scheduled→complete walk.
+ *
+ * Note: there is no `en_route` state. Taylr doesn't track dispatch as a
+ * distinct lifecycle stage; bookings move straight from `scheduled` to
+ * `on_site` once the technician arrives.
  */
 export type ServiceStatus =
   | "scheduled"
-  | "en_route"
   | "on_site"
   | "complete"
   | "invoice_adjusted"
@@ -118,17 +121,36 @@ export type ServiceStatus =
 
 export const SERVICE_STATUS_FLOW: readonly ServiceStatus[] = [
   "scheduled",
-  "en_route",
   "on_site",
   "complete",
   "invoice_adjusted",
 ];
+
+/**
+ * Kind of timeline entry — drives the icon the renderer picks.
+ *
+ *  - `"status"` (default) — a lifecycle event ("Scheduled", "On site",
+ *    "Cancelled · …", etc.). Renders as the small status dot.
+ *  - `"call"` — Taylr logged a phone call attempt to the tenant/agent.
+ *  - `"email"` — Taylr logged an outbound email to the tenant/agent.
+ *
+ * Optional so existing seed data + every other call-site doesn't have
+ * to spell it out for the common "status" case.
+ */
+export type TimelineEntryKind = "status" | "call" | "email";
 
 export type TimelineEntry = {
   status: string;
   label: string;
   at: string; // human-readable timestamp
   by: string; // who did it ("System", "Mia (admin)", etc.)
+  /** What kind of event this is — drives the icon. Defaults to
+   *  `"status"` when omitted. */
+  kind?: TimelineEntryKind;
+  /** Optional one-line note Taylr typed when logging a call or email
+   *  ("Left voicemail", "Spoke to tenant — confirmed Wed afternoon",
+   *  "Sent rebook link", etc.). Rendered beneath the entry label. */
+  note?: string;
 };
 
 export type AdminBooking = {
@@ -520,14 +542,14 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     serviceDate: "2026-04-30",
     serviceSlot: "afternoon",
     paymentStatus: "paid",
-    serviceStatus: "en_route",
+    serviceStatus: "on_site",
     totalAud: 537,
     paymentTimeline: [
       { status: "paid", label: "Card charged · $537.00", at: "Apr 25 · 19:02", by: "System" },
     ],
     serviceTimeline: [
       { status: "scheduled", label: "Slot booked · 30 Apr · Afternoon", at: "Apr 25 · 19:02", by: "System" },
-      { status: "en_route", label: "Technician dispatched", at: "Apr 28 · 12:40", by: "Mia (admin)" },
+      { status: "on_site", label: "Arrived on site", at: "Apr 28 · 12:40", by: "Mia (admin)" },
     ],
     notes: "Customer reported 3 systems but we have 2 on record. Confirm head count on arrival.",
     rolloutId: "rl-ac-marine",
@@ -559,7 +581,6 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     serviceTimeline: [
       { status: "scheduled", label: "Slot booked · 30 Apr · Morning", at: "Apr 24 · 14:11", by: "System" },
-      { status: "en_route", label: "Technician dispatched", at: "Apr 28 · 08:22", by: "System" },
       { status: "on_site", label: "Arrived at unit", at: "Apr 28 · 09:05", by: "Tech (Yusuf)" },
     ],
     notes: "Tenant authorised by agent. Concierge to provide trade key.",
@@ -696,7 +717,6 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     serviceTimeline: [
       { status: "scheduled", label: "Slot booked · 22 Apr · Afternoon", at: "Apr 18 · 13:00", by: "System" },
-      { status: "en_route", label: "Technician dispatched", at: "Apr 22 · 12:40", by: "System" },
       { status: "on_site", label: "Arrived at unit", at: "Apr 22 · 13:08", by: "Tech (Sam)" },
       { status: "complete", label: "Service complete · report sent", at: "Apr 22 · 14:45", by: "Tech (Sam)" },
     ],
@@ -811,6 +831,77 @@ export function coordinationKindForBooking(
     return "awaiting_tenant";
   }
   return null;
+}
+
+/**
+ * Structured "who is on the hook for letting us in?" data for a booking
+ * — drives the admin "Coordinating with" panel (coordination bookings)
+ * and the "Access on the day" panel (scheduled bookings).
+ *
+ *   - `tenant`  — Taylr is contacting the tenant(s) directly
+ *                 (`owner_leased_tenant`, `agent_tenant_taylr`)
+ *   - `agent`   — Owner has nominated their managing agent to coordinate
+ *                 (`owner_leased_agent`); agency name is pulled from the
+ *                 unit's `agentId` since `AdminBooking` doesn't capture
+ *                 the chosen managing-agency id.
+ *   - `booker`  — Whoever placed the booking is the contact: the owner
+ *                 for owner-side methods, the agent for agent-side
+ *                 methods. Most "be there" / "leave key" / "collect &
+ *                 return" / "parcel locker" / "agent self / trade key"
+ *                 methods land here.
+ *
+ *  Returns `null` only when the booking has no usable access method
+ *  (`agent_tenant_pending` — a transient state that should never reach
+ *  the admin), so the panel can be rendered conditionally.
+ */
+export type CoordinationContact =
+  | {
+      kind: "tenant";
+      tenants: AdminBooking["tenants"];
+    }
+  | {
+      kind: "agent";
+      agency: string | null;
+    }
+  | {
+      kind: "booker";
+      role: AdminBooking["bookerRole"];
+      name: string;
+      email: string;
+      phone: string;
+      /** Agency name when the booker is an agent — surfaced above the
+       *  contact name so it's clear which company is on the hook. */
+      agency: string | null;
+    };
+
+export function coordinationContactForBooking(
+  booking: AdminBooking,
+  unit: AdminUnit | null,
+  agents: readonly AdminAgent[],
+): CoordinationContact | null {
+  const m = booking.accessMethod;
+  if (m === "owner_leased_tenant" || m === "agent_tenant_taylr") {
+    return { kind: "tenant", tenants: booking.tenants };
+  }
+  if (m === "owner_leased_agent") {
+    const agency =
+      unit && unit.agentId
+        ? agents.find((a) => a.id === unit.agentId)?.company ?? null
+        : null;
+    return { kind: "agent", agency };
+  }
+  if (m === "agent_tenant_pending") {
+    return null;
+  }
+  return {
+    kind: "booker",
+    role: booking.bookerRole,
+    name: booking.customerName,
+    email: booking.customerEmail,
+    phone: booking.customerPhone,
+    agency:
+      booking.bookerRole === "agent" ? bookerAgencyName(booking) : null,
+  };
 }
 
 // ─── Coordination aging ────────────────────────────────────────────────────
@@ -1523,8 +1614,8 @@ export function latestBookingByUnit(
  *   across this building's bookings (coordination bookings without a
  *   date are excluded). `null` when nothing is scheduled.
  * - `nextScheduled` is the next future booking (today or later) in
- *   `scheduled` / `en_route` status — what the admin should care
- *   about when planning the week.
+ *   `scheduled` status — what the admin should care about when
+ *   planning the week.
  * - `coordinationCount` is bookings whose slot is `to_be_coordinated`,
  *   surfaced separately because they don't fit on the schedule strip.
  */
@@ -1586,7 +1677,7 @@ export function summarizeBuildingRollout(
     .filter(
       (b) =>
         b.serviceDate >= todayIso &&
-        (b.serviceStatus === "scheduled" || b.serviceStatus === "en_route") &&
+        b.serviceStatus === "scheduled" &&
         (b.serviceSlot === "morning" ||
           b.serviceSlot === "afternoon" ||
           b.serviceSlot === "evening"),
@@ -2428,7 +2519,6 @@ export function priorServiceStatusFromTimeline(
     if (status === "rescheduled") continue;
     if (
       status === "scheduled" ||
-      status === "en_route" ||
       status === "on_site" ||
       status === "complete" ||
       status === "invoice_adjusted"

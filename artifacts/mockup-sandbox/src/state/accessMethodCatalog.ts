@@ -162,6 +162,49 @@ export function isManagingAgentMethod(m: AccessMethod | null): boolean {
   return m === "owner_leased_agent";
 }
 
+/**
+ * One-line plain-English summary of how access happens on the day, used
+ * by the admin "Access on the day" / "Coordinating with" panels. Kept
+ * deliberately short — the rest of the booking detail surfaces the
+ * deeper context (key holder name, agency, signed authorisations etc.)
+ * — so this just answers "in plain language, what's the plan?".
+ *
+ * Returns a fallback for the transient `agent_tenant_pending` state and
+ * for `null` so the panel never has to special-case missing data.
+ */
+export function accessOnTheDayDescription(m: AccessMethod | null): string {
+  switch (m) {
+    case "owner_live_at_unit":
+    case "owner_leased_be_there":
+    case "owner_vacant_be_there":
+    case "agent_be_there":
+      return "Booker meets the technician at the unit";
+    case "owner_live_leave_key":
+    case "owner_leased_leave_key":
+    case "owner_vacant_leave_key":
+      return "Nominated key holder lets the technician in";
+    case "owner_live_parcel_locker":
+    case "owner_leased_parcel_locker":
+    case "owner_vacant_parcel_locker":
+      return "Parcel-locker drop code emailed 24 h before the window";
+    case "owner_live_collect":
+    case "owner_vacant_collect":
+      return "Taylr collects the key, services the unit, returns the key";
+    case "owner_leased_tenant":
+    case "agent_tenant_taylr":
+      return "Tenant lets the technician in — Taylr coordinates the time";
+    case "owner_leased_agent":
+      return "Managing agent coordinates access with the tenant";
+    case "agent_tenant_self":
+      return "Agent has briefed the tenant directly — tenant lets us in";
+    case "agent_trade_key":
+      return "Taylr collects & returns the agency trade key";
+    case "agent_tenant_pending":
+    case null:
+      return "Access method not yet confirmed";
+  }
+}
+
 // ─── Signature variants (spec §6.5 + §10.2) ─────────────────────────────────
 
 export const SIG_COLLECT_RETURN = `By signing below I agree to Taylr's Collect & Return Key Service Terms & Conditions: Taylr will collect the nominated key from the address provided, transport it under chain-of-custody, perform the booked service at the unit, and return the key by the chosen method. I authorise Taylr to take temporary custody of this key for the duration of this service. I understand the standard cancellation terms apply once a technician has been dispatched to collect the key.`;

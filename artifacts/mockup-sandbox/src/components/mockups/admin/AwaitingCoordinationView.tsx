@@ -24,8 +24,10 @@ import { ArrowDownNarrowWide, CheckCircle2, Clock, Search } from "lucide-react";
 import {
   bookerAgencyName,
   coordinationKindForBooking,
+  formatCoordinationWaiting,
   formatLastContacted,
   getBuildingForUnit,
+  SEEDED_AGENTS,
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
@@ -33,8 +35,8 @@ import {
 } from "@/state/adminMockData";
 
 import { CustomerCell } from "./BookingsView";
-import { LastChasedChip, PaymentChip, WaitingChip } from "./chips";
-import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+import { PaymentChip } from "./chips";
+import { BRAND } from "./theme";
 
 type Filter = "all" | CoordinationKind;
 
@@ -44,24 +46,79 @@ const FILTER_CHIPS: ReadonlyArray<{ key: Filter; label: string }> = [
   { key: "awaiting_agent", label: "Awaiting agent" },
 ];
 
-function WaitingOnChip({ kind }: { kind: CoordinationKind | null }) {
-  if (kind === null) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-        <Clock className="h-2.5 w-2.5" />
-        Unassigned
-      </span>
-    );
+/**
+ * Plain "who we're coordinating with" cell — replaces the older 3-chip
+ * stack (WaitingOnChip + WaitingChip + LastChasedChip). The first line
+ * names the contact (tenant + phone, or managing agency, or
+ * "Unassigned"); the second line shows total wait + last-contact
+ * recency in muted text. The urgency that was previously encoded in
+ * chip colour now lives in the queue's sort order, not in styling.
+ */
+function CoordinatingWithCell({
+  booking,
+  unit,
+  units,
+  kind,
+}: {
+  booking: AdminBooking;
+  unit: AdminUnit | undefined;
+  units: AdminUnit[];
+  kind: CoordinationKind | null;
+}) {
+  const waiting = formatCoordinationWaiting(booking.createdAt);
+  const lastContacted = formatLastContacted(booking.lastContactedAt);
+  const headerLabel =
+    kind === "awaiting_agent"
+      ? "Managing agent"
+      : kind === "awaiting_tenant"
+        ? "Tenant"
+        : "Unassigned";
+
+  let detail: string;
+  if (kind === "awaiting_tenant") {
+    const first = booking.tenants[0];
+    if (first) {
+      const fullName = `${first.first} ${first.last}`.trim() || "Tenant 1";
+      const extra =
+        booking.tenants.length > 1
+          ? ` · +${booking.tenants.length - 1} more`
+          : "";
+      detail = `${fullName} · ${first.phone || "—"}${extra}`;
+    } else {
+      detail = "Tenant details not captured";
+    }
+  } else if (kind === "awaiting_agent") {
+    // Look up the unit's managing agent (the agency name is on the
+    // unit, not the booking) so the cell stays consistent with the
+    // BookingDetail "Coordinating with" panel.
+    const lookup = unit ?? units.find((u) => u.id === booking.unitId);
+    const agency = lookup?.agentId
+      ? SEEDED_AGENTS.find((a) => a.id === lookup.agentId)?.company ?? null
+      : null;
+    detail = agency ?? "Agency not on file";
+  } else {
+    // No coordination bucket matched — surface the access method so
+    // ops at least know why this row is here.
+    detail = "Access method not yet confirmed";
   }
-  const label = kind === "awaiting_agent" ? "Managing agent" : "Tenant";
+
+  const waitingText =
+    waiting.label === "just now" ? "Waiting just now" : `Waiting ${waiting.label}`;
+  const lastContactText =
+    lastContacted.severity === "never"
+      ? "never contacted"
+      : `last contact ${lastContacted.label}`;
+
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-      style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
-    >
-      <Clock className="h-2.5 w-2.5" />
-      {label}
-    </span>
+    <div className="flex flex-col gap-0.5" data-testid="coordinating-with-cell">
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+        {headerLabel}
+      </div>
+      <div className="text-[12px] font-medium text-slate-900">{detail}</div>
+      <div className="text-[11px] text-slate-500">
+        {waitingText} · {lastContactText}
+      </div>
+    </div>
   );
 }
 
@@ -482,11 +539,12 @@ export function AwaitingCoordinationView({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col items-start gap-1">
-                        <WaitingOnChip kind={kind} />
-                        <WaitingChip createdAt={b.createdAt} />
-                        <LastChasedChip lastContactedAt={b.lastContactedAt} />
-                      </div>
+                      <CoordinatingWithCell
+                        booking={b}
+                        unit={unit}
+                        units={units}
+                        kind={kind}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <PaymentChip status={b.paymentStatus} />

@@ -129,7 +129,7 @@ export function SchedulingModal({
   const heading = isReschedule
     ? "Reschedule appointment"
     : isUndo
-      ? "Restore booking"
+      ? "Restore booking — pick a new slot"
       : "Schedule appointment";
   const confirmLabel = isReschedule
     ? "Confirm reschedule"
@@ -153,6 +153,13 @@ export function SchedulingModal({
       role="dialog"
       aria-modal="true"
       aria-label={dialogLabel}
+      data-testid={
+        isReschedule
+          ? "modal-reschedule-booking"
+          : isUndo
+            ? "modal-reschedule-booking"
+            : "modal-schedule-booking"
+      }
     >
       <div className="flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
@@ -181,6 +188,15 @@ export function SchedulingModal({
         </header>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {isUndo ? (
+            <div
+              data-testid="undo-reschedule-explainer"
+              className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] leading-relaxed text-amber-900"
+            >
+              The original slot was given to another booking. Pick a new date
+              and window to restore this booking into.
+            </div>
+          ) : null}
           <div className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[12px]">
             <SummaryItem
               label="Customer"

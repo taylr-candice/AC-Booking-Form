@@ -142,9 +142,9 @@ test.describe("Admin · Undo cancellation when slot was given away", () => {
     ).toBeVisible();
 
     await rescheduleModal
-      .getByTestId(`reschedule-slot-${RESTORE_DATE}__morning`)
+      .getByTestId(`rollout-pick-slot-${RESTORE_DATE}__morning`)
       .click();
-    await rescheduleModal.getByTestId("button-reschedule-confirm").click();
+    await rescheduleModal.getByTestId("button-confirm-undo-reschedule").click();
     await expect(rescheduleModal).toBeHidden();
 
     // 5. The booking is restored at the new slot and the undo
@@ -173,7 +173,7 @@ test.describe("Admin · Undo cancellation when slot was given away", () => {
     await expect(page.getByRole("button", { name: squatterRowName })).toBeVisible();
     await page.getByRole("button", { name: squatterRowName }).click();
     await expect(page.getByText(NEW_CUSTOMER_NAME).first()).toBeVisible();
-    await expect(page.getByText(NEW_CUSTOMER_EMAIL)).toBeVisible();
+    await expect(page.getByText(NEW_CUSTOMER_EMAIL).first()).toBeVisible();
     // Service date / slot for the second booking didn't move.
     await expect(page.getByText(SHARED_DATE).first()).toBeVisible();
     await expect(page.getByText(/morning/i).first()).toBeVisible();

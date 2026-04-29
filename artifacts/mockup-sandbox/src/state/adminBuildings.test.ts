@@ -332,7 +332,7 @@ describe("summarizeBuildingRollout", () => {
         unitId: "u-c",
         serviceDate: "2026-04-28",
         serviceSlot: "morning",
-        serviceStatus: "en_route",
+        serviceStatus: "scheduled",
       }),
     ];
     const summary = summarizeBuildingRollout(
