@@ -43,6 +43,7 @@ import {
   type AdminBooking,
   type AdminUnit,
   type CoordinationContact,
+  type EmailTemplate,
   type ServiceStatus,
   type TimelineEntry,
 } from "@/state/adminMockData";
@@ -90,6 +91,7 @@ export function BookingDetail({
   onUndoCancelBookingAndReschedule,
   onAcknowledgeSupersede,
   onLogEmailToast,
+  emailTemplates = EMAIL_TEMPLATES,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -134,6 +136,18 @@ export function BookingDetail({
    *  call-sites and tests that don't care about the toast remain
    *  valid — the timeline write happens regardless. */
   onLogEmailToast?: (templateLabel: string, subject: string) => void;
+  /** Live email-template catalog the per-row Log-email form's
+   *  template dropdown reads from. Defaults to the seeded
+   *  {@link EMAIL_TEMPLATES} so the screen stays usable in isolation
+   *  (and existing tests don't have to thread the prop through).
+   *  When mounted from `AdminApp` the prop is the mutable state owned
+   *  by the shell, so any add / edit / remove from the Email
+   *  templates panel shows up in the dropdown on the next render. The
+   *  form snapshots the chosen template's subject + note onto the
+   *  literal timeline entry, so editing or removing a template never
+   *  rewrites historical entries. Mirrors the bulk Log-email picker
+   *  on `AwaitingCoordinationView`. */
+  emailTemplates?: ReadonlyArray<EmailTemplate>;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
@@ -545,6 +559,7 @@ export function BookingDetail({
                     ? () => onScheduleCoordination(booking.id)
                     : undefined
                 }
+                emailTemplates={emailTemplates}
               />
             ) : (
               <AccessOnTheDayPanel
@@ -974,6 +989,7 @@ function CoordinationCoordinatePanel({
   onLogCall,
   onLogEmail,
   onScheduleCoordination,
+  emailTemplates,
 }: {
   booking: AdminBooking;
   contact: CoordinationContact | null;
@@ -987,6 +1003,7 @@ function CoordinationCoordinatePanel({
   onLogCall: (outcome: CallOutcome, note: string) => void;
   onLogEmail: (subject: string, note: string, templateLabel: string) => void;
   onScheduleCoordination?: () => void;
+  emailTemplates: ReadonlyArray<EmailTemplate>;
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
   const lastContacted = formatLastContacted(booking.lastContactedAt);
@@ -1102,7 +1119,11 @@ function CoordinationCoordinatePanel({
         <LogCallForm onCancel={onCloseLogCall} onSubmit={onLogCall} />
       )}
       {showLogEmail && canLog && (
-        <LogEmailForm onCancel={onCloseLogEmail} onSubmit={onLogEmail} />
+        <LogEmailForm
+          onCancel={onCloseLogEmail}
+          onSubmit={onLogEmail}
+          emailTemplates={emailTemplates}
+        />
       )}
     </div>
   );
@@ -1296,9 +1317,24 @@ function LogCallForm({
 function LogEmailForm({
   onCancel,
   onSubmit,
+  emailTemplates,
 }: {
   onCancel: () => void;
+  /** Receives the literal subject + note typed into the form, plus the
+   *  display label of the template that produced them (or the Custom
+   *  label when the picker is on Custom…). The literal subject and
+   *  note are what land on the timeline — snapshot-on-use — while the
+   *  label is forwarded by the AdminApp shell to its toast so a
+   *  per-row email reads the same as a bulk-logged one. */
   onSubmit: (subject: string, note: string, templateLabel: string) => void;
+  /** Live email-template catalog the dropdown reads from. Same prop
+   *  shape (and same snapshot-on-use semantics) as the bulk
+   *  Log-email form on `AwaitingCoordinationView`: picking a template
+   *  prefills subject + note (still editable), and the submitted
+   *  values are the literal strings — never a template id — so
+   *  editing or removing a template later never rewrites the
+   *  historical timeline entry. */
+  emailTemplates: ReadonlyArray<EmailTemplate>;
 }) {
   // Template picker mirrors the bulk-log-email form on
   // `AwaitingCoordinationView` so a single-booking email logged here
@@ -1316,6 +1352,19 @@ function LogEmailForm({
   );
   const [subject, setSubject] = useState("");
   const [note, setNote] = useState("");
+
+  /**
+   * Pick (or unpick) a saved email template from the dropdown above
+   * the subject input. Mirrors the bulk picker's behaviour:
+   *   - Selecting a real template id replaces both inputs with the
+   *     template's presets so the common case doesn't require typing.
+   *     Inputs stay editable so the admin can tweak per booking.
+   *   - Selecting `EMAIL_TEMPLATE_CUSTOM_ID` clears both inputs and
+   *     restores the historical free-text behaviour.
+   *   - If the dropdown id ever drifts (template removed mid-edit),
+   *     fall back to Custom rather than leaving the inputs in a
+   *     stale, half-prefilled state.
+   */
   function handleSelectTemplate(id: string) {
     setTemplateId(id);
     if (id === EMAIL_TEMPLATE_CUSTOM_ID) {
@@ -1323,12 +1372,14 @@ function LogEmailForm({
       setNote("");
       return;
     }
-    const tpl = EMAIL_TEMPLATES.find((t) => t.id === id);
+    const tpl = emailTemplates.find((t) => t.id === id);
     if (!tpl) {
-      // Defensive — the dropdown only renders ids from
-      // EMAIL_TEMPLATES + the Custom sentinel, but if the constant
-      // ever drifts, fall back to Custom rather than leaving the
-      // inputs in a stale, half-prefilled state.
+      // Defensive — the dropdown only renders ids from the live
+      // `emailTemplates` prop + the Custom sentinel, but if the prop
+      // changes mid-edit (template removed from the Email templates
+      // panel between render and select) we fall back to Custom
+      // rather than leaving the inputs in a stale, half-prefilled
+      // state.
       setTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
       setSubject("");
       setNote("");
@@ -1337,15 +1388,20 @@ function LogEmailForm({
     setSubject(tpl.subject);
     setNote(tpl.note);
   }
+
   function handleSubmit() {
     // Resolve the template's display name so the AdminApp toast can
     // confirm what landed; falls back to the Custom label whenever
     // the dropdown is on Custom (or — defensively — pointing at an
     // unknown id, which `handleSelectTemplate` should already prevent).
-    const tpl = EMAIL_TEMPLATES.find((t) => t.id === templateId);
+    // Resolved against the live `emailTemplates` prop so a renamed
+    // template surfaces its current name in the toast — the literal
+    // subject + note still snapshot onto the timeline entry.
+    const tpl = emailTemplates.find((t) => t.id === templateId);
     const templateLabel = tpl ? tpl.name : EMAIL_TEMPLATE_CUSTOM_LABEL;
     onSubmit(subject, note, templateLabel);
   }
+
   return (
     <div
       className="rounded-lg border border-slate-200 bg-white p-3"
@@ -1354,13 +1410,13 @@ function LogEmailForm({
       <div className="text-[12px] font-semibold text-slate-900">
         Log an email
       </div>
-      {/* Template picker — sits above the subject input so ops can
-          grab a saved preset in one click. Defaults to Custom… so
-          opening the form lands ops in the same free-text spot they
-          were before this picker existed. Selecting a template
-          prefills subject + note (still editable); selecting Custom…
-          clears them. Mirror of the dropdown in the bulk-log-email
-          form on `AwaitingCoordinationView`. */}
+      {/* Template picker — sits above the subject input so the admin
+          can grab a saved preset in one click. Defaults to Custom…
+          so opening the form lands the admin in the same free-text
+          spot they were before this picker existed. Selecting a
+          template prefills subject + note (still editable);
+          selecting Custom… clears them. Same dropdown shape as the
+          bulk Log-email form on `AwaitingCoordinationView`. */}
       <label
         className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
         htmlFor="log-email-template"
@@ -1375,7 +1431,7 @@ function LogEmailForm({
         className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
       >
         <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-        {EMAIL_TEMPLATES.map((tpl) => (
+        {emailTemplates.map((tpl) => (
           <option key={tpl.id} value={tpl.id}>
             {tpl.name}
           </option>

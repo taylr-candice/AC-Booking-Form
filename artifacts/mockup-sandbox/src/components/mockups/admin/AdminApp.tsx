@@ -1024,6 +1024,7 @@ export function AdminApp() {
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onLogEmailToast={logEmailToast}
+                emailTemplates={emailTemplates}
               />
             ) : (
               <BookingsView
@@ -1062,6 +1063,7 @@ export function AdminApp() {
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onLogEmailToast={logEmailToast}
+                emailTemplates={emailTemplates}
               />
             ) : (
               <AwaitingCoordinationView
