@@ -31,10 +31,12 @@ import {
   EMAIL_TEMPLATE_CUSTOM_LABEL,
   isCustomEmailTemplateLabel,
   EMAIL_TEMPLATES,
+  formatAttemptRecency,
   formatCoordinationWaiting,
   formatLastContacted,
   getBuildingForUnit,
   getRolloutById,
+  latestCoordinationAttempt,
   requiresTenantCoordination,
   SERVICE_STATUS_FLOW,
   type AdminAgent,
@@ -988,6 +990,14 @@ function CoordinationCoordinatePanel({
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
   const lastContacted = formatLastContacted(booking.lastContactedAt);
+  // Most-recent typed call/email entry for the row-level "Last
+  // attempt: spoke · 3d ago" line below. Mirrors the bookings list
+  // and Awaiting-coordination queue (Task #132) so the staleness
+  // signal an admin saw before clicking in stays visible on the
+  // detail screen too. `null` for bookings that have only been
+  // "Marked as chased" the legacy way (or never touched) — we just
+  // omit the line in that case rather than render an empty stub.
+  const latestAttempt = latestCoordinationAttempt(booking.serviceTimeline);
   const canLog = !booking.isLive && !isCancelled;
   return (
     <div
@@ -1023,6 +1033,34 @@ function CoordinationCoordinatePanel({
           ? "never contacted"
           : `last contact ${lastContacted.label}`}
       </div>
+
+      {latestAttempt && (() => {
+        // Same "Last attempt: spoke · 3d ago" line the bookings list
+        // and Awaiting-coordination queue render (Task #132). The
+        // recency suffix is sourced from the entry's own `loggedAt`
+        // (not the row-level `lastContactedAt`) so logging an email
+        // after a call shows the email's age rather than the call's.
+        // Crosses LAST_ATTEMPT_STALE_HOURS → flips into amber so the
+        // staleness signal stays consistent across the queue → detail
+        // handoff.
+        const recency = formatAttemptRecency(latestAttempt.loggedAt);
+        const isStale = recency?.severity === "stale";
+        return (
+          <div
+            className={`text-[11px] ${isStale ? "text-amber-700" : "text-slate-500"}`}
+            data-testid="booking-detail-last-attempt"
+            data-stale={isStale ? "true" : "false"}
+          >
+            Last attempt:{" "}
+            <span
+              className={`font-medium ${isStale ? "text-amber-800" : "text-slate-700"}`}
+            >
+              {latestAttempt.label}
+              {recency ? ` · ${recency.label}` : ""}
+            </span>
+          </div>
+        );
+      })()}
 
       {canLog && (
         <div className="flex flex-wrap items-center gap-2">

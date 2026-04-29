@@ -172,6 +172,83 @@ describe("BookingDetail · coordinating-with panel", () => {
       /tenants?/i,
     );
   });
+
+  /**
+   * The booking detail screen mirrors the bookings list +
+   * Awaiting-coordination queue's "Last attempt: spoke · 3d ago"
+   * line so the staleness signal an admin saw on the queue stays
+   * visible after they click in (Task #140). The line:
+   *   - Renders only when there's a typed call/email entry to point
+   *     at (legacy "Mark as chased"-only bookings keep the older
+   *     `last contact …` chase chip and nothing more).
+   *   - Reads `fresh` (slate text) when the latest entry's
+   *     `loggedAt` is younger than `LAST_ATTEMPT_STALE_HOURS`.
+   *   - Flips into the amber `stale` style once that threshold is
+   *     crossed — same `data-stale` boolean the queue uses, so a
+   *     visual-regression test could pin both surfaces against the
+   *     same attribute.
+   */
+  describe("Last attempt freshness line", () => {
+    it("omits the line when the booking has no logged call/email entries", () => {
+      renderDetail(makeBooking());
+      expect(screen.queryByTestId("booking-detail-last-attempt")).toBeNull();
+    });
+
+    it("renders a fresh (slate) Last attempt line for a recent call", () => {
+      const recentIso = new Date(
+        Date.now() - 3 * 60 * 60 * 1000, // 3h ago — well under the 48h stale threshold
+      ).toISOString();
+      renderDetail(
+        makeBooking({
+          lastContactedAt: recentIso,
+          serviceTimeline: [
+            {
+              kind: "call",
+              status: "logged_call",
+              label: "Logged call · Spoke to them",
+              at: "Today",
+              by: "Mia (admin)",
+              loggedAt: recentIso,
+            },
+          ],
+        }),
+      );
+      const line = screen.getByTestId("booking-detail-last-attempt");
+      expect(line.getAttribute("data-stale")).toBe("false");
+      // Driven by latestCoordinationAttempt → "spoke" label, plus a
+      // recency suffix from formatAttemptRecency.
+      expect(line.textContent).toMatch(/Last attempt:\s*spoke/);
+      expect(line.textContent).toMatch(/ago|just now/);
+    });
+
+    it("flips into the amber stale style once the latest attempt crosses LAST_ATTEMPT_STALE_HOURS", () => {
+      const staleIso = new Date(
+        Date.now() - 72 * 60 * 60 * 1000, // 3d ago — past the 48h threshold
+      ).toISOString();
+      renderDetail(
+        makeBooking({
+          lastContactedAt: staleIso,
+          serviceTimeline: [
+            {
+              kind: "email",
+              status: "logged_email",
+              label: "Logged email · Booking access — please confirm",
+              at: "3d ago",
+              by: "Mia (admin)",
+              loggedAt: staleIso,
+            },
+          ],
+        }),
+      );
+      const line = screen.getByTestId("booking-detail-last-attempt");
+      expect(line.getAttribute("data-stale")).toBe("true");
+      // Amber warning class — same hue the queue uses so the
+      // staleness cue is visually identical across surfaces.
+      expect(line.className).toContain("text-amber-700");
+      expect(line.textContent).toMatch(/Last attempt:/);
+      expect(line.textContent).toMatch(/3d ago/);
+    });
+  });
 });
 
 describe("BookingDetail · log call / log email", () => {
