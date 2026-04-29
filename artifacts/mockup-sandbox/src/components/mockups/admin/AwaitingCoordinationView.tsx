@@ -53,6 +53,34 @@ const FILTER_CHIPS: ReadonlyArray<{ key: Filter; label: string }> = [
 ];
 
 /**
+ * Outcome filter chips. Narrow the queue down to rows whose most
+ * recent `kind: "call" | "email"` timeline entry matches a specific
+ * outcome — e.g. "show me everyone we left a voicemail for so I can
+ * decide who to ring next" — or to rows with no logged attempts at
+ * all ("Never logged"). Composed on top of the waiting-on chip,
+ * building filter, and search.
+ */
+type OutcomeFilter =
+  | "all"
+  | "spoke"
+  | "no_answer"
+  | "voicemail"
+  | "email"
+  | "never_logged";
+
+const OUTCOME_FILTER_CHIPS: ReadonlyArray<{
+  key: OutcomeFilter;
+  label: string;
+}> = [
+  { key: "all", label: "Any outcome" },
+  { key: "spoke", label: "Spoke" },
+  { key: "no_answer", label: "No answer" },
+  { key: "voicemail", label: "Voicemail" },
+  { key: "email", label: "Email" },
+  { key: "never_logged", label: "Never logged" },
+];
+
+/**
  * Plain "who we're coordinating with" cell — replaces the older 3-chip
  * stack (WaitingOnChip + WaitingChip + LastChasedChip). The first line
  * names the contact (tenant + phone, or managing agency, or
@@ -193,6 +221,10 @@ export function AwaitingCoordinationView({
   const [showBulkLogCall, setShowBulkLogCall] = useState(false);
   const [bulkOutcome, setBulkOutcome] = useState<CallOutcome>("no_answer");
   const [bulkNote, setBulkNote] = useState("");
+  // Outcome chip filter — local because no other view needs to know
+  // which outcome ops are pivoting on, and resetting it on view
+  // remount matches how the bulk-action selection behaves.
+  const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
   // Pre-compute the kind for each coordination booking so we don't
   // recompute it on every filter / search keystroke. We include every
   // booking whose serviceSlot is `to_be_coordinated`; rows whose
@@ -243,6 +275,23 @@ export function AwaitingCoordinationView({
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
+    }
+    if (outcomeFilter !== "all") {
+      const latest = latestCoordinationAttempt(b.serviceTimeline);
+      if (outcomeFilter === "never_logged") {
+        if (latest !== null) return false;
+      } else if (outcomeFilter === "email") {
+        if (!latest || latest.kind !== "email") return false;
+      } else {
+        // spoke | no_answer | voicemail
+        if (
+          !latest ||
+          latest.kind !== "call" ||
+          latest.callOutcome !== outcomeFilter
+        ) {
+          return false;
+        }
+      }
     }
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
@@ -434,6 +483,40 @@ export function AwaitingCoordinationView({
             );
           })}
         </div>
+      </div>
+
+      {/* Outcome chip row — narrows the queue by the most recent
+          call/email outcome on each row, so a team lead can pull up
+          (say) "everyone we left a voicemail for" in one click and
+          decide who to ring next. Composes with the waiting-on chip,
+          building filter, and search above. */}
+      <div
+        className="flex flex-wrap items-center gap-1.5"
+        data-testid="awaiting-coordination-outcome-filter"
+      >
+        <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          Last attempt
+        </span>
+        {OUTCOME_FILTER_CHIPS.map((chip) => {
+          const active = outcomeFilter === chip.key;
+          return (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => setOutcomeFilter(chip.key)}
+              data-testid={`chip-outcome-${chip.key}`}
+              aria-pressed={active}
+              className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
+                active
+                  ? "text-white"
+                  : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+              style={active ? { backgroundColor: BRAND } : undefined}
+            >
+              {chip.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Ordering hint — explains the composite priority sort so ops
