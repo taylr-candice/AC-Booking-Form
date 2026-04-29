@@ -181,6 +181,37 @@ export function AdminApp() {
     );
   }
 
+  /**
+   * Bulk-mark several bookings as chased in one go. Mirrors the
+   * per-booking `markAsChased()` in `BookingDetail` (same `chased`
+   * timeline entry shape, same `lastContactedAt` stamp) but threads
+   * every selected id through a single `setSeededBookings` so we don't
+   * race on stale state when ops checks four rows at once. The live
+   * demo row is silently skipped — same guard as `updateBooking`.
+   */
+  function bulkMarkAsChased(ids: string[]) {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const nowIso = new Date().toISOString();
+    setSeededBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === "bk-live") return b;
+        if (!idSet.has(b.id)) return b;
+        const newEntry: TimelineEntry = {
+          status: "chased",
+          label: "Marked as chased",
+          at: "Just now",
+          by: "Mia (admin)",
+        };
+        return {
+          ...b,
+          lastContactedAt: nowIso,
+          serviceTimeline: [...b.serviceTimeline, newEntry],
+        };
+      }),
+    );
+  }
+
   // ── Cancel / Reschedule (Task #49) ─────────────────────────────────────
   //
   // Both flows are admin-only and the live demo row is read-only here
@@ -797,6 +828,7 @@ export function AdminApp() {
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}
                 onSchedule={(id) => setSchedulingBookingId(id)}
+                onBulkMarkAsChased={bulkMarkAsChased}
               />
             )
           ) : null}

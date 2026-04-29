@@ -18,7 +18,8 @@
  * — exactly the same click-through as the bookings list.
  */
 
-import { Clock, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Clock, Search } from "lucide-react";
 
 import {
   bookerAgencyName,
@@ -75,6 +76,7 @@ export function AwaitingCoordinationView({
   onSearch,
   onOpen,
   onSchedule,
+  onBulkMarkAsChased,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -89,7 +91,17 @@ export function AwaitingCoordinationView({
   /** Open the "Schedule appointment" modal for a coordination booking.
    *  Optional so this view stays usable in isolation. */
   onSchedule?: (id: string) => void;
+  /** Bulk-stamp `lastContactedAt` + append a "Marked as chased" entry
+   *  to the service timeline of every supplied booking. Same shape as
+   *  `BookingDetail.markAsChased()`. Optional so this view stays
+   *  usable in isolation. */
+  onBulkMarkAsChased?: (ids: string[]) => void;
 }) {
+  // Selection lives entirely in this view — once a bulk action fires
+  // we clear it. The live demo row is excluded from selection because
+  // `updateBooking` is a no-op for it (mirrors the per-booking
+  // affordance, which hides for live rows).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // Pre-compute the kind for each coordination booking so we don't
   // recompute it on every filter / search keystroke. We include every
   // booking whose serviceSlot is `to_be_coordinated`; rows whose
@@ -140,6 +152,84 @@ export function AwaitingCoordinationView({
     }
     return true;
   });
+
+  // Live-demo rows are read-only in this mockup, and cancelled rows
+  // can't be chased (mirrors the same `!isLive && !isCancelled` guard
+  // the per-booking "Mark as chased" button uses in BookingDetail).
+  // Cancelled bookings shouldn't normally appear here — the queue
+  // filters by `serviceSlot === "to_be_coordinated"` — but we apply
+  // the same constraint defensively so the bulk path can never get
+  // out of sync with the single-row path.
+  const selectableIds = useMemo(
+    () =>
+      filtered
+        .filter(({ b }) => !b.isLive && b.serviceStatus !== "cancelled")
+        .map(({ b }) => b.id),
+    [filtered],
+  );
+  // Drop any stale ids from the selection if a filter / search change
+  // hides them. This keeps "Mark N as chased" honest — the count and
+  // the action only ever refer to rows the user can actually see.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const visible = new Set(filtered.map(({ b }) => b.id));
+      let dirty = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (visible.has(id)) {
+          next.add(id);
+        } else {
+          dirty = true;
+        }
+      }
+      return dirty ? next : prev;
+    });
+  }, [filtered]);
+
+  const selectedCount = selectedIds.size;
+  const allSelectableSelected =
+    selectableIds.length > 0 &&
+    selectableIds.every((id) => selectedIds.has(id));
+  const someSelectableSelected =
+    selectedCount > 0 && !allSelectableSelected;
+
+  function toggleRow(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelectedIds((prev) => {
+      // Conventional table-checkbox semantics: if every visible
+      // selectable row is already in the selection, the next click
+      // clears; otherwise (none or a partial set) we top up the
+      // selection to include every visible selectable row.
+      const everyVisibleSelected =
+        selectableIds.length > 0 &&
+        selectableIds.every((id) => prev.has(id));
+      if (everyVisibleSelected) return new Set();
+      const next = new Set(prev);
+      for (const id of selectableIds) next.add(id);
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  function handleBulkChase() {
+    if (!onBulkMarkAsChased || selectedCount === 0) return;
+    onBulkMarkAsChased(Array.from(selectedIds));
+    clearSelection();
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -232,6 +322,26 @@ export function AwaitingCoordinationView({
         <table className="w-full text-left text-[13px]">
           <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
             <tr>
+              {onBulkMarkAsChased && (
+                <th className="w-10 px-4 py-3 font-semibold">
+                  <input
+                    type="checkbox"
+                    aria-label={
+                      allSelectableSelected
+                        ? "Clear all selections"
+                        : "Select all visible coordination bookings"
+                    }
+                    data-testid="checkbox-select-all-coordination"
+                    disabled={selectableIds.length === 0}
+                    checked={allSelectableSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelectableSelected;
+                    }}
+                    onChange={toggleAll}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-pink-600 focus:ring-pink-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </th>
+              )}
               <th className="px-4 py-3 font-semibold">Booking</th>
               <th className="px-4 py-3 font-semibold">Customer</th>
               <th className="px-4 py-3 font-semibold">Unit</th>
@@ -245,7 +355,10 @@ export function AwaitingCoordinationView({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-slate-500">
+                <td
+                  colSpan={onBulkMarkAsChased ? 9 : 8}
+                  className="px-4 py-10 text-center text-slate-500"
+                >
                   No coordination bookings match these filters.
                 </td>
               </tr>
@@ -253,6 +366,7 @@ export function AwaitingCoordinationView({
               filtered.map(({ b, kind }) => {
                 const unit = units.find((u) => u.id === b.unitId);
                 const building = getBuildingForUnit(unit ?? null);
+                const isSelected = selectedIds.has(b.id);
                 return (
                   <tr
                     key={b.id}
@@ -266,8 +380,32 @@ export function AwaitingCoordinationView({
                     tabIndex={0}
                     role="button"
                     aria-label={`Open booking ${b.id} for ${b.customerName}`}
-                    className="cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                    aria-selected={isSelected || undefined}
+                    className={`cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+                      isSelected ? "bg-pink-50/60" : ""
+                    }`}
                   >
+                    {onBulkMarkAsChased && (
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={
+                            b.isLive
+                              ? `Booking ${b.id} is read-only and cannot be selected`
+                              : b.serviceStatus === "cancelled"
+                                ? `Booking ${b.id} is cancelled and cannot be chased`
+                                : `Select booking ${b.id} for bulk chase`
+                          }
+                          data-testid={`checkbox-coordination-row-${b.id}`}
+                          disabled={b.isLive || b.serviceStatus === "cancelled"}
+                          checked={isSelected}
+                          onChange={() => toggleRow(b.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="h-4 w-4 cursor-pointer rounded border-slate-300 text-pink-600 focus:ring-pink-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 font-semibold text-slate-900">
                         {b.id}
@@ -348,6 +486,43 @@ export function AwaitingCoordinationView({
         Showing {filtered.length} of {totalCount} coordination booking
         {totalCount === 1 ? "" : "s"}.
       </div>
+
+      {/* Sticky bulk-action bar — only mounted when ops has actually
+          selected something. Pinned to the viewport bottom so it's
+          reachable even while scrolling a long queue. */}
+      {onBulkMarkAsChased && selectedCount > 0 && (
+        <div
+          role="region"
+          aria-label="Bulk actions for selected coordination bookings"
+          data-testid="bulk-action-bar-coordination"
+          className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
+        >
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-lg">
+            <span className="text-[13px] font-semibold text-slate-900">
+              {selectedCount} selected
+            </span>
+            <span className="text-slate-300">·</span>
+            <button
+              type="button"
+              onClick={handleBulkChase}
+              data-testid="button-bulk-mark-as-chased"
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+              style={{ backgroundColor: BRAND }}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Mark {selectedCount} as chased
+            </button>
+            <button
+              type="button"
+              onClick={clearSelection}
+              data-testid="button-bulk-clear-selection"
+              className="rounded-full px-2.5 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
