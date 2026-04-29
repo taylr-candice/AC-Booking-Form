@@ -39,6 +39,7 @@ import {
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
+  type CallTemplate,
   type CoordinationKind,
   type EmailTemplate,
 } from "@/state/adminMockData";
@@ -229,6 +230,7 @@ export function AwaitingCoordinationView({
   onBulkLogCall,
   onBulkLogEmail,
   emailTemplates = EMAIL_TEMPLATES,
+  callTemplates = CALL_TEMPLATES,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -296,6 +298,14 @@ export function AwaitingCoordinationView({
    *  remove from the Email templates panel shows up in the dropdown
    *  on the next render. */
   emailTemplates?: ReadonlyArray<EmailTemplate>;
+  /** Live call-template catalog the bulk Log-call dropdown reads
+   *  from. Mirror of `emailTemplates` for the call channel —
+   *  defaults to the seeded {@link CALL_TEMPLATES} so the view stays
+   *  usable in isolation, and is the shell's mutable state when
+   *  mounted from `AdminApp`. The form snapshots the chosen
+   *  template's note onto the literal timeline entry, so editing or
+   *  removing a template never rewrites historical entries. */
+  callTemplates?: ReadonlyArray<CallTemplate>;
 }) {
   // Selection lives entirely in this view — once a bulk action fires
   // we clear it. The live demo row is excluded from selection because
@@ -624,12 +634,12 @@ export function AwaitingCoordinationView({
       setBulkNote("");
       return;
     }
-    const tpl = CALL_TEMPLATES.find((t) => t.id === id);
+    const tpl = callTemplates.find((t) => t.id === id);
     if (!tpl) {
-      // Defensive — the dropdown only renders ids from
-      // `CALL_TEMPLATES` + the Custom sentinel — but if the catalog
-      // ever drifts, fall back to Custom rather than leaving the
-      // note in a stale, half-prefilled state.
+      // Defensive — the dropdown only renders ids from the live
+      // `callTemplates` prop + the Custom sentinel — but if the
+      // catalog ever drifts, fall back to Custom rather than leaving
+      // the note in a stale, half-prefilled state.
       setBulkCallTemplateId(CALL_TEMPLATE_CUSTOM_ID);
       setBulkNote("");
       return;
@@ -643,7 +653,9 @@ export function AwaitingCoordinationView({
     // confirm what landed; falls back to the Custom label whenever
     // the dropdown is on Custom (or — defensively — pointing at an
     // unknown id, which the select handler should already prevent).
-    const tpl = CALL_TEMPLATES.find((t) => t.id === bulkCallTemplateId);
+    // Resolved against the live `callTemplates` prop so a renamed
+    // template surfaces its current name in the toast.
+    const tpl = callTemplates.find((t) => t.id === bulkCallTemplateId);
     const templateLabel = tpl ? tpl.name : CALL_TEMPLATE_CUSTOM_LABEL;
     onBulkLogCall(
       Array.from(selectedIds),
@@ -1131,7 +1143,7 @@ export function AwaitingCoordinationView({
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
                 >
                   <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-                  {CALL_TEMPLATES.map((tpl) => (
+                  {callTemplates.map((tpl) => (
                     <option key={tpl.id} value={tpl.id}>
                       {tpl.name}
                     </option>

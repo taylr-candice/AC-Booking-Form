@@ -45,6 +45,7 @@ import {
   type AdminAgent,
   type AdminBooking,
   type AdminUnit,
+  type CallTemplate,
   type CoordinationContact,
   type EmailTemplate,
   type ServiceStatus,
@@ -96,6 +97,7 @@ export function BookingDetail({
   onLogCallToast,
   onLogEmailToast,
   emailTemplates = EMAIL_TEMPLATES,
+  callTemplates = CALL_TEMPLATES,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -164,6 +166,15 @@ export function BookingDetail({
    *  rewrites historical entries. Mirrors the bulk Log-email picker
    *  on `AwaitingCoordinationView`. */
   emailTemplates?: ReadonlyArray<EmailTemplate>;
+  /** Live call-template catalog the per-row Log-call form's template
+   *  dropdown reads from. Mirror of `emailTemplates` for the call
+   *  channel — defaults to the seeded {@link CALL_TEMPLATES} so the
+   *  screen stays usable in isolation, and is the shell's mutable
+   *  state when mounted from `AdminApp`. The form snapshots the
+   *  chosen template's note onto the literal timeline entry, so
+   *  editing or removing a template never rewrites historical
+   *  entries. */
+  callTemplates?: ReadonlyArray<CallTemplate>;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
@@ -588,6 +599,7 @@ export function BookingDetail({
                     : undefined
                 }
                 emailTemplates={emailTemplates}
+                callTemplates={callTemplates}
               />
             ) : (
               <AccessOnTheDayPanel
@@ -1018,6 +1030,7 @@ function CoordinationCoordinatePanel({
   onLogEmail,
   onScheduleCoordination,
   emailTemplates,
+  callTemplates,
 }: {
   booking: AdminBooking;
   contact: CoordinationContact | null;
@@ -1032,6 +1045,7 @@ function CoordinationCoordinatePanel({
   onLogEmail: (subject: string, note: string, templateLabel: string) => void;
   onScheduleCoordination?: () => void;
   emailTemplates: ReadonlyArray<EmailTemplate>;
+  callTemplates: ReadonlyArray<CallTemplate>;
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
   const lastContacted = formatLastContacted(booking.lastContactedAt);
@@ -1144,7 +1158,11 @@ function CoordinationCoordinatePanel({
       )}
 
       {showLogCall && canLog && (
-        <LogCallForm onCancel={onCloseLogCall} onSubmit={onLogCall} />
+        <LogCallForm
+          onCancel={onCloseLogCall}
+          onSubmit={onLogCall}
+          callTemplates={callTemplates}
+        />
       )}
       {showLogEmail && canLog && (
         <LogEmailForm
@@ -1272,6 +1290,7 @@ function ContactBlock({ contact }: { contact: CoordinationContact | null }) {
 function LogCallForm({
   onCancel,
   onSubmit,
+  callTemplates,
 }: {
   onCancel: () => void;
   onSubmit: (
@@ -1279,6 +1298,13 @@ function LogCallForm({
     note: string,
     templateLabel: string,
   ) => void;
+  /** Live call-template catalog the dropdown reads from. Same prop
+   *  shape (and same snapshot-on-use semantics) as the bulk Log-call
+   *  form on `AwaitingCoordinationView`: picking a template prefills
+   *  the note (still editable), and the submitted values are the
+   *  literal strings — never a template id — so editing or removing
+   *  a template later never rewrites the historical timeline entry. */
+  callTemplates: ReadonlyArray<CallTemplate>;
 }) {
   // Template picker mirrors the bulk-log-call form on
   // `AwaitingCoordinationView` (and the per-row Log email form
@@ -1303,12 +1329,14 @@ function LogCallForm({
       setNote("");
       return;
     }
-    const tpl = CALL_TEMPLATES.find((t) => t.id === id);
+    const tpl = callTemplates.find((t) => t.id === id);
     if (!tpl) {
-      // Defensive — the dropdown only renders ids from
-      // CALL_TEMPLATES + the Custom sentinel, but if the constant
-      // ever drifts, fall back to Custom rather than leaving the
-      // note in a stale, half-prefilled state.
+      // Defensive — the dropdown only renders ids from the live
+      // `callTemplates` prop + the Custom sentinel, but if the prop
+      // changes mid-edit (template removed from the Call templates
+      // panel between render and select) we fall back to Custom
+      // rather than leaving the note in a stale, half-prefilled
+      // state.
       setTemplateId(CALL_TEMPLATE_CUSTOM_ID);
       setNote("");
       return;
@@ -1320,7 +1348,10 @@ function LogCallForm({
     // confirm what landed; falls back to the Custom label whenever
     // the dropdown is on Custom (or — defensively — pointing at an
     // unknown id, which `handleSelectTemplate` should already prevent).
-    const tpl = CALL_TEMPLATES.find((t) => t.id === templateId);
+    // Resolved against the live `callTemplates` prop so a renamed
+    // template surfaces its current name in the toast — the literal
+    // note still snapshots onto the timeline entry.
+    const tpl = callTemplates.find((t) => t.id === templateId);
     const templateLabel = tpl ? tpl.name : CALL_TEMPLATE_CUSTOM_LABEL;
     onSubmit(outcome, note, templateLabel);
   }
@@ -1353,7 +1384,7 @@ function LogCallForm({
         className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
       >
         <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-        {CALL_TEMPLATES.map((tpl) => (
+        {callTemplates.map((tpl) => (
           <option key={tpl.id} value={tpl.id}>
             {tpl.name}
           </option>

@@ -2238,6 +2238,46 @@ export function nextEmailTemplateId(
 }
 
 /**
+ * Trim a draft call template's two free-text fields. Mirror of
+ * {@link normalizeEmailTemplateDraft} for the call channel — same
+ * snapshot-on-use semantics: the trim runs at Save time so stray
+ * whitespace from the form never reaches the saved list (and the
+ * dropdown rendered against it). Pure / data-only.
+ */
+export function normalizeCallTemplateDraft(draft: {
+  name: string;
+  note: string;
+}): { name: string; note: string } {
+  return {
+    name: draft.name.trim(),
+    note: draft.note.trim(),
+  };
+}
+
+/**
+ * Generate the next monotonic `call-tpl-N` id given the current
+ * call-template list. Mirror of {@link nextEmailTemplateId} but with a
+ * distinct `call-tpl-` prefix so a future combined audit / migration
+ * can tell email-template ids and call-template ids apart at a glance.
+ * Falls back to `call-tpl-1` when no numeric ids exist (so the very
+ * first user-created template after the seeded ones still gets a
+ * sensible id alongside the readable seeded slugs like
+ * `voicemail_left`). Pure / data-only.
+ */
+export function nextCallTemplateId(
+  templates: readonly CallTemplate[],
+): string {
+  let max = 0;
+  for (const t of templates) {
+    const m = /^call-tpl-(\d+)$/.exec(t.id);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `call-tpl-${max + 1}`;
+}
+
+/**
  * Per-system / per-extra prices used to compute `totalAud` for an
  * admin-created booking. Mirrors the customer-side total (see
  * `liveBookingFromSession` and the customer pricing card). Kept here so

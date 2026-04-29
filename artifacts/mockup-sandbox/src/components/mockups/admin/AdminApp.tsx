@@ -22,6 +22,7 @@ import {
   applyBulkLogEmail,
   bookingDurationMinutes,
   buildRescheduledTimelineEntry,
+  CALL_TEMPLATES,
   consumeBookingCapacity,
   convertCoordinationToScheduledPatch,
   createRollout,
@@ -30,7 +31,9 @@ import {
   formatBookingShortDate,
   getActiveBookingForUnit,
   liveBookingFromSession,
+  nextCallTemplateId,
   nextEmailTemplateId,
+  normalizeCallTemplateDraft,
   normalizeEmailTemplateDraft,
   notifyLiveBookingsChanged,
   notifyLiveUnitsChanged,
@@ -49,6 +52,7 @@ import {
   type AdminBuilding,
   type AdminCreatedScheduleChoice,
   type AdminUnit,
+  type CallTemplate,
   type EmailTemplate,
   type PaymentStatus,
   type ServiceStatus,
@@ -58,6 +62,7 @@ import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
+import { CallTemplatesView } from "./CallTemplatesView";
 import { EmailTemplatesView } from "./EmailTemplatesView";
 import {
   BookingDetail,
@@ -152,6 +157,45 @@ export function AdminApp() {
   }
   function removeEmailTemplate(id: string) {
     setEmailTemplates((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  // Mutable call-template catalog for the per-row Log-call form on
+  // `BookingDetail` and the bulk Log-call form on
+  // `AwaitingCoordinationView`. Mirror of `emailTemplates` above —
+  // seeded from {@link CALL_TEMPLATES}, mutated from the
+  // "Call templates" panel, and consumed live by both Log-call
+  // dropdowns. Editing or removing a template never rewrites
+  // historical timeline entries — both forms snapshot the template's
+  // note onto the entry at log time, not a template id, so the audit
+  // trail is immutable by construction.
+  const [callTemplates, setCallTemplates] = useState<CallTemplate[]>([
+    ...CALL_TEMPLATES,
+  ]);
+  function createCallTemplate(draft: { name: string; note: string }) {
+    const normalized = normalizeCallTemplateDraft(draft);
+    if (normalized.name.length === 0) {
+      // Modal already disables Save in this state; this guard keeps a
+      // future programmatic caller from sneaking a half-formed
+      // template into the catalog.
+      return;
+    }
+    setCallTemplates((prev) => [
+      ...prev,
+      { id: nextCallTemplateId(prev), ...normalized },
+    ]);
+  }
+  function updateCallTemplate(
+    id: string,
+    draft: { name: string; note: string },
+  ) {
+    const normalized = normalizeCallTemplateDraft(draft);
+    if (normalized.name.length === 0) return;
+    setCallTemplates((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...normalized } : t)),
+    );
+  }
+  function removeCallTemplate(id: string) {
+    setCallTemplates((prev) => prev.filter((t) => t.id !== id));
   }
 
   const [view, setView] = useState<ViewId>("bookings");
@@ -1087,6 +1131,7 @@ export function AdminApp() {
                 onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
                 emailTemplates={emailTemplates}
+                callTemplates={callTemplates}
               />
             ) : (
               <BookingsView
@@ -1127,6 +1172,7 @@ export function AdminApp() {
                 onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
                 emailTemplates={emailTemplates}
+                callTemplates={callTemplates}
               />
             ) : (
               <AwaitingCoordinationView
@@ -1144,6 +1190,7 @@ export function AdminApp() {
                 onBulkLogCall={bulkLogCall}
                 onBulkLogEmail={bulkLogEmail}
                 emailTemplates={emailTemplates}
+                callTemplates={callTemplates}
               />
             )
           ) : null}
@@ -1230,6 +1277,15 @@ export function AdminApp() {
               onCreate={createEmailTemplate}
               onUpdate={updateEmailTemplate}
               onRemove={removeEmailTemplate}
+            />
+          )}
+
+          {view === "call_templates" && (
+            <CallTemplatesView
+              templates={callTemplates}
+              onCreate={createCallTemplate}
+              onUpdate={updateCallTemplate}
+              onRemove={removeCallTemplate}
             />
           )}
         </main>
