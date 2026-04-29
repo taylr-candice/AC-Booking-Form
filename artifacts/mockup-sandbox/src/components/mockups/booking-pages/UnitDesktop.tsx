@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -25,7 +25,9 @@ import {
 import {
   findRolloutForBooking,
   getActiveBookingForUnit,
-  SEEDED_BOOKINGS,
+  getLiveBookings,
+  getLiveBookingsVersion,
+  subscribeLiveBookings,
   type ActiveBookingForUnit,
 } from "../../../state/adminMockData";
 
@@ -162,19 +164,35 @@ export function UnitDesktop() {
   //   - "none"             → bookable as normal.
   //
   // We deliberately ignore the live-demo session row here (it never
-  // appears in `SEEDED_BOOKINGS`), so a customer who already picked
-  // a unit and walked back doesn't block themselves.
+  // appears in the live bookings list), so a customer who already
+  // picked a unit and walked back doesn't block themselves.
+  //
+  // Reads via `getLiveBookings()` so cancel/reschedule/supersede
+  // mutations done in the admin shell are reflected immediately.
+  // The dependency on `bookingsRefreshKey` re-runs the memo whenever
+  // the admin shell bumps it after a mutation; in canvas-isolated mode
+  // (no admin shell) the key never changes and the source returns
+  // `SEEDED_BOOKINGS`, so behaviour is unchanged.
+  const liveBookingsVersion = useSyncExternalStore(
+    subscribeLiveBookings,
+    getLiveBookingsVersion,
+    getLiveBookingsVersion,
+  );
   const unitStatuses = useMemo(() => {
+    // `liveBookingsVersion` is intentionally read so the memo re-runs
+    // whenever the admin shell mutates the bookings list.
+    void liveBookingsVersion;
+    const liveBookings = getLiveBookings();
     const out = new Map<string, ActiveBookingForUnit>();
     for (const u of UNITS) {
       const rollout = findRolloutForBooking("svc-ac", u.id);
       out.set(
         u.id,
-        getActiveBookingForUnit(u.id, SEEDED_BOOKINGS, rollout?.id ?? null),
+        getActiveBookingForUnit(u.id, liveBookings, rollout?.id ?? null),
       );
     }
     return out;
-  }, []);
+  }, [liveBookingsVersion]);
   const selected = UNITS.find((u) => u.id === selectedId);
   const selectedStatus = selected ? unitStatuses.get(selected.id) : undefined;
   const canContinue = canContinueStep1({

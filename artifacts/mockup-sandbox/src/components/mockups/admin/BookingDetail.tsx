@@ -48,13 +48,13 @@ export function BookingDetail({
    *  Wired by `AdminApp` — the live demo row never reaches this. */
   onCancelBooking: (id: string, note: string) => void;
   /** Move a booking's slot. Reused capacity helpers ensure the rollout
-   *  view stays in sync. Note is REQUIRED for the audit trail
-   *  (Task #49 review) — the modal won't enable Confirm without one. */
+   *  view stays in sync. Note is OPTIONAL per spec T007 — only cancel
+   *  (T006) requires a note. */
   onRescheduleBooking: (
     id: string,
     date: string,
     window: "morning" | "afternoon",
-    note: string,
+    note?: string,
   ) => void;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);

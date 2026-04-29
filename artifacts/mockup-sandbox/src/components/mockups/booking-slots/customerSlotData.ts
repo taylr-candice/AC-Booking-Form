@@ -24,8 +24,8 @@
 import {
   findRolloutForBooking,
   getActiveBookingForUnit,
+  getLiveBookings,
   rolloutSlotStatus,
-  SEEDED_BOOKINGS,
   type AdminBooking,
   type AdminRollout,
   type RolloutSlotStatus,
@@ -137,8 +137,13 @@ export function disabledReasonForStatus(
  * stuck.
  *
  * The customer's own in-progress booking (the live-demo session row)
- * never appears in `SEEDED_BOOKINGS`, so we don't need to filter it
- * out by id — the seeded list is naturally "everyone but me".
+ * never appears in the live bookings list, so we don't need to filter
+ * it out by id — the list is naturally "everyone but me".
+ *
+ * Reads the *live* bookings via {@link getLiveBookings} so cancellation
+ * / reschedule / supersede mutations made in the admin shell are
+ * reflected immediately. In canvas-isolated mode (no admin shell
+ * mounted) the source falls back to `SEEDED_BOOKINGS`.
  *
  * Task #49 review: previously this only returned paid bookings, which
  * meant the second tenant could still walk the picker even though the
@@ -156,7 +161,7 @@ export function alreadyScheduledByOther(
   if (!unitId) return null;
   const rollout = findRolloutForBooking("svc-ac", unitId);
   if (!rollout) return null;
-  const verdict = getActiveBookingForUnit(unitId, SEEDED_BOOKINGS, rollout.id);
+  const verdict = getActiveBookingForUnit(unitId, getLiveBookings(), rollout.id);
   if (verdict.kind === "paid")
     return { booking: verdict.booking, kind: "paid" };
   if (verdict.kind === "invoice_pending")

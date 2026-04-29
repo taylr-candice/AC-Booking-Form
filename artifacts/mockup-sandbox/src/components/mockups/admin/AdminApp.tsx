@@ -25,11 +25,13 @@ import {
   findRolloutForBooking,
   getActiveBookingForUnit,
   liveBookingFromSession,
+  notifyLiveBookingsChanged,
   releaseBookingCapacity,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
   SEEDED_BUILDINGS,
   SEEDED_UNITS,
+  setLiveBookingsSource,
   updateRolloutSlot,
   type AdminAgent,
   type AdminBooking,
@@ -72,6 +74,10 @@ export function AdminApp() {
   const [rolloutsRefreshKey, setRolloutsRefreshKey] = useState(0);
   function bumpRolloutsRefreshKey() {
     setRolloutsRefreshKey((k) => k + 1);
+    // Notify customer-side subscribers (slot pickers, unit tiles) that
+    // the live bookings list changed so their "already scheduled by
+    // someone else" lock and unit-availability badges re-evaluate.
+    notifyLiveBookingsChanged();
   }
 
   // Live customer booking pulled from sessionStorage.
@@ -202,21 +208,30 @@ export function AdminApp() {
     setSeededBookings((prev) =>
       prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
     );
-    if (releaseOk) bumpRolloutsRefreshKey();
+    // Cancel always changes the booking's lifecycle, so customer-side
+    // subscribers (slot pickers + unit tiles) MUST be told even when
+    // the booking had no concrete slot to release (coordination /
+    // unscheduled). Keep `releaseOk` to gate the rollouts refresh
+    // (capacity didn't change in that case) but always notify
+    // live-bookings subscribers via `notifyLiveBookingsChanged`.
+    if (releaseOk) {
+      bumpRolloutsRefreshKey();
+    } else {
+      notifyLiveBookingsChanged();
+    }
   }
 
   function rescheduleBooking(
     id: string,
     date: string,
     window: "morning" | "afternoon",
-    note: string,
+    note?: string,
   ) {
     if (id === "bk-live") return;
-    // Reschedule note is mandatory for the audit trail (Task #49
-    // review). Defensive trim+empty check at the handler too so a
-    // future caller can't bypass the modal's gate.
-    const trimmedNote = note.trim();
-    if (trimmedNote.length === 0) return;
+    // Per spec T007 the reschedule note is OPTIONAL — only cancel
+    // (T006) requires a note. Trim defensively so accidental
+    // whitespace doesn't leak into the audit-trail label.
+    const trimmedNote = note?.trim() ?? "";
     const booking = seededBookings.find((b) => b.id === id);
     if (!booking || !booking.rolloutId) return;
     if (booking.serviceStatus === "cancelled") return;
@@ -232,9 +247,9 @@ export function AdminApp() {
     };
     consumeBookingCapacity(moved, booking.rolloutId, date, window);
     const winLabel = window === "morning" ? "morning" : "afternoon";
-    // Note is guaranteed non-empty by the trimmedNote guard above —
-    // always include it in the timeline label.
-    const noteSuffix = ` — ${trimmedNote}`;
+    // Note is optional — append it only when the admin actually typed
+    // one so the audit-trail label stays clean for note-less moves.
+    const noteSuffix = trimmedNote ? ` — ${trimmedNote}` : "";
     // Task #49 review: include the *previous* date/window in the
     // timeline label so the audit trail reads end-to-end ("from →
     // to"). Falls back to "an unscheduled slot" only for legacy rows
@@ -313,6 +328,12 @@ export function AdminApp() {
   // always sees the freshest list. Reset on unmount to prevent a stale
   // closure from outliving the admin shell.
   useEffect(() => {
+    // Expose the admin's live (mutable) bookings list to customer-side
+    // helpers (slot pickers, unit tiles) so admin cancel / reschedule /
+    // supersede edits become visible to the customer flow when both
+    // shells are mounted in the same React tree.
+    setLiveBookingsSource(() => seededBookings);
+    notifyLiveBookingsChanged();
     setUniquenessGuard((sess, newBookingReference) => {
       if (!sess.unit_id) return "ok";
       const rollout = findRolloutForBooking("svc-ac", sess.unit_id);
@@ -370,7 +391,10 @@ export function AdminApp() {
       }
       return "ok";
     });
-    return () => setUniquenessGuard(null);
+    return () => {
+      setUniquenessGuard(null);
+      setLiveBookingsSource(null);
+    };
   }, [seededBookings]);
 
   function openNewBooking(buildingId: string | null) {

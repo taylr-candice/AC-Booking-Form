@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   ArrowRight,
   Sunrise,
@@ -18,6 +18,10 @@ import {
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
 import { isPastDate, unitCity } from "../../../state/bookingHelpers";
+import {
+  getLiveBookingsVersion,
+  subscribeLiveBookings,
+} from "../../../state/adminMockData";
 import {
   alreadyScheduledByOther,
   disabledReasonForStatus,
@@ -108,9 +112,20 @@ export function SlotsDesktop() {
   // the booked date/window/booker so they understand *why*. Skip the
   // lock when no unit is selected (canvas-isolated preview keeps the
   // picker fully interactive on its own iframe).
+  // Subscribe to admin-side mutations (cancel / reschedule / supersede)
+  // so this lock view re-evaluates as soon as the admin changes the
+  // bookings list. Canvas-isolated mode never fires this.
+  const liveBookingsVersion = useSyncExternalStore(
+    subscribeLiveBookings,
+    getLiveBookingsVersion,
+    getLiveBookingsVersion,
+  );
   const lockedByOther = useMemo(
-    () => alreadyScheduledByOther(session.unit_id),
-    [session.unit_id],
+    () => {
+      void liveBookingsVersion;
+      return alreadyScheduledByOther(session.unit_id);
+    },
+    [session.unit_id, liveBookingsVersion],
   );
   const visibleDays = useMemo(
     () => slotData.days.filter((d) => !isPastDate(d.date)),

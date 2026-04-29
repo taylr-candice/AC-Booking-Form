@@ -1488,4 +1488,144 @@ describe("Tenant lock view + supersede flow (Task #49 admin integration)", () =>
     // from any other test reading the module-level rollouts store.
     __resetRolloutsForTests();
   });
+
+  // Cross-panel live-bookings wiring (Task #49 architect re-review):
+  // when AdminApp registers a getter via `setLiveBookingsSource`,
+  // customer-side helpers (`alreadyScheduledByOther`) must read from
+  // that mutable list — so admin cancel / reschedule / supersede
+  // mutations become visible to a customer slot picker mounted in
+  // the same React tree. We also verify `subscribeLiveBookings`
+  // listeners fire on `notifyLiveBookingsChanged()`.
+  it("admin cancel mutation propagates to alreadyScheduledByOther via live-bookings source", async () => {
+    const { alreadyScheduledByOther } = await import(
+      "../components/mockups/booking-slots/customerSlotData"
+    );
+    const {
+      SEEDED_BOOKINGS,
+      findRolloutForBooking,
+      setLiveBookingsSource,
+      notifyLiveBookingsChanged,
+      subscribeLiveBookings,
+    } = await import("./adminMockData");
+
+    const paid = SEEDED_BOOKINGS.find(
+      (b) =>
+        b.serviceStatus !== "cancelled" &&
+        b.paymentStatus === "paid" &&
+        !!findRolloutForBooking("svc-ac", b.unitId),
+    );
+    if (!paid) return;
+
+    let liveBookings: import("./adminMockData").AdminBooking[] = [
+      ...SEEDED_BOOKINGS,
+    ];
+    setLiveBookingsSource(() => liveBookings);
+
+    let listenerCalls = 0;
+    const unsubscribe = subscribeLiveBookings(() => {
+      listenerCalls += 1;
+    });
+
+    try {
+      // Before mutation, the picker is locked.
+      const before = alreadyScheduledByOther(paid.unitId);
+      expect(before?.kind).toBe("paid");
+      expect(before?.booking.id).toBe(paid.id);
+
+      // Admin cancels the paid booking — replace the row in the
+      // mutable list (mirrors AdminApp.setSeededBookings) and notify.
+      liveBookings = liveBookings.map((b) =>
+        b.id === paid.id ? { ...b, serviceStatus: "cancelled" as const } : b,
+      );
+      notifyLiveBookingsChanged();
+
+      expect(listenerCalls).toBeGreaterThanOrEqual(1);
+
+      // Customer picker now sees no blocker for this unit.
+      const after = alreadyScheduledByOther(paid.unitId);
+      expect(after).toBeNull();
+    } finally {
+      unsubscribe();
+      setLiveBookingsSource(null);
+    }
+  });
+
+  // Regression for the architect re-review finding: when AdminApp's
+  // `cancelBooking` runs against a booking with no concrete slot to
+  // release (e.g., coordination / unscheduled), `releaseBookingCapacity`
+  // returns false, so the rollouts refresh key is NOT bumped — but
+  // live-bookings subscribers must still be notified so customer-side
+  // panels reflect the cancellation. We exercise this by simulating
+  // the cancel path: mutate the row, call `notifyLiveBookingsChanged`,
+  // and assert subscribers fire and the helper recomputes.
+  it("cancel notifies live-bookings subscribers even when no slot capacity is released (unscheduled / coordination)", async () => {
+    const { alreadyScheduledByOther } = await import(
+      "../components/mockups/booking-slots/customerSlotData"
+    );
+    const {
+      SEEDED_BOOKINGS,
+      findRolloutForBooking,
+      releaseBookingCapacity,
+      setLiveBookingsSource,
+      notifyLiveBookingsChanged,
+      subscribeLiveBookings,
+    } = await import("./adminMockData");
+
+    const paid = SEEDED_BOOKINGS.find(
+      (b) =>
+        b.serviceStatus !== "cancelled" &&
+        b.paymentStatus === "paid" &&
+        !!findRolloutForBooking("svc-ac", b.unitId),
+    );
+    if (!paid) return;
+
+    // Synthetic coordination/unscheduled blocker on the same unit:
+    // rolloutId stays set (so `getActiveBookingForUnit` still matches
+    // the row to the rollout) but serviceDate / serviceSlot are
+    // cleared so `releaseBookingCapacity` returns false. That's the
+    // exact branch in AdminApp.cancelBooking that previously skipped
+    // notifying live-bookings subscribers.
+    const unscheduled: import("./adminMockData").AdminBooking = {
+      ...paid,
+      id: "bk-test-unscheduled",
+      serviceDate: undefined,
+      serviceSlot: undefined,
+    };
+    expect(releaseBookingCapacity(unscheduled)).toBe(false);
+
+    let liveBookings: import("./adminMockData").AdminBooking[] = [
+      unscheduled,
+      ...SEEDED_BOOKINGS.filter((b) => b.id !== paid.id),
+    ];
+    setLiveBookingsSource(() => liveBookings);
+
+    let listenerCalls = 0;
+    const unsubscribe = subscribeLiveBookings(() => {
+      listenerCalls += 1;
+    });
+
+    try {
+      // Before: customer picker sees the unscheduled paid blocker.
+      const before = alreadyScheduledByOther(unscheduled.unitId);
+      expect(before?.kind).toBe("paid");
+      expect(before?.booking.id).toBe("bk-test-unscheduled");
+
+      // Cancel the unscheduled blocker (mirrors AdminApp.cancelBooking
+      // when releaseOk === false: mutate row + notify, no rollouts
+      // refresh).
+      liveBookings = liveBookings.map((b) =>
+        b.id === unscheduled.id
+          ? { ...b, serviceStatus: "cancelled" as const }
+          : b,
+      );
+      notifyLiveBookingsChanged();
+
+      expect(listenerCalls).toBeGreaterThanOrEqual(1);
+      const after = alreadyScheduledByOther(unscheduled.unitId);
+      expect(after).toBeNull();
+    } finally {
+      unsubscribe();
+      setLiveBookingsSource(null);
+    }
+  });
 });

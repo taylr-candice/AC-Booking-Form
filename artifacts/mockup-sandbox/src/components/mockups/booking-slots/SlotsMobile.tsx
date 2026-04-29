@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,6 +18,10 @@ import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
+import {
+  getLiveBookingsVersion,
+  subscribeLiveBookings,
+} from "../../../state/adminMockData";
 import {
   alreadyScheduledByOther,
   disabledReasonForStatus,
@@ -72,9 +76,17 @@ export function SlotsMobile() {
   );
   const rollout = slotData.rollout;
   // Uniqueness lock — see SlotsDesktop for rationale.
+  const liveBookingsVersion = useSyncExternalStore(
+    subscribeLiveBookings,
+    getLiveBookingsVersion,
+    getLiveBookingsVersion,
+  );
   const lockedByOther = useMemo(
-    () => alreadyScheduledByOther(session.unit_id),
-    [session.unit_id],
+    () => {
+      void liveBookingsVersion;
+      return alreadyScheduledByOther(session.unit_id);
+    },
+    [session.unit_id, liveBookingsVersion],
   );
   const visibleDays = useMemo(
     () => slotData.days.filter((d) => !isPastDate(d.date)),

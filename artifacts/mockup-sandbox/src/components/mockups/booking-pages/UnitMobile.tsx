@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -25,7 +25,9 @@ import {
 import {
   findRolloutForBooking,
   getActiveBookingForUnit,
-  SEEDED_BOOKINGS,
+  getLiveBookings,
+  getLiveBookingsVersion,
+  subscribeLiveBookings,
   type ActiveBookingForUnit,
   type AdminBooking,
 } from "../../../state/adminMockData";
@@ -152,17 +154,29 @@ export function UnitMobile() {
   // See `UnitDesktop` — per-unit "is this unit already taken?" lookup
   // so each row in the dropdown can be disabled (paid) or warned about
   // (invoice_pending) inline. Same source data and helper used.
+  // Read the live bookings list (which the admin shell mutates on
+  // cancel / reschedule / supersede) and re-render via
+  // `useSyncExternalStore` whenever the version bumps. In
+  // canvas-isolated mode the listener never fires and the source
+  // returns `SEEDED_BOOKINGS`.
+  const liveBookingsVersion = useSyncExternalStore(
+    subscribeLiveBookings,
+    getLiveBookingsVersion,
+    getLiveBookingsVersion,
+  );
   const unitStatuses = useMemo(() => {
+    void liveBookingsVersion;
+    const liveBookings = getLiveBookings();
     const out = new Map<string, ActiveBookingForUnit>();
     for (const u of UNITS) {
       const rollout = findRolloutForBooking("svc-ac", u.id);
       out.set(
         u.id,
-        getActiveBookingForUnit(u.id, SEEDED_BOOKINGS, rollout?.id ?? null),
+        getActiveBookingForUnit(u.id, liveBookings, rollout?.id ?? null),
       );
     }
     return out;
-  }, []);
+  }, [liveBookingsVersion]);
   const selected = UNITS.find((u) => u.id === selectedId);
   const selectedStatus = selected ? unitStatuses.get(selected.id) : undefined;
   const canContinue = canContinueStep1({

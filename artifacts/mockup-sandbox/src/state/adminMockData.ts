@@ -2027,6 +2027,62 @@ export type ActiveBookingForUnit =
   | { kind: "paid"; booking: AdminBooking }
   | { kind: "invoice_pending"; booking: AdminBooking };
 
+/**
+ * Live-bookings source registration.
+ *
+ * Customer-side helpers (`alreadyScheduledByOther`, the unit picker
+ * uniqueness check) used to read the static `SEEDED_BOOKINGS` constant
+ * directly. That made cancel/reschedule/supersede mutations done in
+ * the admin shell invisible to the customer flow, even though both run
+ * in the same canvas process.
+ *
+ * `setLiveBookingsSource(getter)` lets the admin shell register a
+ * getter that returns its current `seededBookings` React state. The
+ * default returns `SEEDED_BOOKINGS` so the canvas-isolated mode
+ * (no admin shell mounted) keeps working unchanged.
+ *
+ * Callers re-register on every mutation; the getter is cheap because
+ * `seededBookings` is just the array reference.
+ */
+export type LiveBookingsSource = () => readonly AdminBooking[];
+let liveBookingsSource: LiveBookingsSource = () => SEEDED_BOOKINGS;
+let liveBookingsVersion = 0;
+const liveBookingsListeners = new Set<() => void>();
+
+export function setLiveBookingsSource(source: LiveBookingsSource | null): void {
+  liveBookingsSource = source ?? (() => SEEDED_BOOKINGS);
+  notifyLiveBookingsChanged();
+}
+export function getLiveBookings(): readonly AdminBooking[] {
+  return liveBookingsSource();
+}
+/**
+ * Bump the live-bookings version and notify subscribers. Called by the
+ * admin shell after every cancel / reschedule / supersede mutation so
+ * customer-side components reading `getLiveBookings()` re-render.
+ *
+ * Safe to call from canvas-isolated mode — there are no listeners and
+ * the version counter is harmless.
+ */
+export function notifyLiveBookingsChanged(): void {
+  liveBookingsVersion += 1;
+  for (const fn of liveBookingsListeners) fn();
+}
+/**
+ * Subscribe to live-bookings change notifications. Returns the
+ * unsubscribe function. Designed to plug straight into React's
+ * `useSyncExternalStore`.
+ */
+export function subscribeLiveBookings(listener: () => void): () => void {
+  liveBookingsListeners.add(listener);
+  return () => {
+    liveBookingsListeners.delete(listener);
+  };
+}
+export function getLiveBookingsVersion(): number {
+  return liveBookingsVersion;
+}
+
 export function getActiveBookingForUnit(
   unitId: string,
   bookings: readonly AdminBooking[],
