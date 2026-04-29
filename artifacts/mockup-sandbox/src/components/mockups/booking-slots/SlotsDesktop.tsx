@@ -306,18 +306,23 @@ export function SlotsDesktop() {
             </div>
 
             <div className="grid grid-cols-6 gap-3 mb-8">
-              {week.map((d, i) => {
-                const isMonthBoundary = i > 0 && week[i - 1].month !== d.month;
-                return (
-                  <div key={d.date} className="flex flex-col items-center gap-2">
-                    <div className={`flex h-[68px] w-full flex-col items-center justify-center rounded-xl border bg-slate-50 ${isMonthBoundary ? "border-pink-200 bg-pink-50/30" : "border-slate-200"}`}>
-                      <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{d.weekday}</div>
-                      <div className="text-xl font-bold leading-tight text-slate-900">{d.day}</div>
-                      <div className={`text-[10px] font-medium uppercase tracking-wide ${isMonthBoundary ? "text-pink-600" : "text-slate-500"}`}>{d.month}</div>
-                    </div>
+              {week.map((d) => (
+                <div key={d.date} className="flex flex-col items-center gap-2">
+                  {/*
+                    White background to match the mobile date pill — grey
+                    would read as "unavailable" since that's how disabled
+                    slot tiles look. No month-boundary highlight either:
+                    the month label is already shown beneath the day, and
+                    extra colour was distracting customers more than it
+                    was helping them.
+                  */}
+                  <div className="flex h-[68px] w-full flex-col items-center justify-center rounded-xl border border-slate-200 bg-white">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{d.weekday}</div>
+                    <div className="text-xl font-bold leading-tight text-slate-900">{d.day}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{d.month}</div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
               {week.map((d) => (
                 <DesktopSlotCard
                   key={`${d.date}-am`}
