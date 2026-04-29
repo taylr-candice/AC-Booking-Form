@@ -226,10 +226,12 @@ function FullConfigView({
 
           {cameFromSlotPicker && <SlotPickerCallout />}
 
-          <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-slate-900">{heading}</h1>
-            <p className="mt-2 text-sm text-slate-500">{intro}</p>
-          </div>
+          {!isUnsureMode && (
+            <div className="mb-8">
+              <h1 className="text-2xl font-semibold text-slate-900">{heading}</h1>
+              <p className="mt-2 text-sm text-slate-500">{intro}</p>
+            </div>
+          )}
 
           <div className="flex-1">
             {/* "Use what's on file" link — only when we have a record (overridden mode). */}
@@ -288,7 +290,7 @@ function FullConfigView({
               </div>
             )}
 
-            {hasOverride && (
+            {hasOverride && !isUnsureMode && (
               <OverrideBanner
                 title={overrideBannerTitle(acTypeFromUnit, override)}
                 detail={overrideBannerDetail(override)}

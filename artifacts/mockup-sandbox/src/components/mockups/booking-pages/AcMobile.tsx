@@ -230,7 +230,9 @@ function FullConfigView({
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
       <div className="flex items-start justify-between px-5 pb-3 pt-5">
         <div className="pr-3">
-          <h1 className="text-[22px] font-semibold leading-tight text-slate-900">{heading}</h1>
+          {!isUnsureMode && (
+            <h1 className="text-[22px] font-semibold leading-tight text-slate-900">{heading}</h1>
+          )}
         </div>
         <button
           type="button"
@@ -246,7 +248,7 @@ function FullConfigView({
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {cameFromSlotPicker && <SlotPickerCallout />}
 
-        <p className="mb-4 text-sm text-slate-500">{intro}</p>
+        {!isUnsureMode && <p className="mb-4 text-sm text-slate-500">{intro}</p>}
 
         {/* "Use what's on file" link — only when we have a record (overridden mode). */}
         {mode === "overridden" && (
@@ -305,7 +307,7 @@ function FullConfigView({
           </div>
         )}
 
-        {hasOverride && (
+        {hasOverride && !isUnsureMode && (
           <OverrideBanner
             title={overrideBannerTitle(acTypeFromUnit, override)}
             detail={overrideBannerDetail(override)}
