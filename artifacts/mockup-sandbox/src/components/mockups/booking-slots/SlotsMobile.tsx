@@ -4,25 +4,22 @@ import {
   ArrowRight,
   Sunrise,
   Sun,
+  Moon,
   Pencil,
   CheckCircle2,
-  Info,
-  AlertTriangle,
   Lock,
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
-import {
-  isBeThereMethod,
-  isUnattendedAccessMethod,
-} from "../../../state/accessMethodCatalog";
+import { isBeThereMethod } from "../../../state/accessMethodCatalog";
 import {
   getLiveBookingsVersion,
   subscribeLiveBookings,
 } from "../../../state/adminMockData";
 import {
+  accessRecapLabel,
   alreadyScheduledByOther,
   resolveCustomerSlotData,
   type CustomerDay,
@@ -36,35 +33,24 @@ const SELECTED_GREEN = "#5FBB97";
 type Slot = CustomerSlot;
 type Day = CustomerDay;
 
+function dayWindows(day: Day): Slot[] {
+  const out: Slot[] = [day.morning, day.afternoon];
+  if (day.evening) out.push(day.evening);
+  return out;
+}
+function dayHasAvailable(day: Day): boolean {
+  return dayWindows(day).some((s) => s.status === "available");
+}
 
 export function SlotsMobile() {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [ack, setAck] = useState(false);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
-  const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
-  // Slot-picker banner branches on the customer's access method into
-  // three modes (unattended / self-attended / coordinated). See
-  // SlotsDesktop for the full rationale — same logic, mobile copy.
   const accessMethod = session.access_method;
-  const unattended = isUnattendedAccessMethod(accessMethod);
-  const selfAttended = isBeThereMethod(accessMethod);
-  const accessMode = unattended
-    ? "unattended"
-    : selfAttended
-      ? "self-attended"
-      : "coordinated";
-  const showChangeAccess = selfAttended;
-  // Role-conditional accountability nudge inside the "Not sure" callout.
-  // Owners and managing agents have very different burdens when a second
-  // visit is needed — owners have to physically open up again, agents
-  // have to re-coordinate tenant access. The copy below is short on
-  // purpose so the distinct keywords ("be home for" / "coordinate with
-  // the tenant") double as test anchors. Falls back to the owner
-  // phrasing when role is unset (the customer hasn't reached Step 1 yet).
-  const accountabilityNudge =
-    session.role === "agent"
-      ? "you'll need to coordinate a second visit with the tenant"
-      : "you'll need to be home for a second visit";
+  const beThere = isBeThereMethod(accessMethod);
+  const recapLabel = accessRecapLabel(accessMethod);
 
   // Resolve the per-(service, building) rollout (Task #59) and pull
   // its day rows. Past dates are filtered out so customers never see
@@ -74,7 +60,6 @@ export function SlotsMobile() {
     [session.unit_id, jobMinutes],
   );
   const rollout = slotData.rollout;
-  // Uniqueness lock — see SlotsDesktop for rationale.
   const liveBookingsVersion = useSyncExternalStore(
     subscribeLiveBookings,
     getLiveBookingsVersion,
@@ -92,29 +77,40 @@ export function SlotsMobile() {
     [slotData.days],
   );
 
-  // If the customer's job size grows (e.g. they edit the AC step in
-  // another iframe via cross-iframe sessionStorage sync), an already-
-  // selected slot might no longer fit. Drop it so the Continue button
-  // can't carry a stale, now-invalid selection forward. The slot's
-  // pre-computed status is the same source of truth the tile uses.
-  const selectedSlotFits = useMemo(() => {
-    if (!selected) return true;
-    for (const d of visibleDays) {
-      for (const slot of [d.morning, d.afternoon]) {
-        if (slot.id === selected) {
-          return slot.status === "available";
-        }
-      }
-    }
-    return false;
-  }, [selected, visibleDays]);
+  const activeDay = useMemo(
+    () => visibleDays.find((d) => d.date === selectedDate) ?? null,
+    [visibleDays, selectedDate],
+  );
+
+  // If the customer's job size grows, an already-selected slot might
+  // no longer fit. Drop it (and the ack) so Confirm can't carry stale,
+  // now-invalid state forward.
   useEffect(() => {
-    if (selected && !selectedSlotFits) setSelected(null);
-  }, [selected, selectedSlotFits]);
+    if (!selectedSlotId) return;
+    const stillValid = visibleDays
+      .flatMap(dayWindows)
+      .some((s) => s.id === selectedSlotId && s.status === "available");
+    if (!stillValid) {
+      setSelectedSlotId(null);
+      setAck(false);
+    }
+  }, [selectedSlotId, visibleDays]);
+
+  // If the active day is no longer in view (rolled past, etc.), clear it.
+  useEffect(() => {
+    if (selectedDate && !activeDay) {
+      setSelectedDate(null);
+      setSelectedSlotId(null);
+      setAck(false);
+    }
+  }, [selectedDate, activeDay]);
+
+  const canConfirm =
+    !!selectedSlotId && !lockedByOther && (!beThere || ack);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
-      {/* Page header — "Check out" style */}
+      {/* Page header */}
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
         <div>
           <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
@@ -135,7 +131,7 @@ export function SlotsMobile() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 pb-6">
-        {/* Section header — pink label + edit, matching Figma */}
+        {/* Section header */}
         <div className="mb-2 mt-1 flex items-center justify-between">
           <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>
             Available Slots
@@ -145,100 +141,23 @@ export function SlotsMobile() {
           </button>
         </div>
 
-        {/* Access-window commitment — prominent, always shown.
-            Copy and the optional "Change access method" nudge branch
-            on the customer's access method (see comments above the
-            `unattended` / `showChangeAccess` derivations). */}
-        <div
-          className="mb-4 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed"
-          style={{ borderColor: "#FBCFE2", backgroundColor: "#FFF1F8", color: "#9D174D" }}
-          data-testid="banner-access-commitment-mobile"
-          data-access-mode={accessMode}
-        >
-          <div className="flex items-start gap-2">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            {unattended ? (
-              <div>
-                <span className="font-semibold">You're authorising us</span>{" "}
-                to access the unit during the window you pick to carry out
-                the service — no one needs to be there.
-              </div>
-            ) : selfAttended ? (
-              <div>
-                <span className="font-semibold">Heads up:</span> we can't
-                guarantee an exact arrival or finish time within the window
-                you pick, so please make sure{" "}
-                <span className="font-semibold">you are</span> available for
-                the <span className="font-semibold">entire window</span>.
-              </div>
-            ) : (
-              <div>
-                The service will be carried out{" "}
-                <span className="font-semibold">sometime within the window</span>{" "}
-                you pick — there's no set arrival time.
-              </div>
-            )}
+        {/* Compact access recap — single line, no pink banner. */}
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700">
+          <div>
+            <span className="text-slate-500">Access:</span>{" "}
+            <span className="font-medium text-slate-900">{recapLabel}</span>
           </div>
-          <div className="mt-2 flex justify-end gap-3">
-            {showChangeAccess && (
-              <button
-              type="button"
-              data-testid="button-change-access"
-              className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80"
-              style={{ color: "#9D174D" }}
-            >
-              Change access method
-            </button>
-          )}
           <button
             type="button"
-            data-testid="button-edit-ac"
-            className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80"
-            style={{ color: "#9D174D" }}
+            data-testid="button-change-access"
+            className="font-semibold underline underline-offset-2 hover:opacity-80"
+            style={{ color: BRAND }}
           >
-            Update AC info
+            Change
           </button>
         </div>
-        </div>
-
-        {/* "Not sure" callout — only when AC step was answered "unsure". */}
-        {isUnsure && (
-          <div
-            className="mb-4 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed"
-            style={{ borderColor: "#FCD34D", backgroundColor: "#FFFBEB", color: "#92400E" }}
-            data-testid="callout-unsure-mobile"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                You picked <span className="font-semibold">"Not sure"</span> on the AC step,
-                so we've sized your slot for one indoor unit. If we find more on-site,
-                the technician may not finish in one visit and Taylr will book a
-                second slot — which means{" "}
-                <span className="font-semibold" data-testid="nudge-accountability-mobile">
-                  {accountabilityNudge}
-                </span>.{" "}
-                <span className="font-semibold">If you can confirm the AC details now,
-                you'll likely avoid that.</span>
-              </div>
-            </div>
-            <div className="mt-2.5 flex justify-end">
-              <button
-                type="button"
-                data-testid="button-edit-ac"
-                className="rounded-full px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:opacity-90"
-                style={{ backgroundColor: "#B45309" }}
-              >
-                Update AC info
-              </button>
-            </div>
-          </div>
-        )}
 
         {!rollout ? (
-          // Empty state: no rollout exists for this customer's
-          // building yet. Match the visual weight of the other
-          // callouts so it can't be missed.
           <div
             className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
             data-testid="empty-no-rollout-mobile"
@@ -255,15 +174,6 @@ export function SlotsMobile() {
             </div>
           </div>
         ) : lockedByOther ? (
-          // Read-only "Already scheduled" — Task #49.
-          //
-          // We deliberately do not surface ANY details of the existing
-          // booking here (no customer name, no contact details, no
-          // booked window/date, no booker role). Customer-facing
-          // surfaces should never expose another customer's data —
-          // even the booked date+window pair is identifying info about
-          // someone else. Anything beyond "this address is already
-          // scheduled, contact Taylr" should go through admin tooling.
           <div
             className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700"
             data-testid="banner-locked-by-other-mobile"
@@ -302,16 +212,90 @@ export function SlotsMobile() {
           </div>
         ) : (
           <>
-            <div className="space-y-3">
+            {/* Day grid — 4 per row on mobile. */}
+            <div className="grid grid-cols-4 gap-2">
               {visibleDays.map((d) => (
-                <DayBlock
+                <DayCard
                   key={d.date}
                   day={d}
-                  selected={selected}
-                  onSelect={(id) => setSelected(id)}
+                  selected={d.date === selectedDate}
+                  onClick={() => {
+                    setSelectedDate(d.date);
+                    setSelectedSlotId(null);
+                    setAck(false);
+                  }}
                 />
               ))}
             </div>
+
+            {/* Window reveal — only after a day is picked. */}
+            {activeDay && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mb-2 text-[12px] font-medium text-slate-500">
+                  {activeDay.weekday} {activeDay.day} {activeDay.month} ·
+                  pick a window
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <SlotCard
+                    slot={activeDay.morning}
+                    icon={<Sunrise className="h-4 w-4" />}
+                    label="Morning"
+                    hint={WINDOW_TIME_RANGE.morning}
+                    selected={selectedSlotId === activeDay.morning.id}
+                    onClick={() => {
+                      setSelectedSlotId(activeDay.morning.id);
+                      setAck(false);
+                    }}
+                  />
+                  <SlotCard
+                    slot={activeDay.afternoon}
+                    icon={<Sun className="h-4 w-4" />}
+                    label="Afternoon"
+                    hint={WINDOW_TIME_RANGE.afternoon}
+                    selected={selectedSlotId === activeDay.afternoon.id}
+                    onClick={() => {
+                      setSelectedSlotId(activeDay.afternoon.id);
+                      setAck(false);
+                    }}
+                  />
+                  {activeDay.evening && (
+                    <SlotCard
+                      slot={activeDay.evening}
+                      icon={<Moon className="h-4 w-4" />}
+                      label="Evening"
+                      hint={WINDOW_TIME_RANGE.evening}
+                      selected={selectedSlotId === activeDay.evening.id}
+                      onClick={() => {
+                        setSelectedSlotId(activeDay.evening!.id);
+                        setAck(false);
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Optional access acknowledgement — only for be-there
+                    methods, since they're the only ones who'd actually
+                    be waiting around for the technician. */}
+                {beThere && selectedSlotId && (
+                  <label
+                    className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700"
+                    data-testid="ack-row-mobile"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={ack}
+                      onChange={(e) => setAck(e.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 cursor-pointer"
+                      style={{ accentColor: BRAND }}
+                      data-testid="ack-checkbox-mobile"
+                    />
+                    <span>
+                      I'll be available for the entire window.
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
 
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-[11px] text-slate-500">
               Need a different date? Call us on{" "}
@@ -324,16 +308,16 @@ export function SlotsMobile() {
         )}
       </div>
 
-      {/* Docked CTA above the bottom nav */}
+      {/* Docked CTA */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
         <button
           type="button"
-          disabled={!selected || !!lockedByOther}
+          disabled={!canConfirm}
           data-testid="button-continue-mobile"
           className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
           style={{ backgroundColor: BRAND }}
         >
-          Continue
+          Confirm
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -341,39 +325,54 @@ export function SlotsMobile() {
   );
 }
 
-
-function DayBlock({
-  day, selected, onSelect,
-}: { day: Day; selected: string | null; onSelect: (id: string) => void }) {
+function DayCard({
+  day,
+  selected,
+  onClick,
+}: {
+  day: Day;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const hasAvailable = dayHasAvailable(day);
+  const disabled = !hasAvailable;
+  const isSelected = selected && hasAvailable;
   return (
-    <div className="flex gap-3">
-      {/* Date pill */}
-      <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white py-2">
-        <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{day.weekday}</div>
-        <div className="text-xl font-bold leading-tight text-slate-900">{day.day}</div>
-        <div className="text-[10px] text-slate-500">{day.month}</div>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      data-testid={`day-card-${day.date}`}
+      aria-pressed={isSelected}
+      className={`flex flex-col items-center justify-center rounded-xl border py-2 transition ${
+        disabled
+          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+          : isSelected
+            ? "text-white shadow-sm"
+            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+      }`}
+      style={
+        isSelected
+          ? { borderColor: SELECTED_GREEN, backgroundColor: SELECTED_GREEN }
+          : undefined
+      }
+    >
+      <div
+        className={`text-[10px] font-medium uppercase tracking-wide ${
+          disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"
+        }`}
+      >
+        {day.weekday}
       </div>
-
-      {/* Slots */}
-      <div className="grid flex-1 grid-cols-2 gap-2">
-        <SlotCard
-          slot={day.morning}
-          icon={<Sunrise className="h-4 w-4" />}
-          label="Morning"
-          hint={WINDOW_TIME_RANGE.morning}
-          selected={selected === day.morning.id}
-          onClick={() => onSelect(day.morning.id)}
-        />
-        <SlotCard
-          slot={day.afternoon}
-          icon={<Sun className="h-4 w-4" />}
-          label="Afternoon"
-          hint={WINDOW_TIME_RANGE.afternoon}
-          selected={selected === day.afternoon.id}
-          onClick={() => onSelect(day.afternoon.id)}
-        />
+      <div className="text-lg font-bold leading-tight">{day.day}</div>
+      <div
+        className={`text-[10px] ${
+          disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"
+        }`}
+      >
+        {day.month}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -387,19 +386,9 @@ function SlotCard({
   selected: boolean;
   onClick: () => void;
 }) {
-  // Status comes from the rollout resolver — same source of truth
-  // the admin schedule editor uses, so the picker variants and the
-  // editor never disagree on what's bookable.
-  const status = slot.status;
-  const fits = status === "available";
+  const fits = slot.status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
-
-  // Customer view is intentionally binary: a window is either selectable
-  // or it's greyed out — the customer sees no reason text. Internal
-  // admin distinctions ("not yet open", "not enough time left for the
-  // job", "fully booked") still drive the availability decision via
-  // `slot.status`, but they are not surfaced to the customer (Task #61).
 
   return (
     <button

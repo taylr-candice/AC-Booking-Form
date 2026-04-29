@@ -39,7 +39,7 @@ import {
  *  in each picker barely changes. */
 export type CustomerSlot = {
   id: string;
-  window: "morning" | "afternoon";
+  window: "morning" | "afternoon" | "evening";
   windowMinutes: number;
   bookedMinutes: number;
   status: RolloutSlotStatus;
@@ -52,6 +52,8 @@ export type CustomerDay = {
   month: string;
   morning: CustomerSlot;
   afternoon: CustomerSlot;
+  /** Present only when the rollout day has an evening window opened. */
+  evening?: CustomerSlot;
 };
 
 export type CustomerSlotData = {
@@ -78,31 +80,48 @@ export function resolveCustomerSlotData(
     return { rollout: null, days: [] };
   }
 
-  const days: CustomerDay[] = rollout.days.map((d) => ({
-    date: d.isoDate,
-    weekday: d.weekdayLabel,
-    day: parseInt(d.dayLabel, 10),
-    month: d.monthLabel,
-    morning: {
-      id: d.morning.id,
-      window: d.morning.window,
-      windowMinutes: d.morning.windowMinutes,
-      bookedMinutes: d.morning.bookedMinutes,
-      status: rolloutSlotStatus(d, d.morning, rollout.capacityModel, jobMinutes),
-    },
-    afternoon: {
-      id: d.afternoon.id,
-      window: d.afternoon.window,
-      windowMinutes: d.afternoon.windowMinutes,
-      bookedMinutes: d.afternoon.bookedMinutes,
-      status: rolloutSlotStatus(
-        d,
-        d.afternoon,
-        rollout.capacityModel,
-        jobMinutes,
-      ),
-    },
-  }));
+  const days: CustomerDay[] = rollout.days.map((d) => {
+    const day: CustomerDay = {
+      date: d.isoDate,
+      weekday: d.weekdayLabel,
+      day: parseInt(d.dayLabel, 10),
+      month: d.monthLabel,
+      morning: {
+        id: d.morning.id,
+        window: d.morning.window,
+        windowMinutes: d.morning.windowMinutes,
+        bookedMinutes: d.morning.bookedMinutes,
+        status: rolloutSlotStatus(d, d.morning, rollout.capacityModel, jobMinutes),
+      },
+      afternoon: {
+        id: d.afternoon.id,
+        window: d.afternoon.window,
+        windowMinutes: d.afternoon.windowMinutes,
+        bookedMinutes: d.afternoon.bookedMinutes,
+        status: rolloutSlotStatus(
+          d,
+          d.afternoon,
+          rollout.capacityModel,
+          jobMinutes,
+        ),
+      },
+    };
+    if (d.evening) {
+      day.evening = {
+        id: d.evening.id,
+        window: d.evening.window,
+        windowMinutes: d.evening.windowMinutes,
+        bookedMinutes: d.evening.bookedMinutes,
+        status: rolloutSlotStatus(
+          d,
+          d.evening,
+          rollout.capacityModel,
+          jobMinutes,
+        ),
+      };
+    }
+    return day;
+  });
 
   return { rollout, days };
 }
@@ -157,7 +176,44 @@ export function alreadyScheduledByOther(
  * render the same string (single source of truth — change here
  * and every picker variant updates).
  */
-export const WINDOW_TIME_RANGE: Record<"morning" | "afternoon", string> = {
+export const WINDOW_TIME_RANGE: Record<
+  "morning" | "afternoon" | "evening",
+  string
+> = {
   morning: "8am – 12pm",
   afternoon: "12pm – 5pm",
+  evening: "5pm – 8pm",
 };
+
+/** Short, human-friendly label for an access method, used by the
+ *  slot picker's "Access: <label> · Change" recap line. Returns a
+ *  generic "I'll be there" when access hasn't been picked yet so the
+ *  recap reads sensibly in canvas-isolated mockups. */
+export function accessRecapLabel(method: string | null): string {
+  switch (method) {
+    case "owner_live_at_unit":
+    case "owner_leased_be_there":
+    case "owner_vacant_be_there":
+    case "agent_be_there":
+      return "I'll be there";
+    case "owner_live_leave_key":
+    case "owner_vacant_leave_key":
+      return "Leave a key";
+    case "owner_live_parcel_locker":
+    case "owner_vacant_parcel_locker":
+      return "Parcel locker";
+    case "owner_live_collect":
+    case "owner_vacant_collect":
+      return "Collect & return";
+    case "owner_leased_agent":
+    case "agent_trade_key":
+      return "Managing agent / trade key";
+    case "owner_leased_tenant":
+    case "agent_tenant_pending":
+    case "agent_tenant_self":
+    case "agent_tenant_taylr":
+      return "Tenant arranges";
+    default:
+      return "I'll be there";
+  }
+}

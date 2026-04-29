@@ -170,7 +170,7 @@ export type AdminBooking = {
   /** Service date (YYYY-MM-DD) and slot ("morning" / "afternoon" /
    *  "to_be_coordinated"). */
   serviceDate: string | null;
-  serviceSlot: "morning" | "afternoon" | "to_be_coordinated" | null;
+  serviceSlot: "morning" | "afternoon" | "evening" | "to_be_coordinated" | null;
   paymentStatus: PaymentStatus;
   serviceStatus: ServiceStatus;
   /** Total in AUD (matches `computeBookingTotal` shape). */
@@ -1326,7 +1326,7 @@ export function liveBookingFromSession(
     serviceDate: isCoordination ? null : session.service_date,
     serviceSlot: isCoordination
       ? "to_be_coordinated"
-      : (session.service_slot as "morning" | "afternoon" | null),
+      : (session.service_slot as "morning" | "afternoon" | "evening" | null),
     paymentStatus: session.cancellation_acknowledged ? "paid" : "pending",
     serviceStatus: isCoordination ? "scheduled" : "scheduled",
     totalAud,
@@ -1537,7 +1537,7 @@ export type BuildingRolloutSummary = {
   dateRange: { from: string; to: string } | null;
   nextScheduled: {
     date: string;
-    slot: "morning" | "afternoon";
+    slot: "morning" | "afternoon" | "evening";
   } | null;
   coordinationCount: number;
 };
@@ -1587,21 +1587,23 @@ export function summarizeBuildingRollout(
       (b) =>
         b.serviceDate >= todayIso &&
         (b.serviceStatus === "scheduled" || b.serviceStatus === "en_route") &&
-        (b.serviceSlot === "morning" || b.serviceSlot === "afternoon"),
+        (b.serviceSlot === "morning" ||
+          b.serviceSlot === "afternoon" ||
+          b.serviceSlot === "evening"),
     )
     .sort((a, b) => {
       if (a.serviceDate !== b.serviceDate) {
         return a.serviceDate.localeCompare(b.serviceDate);
       }
-      // morning before afternoon
-      const aSlot = a.serviceSlot === "morning" ? 0 : 1;
-      const bSlot = b.serviceSlot === "morning" ? 0 : 1;
-      return aSlot - bSlot;
+      // morning < afternoon < evening
+      const order = (s: AdminBooking["serviceSlot"]) =>
+        s === "morning" ? 0 : s === "afternoon" ? 1 : s === "evening" ? 2 : 3;
+      return order(a.serviceSlot) - order(b.serviceSlot);
     });
   const nextScheduled = upcoming[0]
     ? {
         date: upcoming[0].serviceDate,
-        slot: upcoming[0].serviceSlot as "morning" | "afternoon",
+        slot: upcoming[0].serviceSlot as "morning" | "afternoon" | "evening",
       }
     : null;
 
@@ -1705,7 +1707,7 @@ export function nextBookingId(bookings: readonly AdminBooking[]): string {
  * coordination flows).
  */
 export type AdminCreatedScheduleChoice =
-  | { kind: "slot"; date: string; window: "morning" | "afternoon" }
+  | { kind: "slot"; date: string; window: "morning" | "afternoon" | "evening" }
   | { kind: "to_be_coordinated" };
 
 /**
@@ -1958,7 +1960,7 @@ export const SEEDED_SERVICES: AdminService[] = [
  *  released to customers. */
 export type RolloutSlot = {
   id: string;
-  window: "morning" | "afternoon";
+  window: "morning" | "afternoon" | "evening";
   windowMinutes: number;
   bookedMinutes: number;
   /** Defined only for `slots_per_window` rollouts. */
@@ -1980,6 +1982,9 @@ export type RolloutDay = {
   open: boolean;
   morning: RolloutSlot;
   afternoon: RolloutSlot;
+  /** Optional 5pm – 8pm window. Most days don't have one — admins
+   *  opt-in per day for evening capacity. */
+  evening?: RolloutSlot;
 };
 
 export type AdminRollout = {
@@ -2004,6 +2009,7 @@ export type AdminRollout = {
 
 const MORNING_WINDOW_MIN = 240; // 8am – 12pm
 const AFTERNOON_WINDOW_MIN = 300; // 12pm – 5pm
+const EVENING_WINDOW_MIN = 180; // 5pm – 8pm
 
 function makeTimeBudgetDay(
   isoDate: string,
@@ -2013,6 +2019,7 @@ function makeTimeBudgetDay(
     open?: boolean;
     morningOpen?: boolean;
     afternoonOpen?: boolean;
+    evening?: { booked: number; open?: boolean };
   } = {},
 ): RolloutDay {
   const [y, mo, d] = isoDate.split("-").map((s) => parseInt(s, 10));
@@ -2021,7 +2028,7 @@ function makeTimeBudgetDay(
     date.getUTCDay()
   ]!;
   const monthLabel = SHORT_MONTHS[mo - 1] ?? "";
-  return {
+  const day: RolloutDay = {
     isoDate,
     dayLabel: String(d),
     weekdayLabel,
@@ -2042,6 +2049,16 @@ function makeTimeBudgetDay(
       openByAdmin: options.afternoonOpen ?? true,
     },
   };
+  if (options.evening !== undefined) {
+    day.evening = {
+      id: `${isoDate.replace(/-/g, "")}-ev`,
+      window: "evening",
+      windowMinutes: EVENING_WINDOW_MIN,
+      bookedMinutes: options.evening.booked,
+      openByAdmin: options.evening.open ?? true,
+    };
+  }
+  return day;
 }
 
 function makeSlotCountDay(
@@ -2053,10 +2070,11 @@ function makeSlotCountDay(
     open?: boolean;
     morningOpen?: boolean;
     afternoonOpen?: boolean;
+    evening?: { booked: number; open?: boolean; bookedCount?: number };
   } = {},
 ): RolloutDay {
   const base = makeTimeBudgetDay(isoDate, 0, 0, options);
-  return {
+  const day: RolloutDay = {
     ...base,
     morning: {
       ...base.morning,
@@ -2069,6 +2087,14 @@ function makeSlotCountDay(
       bookedCount: afternoonBookedCount,
     },
   };
+  if (base.evening) {
+    day.evening = {
+      ...base.evening,
+      slotCount,
+      bookedCount: options.evening?.bookedCount ?? 0,
+    };
+  }
+  return day;
 }
 
 // Aspen flagship rollout — time-budget mode, all windows opened. Mirrors
@@ -2079,15 +2105,15 @@ function makeSlotCountDay(
 const RL_ASPEN_DAYS: RolloutDay[] = [
   makeTimeBudgetDay("2026-04-27",  75, 195),
   makeTimeBudgetDay("2026-04-28", MORNING_WINDOW_MIN,  60),
-  makeTimeBudgetDay("2026-04-29",  45, 105),
+  makeTimeBudgetDay("2026-04-29",  45, 105, { evening: { booked: 0 } }),
   makeTimeBudgetDay("2026-04-30", 165, 280),
-  makeTimeBudgetDay("2026-05-01",  45,  90),
+  makeTimeBudgetDay("2026-05-01",  45,  90, { evening: { booked: 45 } }),
   makeTimeBudgetDay("2026-05-02", 120,   0),
-  makeTimeBudgetDay("2026-05-04",   0,  60),
+  makeTimeBudgetDay("2026-05-04",   0,  60, { evening: { booked: 0 } }),
   makeTimeBudgetDay("2026-05-05", MORNING_WINDOW_MIN,  30),
   makeTimeBudgetDay("2026-05-06", 105, 240),
   makeTimeBudgetDay("2026-05-07",   0, AFTERNOON_WINDOW_MIN),
-  makeTimeBudgetDay("2026-05-08",  60,  90),
+  makeTimeBudgetDay("2026-05-08",  60,  90, { evening: { booked: 0 } }),
   makeTimeBudgetDay("2026-05-09", 150, AFTERNOON_WINDOW_MIN),
 ];
 
@@ -2168,6 +2194,7 @@ function cloneRollout(r: AdminRollout): AdminRollout {
       ...d,
       morning: { ...d.morning },
       afternoon: { ...d.afternoon },
+      ...(d.evening ? { evening: { ...d.evening } } : {}),
     })),
   };
 }
@@ -2450,14 +2477,24 @@ export function getActiveBookingForUnit(
 export function releaseBookingCapacity(booking: AdminBooking): boolean {
   if (!booking.rolloutId) return false;
   if (!booking.serviceDate) return false;
-  if (booking.serviceSlot !== "morning" && booking.serviceSlot !== "afternoon") {
+  if (
+    booking.serviceSlot !== "morning" &&
+    booking.serviceSlot !== "afternoon" &&
+    booking.serviceSlot !== "evening"
+  ) {
     return false;
   }
   const rollout = getRolloutById(booking.rolloutId);
   if (!rollout) return false;
   const day = rollout.days.find((d) => d.isoDate === booking.serviceDate);
   if (!day) return false;
-  const slot = booking.serviceSlot === "morning" ? day.morning : day.afternoon;
+  const slot =
+    booking.serviceSlot === "morning"
+      ? day.morning
+      : booking.serviceSlot === "afternoon"
+        ? day.afternoon
+        : day.evening;
+  if (!slot) return false;
   if (rollout.capacityModel === "slots_per_window") {
     const next = Math.max(0, (slot.bookedCount ?? 0) - 1);
     updateRolloutSlot(rollout.id, day.isoDate, booking.serviceSlot, {
@@ -2482,13 +2519,19 @@ export function consumeBookingCapacity(
   booking: AdminBooking,
   rolloutId: string,
   date: string,
-  window: "morning" | "afternoon",
+  window: "morning" | "afternoon" | "evening",
 ): boolean {
   const rollout = getRolloutById(rolloutId);
   if (!rollout) return false;
   const day = rollout.days.find((d) => d.isoDate === date);
   if (!day) return false;
-  const slot = window === "morning" ? day.morning : day.afternoon;
+  const slot =
+    window === "morning"
+      ? day.morning
+      : window === "afternoon"
+        ? day.afternoon
+        : day.evening;
+  if (!slot) return false;
   if (rollout.capacityModel === "slots_per_window") {
     updateRolloutSlot(rollout.id, day.isoDate, window, {
       bookedCount: (slot.bookedCount ?? 0) + 1,
@@ -2539,7 +2582,7 @@ export function createRollout(input: {
 export function updateRolloutDay(
   rolloutId: string,
   isoDate: string,
-  patch: Partial<Omit<RolloutDay, "isoDate" | "dayLabel" | "weekdayLabel" | "monthLabel" | "morning" | "afternoon">>,
+  patch: Partial<Omit<RolloutDay, "isoDate" | "dayLabel" | "weekdayLabel" | "monthLabel" | "morning" | "afternoon" | "evening">>,
 ): void {
   rollouts = rollouts.map((r) =>
     r.id !== rolloutId
@@ -2556,7 +2599,7 @@ export function updateRolloutDay(
 export function updateRolloutSlot(
   rolloutId: string,
   isoDate: string,
-  window: "morning" | "afternoon",
+  window: "morning" | "afternoon" | "evening",
   patch: Partial<RolloutSlot>,
 ): void {
   rollouts = rollouts.map((r) =>
@@ -2564,11 +2607,12 @@ export function updateRolloutSlot(
       ? r
       : {
           ...r,
-          days: r.days.map((d) =>
-            d.isoDate !== isoDate
-              ? d
-              : { ...d, [window]: { ...d[window], ...patch } },
-          ),
+          days: r.days.map((d) => {
+            if (d.isoDate !== isoDate) return d;
+            const existing = d[window];
+            if (!existing) return d;
+            return { ...d, [window]: { ...existing, ...patch } };
+          }),
         },
   );
 }
@@ -2580,19 +2624,21 @@ export function updateRolloutSlot(
 export function resetRolloutSlotUtilization(
   rolloutId: string,
   isoDate: string,
-  window: "morning" | "afternoon",
+  window: "morning" | "afternoon" | "evening",
 ): { bookedMinutes: number; bookedCount: number } | null {
   const r = getRolloutById(rolloutId);
   if (!r) return null;
   const day = r.days.find((d) => d.isoDate === isoDate);
   if (!day) return null;
+  const slot = day[window];
+  if (!slot) return null;
   const prev = {
-    bookedMinutes: day[window].bookedMinutes,
-    bookedCount: day[window].bookedCount ?? 0,
+    bookedMinutes: slot.bookedMinutes,
+    bookedCount: slot.bookedCount ?? 0,
   };
   updateRolloutSlot(rolloutId, isoDate, window, {
     bookedMinutes: 0,
-    bookedCount: day[window].slotCount === undefined ? undefined : 0,
+    bookedCount: slot.slotCount === undefined ? undefined : 0,
   });
   return prev;
 }
@@ -2645,12 +2691,16 @@ function isWeekend(iso: string): boolean {
  */
 export function convertCoordinationToScheduledPatch(
   b: AdminBooking,
-  schedule: { date: string; window: "morning" | "afternoon" },
+  schedule: { date: string; window: "morning" | "afternoon" | "evening" },
   by: string = ADMIN_USER_LABEL,
   at: string = "Just now",
 ): Pick<AdminBooking, "serviceDate" | "serviceSlot" | "serviceTimeline"> {
   const windowLabel =
-    schedule.window === "morning" ? "Morning" : "Afternoon";
+    schedule.window === "morning"
+      ? "Morning"
+      : schedule.window === "afternoon"
+        ? "Afternoon"
+        : "Evening";
   const entry: TimelineEntry = {
     status: "scheduled",
     label: `Coordinated · ${formatBookingShortDate(schedule.date)} · ${windowLabel}`,

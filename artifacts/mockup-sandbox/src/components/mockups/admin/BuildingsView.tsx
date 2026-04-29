@@ -190,7 +190,7 @@ function NextServiceCell({
   slot,
 }: {
   date: string;
-  slot: "morning" | "afternoon";
+  slot: "morning" | "afternoon" | "evening";
 }) {
   return (
     <>

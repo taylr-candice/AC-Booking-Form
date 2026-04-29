@@ -26,6 +26,7 @@ import {
   infoNoteFor,
   isAgentTenantOption,
   isCollectReturnMethod,
+  isBeThereMethod,
   isLeaveKeyMethod,
   isManagingAgentMethod,
   isStep5Valid,
@@ -132,7 +133,10 @@ export function AccessMobile() {
             {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
             {sig && <SignatureSection title={sig.title} body={sig.body} />}
 
-            <NotesSection />
+            {/* Notes are only useful for be-there methods — otherwise
+                the customer isn't on-site to hand off context to the
+                technician. */}
+            {isBeThereMethod(access) && <NotesSection />}
           </>
         )}
       </div>

@@ -4,33 +4,34 @@
  * Component-level regression tests for the three customer-facing slot
  * pickers (`SlotsMobile`, `SlotsMobileLite`, `SlotsDesktop`).
  *
- * These pin down the conditional rendering rules established by Tasks
- * #27 / #29 so a future change to the seed data, the fit logic, or the
- * AC step can't silently re-introduce regressions:
+ * The Schedule page redesign (Task #72) collapses the old vertical
+ * day list into a compact day grid — the customer first picks a day
+ * card, then the windows for that day reveal beneath it. The legacy
+ * pink access-commitment banner and yellow "Not sure" callout were
+ * stripped along the way; tests for those now live nowhere because
+ * the surfaces themselves are gone.
  *
- *  1. No minute / hour DURATION text ever leaks into the rendered output
- *     for any seeded slot, regardless of job size or AC unsure state.
- *     (Clock-time strings like "8am – 12pm" are intentionally allowed.)
+ * What this file still pins down:
  *
- *  2. The "Not sure" callout renders if and only if
- *     `ac_discrepancy.customer.type === "unsure"` — never on a "split"
- *     or "ducted" answer, and never when there's no discrepancy at all.
+ *  1. No minute / hour DURATION text ever leaks into the rendered
+ *     output for any seeded slot, regardless of job size or AC unsure
+ *     state. (Clock-time strings like "8am – 12pm" are intentionally
+ *     allowed.) The day grid renders no clock text on its own — only
+ *     once a day is picked do the window cards appear — so this test
+ *     covers the initial unselected state, which is what customers
+ *     see first and what catches the most regressions.
  *
- *  3. Disabled slot tiles render NO reason text at all (Task #61).
- *     The customer view is intentionally binary: a window is either
- *     selectable or it's greyed out and not selectable. The old
- *     "Full" / "Not enough time left for this service" / "Not yet open
- *     for booking" / "Won't fit your N-minute service" copy must never
- *     reappear. The underlying availability decision still runs — only
- *     the reason text is suppressed on the customer-facing tile.
- *
- * The store under `../../../state/bookingSession` is module-scoped, so
- * we reset it (and the underlying sessionStorage) between every test
- * to keep state from leaking across cases.
+ *  2. Disabled window tiles render NO reason text at all (Task #61).
+ *     We click a day card first to reveal the windows, then exercise
+ *     the disabled tile inside that day's window grid. Uses the
+ *     "medium" job-size scenario (255m) so morning windows (240m)
+ *     are unbookable but afternoons (300m) still fit — that mix
+ *     guarantees both a clickable day card AND a disabled tile in
+ *     the revealed window grid.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 
 import { SlotsDesktop } from "./SlotsDesktop";
 import { SlotsMobile } from "./SlotsMobile";
@@ -74,30 +75,18 @@ const VARIANTS = [
     name: "SlotsMobile",
     Component: SlotsMobile,
     slotTestidPrefix: "mobile-slot-",
-    unsureCalloutTestid: "callout-unsure-mobile",
-    accountabilityNudgeTestid: "nudge-accountability-mobile",
   },
   {
     name: "SlotsMobileLite",
     Component: SlotsMobileLite,
     slotTestidPrefix: "mobile-slot-",
-    unsureCalloutTestid: "callout-unsure-mobile",
-    accountabilityNudgeTestid: "nudge-accountability-mobile",
   },
   {
     name: "SlotsDesktop",
     Component: SlotsDesktop,
     slotTestidPrefix: "desktop-slot-",
-    unsureCalloutTestid: "callout-unsure-desktop",
-    accountabilityNudgeTestid: "nudge-accountability-desktop",
   },
 ] as const;
-
-// Distinct keywords baked into the role-conditional accountability copy
-// so the assertions don't have to mirror the entire sentence verbatim.
-// Mirrors the literals used by the slot-picker components.
-const OWNER_NUDGE_KEYWORD = "be home for";
-const AGENT_NUDGE_KEYWORD = "coordinate a second visit with the tenant";
 
 /**
  * Job-size scenarios chosen to stress the slot grid in different ways:
@@ -105,8 +94,7 @@ const AGENT_NUDGE_KEYWORD = "coordinate a second visit with the tenant";
  *  - medium: morning windows (240m) too small, afternoon (300m) fine →
  *    exercises both fit and unfit paths in one render
  *  - huge: bigger than every seeded window → every tile is disabled
- *  - unsure: forces `getBookingDurationMinutes` down its fallback branch
- *    (and toggles the "Not sure" callout — covered separately too).
+ *    (so every day card is greyed out)
  */
 type Scenario = {
   label: string;
@@ -133,15 +121,6 @@ const SCENARIOS: Scenario[] = [
     systems: 7,
     additional: 0,
     ac_discrepancy: null,
-  },
-  {
-    label: "unsure customer",
-    systems: 1,
-    additional: 0,
-    ac_discrepancy: {
-      recorded: { type: "split", systems: 2, additional: 1 },
-      customer: { type: "unsure" },
-    },
   },
 ];
 
@@ -171,11 +150,27 @@ function applyScenario(role: Role, s: Scenario) {
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
+/**
+ * Each variant exposes its own testid for the be-there ack-checkbox so
+ * the gate can be exercised in tests. The two mobile pickers share the
+ * "button-continue-mobile" CTA testid; the desktop picker has its own.
+ */
+const ACK_TESTID_BY_VARIANT: Record<(typeof VARIANTS)[number]["name"], string> = {
+  SlotsMobile: "ack-checkbox-mobile",
+  SlotsMobileLite: "ack-checkbox-mobile-lite",
+  SlotsDesktop: "ack-checkbox-desktop",
+};
+
+const CONTINUE_TESTID_BY_VARIANT: Record<(typeof VARIANTS)[number]["name"], string> = {
+  SlotsMobile: "button-continue-mobile",
+  SlotsMobileLite: "button-continue-mobile",
+  SlotsDesktop: "button-continue-desktop",
+};
+
 describe.each(VARIANTS)("$name slot picker", ({
+  name,
   Component,
   slotTestidPrefix,
-  unsureCalloutTestid,
-  accountabilityNudgeTestid,
 }) => {
   describe("no minute/hour leakage in customer UI", () => {
     for (const role of ROLES) {
@@ -198,63 +193,27 @@ describe.each(VARIANTS)("$name slot picker", ({
     }
   });
 
-  describe('"Not sure" callout visibility', () => {
-    it("hides the callout when there is no AC discrepancy", () => {
-      bookingActions.setRole("owner");
-      bookingActions.setAcDiscrepancy(null);
-      const { queryByTestId } = render(<Component />);
-      expect(queryByTestId(unsureCalloutTestid)).toBeNull();
-    });
-
-    it('hides the callout when the customer answered "split"', () => {
-      bookingActions.setRole("owner");
-      bookingActions.setAcDiscrepancy({
-        recorded: { type: "split", systems: 2, additional: 1 },
-        customer: { type: "split", systems: 1, additional: 0 },
-      });
-      const { queryByTestId } = render(<Component />);
-      expect(queryByTestId(unsureCalloutTestid)).toBeNull();
-    });
-
-    it('hides the callout when the customer answered "ducted"', () => {
-      bookingActions.setRole("owner");
-      bookingActions.setAcDiscrepancy({
-        recorded: { type: "split", systems: 2, additional: 1 },
-        customer: { type: "ducted", systems: 1, additional: 0 },
-      });
-      const { queryByTestId } = render(<Component />);
-      expect(queryByTestId(unsureCalloutTestid)).toBeNull();
-    });
-
-    it('shows the callout when the customer answered "unsure"', () => {
-      bookingActions.setRole("owner");
-      bookingActions.setAcDiscrepancy({
-        recorded: { type: "split", systems: 2, additional: 1 },
-        customer: { type: "unsure" },
-      });
-      const { getByTestId } = render(<Component />);
-      const callout = getByTestId(unsureCalloutTestid);
-      // Sanity-check the callout itself is also free of duration leaks.
-      const calloutText = callout.textContent ?? "";
-      expect(calloutText).not.toMatch(NUMERIC_DURATION_RE);
-      expect(calloutText).not.toMatch(MINUTE_WORD_RE);
-      expect(calloutText).not.toMatch(HOUR_WORD_RE);
-    });
-  });
-
   describe("disabled slot tiles render no reason text (Task #61)", () => {
     it("disables unbookable tiles, prevents selection, and renders no reason text", () => {
-      // Force a job size that's larger than every seeded morning AND
-      // afternoon window so we're guaranteed at least one disabled tile.
-      // 7 systems × 45m = 315m > 300m (afternoon) > 240m (morning).
+      // Medium job (255m) lets us guarantee a mix inside ONE day's
+      // window grid: morning (240m) is unbookable, afternoon (300m)
+      // fits, so the day card stays clickable AND the revealed
+      // window grid contains at least one disabled tile.
       applyScenario("owner", {
-        label: "saturating",
-        systems: 7,
-        additional: 0,
+        label: "medium",
+        systems: 4,
+        additional: 5,
         ac_discrepancy: null,
       });
 
       const { container } = render(<Component />);
+
+      // Pick the first clickable day card so the window tiles appear.
+      const firstDay = container.querySelector<HTMLButtonElement>(
+        'button[data-testid^="day-card-"]:not([disabled])',
+      );
+      expect(firstDay).not.toBeNull();
+      fireEvent.click(firstDay!);
 
       const disabledTiles = container.querySelectorAll<HTMLButtonElement>(
         `button[data-testid^="${slotTestidPrefix}"][disabled]`,
@@ -281,9 +240,99 @@ describe.each(VARIANTS)("$name slot picker", ({
       }
     });
 
+  });
+
+  describe("be-there ack checkbox gates Confirm (Task #72)", () => {
+    it("for be-there access methods: Confirm stays disabled until the customer ticks the ack checkbox, then enables", () => {
+      // owner_live_at_unit is a be-there method, so the ack checkbox
+      // must appear and gate Confirm. Use the tiny job so every
+      // window fits and we can deterministically pick the morning.
+      applyScenario("owner", {
+        label: "tiny",
+        systems: 1,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+      bookingActions.setAccessMethod("owner_live_at_unit");
+
+      const { container, getByTestId } = render(<Component />);
+
+      const continueBtn = getByTestId(
+        CONTINUE_TESTID_BY_VARIANT[name],
+      ) as HTMLButtonElement;
+
+      // Without a slot selected, Confirm is disabled — baseline.
+      expect(continueBtn.disabled).toBe(true);
+
+      // Pick a day, then a window. Confirm must STILL be disabled
+      // because the ack checkbox hasn't been ticked yet.
+      const firstDay = container.querySelector<HTMLButtonElement>(
+        'button[data-testid^="day-card-"]:not([disabled])',
+      );
+      expect(firstDay).not.toBeNull();
+      fireEvent.click(firstDay!);
+
+      const firstSlot = container.querySelector<HTMLButtonElement>(
+        `button[data-testid^="${slotTestidPrefix}"]:not([disabled])`,
+      );
+      expect(firstSlot).not.toBeNull();
+      fireEvent.click(firstSlot!);
+
+      expect(continueBtn.disabled).toBe(true);
+
+      // Tick the ack — Confirm must enable now.
+      const ack = getByTestId(
+        ACK_TESTID_BY_VARIANT[name],
+      ) as HTMLInputElement;
+      expect(ack.checked).toBe(false);
+      fireEvent.click(ack);
+      expect(ack.checked).toBe(true);
+
+      expect(continueBtn.disabled).toBe(false);
+    });
+
+    it("for non-be-there access methods: no ack checkbox is rendered, and Confirm enables once a slot is picked", () => {
+      // owner_leased_leave_key is a non-be-there (key-holder) method.
+      // The ack checkbox must NOT be in the DOM, and Confirm must
+      // enable as soon as the customer picks a slot.
+      applyScenario("owner", {
+        label: "tiny",
+        systems: 1,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+      bookingActions.setAccessMethod("owner_leased_leave_key");
+
+      const { container, getByTestId, queryByTestId } = render(<Component />);
+
+      const continueBtn = getByTestId(
+        CONTINUE_TESTID_BY_VARIANT[name],
+      ) as HTMLButtonElement;
+
+      // Pick a day and a window.
+      const firstDay = container.querySelector<HTMLButtonElement>(
+        'button[data-testid^="day-card-"]:not([disabled])',
+      );
+      expect(firstDay).not.toBeNull();
+      fireEvent.click(firstDay!);
+
+      const firstSlot = container.querySelector<HTMLButtonElement>(
+        `button[data-testid^="${slotTestidPrefix}"]:not([disabled])`,
+      );
+      expect(firstSlot).not.toBeNull();
+      fireEvent.click(firstSlot!);
+
+      // Ack checkbox must not exist for non-be-there methods.
+      expect(queryByTestId(ACK_TESTID_BY_VARIANT[name])).toBeNull();
+      // Confirm must enable on slot selection alone.
+      expect(continueBtn.disabled).toBe(false);
+    });
+  });
+
+  describe("legacy reason text never appears on enabled tiles", () => {
     it("never renders the legacy reason text on enabled tiles either", () => {
-      // A small job (45m) fits every seeded window, so every tile is
-      // enabled. The legacy reason text must be absent here too.
+      // A small job (45m) fits every seeded window, so every revealed
+      // tile is enabled. The legacy reason text must be absent here too.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -292,6 +341,14 @@ describe.each(VARIANTS)("$name slot picker", ({
       });
 
       const { container } = render(<Component />);
+
+      // Reveal the windows for the first day so there's something to
+      // assert against.
+      const firstDay = container.querySelector<HTMLButtonElement>(
+        'button[data-testid^="day-card-"]:not([disabled])',
+      );
+      expect(firstDay).not.toBeNull();
+      fireEvent.click(firstDay!);
 
       const enabledTiles = container.querySelectorAll<HTMLButtonElement>(
         `button[data-testid^="${slotTestidPrefix}"]:not([disabled])`,
@@ -304,63 +361,6 @@ describe.each(VARIANTS)("$name slot picker", ({
         expect(tileText).not.toContain("Not enough time left for this service");
         expect(tileText).not.toContain("Not yet open for booking");
       }
-    });
-  });
-
-  describe("accountability nudge flips copy by role", () => {
-    /**
-     * The accountability nudge lives inside the "Not sure" callout, so
-     * we only render it when the customer answered "unsure" on the AC
-     * step. These tests pin the role-conditional phrasing in place so
-     * a future copy refactor can't quietly collapse owner / agent into
-     * a single message again.
-     */
-    function renderUnsureFor(role: Role) {
-      bookingActions.setRole(role);
-      bookingActions.setAcDiscrepancy({
-        recorded: { type: "split", systems: 2, additional: 1 },
-        customer: { type: "unsure" },
-      });
-      return render(<Component />);
-    }
-
-    it("uses the owner copy when role === 'owner'", () => {
-      const { getByTestId } = renderUnsureFor("owner");
-      const nudge = getByTestId(accountabilityNudgeTestid);
-      const text = nudge.textContent ?? "";
-      expect(text).toContain(OWNER_NUDGE_KEYWORD);
-      expect(text).not.toContain(AGENT_NUDGE_KEYWORD);
-    });
-
-    it("uses the agent copy when role === 'agent'", () => {
-      const { getByTestId } = renderUnsureFor("agent");
-      const nudge = getByTestId(accountabilityNudgeTestid);
-      const text = nudge.textContent ?? "";
-      expect(text).toContain(AGENT_NUDGE_KEYWORD);
-      expect(text).not.toContain(OWNER_NUDGE_KEYWORD);
-    });
-
-    it("falls back to the owner copy when role is unset", () => {
-      // The customer can technically reach the slot picker iframe in
-      // isolation (e.g. via the mockup canvas) before picking a role.
-      // We default to the owner phrasing in that case rather than
-      // showing nothing — the canvas mockup should still read sensibly.
-      bookingActions.setRole(null);
-      bookingActions.setAcDiscrepancy({
-        recorded: { type: "split", systems: 2, additional: 1 },
-        customer: { type: "unsure" },
-      });
-      const { getByTestId } = render(<Component />);
-      const text = getByTestId(accountabilityNudgeTestid).textContent ?? "";
-      expect(text).toContain(OWNER_NUDGE_KEYWORD);
-      expect(text).not.toContain(AGENT_NUDGE_KEYWORD);
-    });
-
-    it("does not render the nudge at all when the callout is hidden", () => {
-      bookingActions.setRole("agent");
-      bookingActions.setAcDiscrepancy(null);
-      const { queryByTestId } = render(<Component />);
-      expect(queryByTestId(accountabilityNudgeTestid)).toBeNull();
     });
   });
 });

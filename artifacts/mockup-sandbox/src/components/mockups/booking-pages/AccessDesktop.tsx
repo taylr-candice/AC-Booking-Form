@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
-import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isBeThereMethod, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -81,7 +81,9 @@ export function AccessDesktop() {
                 {isManagingAgentMethod(access) && <ManagingAgencySection />}
                 {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
                 {sig && <SignatureSection title={sig.title} body={sig.body} />}
-                <NotesSection />
+                {/* Notes are only useful for be-there methods — otherwise
+                    the customer isn't on-site to hand off context. */}
+                {isBeThereMethod(access) && <NotesSection />}
               </>
             )}
           </div>

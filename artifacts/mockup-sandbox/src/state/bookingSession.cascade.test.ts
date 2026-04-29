@@ -297,10 +297,22 @@ describe("bookingActions.setAccessMethod — cascade clearing", () => {
     expect(s.service_slot).toBeNull();
   });
 
-  it("does not clear access_notes (notes are independent of the per-method follow-ups)", () => {
-    seedFullSession({ access_method: "owner_leased_leave_key" });
+  it("clears access_notes when switching to a non-be-there method (the textarea is hidden, so any typed note would be unreachable to edit)", () => {
+    // Seed a be-there method so access_notes is in-scope and a note
+    // has been typed. Switching away to a non-be-there method must
+    // wipe the note — otherwise it would be silently carried into
+    // the booking with no UI to view or edit it.
+    seedFullSession({ access_method: "owner_leased_be_there" });
 
     bookingActions.setAccessMethod("owner_leased_tenant");
+
+    expect(getBookingSession().access_notes).toBe("");
+  });
+
+  it("preserves access_notes when switching between two be-there methods (textarea stays visible)", () => {
+    seedFullSession({ access_method: "owner_leased_be_there" });
+
+    bookingActions.setAccessMethod("agent_be_there");
 
     expect(getBookingSession().access_notes).toBe("Side gate code is 1234");
   });

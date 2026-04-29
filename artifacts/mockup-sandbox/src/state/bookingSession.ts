@@ -224,7 +224,7 @@ export type UnitUnavailableBlocker = {
   date: string | null;
   /** Window the winning booking took. `null` for coordination bookings
    *  with `to_be_coordinated`. */
-  slot: "morning" | "afternoon" | "to_be_coordinated" | null;
+  slot: "morning" | "afternoon" | "evening" | "to_be_coordinated" | null;
 };
 
 // ─── Uniqueness guard ──────────────────────────────────────────────────────
@@ -524,9 +524,23 @@ function clearAccessFollowUps(s: BookingState): BookingState {
     tenants: [],
     signature_acknowledged: false,
     signature_name: "",
-    // access_notes is independent — always shown, always optional.
+    // access_notes is cascade-cleared by `setAccessMethod` itself when
+    // the new method is non-be-there (the textarea is hidden in that
+    // case so any previously-typed note would be unreachable to edit).
   };
 }
+
+/** Be-there methods are the only ones that show the access-notes
+ *  textarea — when the customer isn't on-site, technician notes have
+ *  no destination. Mirrors the `isBeThereMethod` test in
+ *  `accessMethodCatalog`. Inlined here so this module stays
+ *  dependency-free. */
+const BE_THERE_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set<AccessMethod>([
+  "owner_live_at_unit",
+  "owner_leased_be_there",
+  "owner_vacant_be_there",
+  "agent_be_there",
+]);
 
 /** Clear everything that depends on the role (spec §13.3 row "Role"). */
 function clearRoleDownstream(s: BookingState): BookingState {
@@ -788,6 +802,15 @@ export const bookingActions = {
         ? COORDINATION_ACCESS_METHODS.has(access_method)
         : false;
       const next = clearAccessFollowUps({ ...s, access_method });
+      // Drop any previously-typed access notes when switching to a
+      // method where the textarea is hidden — otherwise the note would
+      // be silently carried into the booking with no UI to edit it.
+      const newIsBeThere = access_method
+        ? BE_THERE_ACCESS_METHODS.has(access_method)
+        : false;
+      if (!newIsBeThere) {
+        next.access_notes = "";
+      }
       if (wasCoordination !== isCoordination) {
         next.service_date = null;
         next.service_slot = null;
