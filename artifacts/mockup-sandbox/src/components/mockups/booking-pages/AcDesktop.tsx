@@ -43,7 +43,7 @@ type Copy = {
 
 const COPY: Record<KnownType, Copy> = {
   ducted: {
-    heading: "Confirm your AC setup",
+    heading: "Confirm the AC setup",
     intro:
       "Please confirm the number of systems and any extra return-air grilles so we can price your service correctly.",
     systemsLabel: "Number of ducted systems",
@@ -61,7 +61,7 @@ const COPY: Record<KnownType, Copy> = {
     addonUnitPlural: "extra return-air grilles",
   },
   split: {
-    heading: "Confirm your AC setup",
+    heading: "Confirm the AC setup",
     intro:
       "Please confirm the number of split systems and any extra indoor units so we can price your service correctly.",
     systemsLabel: "Number of split systems",
@@ -264,7 +264,7 @@ export function AcDesktop() {
   };
 
   // Heading + intro depend on whether we know the type yet.
-  const heading = needsTypePick ? "Tell us about your AC setup" : copy?.heading ?? "Tell us about your AC setup";
+  const heading = needsTypePick ? "Tell us about the AC setup" : copy?.heading ?? "Tell us about the AC setup";
   const intro = needsTypePick
     ? "We don’t yet have AC details for this unit."
     : copy?.intro ?? "Our technician will confirm your AC setup on-site.";
