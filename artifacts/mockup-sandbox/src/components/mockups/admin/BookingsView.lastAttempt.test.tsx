@@ -355,3 +355,115 @@ describe("BookingsView last-attempt staleness", () => {
     expect(node.className).toContain("text-slate-500");
   });
 });
+
+/**
+ * Email-template suffix on the row's "Last attempt: …" line. Task
+ * #138 made `BookingDetail.logEmail` persist the picked template's
+ * name onto the resulting timeline entry as `templateLabel`; Task
+ * #141 surfaces that name as a small grey suffix on the bookings
+ * list so ops can triage the queue at a glance without opening each
+ * booking. Custom / legacy entries (`templateLabel` absent) keep
+ * the existing label-only rendering.
+ */
+describe("BookingsView last-attempt template suffix", () => {
+  function templateNode(): HTMLElement | null {
+    return screen.queryByTestId("bookings-row-last-attempt-template");
+  }
+
+  it("appends the picked template name when the latest email entry carries one", () => {
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "email",
+        status: "logged_email",
+        label: "Logged email · Booking access — please confirm window",
+        at: "Just now",
+        by: "Mia (admin)",
+        templateLabel: "Sent rebook link",
+      },
+    ];
+    renderView(
+      makeBooking({ id: "bk-tpl", serviceTimeline: timeline }),
+    );
+    expect(attemptText()).toBe(
+      'Last attempt: email · "Booking access — please confirm window" · Sent rebook link',
+    );
+    // The suffix is rendered in its own muted span so it stays
+    // visually distinct from the bolded label.
+    const suffix = templateNode();
+    expect(suffix).not.toBeNull();
+    expect(suffix!.textContent).toContain("Sent rebook link");
+    expect(suffix!.className).toContain("text-slate-500");
+  });
+
+  it("omits the suffix when the latest email entry has no templateLabel (Custom / legacy)", () => {
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "email",
+        status: "logged_email",
+        label: "Logged email · Booking access — please confirm window",
+        at: "Just now",
+        by: "Mia (admin)",
+      },
+    ];
+    renderView(
+      makeBooking({ id: "bk-no-tpl", serviceTimeline: timeline }),
+    );
+    expect(attemptText()).toBe(
+      'Last attempt: email · "Booking access — please confirm window"',
+    );
+    expect(templateNode()).toBeNull();
+  });
+
+  it("never renders a suffix on a logged-call row", () => {
+    // `templateLabel` is an email-only concept; the suffix must not
+    // bleed into call entries even if a stale field somehow survives
+    // a future schema change.
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Spoke to them",
+        at: "Just now",
+        by: "Mia (admin)",
+        // Intentionally pretend the field made it onto a call row —
+        // the renderer should still ignore it.
+        templateLabel: "Sent rebook link",
+      },
+    ];
+    renderView(
+      makeBooking({ id: "bk-call-tpl", serviceTimeline: timeline }),
+    );
+    expect(attemptText()).toBe("Last attempt: spoke");
+    expect(templateNode()).toBeNull();
+  });
+
+  it("uses the latest entry's template when an email follows an older email", () => {
+    // Older "Sent rebook link" email then a fresher "Awaiting access"
+    // email — the cell must surface the newer template, not the
+    // older one, so ops can see what's currently in flight.
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "email",
+        status: "logged_email",
+        label: "Logged email · Please rebook",
+        at: "Yesterday",
+        by: "Mia (admin)",
+        templateLabel: "Sent rebook link",
+      },
+      {
+        kind: "email",
+        status: "logged_email",
+        label: "Logged email · Awaiting access",
+        at: "Just now",
+        by: "Mia (admin)",
+        templateLabel: "Awaiting access info",
+      },
+    ];
+    renderView(
+      makeBooking({ id: "bk-tpl-newer", serviceTimeline: timeline }),
+    );
+    expect(attemptText()).toBe(
+      'Last attempt: email · "Awaiting access" · Awaiting access info',
+    );
+  });
+});

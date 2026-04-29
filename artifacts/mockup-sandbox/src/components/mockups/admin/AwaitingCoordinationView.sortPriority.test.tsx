@@ -440,3 +440,88 @@ describe("AwaitingCoordinationView last-attempt staleness", () => {
     expect(node.className).toContain("text-slate-500");
   });
 });
+
+/**
+ * Email-template suffix on the queue's "Last attempt: …" cell line.
+ * Mirrors the same suffix on the bookings list row (see
+ * `BookingsView.lastAttempt.test.tsx`) so a team lead triaging the
+ * Awaiting-coordination queue can see which template was sent
+ * without opening each booking (Task #141). Custom / legacy email
+ * entries (no persisted `templateLabel`) keep the existing
+ * label-only line.
+ */
+describe("AwaitingCoordinationView last-attempt template suffix", () => {
+  function renderQueueCellText(timeline: TimelineEntry[]): string {
+    const booking = makeBooking({
+      id: "bk-tpl",
+      unitId: "u1",
+      lastContactedAt: "2026-04-28T09:00:00+10:00",
+      serviceTimeline: timeline,
+    });
+    render(<Harness initial={[booking]} />);
+    const node = screen.getByTestId("coordinating-with-last-attempt");
+    return node.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  }
+
+  it("appends the picked template name when the latest email entry carries one", () => {
+    expect(
+      renderQueueCellText([
+        {
+          kind: "email",
+          status: "logged_email",
+          label: "Logged email · Booking access — please confirm window",
+          at: "Just now",
+          by: "Mia (admin)",
+          templateLabel: "Sent rebook link",
+        },
+      ]),
+    ).toBe(
+      'Last attempt: email · "Booking access — please confirm window" · Sent rebook link',
+    );
+    // The suffix is rendered in its own muted span so it stays
+    // visually distinct from the bolded outcome.
+    const suffix = screen.getByTestId(
+      "coordinating-with-last-attempt-template",
+    );
+    expect(suffix.textContent).toContain("Sent rebook link");
+    expect(suffix.className).toContain("text-slate-500");
+  });
+
+  it("omits the suffix when the latest email entry has no templateLabel", () => {
+    expect(
+      renderQueueCellText([
+        {
+          kind: "email",
+          status: "logged_email",
+          label: "Logged email · Booking access — please confirm window",
+          at: "Just now",
+          by: "Mia (admin)",
+        },
+      ]),
+    ).toBe('Last attempt: email · "Booking access — please confirm window"');
+    expect(
+      screen.queryByTestId("coordinating-with-last-attempt-template"),
+    ).toBeNull();
+  });
+
+  it("never renders the suffix on a logged-call row", () => {
+    // `templateLabel` is an email-only concept; the suffix must not
+    // bleed into call entries even if a stale field somehow survives
+    // a future schema change.
+    expect(
+      renderQueueCellText([
+        {
+          kind: "call",
+          status: "logged_call",
+          label: "Logged call · Spoke to them",
+          at: "Just now",
+          by: "Mia (admin)",
+          templateLabel: "Sent rebook link",
+        },
+      ]),
+    ).toBe("Last attempt: spoke");
+    expect(
+      screen.queryByTestId("coordinating-with-last-attempt-template"),
+    ).toBeNull();
+  });
+});

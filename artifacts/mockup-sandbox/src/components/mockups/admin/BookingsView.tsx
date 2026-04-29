@@ -677,6 +677,24 @@ export function BookingsView({
                               {latestAttempt.label}
                               {recency ? ` · ${recency.label}` : ""}
                             </span>
+                            {latestAttempt.templateLabel && (
+                              // Small grey suffix naming the picked
+                              // email template (Task #141), mirroring
+                              // the same suffix on the Awaiting-
+                              // coordination queue's row so ops can
+                              // triage by template at a glance without
+                              // opening each booking. Custom / legacy
+                              // entries leave `templateLabel` as
+                              // `null` and skip this entirely.
+                              <span
+                                className="text-slate-500"
+                                data-testid="bookings-row-last-attempt-template"
+                                data-booking-id={b.id}
+                              >
+                                {" · "}
+                                {latestAttempt.templateLabel}
+                              </span>
+                            )}
                           </div>
                         );
                       })()}

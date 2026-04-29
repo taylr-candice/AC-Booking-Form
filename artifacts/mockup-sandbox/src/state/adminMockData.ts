@@ -1146,6 +1146,14 @@ export type LatestCoordinationAttempt = {
    *  `null` for legacy entries that pre-date the field, in which
    *  case the recency suffix is omitted gracefully. */
   loggedAt: string | null;
+  /** When `kind === "email"` and the underlying entry was produced
+   *  by picking a real {@link EMAIL_TEMPLATES} option, the template's
+   *  human-readable name (e.g. `"Sent rebook link"`). `null` for
+   *  calls, for Custom emails (no persisted template), and for
+   *  legacy email entries that pre-date Task #138 — those rows fall
+   *  back to the existing label-only rendering on the bookings list
+   *  + Awaiting-coordination queue (Task #141). */
+  templateLabel: string | null;
 };
 
 /** `BookingDetail.logCall` encodes the outcome in the entry label
@@ -1197,14 +1205,23 @@ export function latestCoordinationAttempt(
         emailSubject: null,
         label: outcome ? CALL_OUTCOME_DISPLAY[outcome] : "call",
         loggedAt,
+        templateLabel: null,
       };
     }
+    // Surface the picked email template's name so the row-level
+    // "Last attempt" cell on the bookings list + Awaiting-coordination
+    // queue can render it as a small grey suffix (Task #141). The
+    // entry-level field is only populated when a real template was
+    // chosen — Custom / legacy email entries leave it `null` and the
+    // renderer falls back to the existing label-only line.
+    const trimmedTemplate = entry.templateLabel?.trim() ?? "";
     return {
       kind: "email",
       callOutcome: null,
       emailSubject: suffix,
       label: suffix.length > 0 ? `email · "${suffix}"` : "email",
       loggedAt,
+      templateLabel: trimmedTemplate.length > 0 ? trimmedTemplate : null,
     };
   }
   return null;

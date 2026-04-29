@@ -189,6 +189,21 @@ function CoordinatingWithCell({
               {latestAttempt.label}
               {recency ? ` · ${recency.label}` : ""}
             </span>
+            {latestAttempt.templateLabel && (
+              // Small grey suffix naming the email template the admin
+              // picked when logging the email (Task #141), so a team
+              // lead can triage the queue at a glance — "spoke ·
+              // 2h ago · Sent rebook link" reads naturally inline
+              // without an extra row. Custom / legacy entries leave
+              // `templateLabel` as `null` and skip this entirely.
+              <span
+                className="text-slate-500"
+                data-testid="coordinating-with-last-attempt-template"
+              >
+                {" · "}
+                {latestAttempt.templateLabel}
+              </span>
+            )}
           </div>
         );
       })()}
