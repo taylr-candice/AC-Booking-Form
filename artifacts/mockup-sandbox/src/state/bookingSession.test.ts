@@ -187,6 +187,10 @@ describe("migratePersistedSession — preserves other persisted fields", () => {
     expect(out.tenants).toEqual([]);
     expect(out.cancellation_acknowledged).toBe(false);
     expect(out.access_notes).toBe("");
+    // Task #50: AC step now branches on this flag — legacy persisted
+    // blobs that pre-date the field must default back to the on-file
+    // view (`false`).
+    expect(out.ac_override_active).toBe(false);
   });
 });
 
@@ -819,6 +823,106 @@ describe("Step 3 (Access) cascade clears (bookingActions)", () => {
     });
   });
 
+  // ─── D2. AC override flag (Task #50) ────────────────────────────────────
+  // The Step 2 AC page now branches on `ac_override_active` to choose
+  // between the on-file (minimal) view and the full configuration UI.
+  // The flag's setter has special behaviour: clearing it back to false
+  // also wipes any discrepancy snapshot, because reverting to "use
+  // what's on file" means the booking will be recorded as matching
+  // the on-file record exactly. The flag must also cascade-clear on
+  // unit change, terminal-state resets, and bookAnother — captured in
+  // the existing setUnit / pickAnotherUnit / bookAnother tests above.
+  describe("D2. AC override flag", () => {
+    beforeEach(() => {
+      bookingActions.reset();
+    });
+
+    it("starts false on a fresh session", () => {
+      expect(getBookingSession().ac_override_active).toBe(false);
+    });
+
+    it("setAcOverrideActive(true) flips the flag without touching anything else", () => {
+      bookingActions.setUnit("u1");
+      bookingActions.setSystems(2);
+
+      bookingActions.setAcOverrideActive(true);
+
+      const s = getBookingSession();
+      expect(s.ac_override_active).toBe(true);
+      expect(s.unit_id).toBe("u1");
+      expect(s.num_systems).toBe(2);
+    });
+
+    it("setAcOverrideActive is a no-op when the flag is already at the target value", () => {
+      const ref1 = getBookingSession();
+      bookingActions.setAcOverrideActive(false);
+      // Already false → same reference, no spurious render churn.
+      expect(getBookingSession()).toBe(ref1);
+
+      bookingActions.setAcOverrideActive(true);
+      const ref2 = getBookingSession();
+      bookingActions.setAcOverrideActive(true);
+      expect(getBookingSession()).toBe(ref2);
+    });
+
+    it("setAcOverrideActive(false) also clears any captured discrepancy snapshot", () => {
+      // Customer overrode the on-file record and we captured the diff.
+      bookingActions.setUnit("u1");
+      bookingActions.setAcOverrideActive(true);
+      bookingActions.setAcDiscrepancy({
+        recorded: { type: "ducted", systems: 1, additional: 1 },
+        customer: { type: "ducted", systems: 2, additional: 0 },
+      });
+      expect(getBookingSession().ac_discrepancy).not.toBeNull();
+
+      // Customer changed their mind and clicked "Use what's on file" —
+      // the snapshot must go too, otherwise the booking would be
+      // recorded as matching the on-file record while still carrying
+      // a stale "they amended these numbers" diff.
+      bookingActions.setAcOverrideActive(false);
+
+      const s = getBookingSession();
+      expect(s.ac_override_active).toBe(false);
+      expect(s.ac_discrepancy).toBeNull();
+    });
+
+    it("setUnit cascade-clears the override flag — flag is per-unit", () => {
+      bookingActions.setUnit("u1");
+      bookingActions.setAcOverrideActive(true);
+      expect(getBookingSession().ac_override_active).toBe(true);
+
+      bookingActions.setUnit("u2");
+      expect(getBookingSession().ac_override_active).toBe(false);
+    });
+
+    it("bookAnother resets the override flag back to false", () => {
+      bookingActions.setUnit("u1");
+      bookingActions.setAcOverrideActive(true);
+      expect(getBookingSession().ac_override_active).toBe(true);
+
+      bookingActions.bookAnother();
+      expect(getBookingSession().ac_override_active).toBe(false);
+    });
+
+    it("migratePersistedSession defaults the flag to false when missing", () => {
+      const out = migratePersistedSession(
+        JSON.stringify({ unit_id: "u1", current_step: 2 }),
+      );
+      expect(out.ac_override_active).toBe(false);
+    });
+
+    it("migratePersistedSession preserves a persisted true value", () => {
+      const out = migratePersistedSession(
+        JSON.stringify({
+          unit_id: "u1",
+          current_step: 2,
+          ac_override_active: true,
+        }),
+      );
+      expect(out.ac_override_active).toBe(true);
+    });
+  });
+
   // ─── E. AC step origin hint ─────────────────────────────────────────────
   // The AC step's "you came back to confirm AC details" banner reads
   // `ac_step_origin === "slot_picker"`. The origin is set by the slot
@@ -1038,6 +1142,13 @@ describe("unit-unavailable terminal state", () => {
     expect(before.ac_discrepancy).not.toBeNull();
     expect(before.current_step).toBe(5);
 
+    // Task #50: prove pickAnotherUnit also resets the override flag
+    // so the new unit's on-file view shows by default — otherwise a
+    // customer who overrode AC details on the unavailable unit would
+    // skip straight into the full config UI on the new unit too.
+    bookingActions.setAcOverrideActive(true);
+    expect(getBookingSession().ac_override_active).toBe(true);
+
     bookingActions.pickAnotherUnit();
 
     const after = getBookingSession();
@@ -1045,6 +1156,7 @@ describe("unit-unavailable terminal state", () => {
     expect(after.unit_unavailable).toBe(false);
     expect(after.unit_id).toBeNull();
     expect(after.ac_discrepancy).toBeNull();
+    expect(after.ac_override_active).toBe(false);
     expect(after.current_step).toBe(1);
     // Identity, AC counts, access method and slot all survive — the
     // whole point of pickAnotherUnit vs bookAnother is that the

@@ -181,6 +181,36 @@ export function getAcRecord(unit_id: string | null): AcRecord | null {
 }
 
 /**
+ * Which "mode" the AC step (Step 2) renders in for the customer.
+ *
+ * - `"on-file"`     — we have a record on file for this unit and the
+ *                     customer hasn't asked to override it. Renders a
+ *                     minimal summary + price block + "Agree and
+ *                     continue" button + "Update the details" link.
+ * - `"overridden"`  — we have a record on file but the customer clicked
+ *                     "Update the details" to amend it. Renders the
+ *                     full configuration UI with the acknowledgement
+ *                     checkbox and a "Use what's on file" reset link.
+ * - `"no-record"`   — no record on file for this unit. Same full
+ *                     configuration UI as overridden, but with no
+ *                     reset link (there's nothing to reset to).
+ *
+ * The discrepancy snapshot (`ac_discrepancy` on the booking session)
+ * is only ever captured in the `"overridden"` mode — on-file means the
+ * customer accepted the record exactly, and no-record means there's
+ * nothing to compare against.
+ */
+export type AcMode = "on-file" | "overridden" | "no-record";
+
+export function getAcMode(
+  unit_id: string | null,
+  ac_override_active: boolean,
+): AcMode {
+  if (!getAcRecord(unit_id)) return "no-record";
+  return ac_override_active ? "overridden" : "on-file";
+}
+
+/**
  * Pure comparator — returns `null` when the customer's selection on
  * Step 4 matches what Taylr has on record exactly. Otherwise returns
  * the snapshot to persist on the booking session so the admin mockup

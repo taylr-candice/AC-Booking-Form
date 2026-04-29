@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeAcDiscrepancy,
+  getAcMode,
   getAcRecord,
   isPastDate,
   unitCity,
@@ -52,6 +53,43 @@ describe("getAcRecord", () => {
 
   it("returns null when no unit is selected yet", () => {
     expect(getAcRecord(null)).toBeNull();
+  });
+});
+
+describe("getAcMode", () => {
+  // Task #50 — drives the Step 2 branch between the on-file (minimal)
+  // view, the overridden full-config view, and the no-record view.
+  // The mode is fully determined by (a) whether we have a record on
+  // file for the unit, and (b) the per-session override flag.
+  it("returns 'on-file' when we have a record and the override flag is false", () => {
+    expect(getAcMode("u1", false)).toBe("on-file");
+    expect(getAcMode("u2", false)).toBe("on-file");
+    expect(getAcMode("u5", false)).toBe("on-file");
+  });
+
+  it("returns 'overridden' when we have a record and the override flag is true", () => {
+    expect(getAcMode("u1", true)).toBe("overridden");
+    expect(getAcMode("u2", true)).toBe("overridden");
+  });
+
+  it("returns 'no-record' when the unit has no record on file, regardless of the flag", () => {
+    // Catalog units flagged 'unknown'.
+    expect(getAcMode("u3", false)).toBe("no-record");
+    expect(getAcMode("u3", true)).toBe("no-record");
+    expect(getAcMode("u4", false)).toBe("no-record");
+    expect(getAcMode("u4", true)).toBe("no-record");
+  });
+
+  it("returns 'no-record' for unknown ids and for null (no unit selected yet)", () => {
+    expect(getAcMode("does-not-exist", false)).toBe("no-record");
+    expect(getAcMode("does-not-exist", true)).toBe("no-record");
+    expect(getAcMode(null, false)).toBe("no-record");
+    expect(getAcMode(null, true)).toBe("no-record");
+  });
+
+  it("respects the legacy unit alias — same mode for canonical and alias id", () => {
+    expect(getAcMode("unit-g01-335-aspen", false)).toBe(getAcMode("u1", false));
+    expect(getAcMode("unit-g01-335-aspen", true)).toBe(getAcMode("u1", true));
   });
 });
 

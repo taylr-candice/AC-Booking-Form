@@ -124,6 +124,15 @@ export type BookingState = {
    *  record to compare against). Read by the admin mockup to surface
    *  the discrepancy after the booking. */
   ac_discrepancy: AcDiscrepancy | null;
+  /** Whether the customer has explicitly chosen to override what's on
+   *  file for their unit on Step 2. Drives the AC step's "mode":
+   *  `false` = on-file (minimal summary + Agree button); `true` =
+   *  overridden (full configuration UI with the acknowledgement
+   *  checkbox). The flag has no effect for units with no record on
+   *  file — those always show the full configuration UI. Cleared on
+   *  unit change, "Use what's on file" reset, and `bookAnother` /
+   *  `pickAnotherUnit` / `reset`. */
+  ac_override_active: boolean;
   // Step 3 — primary residence + access method + follow-ups
   primary_residence: PrimaryResidence | null;
   access_method: AccessMethod | null;
@@ -308,6 +317,7 @@ const INITIAL_STATE: BookingState = {
   num_systems: 1,
   num_additional_indoor: 0,
   ac_discrepancy: null,
+  ac_override_active: false,
   primary_residence: null,
   access_method: null,
   key_holder_name: "",
@@ -662,6 +672,10 @@ export const bookingActions = {
             // and would be misleading once the unit changes — wipe it so the
             // AC step starts from a clean slate when the customer revisits it.
             ac_discrepancy: null,
+            // The override flag is per-unit — once the unit changes, the
+            // customer should land back on the new unit's on-file view
+            // (or the no-record full UI if there are no records).
+            ac_override_active: false,
           },
     );
   },
@@ -728,6 +742,25 @@ export const bookingActions = {
         ? s
         : { ...s, ac_discrepancy: discrepancy },
     );
+  },
+  /** Toggle the on-file vs overridden mode flag for the AC step.
+   *  Set to `true` when the customer clicks "Update the details" on
+   *  the on-file view; cleared by "Use what's on file", unit change,
+   *  and `bookAnother`/`pickAnotherUnit`/`reset`. When clearing back
+   *  to `false`, also wipes any captured discrepancy snapshot — the
+   *  customer is reverting to the on-file record, so the prior
+   *  override should not survive in the booking session. */
+  setAcOverrideActive(active: boolean) {
+    setState((s) => {
+      if (s.ac_override_active === active) return s;
+      if (!active) {
+        // Reverting to "use what's on file" — also drop the captured
+        // discrepancy so the booking is recorded as matching the
+        // on-file record exactly.
+        return { ...s, ac_override_active: false, ac_discrepancy: null };
+      }
+      return { ...s, ac_override_active: true };
+    });
   },
 
   // Step 3 — access method + follow-ups
@@ -913,6 +946,7 @@ export const bookingActions = {
             unit_unavailable_blocker: null,
             unit_id: null,
             ac_discrepancy: null,
+            ac_override_active: false,
             current_step: 1,
           }
         : s,
