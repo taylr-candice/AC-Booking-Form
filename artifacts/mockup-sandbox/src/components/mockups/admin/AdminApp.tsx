@@ -224,6 +224,15 @@ export function AdminApp() {
         };
       }),
     );
+    // Confirmation toast so a busy admin scanning a long queue sees
+    // the bulk chase landed — matches the toast pattern used by
+    // cancel / reschedule / schedule-coordination. The early return
+    // above guarantees we never fire a toast for a no-op.
+    const count = ids.length;
+    setToast({
+      id: `bulk-chase-${Date.now()}`,
+      message: `Marked ${count} booking${count === 1 ? "" : "s"} as chased`,
+    });
   }
 
   // ── Cancel / Reschedule (Task #49) ─────────────────────────────────────
