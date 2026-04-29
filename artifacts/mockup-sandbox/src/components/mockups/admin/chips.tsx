@@ -4,11 +4,12 @@
  * status pill, and the service status pill.
  */
 
-import { Clock } from "lucide-react";
+import { Clock, PhoneOff, PhoneOutgoing } from "lucide-react";
 
 import {
   bookingDurationMinutes,
   formatCoordinationWaiting,
+  formatLastContacted,
   type AdminBooking,
   type PaymentStatus,
   type ServiceStatus,
@@ -91,6 +92,52 @@ export function WaitingChip({ createdAt }: { createdAt: string }) {
     >
       <Clock className="h-2.5 w-2.5" />
       Waiting {label}
+    </span>
+  );
+}
+
+/**
+ * "Last chased Xh/Xd ago" / "Never chased" chip used by the admin
+ * Awaiting-coordination queue (per-row) and the booking detail
+ * Schedule card. Sits next to {@link WaitingChip} so an ops user can
+ * read both signals in one glance — total wait + recency of the last
+ * follow-up.
+ *
+ * Pulls the bucket + label from {@link formatLastContacted}. The icon
+ * flips to a struck-through phone when the row has never been chased,
+ * to make the "you should call this customer" signal scannable.
+ */
+export function LastChasedChip({
+  lastContactedAt,
+}: {
+  lastContactedAt: string | null;
+}) {
+  const { label, severity } = formatLastContacted(lastContactedAt);
+  const map: Record<typeof severity, { bg: string; fg: string }> = {
+    // Amber for "never" so the unchased rows stand out next to the
+    // chased ones — pairs well with WaitingChip's own escalation.
+    never: { bg: "#FEF3C7", fg: "#92400E" },
+    fresh: { bg: "#F1F5F9", fg: "#475569" },
+    // Stale isn't an emergency on its own — it's "consider another
+    // nudge" — so we use a softer tone than WaitingChip's stale red.
+    stale: { bg: "#F1F5F9", fg: "#475569" },
+  };
+  const { bg, fg } = map[severity];
+  const Icon = severity === "never" ? PhoneOff : PhoneOutgoing;
+  const tooltip =
+    severity === "never"
+      ? "Never chased — consider following up with the tenant or agent"
+      : `Last chase: ${label}`;
+  const text = severity === "never" ? "Never chased" : `Last chased ${label}`;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      style={{ backgroundColor: bg, color: fg }}
+      title={tooltip}
+      data-testid="chip-last-chased"
+    >
+      <Icon className="h-2.5 w-2.5" />
+      {text}
     </span>
   );
 }

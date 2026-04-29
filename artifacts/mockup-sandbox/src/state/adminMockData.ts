@@ -210,6 +210,14 @@ export type AdminBooking = {
    *  on `paymentTimeline` / `serviceTimeline` are display-only and not
    *  reliable for arithmetic, hence this dedicated field. */
   createdAt: string;
+  /** ISO timestamp of the most recent admin "Mark as chased" action,
+   *  or `null` when the booking has never been chased. Surfaced in the
+   *  admin Awaiting-coordination queue alongside `createdAt` so an
+   *  ops user can see *both* total wait time and time-since-last-touch
+   *  ("Waiting 6d · last chased 1d ago" vs "never chased"). The
+   *  matching audit trail entry lives on `serviceTimeline` so a chase
+   *  is also visible in the per-booking history. */
+  lastContactedAt: string | null;
 };
 
 // ─── Seeded buildings ───────────────────────────────────────────────────────
@@ -489,6 +497,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Buzzer on left. Lockbox code 4421.",
     rolloutId: "rl-ac-aspen",
     createdAt: "2026-04-26T09:14:00+10:00",
+    lastContactedAt: null,
   },
   {
     id: "bk-1041",
@@ -523,6 +532,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Customer reported 3 systems but we have 2 on record. Confirm head count on arrival.",
     rolloutId: "rl-ac-marine",
     createdAt: "2026-04-25T19:02:00+10:00",
+    lastContactedAt: null,
   },
   {
     id: "bk-1040",
@@ -555,6 +565,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Tenant authorised by agent. Concierge to provide trade key.",
     rolloutId: null,
     createdAt: "2026-04-24T14:11:00+10:00",
+    lastContactedAt: null,
   },
   {
     id: "bk-1039",
@@ -586,6 +597,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Customer is new — no AC record on file. Update unit catalog after first visit.",
     rolloutId: "rl-ac-marine",
     createdAt: "2026-04-27T10:01:00+10:00",
+    lastContactedAt: null,
   },
   {
     id: "bk-1038",
@@ -620,6 +632,10 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Tenants will provide access — Taylr to coordinate. 3 tenants on file.",
     rolloutId: "rl-ac-bourke",
     createdAt: "2026-04-23T11:50:00+10:00",
+    // Intentionally never chased — 6 days waiting with no follow-up is
+    // exactly the kind of row the new "last chased" hint should
+    // surface to ops on the Awaiting-coordination queue.
+    lastContactedAt: null,
   },
   {
     id: "bk-1037",
@@ -653,6 +669,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Customer wasn't sure of AC type — tech to confirm on arrival and update catalog.",
     rolloutId: "rl-ac-bourke",
     createdAt: "2026-04-27T18:30:00+10:00",
+    lastContactedAt: null,
   },
   {
     id: "bk-1036",
@@ -686,6 +703,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Filter replacement on system 2 — billed separately (see invoice adjustment).",
     rolloutId: "rl-ac-marine",
     createdAt: "2026-04-18T13:00:00+10:00",
+    lastContactedAt: null,
   },
   {
     id: "bk-1035",
@@ -718,6 +736,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Tech finished 25 min early; goodwill refund applied for unused time.",
     rolloutId: null,
     createdAt: "2026-04-16T08:20:00+10:00",
+    lastContactedAt: null,
   },
   {
     // Owner-leased + "Arrange with agent" — Taylr is now waiting on the
@@ -752,6 +771,11 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     notes: "Owner asked us to arrange access via Vantage Strata Management. Agent contacted Apr 28 — awaiting reply.",
     rolloutId: "rl-ac-aspen",
     createdAt: "2026-04-28T09:30:00+10:00",
+    // Matches the "Agent contacted Apr 28" line in the notes — gives
+    // the Awaiting-coordination demo a row that already shows the
+    // "last chased Xh ago" hint instead of every row reading "never
+    // chased".
+    lastContactedAt: "2026-04-28T11:00:00+10:00",
   },
 ];
 
@@ -843,6 +867,65 @@ export function formatCoordinationWaiting(
   } else {
     severity = "fresh";
   }
+  return { label, severity, hours };
+}
+
+/**
+ * Severity buckets for "last chased" — mirrors {@link CoordinationWaitSeverity}
+ * but adds a `never` bucket for bookings that haven't been chased at all.
+ *
+ *   - `never` — `lastContactedAt` is `null` → ops should chase
+ *   - `fresh` — chased < 24h ago → no action needed
+ *   - `stale` — chased ≥ 24h ago → maybe time for another nudge
+ *
+ * Kept narrow on purpose (no `warn` bucket) — the WaitingChip already
+ * carries the urgency around total wait, this chip just answers "did
+ * anyone touch this recently?".
+ */
+export type LastContactedSeverity = "never" | "fresh" | "stale";
+
+const CONTACT_STALE_HOURS = 24;
+
+/**
+ * Format the time elapsed since a coordination booking was last
+ * "chased" (an admin clicked Mark as chased). Used by the admin
+ * Awaiting-coordination queue (per-row chip) and the booking detail
+ * Schedule card. Returns:
+ *   - `label`    — short human string ("never chased", "just now",
+ *                  "Xh ago", "Xd ago")
+ *   - `severity` — bucket for chip colouring (see {@link LastContactedSeverity})
+ *   - `hours`    — raw hours since the chase (≥ 0); 0 when never
+ *                  chased so callers can sort missing rows alongside
+ *                  the freshly-chased ones if they want.
+ *
+ * Negative diffs (lastContactedAt in the future, e.g. clock skew)
+ * clamp to "just now" / `fresh` so the UI never reads a negative time.
+ * Malformed timestamps fall back to `never` so a corrupted seed row
+ * still nudges ops to follow up.
+ */
+export function formatLastContacted(
+  lastContactedAtIso: string | null,
+  now: Date = new Date(),
+): { label: string; severity: LastContactedSeverity; hours: number } {
+  if (lastContactedAtIso === null) {
+    return { label: "never chased", severity: "never", hours: 0 };
+  }
+  const contacted = new Date(lastContactedAtIso).getTime();
+  if (!Number.isFinite(contacted)) {
+    return { label: "never chased", severity: "never", hours: 0 };
+  }
+  const diffMs = Math.max(0, now.getTime() - contacted);
+  const hours = diffMs / (1000 * 60 * 60);
+  let label: string;
+  if (hours < 1) {
+    label = "just now";
+  } else if (hours < 24) {
+    label = `${Math.floor(hours)}h ago`;
+  } else {
+    label = `${Math.floor(hours / 24)}d ago`;
+  }
+  const severity: LastContactedSeverity =
+    hours >= CONTACT_STALE_HOURS ? "stale" : "fresh";
   return { label, severity, hours };
 }
 
@@ -1280,6 +1363,10 @@ export function liveBookingFromSession(
     isLive: true,
     rolloutId: resolveLiveRolloutId(session.unit_id),
     createdAt: getOrInitLiveBookingCreatedAt(),
+    // Live row is read-only in the admin shell (the customer flow owns
+    // it), so it never carries a chase timestamp — the "Mark as chased"
+    // affordance on BookingDetail is suppressed for this booking.
+    lastContactedAt: null,
   };
 }
 
@@ -1760,6 +1847,9 @@ export function buildAdminCreatedBooking(
     ],
     notes: input.notes ?? "Phone booking — captured by admin on the customer's behalf.",
     createdAt: input.createdAtIso ?? new Date().toISOString(),
+    // A freshly admin-created booking has never been chased — the
+    // creation itself isn't a follow-up, it's the booking landing.
+    lastContactedAt: null,
   };
 }
 

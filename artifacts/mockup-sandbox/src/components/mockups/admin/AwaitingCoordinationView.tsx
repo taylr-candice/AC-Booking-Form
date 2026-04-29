@@ -31,7 +31,7 @@ import {
 } from "@/state/adminMockData";
 
 import { CustomerCell } from "./BookingsView";
-import { PaymentChip, WaitingChip } from "./chips";
+import { LastChasedChip, PaymentChip, WaitingChip } from "./chips";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
 type Filter = "all" | CoordinationKind;
@@ -311,6 +311,7 @@ export function AwaitingCoordinationView({
                       <div className="flex flex-col items-start gap-1">
                         <WaitingOnChip kind={kind} />
                         <WaitingChip createdAt={b.createdAt} />
+                        <LastChasedChip lastContactedAt={b.lastContactedAt} />
                       </div>
                     </td>
                     <td className="px-4 py-3">

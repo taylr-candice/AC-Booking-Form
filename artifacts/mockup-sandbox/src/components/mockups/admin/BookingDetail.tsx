@@ -7,7 +7,7 @@
  * session) are read-only here; the customer flow is the source of truth.
  */
 
-import { CalendarClock, ChevronLeft, TriangleAlert, XCircle } from "lucide-react";
+import { CalendarClock, ChevronLeft, PhoneOutgoing, TriangleAlert, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -24,7 +24,7 @@ import {
 
 import { Card, Field } from "./atoms";
 import { CancelBookingModal } from "./CancelBookingModal";
-import { PaymentChip, ServiceChip, SlotCell, WaitingChip } from "./chips";
+import { LastChasedChip, PaymentChip, ServiceChip, SlotCell, WaitingChip } from "./chips";
 import { RescheduleBookingModal } from "./RescheduleBookingModal";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
@@ -133,6 +133,28 @@ export function BookingDetail({
   function saveNotes() {
     if (!booking) return;
     onUpdate(booking.id, { notes });
+  }
+
+  /**
+   * Record a chase: stamp `lastContactedAt` with the current ISO time
+   * and append a service-timeline marker so the audit trail captures
+   * who chased and when. Called from the Schedule card affordance —
+   * disabled for the live demo row (read-only) and for cancelled rows
+   * (no point chasing a closed booking).
+   */
+  function markAsChased() {
+    if (!booking) return;
+    const nowIso = new Date().toISOString();
+    const newEntry = {
+      status: "chased",
+      label: "Marked as chased",
+      at: "Just now",
+      by: "Mia (admin)",
+    };
+    onUpdate(booking.id, {
+      lastContactedAt: nowIso,
+      serviceTimeline: [...booking.serviceTimeline, newEntry],
+    });
   }
 
   return (
@@ -334,6 +356,19 @@ export function BookingDetail({
             {booking.serviceSlot === "to_be_coordinated" && (
               <div className="mt-3 flex flex-col items-start gap-2">
                 <WaitingChip createdAt={booking.createdAt} />
+                <LastChasedChip lastContactedAt={booking.lastContactedAt} />
+                {!booking.isLive && !isCancelled && (
+                  <button
+                    type="button"
+                    onClick={markAsChased}
+                    data-testid="button-mark-chased"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                    title="Stamp 'last contacted' with the current time and add a marker to the service timeline."
+                  >
+                    <PhoneOutgoing className="h-3.5 w-3.5" />
+                    Mark as chased
+                  </button>
+                )}
                 {!booking.isLive && onScheduleCoordination && (
                   <button
                     type="button"

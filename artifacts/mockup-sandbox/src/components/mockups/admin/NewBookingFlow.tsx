@@ -1044,6 +1044,7 @@ function Step4Review({
     serviceTimeline: [],
     notes: "",
     createdAt: "",
+    lastContactedAt: null,
   });
 
   const agencyLabel =
