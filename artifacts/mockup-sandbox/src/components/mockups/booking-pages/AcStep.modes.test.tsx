@@ -419,3 +419,128 @@ describe.each(VARIANTS)(
     );
   },
 );
+
+// ─── (4) Merged UnsureCard — per-path content contract (Task #102/#144) ────
+//
+// Task #102 collapsed the old OverrideBanner + UnsureCard pair into a
+// single `card-unsure-merged` shown above the price block in BOTH unsure
+// entry routes. This section pins down the per-path content of that card
+// and the price block beside it, so a future refactor of the unsure
+// paths can't silently regress the affordances or the price reassurance:
+//
+//   - Type-level (`override === "unsure"`):
+//       * `card-unsure-merged` rendered
+//       * "Change AC type" affordance (`button-change-ac-type-unsure`) —
+//         lets the customer back out to the type picker
+//       * NO undo-count affordance (there's no count to undo to)
+//       * Price block total reads "$179" (1 default system × $179)
+//       * Price block qualifier reads "Default — confirmed on the day"
+//         (the type-specific qualifier is intentionally suppressed
+//         because the customer has told us they don't know the type)
+//
+//   - Count-level (`notSureCount === true` after a known type):
+//       * `card-unsure-merged` rendered
+//       * "← I'd like to enter the count myself" affordance
+//         (`button-undo-not-sure`) — returns to the systems stepper
+//       * NO change-ac-type affordance (the type is already known)
+//       * Context line "Showing split setup" (or "Showing ducted setup")
+//       * Price block total reads "$179" (1 default system × $179)
+//
+//   - In NEITHER unsure path does the pink OverrideBanner render —
+//     `button-override-reset` is its tell-tale testid (asserted in the
+//     streamlined-view contract above and re-asserted here as a guard
+//     against a future banner sneaking back into the merged-card path).
+
+describe.each(VARIANTS)(
+  "$label — merged UnsureCard per-path content",
+  ({ Component }) => {
+    it(
+      "type-level unsure: card-unsure-merged contains " +
+        "button-change-ac-type-unsure (and no undo affordance), the " +
+        "price block total is $179 with the 'Default — confirmed on the " +
+        "day' qualifier, and no OverrideBanner reset is shown",
+      () => {
+        // u3 has no record on file, so the type picker is the leading
+        // content — picking "Not sure" puts us in the type-level
+        // unsure path (override === "unsure", notSureCount === false).
+        bookingActions.setUnit(UNIT_WITHOUT_RECORD);
+
+        const { getByTestId, queryByTestId, getByText } = render(
+          <Component />,
+        );
+
+        act(() => {
+          fireEvent.click(getByTestId("choice-unsure"));
+        });
+
+        // Merged card is rendered with the type-level affordance only.
+        const card = getByTestId("card-unsure-merged");
+        expect(card).toBeInTheDocument();
+        expect(getByTestId("button-change-ac-type-unsure")).toBeInTheDocument();
+        expect(queryByTestId("button-undo-not-sure")).toBeNull();
+        // No type context line in the type-level path — there's no
+        // known type to "show".
+        expect(queryByTestId("text-unsure-context")).toBeNull();
+
+        // No pink OverrideBanner in the merged-card path.
+        expect(queryByTestId("button-override-reset")).toBeNull();
+
+        // Price block — default 1 × $179 with the type-agnostic
+        // qualifier (the type-specific "1 outdoor + 1 indoor unit per
+        // system" line is intentionally suppressed in the type-level
+        // unsure state — see PriceBlock's `knownType={null}` branch).
+        const price = getByTestId("block-price");
+        expect(price).toBeInTheDocument();
+        expect(getByTestId("text-price-total")).toHaveTextContent("$179");
+        expect(
+          getByText(/Default\s*—\s*confirmed on the day/i),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it(
+      "count-level unsure (split): card-unsure-merged contains " +
+        "button-undo-not-sure and the 'Showing split setup' context " +
+        "line, the price block total is $179, and no OverrideBanner " +
+        "reset is shown",
+      () => {
+        // u3 surfaces the type picker out of the box. Pick split, then
+        // tap the "Not sure? We can confirm this on-site" link under
+        // the systems stepper to enter the count-level unsure path
+        // with a known type (override === "split", notSureCount ===
+        // true).
+        bookingActions.setUnit(UNIT_WITHOUT_RECORD);
+
+        const { getByTestId, queryByTestId } = render(<Component />);
+
+        act(() => {
+          fireEvent.click(getByTestId("choice-split"));
+        });
+        act(() => {
+          fireEvent.click(getByTestId("link-not-sure-count"));
+        });
+
+        // Merged card is rendered with the count-level affordance only.
+        const card = getByTestId("card-unsure-merged");
+        expect(card).toBeInTheDocument();
+        expect(getByTestId("button-undo-not-sure")).toBeInTheDocument();
+        expect(queryByTestId("button-change-ac-type-unsure")).toBeNull();
+
+        // Context line spells out which known setup we're booking the
+        // default against — this is the customer's reassurance that
+        // their type pick wasn't lost when they tapped "Not sure".
+        expect(getByTestId("text-unsure-context")).toHaveTextContent(
+          /Showing split setup/i,
+        );
+
+        // No pink OverrideBanner in the merged-card path.
+        expect(queryByTestId("button-override-reset")).toBeNull();
+
+        // Price block — default 1 × $179 (displaySystems collapses to
+        // 1 in unsure mode regardless of any prior stepper state).
+        expect(getByTestId("block-price")).toBeInTheDocument();
+        expect(getByTestId("text-price-total")).toHaveTextContent("$179");
+      },
+    );
+  },
+);
