@@ -11,6 +11,7 @@ import {
   Clock,
   CreditCard,
   Home,
+  Mail,
   Snowflake,
   Users,
   type LucideIcon,
@@ -27,6 +28,7 @@ const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string; icon: LucideIcon }> 
   { id: "buildings", label: "Buildings", icon: Building2 },
   { id: "units", label: "Units", icon: Home },
   { id: "agents", label: "Agents", icon: Users },
+  { id: "email_templates", label: "Email templates", icon: Mail },
 ];
 
 export function Sidebar({

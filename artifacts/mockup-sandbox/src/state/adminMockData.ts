@@ -1964,6 +1964,18 @@ export const ADMIN_USER_LABEL = "Mia (admin)";
  * fully free-text entry — that's the default state when the form
  * opens, so the historical free-text behaviour is preserved.
  *
+ * This constant is the **seed** — `AdminApp` copies it into mutable
+ * state on mount so admins can add, edit, and remove templates from
+ * the "Email templates" panel for the demo session. The bulk Log-
+ * email dropdown reads the live state, not this constant, so newly-
+ * created templates show up immediately. Edits never retroactively
+ * change timeline entries that were already logged: the bulk form
+ * snapshots the template's subject + note into local input state at
+ * pick time, then `buildBulkLogEmailEntry` writes those literal
+ * strings into the timeline (no template id reference is stored on
+ * the entry), so renaming or deleting a template later leaves
+ * historical entries intact.
+ *
  * Keep this list short and intention-revealing — its main job is to
  * keep timeline labels consistent across batches so the Awaiting-
  * coordination "Last attempt" cell stays scannable. New templates
@@ -2022,6 +2034,46 @@ export const EMAIL_TEMPLATE_CUSTOM_ID = "custom";
  *  option). Kept alongside `EMAIL_TEMPLATES` so the view and the
  *  AdminApp handler agree on what to show. */
 export const EMAIL_TEMPLATE_CUSTOM_LABEL = "Custom";
+
+/**
+ * Trim a draft email template's three free-text fields. Used by both
+ * the create + edit code paths in the admin "Email templates" panel
+ * so stray whitespace from the form never reaches the saved list (and
+ * the dropdown rendered against it). Pure / data-only.
+ */
+export function normalizeEmailTemplateDraft(draft: {
+  name: string;
+  subject: string;
+  note: string;
+}): { name: string; subject: string; note: string } {
+  return {
+    name: draft.name.trim(),
+    subject: draft.subject.trim(),
+    note: draft.note.trim(),
+  };
+}
+
+/**
+ * Generate the next monotonic `tpl-N` id given the current template
+ * list. Mirrors {@link nextBookingId}: scan every id, keep ones shaped
+ * `tpl-<digits>`, take the max numeric suffix, and return one above
+ * it. Falls back to `tpl-1` when no numeric ids exist (so the very
+ * first user-created template after the seeded ones still gets a
+ * sensible id alongside the readable seeded slugs like `rebook_link`).
+ * Pure / data-only.
+ */
+export function nextEmailTemplateId(
+  templates: readonly EmailTemplate[],
+): string {
+  let max = 0;
+  for (const t of templates) {
+    const m = /^tpl-(\d+)$/.exec(t.id);
+    if (!m) continue;
+    const n = parseInt(m[1], 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return `tpl-${max + 1}`;
+}
 
 /**
  * Per-system / per-extra prices used to compute `totalAud` for an

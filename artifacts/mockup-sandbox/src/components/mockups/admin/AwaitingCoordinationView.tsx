@@ -37,6 +37,7 @@ import {
   type AdminBuilding,
   type AdminUnit,
   type CoordinationKind,
+  type EmailTemplate,
 } from "@/state/adminMockData";
 
 import {
@@ -200,6 +201,7 @@ export function AwaitingCoordinationView({
   onSchedule,
   onBulkLogCall,
   onBulkLogEmail,
+  emailTemplates = EMAIL_TEMPLATES,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -245,6 +247,14 @@ export function AwaitingCoordinationView({
     note: string,
     templateLabel: string,
   ) => void;
+  /** Live email-template catalog the bulk Log-email dropdown reads
+   *  from. Defaults to the seeded {@link EMAIL_TEMPLATES} so the view
+   *  stays usable in isolation (and existing tests don't have to
+   *  thread the prop through). When mounted from `AdminApp` the prop
+   *  is the mutable state owned by the shell, so any add / edit /
+   *  remove from the Email templates panel shows up in the dropdown
+   *  on the next render. */
+  emailTemplates?: ReadonlyArray<EmailTemplate>;
 }) {
   // Selection lives entirely in this view — once a bulk action fires
   // we clear it. The live demo row is excluded from selection because
@@ -565,12 +575,13 @@ export function AwaitingCoordinationView({
       setBulkEmailNote("");
       return;
     }
-    const tpl = EMAIL_TEMPLATES.find((t) => t.id === id);
+    const tpl = emailTemplates.find((t) => t.id === id);
     if (!tpl) {
       // Shouldn't happen — the dropdown only renders ids from
-      // EMAIL_TEMPLATES + the Custom sentinel — but if the constant
-      // ever drifts, fall back to Custom rather than leaving the
-      // inputs in a stale, half-prefilled state.
+      // `emailTemplates` + the Custom sentinel — but if the catalog
+      // ever drifts (e.g. a template was just removed from the
+      // Email templates panel mid-edit), fall back to Custom rather
+      // than leaving the inputs in a stale, half-prefilled state.
       setBulkEmailTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
       setBulkEmailSubject("");
       setBulkEmailNote("");
@@ -586,7 +597,7 @@ export function AwaitingCoordinationView({
     // confirm what landed; falls back to the Custom label whenever
     // the dropdown is on Custom (or — defensively — pointing at an
     // unknown id, which the select handler should already prevent).
-    const tpl = EMAIL_TEMPLATES.find((t) => t.id === bulkEmailTemplateId);
+    const tpl = emailTemplates.find((t) => t.id === bulkEmailTemplateId);
     const templateLabel = tpl ? tpl.name : EMAIL_TEMPLATE_CUSTOM_LABEL;
     onBulkLogEmail(
       Array.from(selectedIds),
@@ -1083,7 +1094,7 @@ export function AwaitingCoordinationView({
                   className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
                 >
                   <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-                  {EMAIL_TEMPLATES.map((tpl) => (
+                  {emailTemplates.map((tpl) => (
                     <option key={tpl.id} value={tpl.id}>
                       {tpl.name}
                     </option>

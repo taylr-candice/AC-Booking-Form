@@ -25,10 +25,13 @@ import {
   consumeBookingCapacity,
   convertCoordinationToScheduledPatch,
   createRollout,
+  EMAIL_TEMPLATES,
   findRolloutForBooking,
   formatBookingShortDate,
   getActiveBookingForUnit,
   liveBookingFromSession,
+  nextEmailTemplateId,
+  normalizeEmailTemplateDraft,
   notifyLiveBookingsChanged,
   notifyLiveUnitsChanged,
   priorServiceStatusFromTimeline,
@@ -46,6 +49,7 @@ import {
   type AdminBuilding,
   type AdminCreatedScheduleChoice,
   type AdminUnit,
+  type EmailTemplate,
   type PaymentStatus,
   type ServiceStatus,
   type TimelineEntry,
@@ -54,6 +58,7 @@ import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
+import { EmailTemplatesView } from "./EmailTemplatesView";
 import {
   BookingDetail,
   CALL_OUTCOME_LABEL,
@@ -106,6 +111,48 @@ export function AdminApp() {
   // them in state so future tasks (e.g. add a building, rename one) only
   // need to flip a `setBuildings` setter through.
   const [buildings] = useState<AdminBuilding[]>([...SEEDED_BUILDINGS]);
+
+  // Mutable email-template catalog for the bulk Log-email dropdown
+  // on the Awaiting-coordination queue. Seeded from `EMAIL_TEMPLATES`
+  // so the dropdown isn't empty on first render; admins can add /
+  // edit / remove from the "Email templates" panel and the dropdown
+  // picks the changes up on the next render. Editing or removing a
+  // template never rewrites historical timeline entries — the bulk
+  // form snapshots subject + note onto the entry at log time, not a
+  // template id, so the audit trail is immutable by construction.
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([
+    ...EMAIL_TEMPLATES,
+  ]);
+  function createEmailTemplate(draft: {
+    name: string;
+    subject: string;
+    note: string;
+  }) {
+    const normalized = normalizeEmailTemplateDraft(draft);
+    if (normalized.name.length === 0 || normalized.subject.length === 0) {
+      // Modal already disables Save in this state; this guard keeps a
+      // future programmatic caller from sneaking a half-formed
+      // template into the catalog.
+      return;
+    }
+    setEmailTemplates((prev) => [
+      ...prev,
+      { id: nextEmailTemplateId(prev), ...normalized },
+    ]);
+  }
+  function updateEmailTemplate(
+    id: string,
+    draft: { name: string; subject: string; note: string },
+  ) {
+    const normalized = normalizeEmailTemplateDraft(draft);
+    if (normalized.name.length === 0 || normalized.subject.length === 0) return;
+    setEmailTemplates((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...normalized } : t)),
+    );
+  }
+  function removeEmailTemplate(id: string) {
+    setEmailTemplates((prev) => prev.filter((t) => t.id !== id));
+  }
 
   const [view, setView] = useState<ViewId>("bookings");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
@@ -993,6 +1040,7 @@ export function AdminApp() {
                 onSchedule={openSchedule}
                 onBulkLogCall={bulkLogCall}
                 onBulkLogEmail={bulkLogEmail}
+                emailTemplates={emailTemplates}
               />
             )
           ) : null}
@@ -1070,6 +1118,15 @@ export function AdminApp() {
               setAgents={setAgents}
               units={units}
               setUnits={setUnits}
+            />
+          )}
+
+          {view === "email_templates" && (
+            <EmailTemplatesView
+              templates={emailTemplates}
+              onCreate={createEmailTemplate}
+              onUpdate={updateEmailTemplate}
+              onRemove={removeEmailTemplate}
             />
           )}
         </main>

@@ -9,4 +9,5 @@ export type ViewId =
   | "rollouts"
   | "buildings"
   | "units"
-  | "agents";
+  | "agents"
+  | "email_templates";

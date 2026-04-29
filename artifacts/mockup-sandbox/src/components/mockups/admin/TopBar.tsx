@@ -79,6 +79,9 @@ export function TopBar({
   } else if (view === "agents") {
     title = "Agents";
     crumb = "Leasing agents and the units they manage";
+  } else if (view === "email_templates") {
+    title = "Email templates";
+    crumb = "Saved templates that prefill the bulk Log email form";
   }
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4">
