@@ -8,15 +8,24 @@ const BRAND = "#ED017F";
  * Type-aware "View terms" modal shown from the AC step's
  * acknowledgement checkbox in `overridden` and `no-record` mode.
  *
- * Combines two clauses:
+ * Combines three clauses:
  *  1. Price-adjustment clause — mirrors the existing checkbox label,
- *     spelled out in detail (more on the day → invoice the unpaid
- *     difference; fewer on the day → credit or refund the difference).
- *  2. Subsequent-visit / rebook clause — new in Task #50: if what's
+ *     spelled out in detail (more on the day → endeavour to service
+ *     them all and invoice the unpaid difference; fewer on the day →
+ *     credit or refund the difference). Softened in Task #87 from
+ *     "will service" to "will endeavour to service" so we don't
+ *     over-commit the technician when on-site reality differs.
+ *  2. Subsequent-visit / rebook clause — added in Task #50: if what's
  *     on-site genuinely doesn't match what was booked (e.g. the
  *     technician finds extra systems that need separate scheduling
  *     to fit the day's window) we may need to rebook a follow-up
- *     visit to complete the work.
+ *     visit to complete the work, which may incur a second call-out
+ *     fee (call-out fee note added in Task #87).
+ *  3. Adequate-access clause — added in Task #87: the technician needs
+ *     to be able to physically reach the system itself (ceiling
+ *     cavities, indoor units, return-air grilles) for the service to
+ *     be carried out, and we won't refund a service that couldn't be
+ *     performed because of access limitations on-site.
  */
 export function AcTermsModal({
   acType,
@@ -81,8 +90,8 @@ export function AcTermsModal({
             >
               <li>
                 If there are more systems or {noun} on the day, Taylr will
-                service all of them and invoice the unpaid difference
-                afterward.
+                endeavour to service all of them and invoice the unpaid
+                difference afterward.
               </li>
               <li>
                 If there are fewer, Taylr will credit or refund the difference.
@@ -103,7 +112,24 @@ export function AcTermsModal({
               different from what was booked (for example, more systems than the
               day's window can fit), the technician may not be able to finish
               the service in one visit and a subsequent visit or rebook may be
-              required to complete the work.
+              required to complete the work, which may incur a second call-out
+              fee.
+            </p>
+          </section>
+
+          <section className="mt-5">
+            <h3 className="text-[13px] font-semibold text-slate-900">
+              Adequate access to the system is required
+            </h3>
+            <p
+              className="mt-2 text-[13px] text-slate-700 leading-relaxed"
+              data-testid="terms-access-clause"
+            >
+              The technician needs to be able to physically reach the system
+              itself — for example, the ceiling cavity, indoor units, or
+              return-air grilles — for the service to be carried out. If the
+              service can't be performed on the day because of access
+              limitations on-site, refunds will not be issued.
             </p>
           </section>
 
