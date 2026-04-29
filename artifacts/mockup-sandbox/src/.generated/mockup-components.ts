@@ -9,6 +9,7 @@ export const modules: ModuleMap = {
   "./components/mockups/admin/BuildingDetail.tsx": () => import("../components/mockups/admin/BuildingDetail.tsx"),
   "./components/mockups/admin/BuildingsView.tsx": () => import("../components/mockups/admin/BuildingsView.tsx"),
   "./components/mockups/admin/CancelBookingModal.tsx": () => import("../components/mockups/admin/CancelBookingModal.tsx"),
+  "./components/mockups/admin/InvoiceVoidAlerts.tsx": () => import("../components/mockups/admin/InvoiceVoidAlerts.tsx"),
   "./components/mockups/admin/NewBookingFlow.tsx": () => import("../components/mockups/admin/NewBookingFlow.tsx"),
   "./components/mockups/admin/RescheduleBookingModal.tsx": () => import("../components/mockups/admin/RescheduleBookingModal.tsx"),
   "./components/mockups/admin/RolloutScheduleEditor.tsx": () => import("../components/mockups/admin/RolloutScheduleEditor.tsx"),

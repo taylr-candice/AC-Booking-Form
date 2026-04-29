@@ -747,6 +747,7 @@ export function AdminApp() {
                 onScheduleCoordination={(id) => setSchedulingBookingId(id)}
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
+                onAcknowledgeSupersede={acknowledgeSupersede}
               />
             ) : (
               <BookingsView
@@ -781,6 +782,7 @@ export function AdminApp() {
                 onScheduleCoordination={(id) => setSchedulingBookingId(id)}
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={undoCancelBookingAndReschedule}
+                onAcknowledgeSupersede={acknowledgeSupersede}
               />
             ) : (
               <AwaitingCoordinationView

@@ -19,6 +19,7 @@ import {
 } from "@/state/adminMockData";
 
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
+import { InvoiceVoidAlerts } from "./InvoiceVoidAlerts";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
 /**
@@ -154,6 +155,15 @@ export function BookingsView({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Invoice-void alerts — sit above the toolbar so admins notice
+          superseded bookings even when "Show cancelled" is off and even
+          if a building / status filter would otherwise hide the row. */}
+      <InvoiceVoidAlerts
+        bookings={bookings}
+        units={units}
+        onOpen={onOpen}
+        onAcknowledge={onAcknowledgeSupersede}
+      />
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-1 items-center gap-2">

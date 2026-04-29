@@ -7,7 +7,15 @@
  * session) are read-only here; the customer flow is the source of truth.
  */
 
-import { CalendarClock, ChevronLeft, PhoneOutgoing, RotateCcw, TriangleAlert, XCircle } from "lucide-react";
+import {
+  CalendarClock,
+  ChevronLeft,
+  PhoneOutgoing,
+  ReceiptText,
+  RotateCcw,
+  TriangleAlert,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -63,6 +71,7 @@ export function BookingDetail({
   onScheduleCoordination,
   onUndoCancelBooking,
   onUndoCancelBookingAndReschedule,
+  onAcknowledgeSupersede,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -98,6 +107,11 @@ export function BookingDetail({
     date: string,
     window: "morning" | "afternoon",
   ) => void;
+  /** Admin-records the corresponding invoice has been voided in the
+   *  billing system. Drives the prominent "void this invoice" alert
+   *  shown when `supersededByBookingId` is set. Optional so older
+   *  call-sites that don't yet thread it remain valid. */
+  onAcknowledgeSupersede?: (id: string) => void;
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
@@ -215,6 +229,12 @@ export function BookingDetail({
 
   return (
     <div className="flex flex-col gap-4">
+      {booking.supersededByBookingId && onAcknowledgeSupersede && (
+        <SupersedeAlert
+          booking={booking}
+          onAcknowledge={() => onAcknowledgeSupersede(booking.id)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -624,6 +644,66 @@ function UndoConflictDialog({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "This invoice still needs voiding" alert.
+ *
+ * Shown at the top of the booking detail whenever
+ * {@link AdminBooking.supersededByBookingId} is set. The detail screen
+ * is where an admin lands from the dashboard banner; this alert
+ * restates the situation in context (which booking won the unit, the
+ * outstanding amount) and exposes a single explicit "Record invoice
+ * void" action. Clicking it fires `onAcknowledge` (which clears the
+ * flag and stamps the service timeline), so the alert disappears and
+ * the dashboard banner row drops off.
+ */
+function SupersedeAlert({
+  booking,
+  onAcknowledge,
+}: {
+  booking: AdminBooking;
+  onAcknowledge: () => void;
+}) {
+  return (
+    <div
+      className="flex flex-wrap items-start gap-3 rounded-xl border p-4"
+      style={{ borderColor: BRAND, backgroundColor: BRAND_SOFT }}
+      data-testid="alert-supersede"
+    >
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        style={{ backgroundColor: "white", color: BRAND_DEEP }}
+      >
+        <ReceiptText className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div
+          className="text-[13px] font-bold uppercase tracking-wider"
+          style={{ color: BRAND_DEEP }}
+        >
+          Void this customer's invoice in billing
+        </div>
+        <p className="mt-0.5 text-[12px] text-slate-700">
+          This booking was auto-cancelled when{" "}
+          <strong>{booking.supersededByBookingId}</strong> paid for the
+          same unit first. The customer's invoice for{" "}
+          <strong>${booking.totalAud.toFixed(2)}</strong> is still open
+          in your billing system — confirm it's been voided, then record
+          it here so this alert clears.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onAcknowledge}
+        className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
+        style={{ backgroundColor: BRAND }}
+        data-testid="alert-supersede-acknowledge"
+      >
+        Record invoice void
+      </button>
     </div>
   );
 }
