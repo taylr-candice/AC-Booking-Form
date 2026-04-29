@@ -26,6 +26,9 @@ import { useEffect, useState } from "react";
 import { accessOnTheDayDescription } from "@/state/accessMethodCatalog";
 import {
   bookerAgencyName,
+  CALL_TEMPLATE_CUSTOM_ID,
+  CALL_TEMPLATE_CUSTOM_LABEL,
+  CALL_TEMPLATES,
   coordinationContactForBooking,
   EMAIL_TEMPLATE_CUSTOM_ID,
   EMAIL_TEMPLATE_CUSTOM_LABEL,
@@ -90,6 +93,7 @@ export function BookingDetail({
   onUndoCancelBooking,
   onUndoCancelBookingAndReschedule,
   onAcknowledgeSupersede,
+  onLogCallToast,
   onLogEmailToast,
   emailTemplates = EMAIL_TEMPLATES,
 }: {
@@ -127,6 +131,18 @@ export function BookingDetail({
    *  shown when `supersededByBookingId` is set. Optional so older
    *  call-sites that don't yet thread it remain valid. */
   onAcknowledgeSupersede?: (id: string) => void;
+  /** Mirror of the bulk-log-call toast on
+   *  {@link AwaitingCoordinationView}: fired after a per-row call is
+   *  logged so the AdminApp shell can surface a confirmation toast
+   *  reflecting which template (or `Custom`) landed. Same shape as
+   *  the bulk handler's toast so single- and batch-logged calls read
+   *  consistently in ops' bottom-right toaster. The second arg is the
+   *  human-readable outcome label (e.g. `"Spoke to them"`) so the
+   *  toast can fall back to it on the `Custom` path — analogous to
+   *  how the email toast falls back to the free-text subject.
+   *  Optional so existing call-sites and tests that don't care about
+   *  the toast remain valid — the timeline write happens regardless. */
+  onLogCallToast?: (templateLabel: string, outcomeLabel: string) => void;
   /** Mirror of the bulk-log-email toast on
    *  {@link AwaitingCoordinationView}: fired after a per-row email
    *  is logged so the AdminApp shell can surface a confirmation toast
@@ -256,8 +272,19 @@ export function BookingDetail({
    * / "Left voicemail"); free-text colour goes on the `note` field
    * so the timeline can render it inline. Replaces the previous
    * "Mark as chased" button — every chase now has structure.
+   *
+   * `templateLabel` is the human-readable name of the seeded
+   * {@link CALL_TEMPLATES} entry the admin picked in the Log call
+   * form (e.g. `"No answer — left voicemail"`), or
+   * {@link CALL_TEMPLATE_CUSTOM_LABEL} when they bypassed the picker.
+   * It does NOT change the timeline label — that stays
+   * `Logged call · {Outcome}` so per-row entries line up with bulk-
+   * logged ones in the Awaiting-coordination "Last attempt" cell.
+   * Instead it's forwarded to the optional {@link onLogCallToast}
+   * callback so the AdminApp shell can fire the same template-aware
+   * confirmation toast the bulk action does.
    */
-  function logCall(outcome: CallOutcome, note: string) {
+  function logCall(outcome: CallOutcome, note: string, templateLabel: string) {
     if (!booking) return;
     const nowIso = new Date().toISOString();
     const newEntry: TimelineEntry = {
@@ -273,6 +300,7 @@ export function BookingDetail({
       lastContactedAt: nowIso,
       serviceTimeline: [...booking.serviceTimeline, newEntry],
     });
+    onLogCallToast?.(templateLabel, CALL_OUTCOME_LABEL[outcome]);
   }
 
   /**
@@ -546,8 +574,8 @@ export function BookingDetail({
                 }}
                 onCloseLogCall={() => setShowLogCall(false)}
                 onCloseLogEmail={() => setShowLogEmail(false)}
-                onLogCall={(outcome, note) => {
-                  logCall(outcome, note);
+                onLogCall={(outcome, note, templateLabel) => {
+                  logCall(outcome, note, templateLabel);
                   setShowLogCall(false);
                 }}
                 onLogEmail={(subject, note, templateLabel) => {
@@ -1000,7 +1028,7 @@ function CoordinationCoordinatePanel({
   onOpenLogEmail: () => void;
   onCloseLogCall: () => void;
   onCloseLogEmail: () => void;
-  onLogCall: (outcome: CallOutcome, note: string) => void;
+  onLogCall: (outcome: CallOutcome, note: string, templateLabel: string) => void;
   onLogEmail: (subject: string, note: string, templateLabel: string) => void;
   onScheduleCoordination?: () => void;
   emailTemplates: ReadonlyArray<EmailTemplate>;
@@ -1246,10 +1274,56 @@ function LogCallForm({
   onSubmit,
 }: {
   onCancel: () => void;
-  onSubmit: (outcome: CallOutcome, note: string) => void;
+  onSubmit: (
+    outcome: CallOutcome,
+    note: string,
+    templateLabel: string,
+  ) => void;
 }) {
+  // Template picker mirrors the bulk-log-call form on
+  // `AwaitingCoordinationView` (and the per-row Log email form
+  // alongside) so a single-booking call logged here ends up with the
+  // same canonical note as one logged in bulk. Defaults to `Custom…`
+  // so opening the form lands ops in the same free-text spot they
+  // were before this picker existed. Selecting a real template
+  // prefills the shared note (still editable); selecting `Custom…`
+  // clears it. Outcome is a separate dropdown — picking a template
+  // never overwrites the outcome because the same template wording
+  // ("Spoke to them — confirmed window") can apply across outcomes
+  // and we'd rather ops re-pick the outcome explicitly than silently
+  // lose what they had.
+  const [templateId, setTemplateId] = useState<string>(
+    CALL_TEMPLATE_CUSTOM_ID,
+  );
   const [outcome, setOutcome] = useState<CallOutcome>("no_answer");
   const [note, setNote] = useState("");
+  function handleSelectTemplate(id: string) {
+    setTemplateId(id);
+    if (id === CALL_TEMPLATE_CUSTOM_ID) {
+      setNote("");
+      return;
+    }
+    const tpl = CALL_TEMPLATES.find((t) => t.id === id);
+    if (!tpl) {
+      // Defensive — the dropdown only renders ids from
+      // CALL_TEMPLATES + the Custom sentinel, but if the constant
+      // ever drifts, fall back to Custom rather than leaving the
+      // note in a stale, half-prefilled state.
+      setTemplateId(CALL_TEMPLATE_CUSTOM_ID);
+      setNote("");
+      return;
+    }
+    setNote(tpl.note);
+  }
+  function handleSubmit() {
+    // Resolve the template's display name so the AdminApp toast can
+    // confirm what landed; falls back to the Custom label whenever
+    // the dropdown is on Custom (or — defensively — pointing at an
+    // unknown id, which `handleSelectTemplate` should already prevent).
+    const tpl = CALL_TEMPLATES.find((t) => t.id === templateId);
+    const templateLabel = tpl ? tpl.name : CALL_TEMPLATE_CUSTOM_LABEL;
+    onSubmit(outcome, note, templateLabel);
+  }
   return (
     <div
       className="rounded-lg border border-slate-200 bg-white p-3"
@@ -1258,6 +1332,33 @@ function LogCallForm({
       <div className="text-[12px] font-semibold text-slate-900">
         Log a call
       </div>
+      {/* Template picker — sits above the outcome + note inputs so
+          ops can grab a saved preset in one click. Defaults to
+          Custom… so opening the form lands ops in the same free-text
+          spot they were before this picker existed. Selecting a
+          template prefills the note (still editable); selecting
+          Custom… clears it. Mirror of the dropdown in the bulk-log-
+          call form on `AwaitingCoordinationView`. */}
+      <label
+        className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+        htmlFor="log-call-template"
+      >
+        Template
+      </label>
+      <select
+        id="log-call-template"
+        value={templateId}
+        onChange={(e) => handleSelectTemplate(e.target.value)}
+        data-testid="select-call-template"
+        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+      >
+        <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+        {CALL_TEMPLATES.map((tpl) => (
+          <option key={tpl.id} value={tpl.id}>
+            {tpl.name}
+          </option>
+        ))}
+      </select>
       <label
         className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
         htmlFor="log-call-outcome"
@@ -1302,7 +1403,7 @@ function LogCallForm({
         </button>
         <button
           type="button"
-          onClick={() => onSubmit(outcome, note)}
+          onClick={handleSubmit}
           data-testid="button-confirm-log-call"
           className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
           style={{ backgroundColor: BRAND }}

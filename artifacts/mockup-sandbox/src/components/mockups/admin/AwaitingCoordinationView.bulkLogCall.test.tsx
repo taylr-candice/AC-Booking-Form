@@ -33,10 +33,11 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  AdminBooking,
-  AdminBuilding,
-  AdminUnit,
+import {
+  CALL_TEMPLATES,
+  type AdminBooking,
+  type AdminBuilding,
+  type AdminUnit,
 } from "@/state/adminMockData";
 
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
@@ -130,6 +131,7 @@ function Harness({
     ids: string[],
     outcome: "no_answer" | "spoke" | "voicemail",
     note: string,
+    templateLabel: string,
   ) => void;
 }) {
   const [filter, setFilter] = useState<"all">("all");
@@ -186,13 +188,17 @@ describe("AwaitingCoordinationView · bulk log call", () => {
     fireEvent.click(screen.getByTestId("button-bulk-confirm-log-call"));
 
     expect(onBulkLogCall).toHaveBeenCalledTimes(1);
-    const [ids, outcome, note] = onBulkLogCall.mock.calls[0];
+    const [ids, outcome, note, templateLabel] = onBulkLogCall.mock.calls[0];
     expect(new Set(ids)).toEqual(new Set(["bk-1", "bk-3"]));
     expect(outcome).toBe("voicemail");
     // The view passes the raw note straight through; the AdminApp
     // handler trims it before stamping the timeline. We assert the
     // raw value here so the contract between the two stays explicit.
     expect(note).toBe("  Voicemail blast — try again Wed AM  ");
+    // The template picker defaults to Custom… so submitting without
+    // touching it must report "Custom" — keeps the AdminApp toast
+    // path honest for free-text submits.
+    expect(templateLabel).toBe("Custom");
 
     // Selection is cleared after submit so the bar (and form) collapse.
     expect(screen.queryByTestId("bulk-action-bar-coordination")).toBeNull();
@@ -219,6 +225,86 @@ describe("AwaitingCoordinationView · bulk log call", () => {
     expect(ids).toEqual(["bk-only"]);
     expect(outcome).toBe("no_answer");
     expect(note).toBe("");
+  });
+
+  it("picking a saved template prefills the shared note input and reports the template name to onBulkLogCall", () => {
+    const onBulkLogCall = vi.fn();
+    const tpl = CALL_TEMPLATES[0];
+    render(
+      <Harness
+        bookings={[makeBooking({ id: "bk-tpl", unitId: "u1" })]}
+        onBulkLogCall={onBulkLogCall}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-tpl"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+
+    // Form opens with the dropdown on Custom… so the note starts
+    // empty — matches the historical free-text behaviour for anyone
+    // who didn't ask for a template.
+    const noteInput = screen.getByTestId(
+      "input-bulk-call-note",
+    ) as HTMLTextAreaElement;
+    expect(noteInput.value).toBe("");
+
+    // Pick the first seeded template — the note should snap to the
+    // template's preset value. Outcome is intentionally NOT touched
+    // by the picker.
+    fireEvent.change(screen.getByTestId("select-bulk-call-template"), {
+      target: { value: tpl.id },
+    });
+    expect(noteInput.value).toBe(tpl.note);
+
+    // Note stays editable so ops can tweak per batch — small edit
+    // survives submit.
+    fireEvent.change(noteInput, {
+      target: { value: `${tpl.note} (Bldg A)` },
+    });
+
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-call"));
+
+    expect(onBulkLogCall).toHaveBeenCalledTimes(1);
+    const [ids, outcome, note, templateLabel] = onBulkLogCall.mock.calls[0];
+    expect(ids).toEqual(["bk-tpl"]);
+    // Outcome stays at the default — the template picker doesn't
+    // touch it.
+    expect(outcome).toBe("no_answer");
+    expect(note).toBe(`${tpl.note} (Bldg A)`);
+    // The template's display name (not its id) flows up so the
+    // AdminApp toast can confirm which preset landed across the
+    // batch.
+    expect(templateLabel).toBe(tpl.name);
+  });
+
+  it("switching from a template back to Custom… clears the prefilled note", () => {
+    const onBulkLogCall = vi.fn();
+    const tpl = CALL_TEMPLATES[1] ?? CALL_TEMPLATES[0];
+    render(
+      <Harness
+        bookings={[makeBooking({ id: "bk-flip", unitId: "u1" })]}
+        onBulkLogCall={onBulkLogCall}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-flip"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    fireEvent.change(screen.getByTestId("select-bulk-call-template"), {
+      target: { value: tpl.id },
+    });
+
+    const noteInput = screen.getByTestId(
+      "input-bulk-call-note",
+    ) as HTMLTextAreaElement;
+    expect(noteInput.value).toBe(tpl.note);
+
+    // Flip back to Custom… — the historical free-text entry mode —
+    // and the note should be wiped so ops aren't left typing on top
+    // of the previous preset.
+    fireEvent.change(screen.getByTestId("select-bulk-call-template"), {
+      target: { value: "custom" },
+    });
+    expect(noteInput.value).toBe("");
   });
 
   it("Cancel collapses the form without firing onBulkLogCall", () => {

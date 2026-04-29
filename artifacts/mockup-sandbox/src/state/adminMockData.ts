@@ -2121,6 +2121,83 @@ export function isCustomEmailTemplateLabel(label: string): boolean {
 }
 
 /**
+ * Call-note template — mirror of {@link EmailTemplate} for the call
+ * channel. Used by both the per-row `BookingDetail.LogCallForm` and
+ * the bulk `LogCallForm` on `AwaitingCoordinationView` so a single
+ * dropdown of saved call notes ("No answer — left voicemail", "Spoke
+ * to tenant — confirmed window", …) drives both flows. The picker
+ * only prefills the shared `note` — the call outcome
+ * (No answer / Spoke / Voicemail) stays a separate dropdown so ops
+ * can describe the same outcome with different colour, and so a
+ * template can be reused across outcomes when the wording fits.
+ *
+ * Like email templates, picking a template does NOT change the
+ * timeline label (`Logged call · {Outcome}` is still derived from
+ * the outcome dropdown). The template's `name` is forwarded to the
+ * AdminApp shell so the success toast can confirm which preset
+ * landed — keeps the "Last attempt" cell scannable across batches.
+ */
+export type CallTemplate = {
+  id: string;
+  /** Human-readable label shown in the dropdown and reflected in the
+   *  bulk- / per-row log-call toast so ops can confirm which template
+   *  landed. */
+  name: string;
+  /** Pre-filled shared note. Becomes the entry's `note` field on the
+   *  service timeline (omitted when blank, matching the per-row
+   *  `BookingDetail.logCall` shape). */
+  note: string;
+};
+
+/**
+ * Seeded call-note presets ops can pick from when logging a call —
+ * mirror of {@link EMAIL_TEMPLATES} for the call channel. New entries
+ * should follow the existing tone (a one-line dropdown label + a 1-2
+ * sentence suggested note) and cover the common outcomes ops actually
+ * write into the audit trail. Order is roughly the frequency ops
+ * uses them: voicemail first (most common no-pickup result), then
+ * the various spoke / no-answer follow-ups.
+ */
+export const CALL_TEMPLATES: ReadonlyArray<CallTemplate> = [
+  {
+    id: "voicemail_left",
+    name: "No answer — left voicemail",
+    note: "No answer on the listed number — left a voicemail with the booking ref and a callback number.",
+  },
+  {
+    id: "no_answer",
+    name: "No answer — no voicemail",
+    note: "Rang the listed number — no answer and no voicemail box available. Will try again next business day.",
+  },
+  {
+    id: "spoke_confirmed",
+    name: "Spoke to them — confirmed window",
+    note: "Spoke briefly and confirmed the proposed service window — happy to proceed.",
+  },
+  {
+    id: "spoke_will_call_back",
+    name: "Spoke briefly — they'll call back",
+    note: "Caught them mid-meeting — they'll call back later this week to lock in a window.",
+  },
+  {
+    id: "wrong_number",
+    name: "Wrong number on file",
+    note: "Number on file is wrong or disconnected — flag with agent for an updated tenant contact.",
+  },
+];
+
+/** Sentinel id used by the call-template dropdown for the free-text
+ *  "Custom…" option. Mirror of {@link EMAIL_TEMPLATE_CUSTOM_ID} so the
+ *  view + helpers reference the same string across both channels. */
+export const CALL_TEMPLATE_CUSTOM_ID = "custom";
+
+/** Toast / audit label used when the admin submits a log-call form
+ *  without picking a template (i.e. the `Custom…` dropdown option).
+ *  Mirror of {@link EMAIL_TEMPLATE_CUSTOM_LABEL} so the AdminApp
+ *  handler can render a consistent toast across both channels. */
+export const CALL_TEMPLATE_CUSTOM_LABEL = "Custom";
+
+/**
  * Trim a draft email template's three free-text fields. Used by both
  * the create + edit code paths in the admin "Email templates" panel
  * so stray whitespace from the form never reaches the saved list (and

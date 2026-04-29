@@ -36,6 +36,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CALL_TEMPLATES,
   EMAIL_TEMPLATES,
   SEEDED_BOOKINGS,
   type AdminAgent,
@@ -279,6 +280,94 @@ describe("BookingDetail · log call / log email", () => {
     expect(newEntry.status).toBe("logged_call");
     expect(newEntry.label).toBe("Logged call · Spoke to them");
     expect(newEntry.note).toBe("Confirmed Wed afternoon");
+  });
+
+  it("Log call form opens with the template dropdown on Custom… so the note input starts empty", () => {
+    renderDetail(makeBooking());
+    fireEvent.click(screen.getByTestId("button-log-call"));
+    const select = screen.getByTestId(
+      "select-call-template",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("custom");
+    expect(
+      (screen.getByTestId("input-call-note") as HTMLTextAreaElement).value,
+    ).toBe("");
+  });
+
+  it("picking a saved call template prefills the note input (still editable) and reports the template name to onLogCallToast", () => {
+    const onUpdate = vi.fn();
+    const onLogCallToast = vi.fn();
+    const tpl = CALL_TEMPLATES[0];
+    renderDetail(makeBooking(), { onUpdate, onLogCallToast });
+
+    fireEvent.click(screen.getByTestId("button-log-call"));
+    fireEvent.change(screen.getByTestId("select-call-template"), {
+      target: { value: tpl.id },
+    });
+
+    const noteInput = screen.getByTestId(
+      "input-call-note",
+    ) as HTMLTextAreaElement;
+    expect(noteInput.value).toBe(tpl.note);
+
+    // Note stays editable after the template prefill — small edit
+    // survives submit.
+    fireEvent.change(noteInput, {
+      target: { value: `${tpl.note} (Bldg A)` },
+    });
+    fireEvent.click(screen.getByTestId("button-confirm-log-call"));
+
+    // Timeline label still encodes outcome only — same shape as the
+    // bulk-logged entry so the Awaiting-coordination "Last attempt"
+    // cell reads consistently.
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [, patch] = onUpdate.mock.calls[0];
+    const newEntry = patch.serviceTimeline.at(-1);
+    expect(newEntry.label).toBe("Logged call · No answer");
+    expect(newEntry.note).toBe(`${tpl.note} (Bldg A)`);
+
+    // Toast callback receives the template's display name (not its
+    // id) so the AdminApp shell can confirm which preset landed —
+    // mirror of the bulk-log-call toast.
+    expect(onLogCallToast).toHaveBeenCalledTimes(1);
+    expect(onLogCallToast.mock.calls[0][0]).toBe(tpl.name);
+    // Outcome label flows up so the Custom-path fallback in the
+    // AdminApp toast still has something useful to surface.
+    expect(onLogCallToast.mock.calls[0][1]).toBe("No answer");
+  });
+
+  it("switching from a call template back to Custom… clears the prefilled note", () => {
+    const tpl = CALL_TEMPLATES[1] ?? CALL_TEMPLATES[0];
+    renderDetail(makeBooking());
+
+    fireEvent.click(screen.getByTestId("button-log-call"));
+    fireEvent.change(screen.getByTestId("select-call-template"), {
+      target: { value: tpl.id },
+    });
+    const noteInput = screen.getByTestId(
+      "input-call-note",
+    ) as HTMLTextAreaElement;
+    expect(noteInput.value).toBe(tpl.note);
+
+    fireEvent.change(screen.getByTestId("select-call-template"), {
+      target: { value: "custom" },
+    });
+    expect(noteInput.value).toBe("");
+  });
+
+  it("Custom call submit reports the Custom label + outcome to onLogCallToast", () => {
+    const onLogCallToast = vi.fn();
+    renderDetail(makeBooking(), { onLogCallToast });
+
+    fireEvent.click(screen.getByTestId("button-log-call"));
+    fireEvent.change(screen.getByTestId("select-call-outcome"), {
+      target: { value: "voicemail" },
+    });
+    fireEvent.click(screen.getByTestId("button-confirm-log-call"));
+
+    expect(onLogCallToast).toHaveBeenCalledTimes(1);
+    expect(onLogCallToast.mock.calls[0][0]).toBe("Custom");
+    expect(onLogCallToast.mock.calls[0][1]).toBe("Left voicemail");
   });
 
   it("Log email → submit appends a kind:'email' entry with the subject in the label", () => {

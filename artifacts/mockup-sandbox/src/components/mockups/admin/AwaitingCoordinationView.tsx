@@ -23,6 +23,9 @@ import { ArrowDownNarrowWide, Clock, Mail, Phone, Search } from "lucide-react";
 
 import {
   bookerAgencyName,
+  CALL_TEMPLATE_CUSTOM_ID,
+  CALL_TEMPLATE_CUSTOM_LABEL,
+  CALL_TEMPLATES,
   coordinationKindForBooking,
   EMAIL_TEMPLATE_CUSTOM_ID,
   EMAIL_TEMPLATE_CUSTOM_LABEL,
@@ -247,8 +250,22 @@ export function AwaitingCoordinationView({
    *  colour. Same shape as `BookingDetail.logCall()` so the timeline
    *  reads consistently regardless of how the entry was created.
    *  Replaces the legacy `onBulkMarkAsChased` (generic chased entry).
+   *
+   *  `templateLabel` is the human-readable name of the seeded
+   *  template the admin picked (e.g. `"No answer — left voicemail"`),
+   *  or `CALL_TEMPLATE_CUSTOM_LABEL` (`"Custom"`) when the admin
+   *  bypassed the picker and typed their own note. The AdminApp
+   *  handler reflects this in the success toast so ops can confirm at
+   *  a glance which template landed across the batch — mirror of the
+   *  bulk-log-email toast.
+   *
    *  Optional so this view stays usable in isolation. */
-  onBulkLogCall?: (ids: string[], outcome: CallOutcome, note: string) => void;
+  onBulkLogCall?: (
+    ids: string[],
+    outcome: CallOutcome,
+    note: string,
+    templateLabel: string,
+  ) => void;
   /** Bulk-log an email against every supplied booking. Mirror of
    *  `onBulkLogCall` for the email channel — appends a typed
    *  `kind: "email"` / `status: "logged_email"` timeline entry whose
@@ -291,7 +308,22 @@ export function AwaitingCoordinationView({
   // per-row LogCallForm behaviour; the shared note is optional.
   // Only one of the two bulk forms (call / email) can be open at a
   // time so the action bar never grows two competing panels above it.
+  //
+  // The dropdown above the outcome lets ops pick from a small set of
+  // seeded `CALL_TEMPLATES` (suggested note presets) so the common
+  // case — "No answer — left voicemail", "Spoke to them — confirmed
+  // window", etc. — doesn't require retyping the same shared note
+  // every time. Selecting a template prefills the note input but
+  // leaves it editable; selecting `Custom…` clears it and falls back
+  // to the historical free-text behaviour. Outcome stays a separate
+  // dropdown — picking a template never overwrites the outcome
+  // because the same template wording can apply across outcomes.
+  // Default is `Custom…` so opening the form lands ops in the same
+  // place they were before this picker existed.
   const [showBulkLogCall, setShowBulkLogCall] = useState(false);
+  const [bulkCallTemplateId, setBulkCallTemplateId] = useState<string>(
+    CALL_TEMPLATE_CUSTOM_ID,
+  );
   const [bulkOutcome, setBulkOutcome] = useState<CallOutcome>("no_answer");
   const [bulkNote, setBulkNote] = useState("");
 
@@ -560,6 +592,7 @@ export function AwaitingCoordinationView({
     // "nothing in flight" state — otherwise re-selecting a different
     // set would resurface the previous outcome / subject / note.
     setShowBulkLogCall(false);
+    setBulkCallTemplateId(CALL_TEMPLATE_CUSTOM_ID);
     setBulkOutcome("no_answer");
     setBulkNote("");
     setShowBulkLogEmail(false);
@@ -568,9 +601,56 @@ export function AwaitingCoordinationView({
     setBulkEmailNote("");
   }
 
+  /**
+   * Pick (or unpick) a saved call-note template from the dropdown
+   * above the outcome input.
+   *
+   *   - Selecting a real template id replaces the shared note with
+   *     the template's preset so the common case (e.g. "No answer —
+   *     left voicemail") doesn't require any typing. Inputs stay
+   *     editable so ops can tweak per batch.
+   *   - Selecting `CALL_TEMPLATE_CUSTOM_ID` clears the note and
+   *     restores the historical free-text behaviour.
+   *
+   * Outcome is intentionally NOT touched — the same template wording
+   * ("Spoke to them — confirmed window") can apply across outcomes,
+   * so we'd rather ops re-pick the outcome explicitly than silently
+   * overwrite what they already chose. Mirror of
+   * {@link handleSelectEmailTemplate} for the email channel.
+   */
+  function handleSelectCallTemplate(id: string) {
+    setBulkCallTemplateId(id);
+    if (id === CALL_TEMPLATE_CUSTOM_ID) {
+      setBulkNote("");
+      return;
+    }
+    const tpl = CALL_TEMPLATES.find((t) => t.id === id);
+    if (!tpl) {
+      // Defensive — the dropdown only renders ids from
+      // `CALL_TEMPLATES` + the Custom sentinel — but if the catalog
+      // ever drifts, fall back to Custom rather than leaving the
+      // note in a stale, half-prefilled state.
+      setBulkCallTemplateId(CALL_TEMPLATE_CUSTOM_ID);
+      setBulkNote("");
+      return;
+    }
+    setBulkNote(tpl.note);
+  }
+
   function handleSubmitBulkLogCall() {
     if (!onBulkLogCall || selectedCount === 0) return;
-    onBulkLogCall(Array.from(selectedIds), bulkOutcome, bulkNote);
+    // Resolve the template's display name so the AdminApp toast can
+    // confirm what landed; falls back to the Custom label whenever
+    // the dropdown is on Custom (or — defensively — pointing at an
+    // unknown id, which the select handler should already prevent).
+    const tpl = CALL_TEMPLATES.find((t) => t.id === bulkCallTemplateId);
+    const templateLabel = tpl ? tpl.name : CALL_TEMPLATE_CUSTOM_LABEL;
+    onBulkLogCall(
+      Array.from(selectedIds),
+      bulkOutcome,
+      bulkNote,
+      templateLabel,
+    );
     clearSelection();
   }
 
@@ -1026,6 +1106,37 @@ export function AwaitingCoordinationView({
                 <div className="mt-0.5 text-[11px] text-slate-500">
                   Same outcome and note will be added to every selected row.
                 </div>
+                {/* Template picker — sits above the outcome + note
+                    inputs so ops can grab a saved preset in one
+                    click. Defaults to Custom… so opening the form
+                    lands ops in the same free-text spot they were
+                    before this picker existed. Selecting a template
+                    prefills the shared note (still editable);
+                    selecting Custom… clears it. Outcome stays a
+                    separate dropdown — picking a template never
+                    overwrites the outcome because the same wording
+                    can apply across outcomes. Mirror of the email
+                    template picker below. */}
+                <label
+                  className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+                  htmlFor="bulk-log-call-template"
+                >
+                  Template
+                </label>
+                <select
+                  id="bulk-log-call-template"
+                  value={bulkCallTemplateId}
+                  onChange={(e) => handleSelectCallTemplate(e.target.value)}
+                  data-testid="select-bulk-call-template"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                >
+                  <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+                  {CALL_TEMPLATES.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.name}
+                    </option>
+                  ))}
+                </select>
                 <label
                   className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
                   htmlFor="bulk-log-call-outcome"
@@ -1065,6 +1176,7 @@ export function AwaitingCoordinationView({
                     type="button"
                     onClick={() => {
                       setShowBulkLogCall(false);
+                      setBulkCallTemplateId(CALL_TEMPLATE_CUSTOM_ID);
                       setBulkOutcome("no_answer");
                       setBulkNote("");
                     }}

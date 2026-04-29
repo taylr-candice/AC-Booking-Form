@@ -266,8 +266,26 @@ export function AdminApp() {
    * sees the bulk action landed — matches the toast pattern used by
    * cancel / reschedule / schedule-coordination. The early return
    * above guarantees we never fire a toast for a no-op.
+   *
+   * `templateLabel` is the human-readable name of the seeded
+   * `CALL_TEMPLATES` entry the admin picked in the bulk-log-call form
+   * (e.g. `"No answer — left voicemail"`), or
+   * `CALL_TEMPLATE_CUSTOM_LABEL` (`"Custom"`) when the admin bypassed
+   * the picker. It does NOT change the timeline label — the timeline
+   * still encodes outcome only, so per-row and bulk entries line up
+   * in the Awaiting-coordination "Last attempt" cell. Instead it
+   * shapes the confirmation toast: when a real template was picked
+   * we surface its name; on the Custom path we surface the outcome
+   * label so ops still sees what kind of attempt landed (mirror of
+   * how the bulk-log-email toast falls back to the free-text subject
+   * on Custom).
    */
-  function bulkLogCall(ids: string[], outcome: CallOutcome, note: string) {
+  function bulkLogCall(
+    ids: string[],
+    outcome: CallOutcome,
+    note: string,
+    templateLabel: string,
+  ) {
     if (ids.length === 0) return;
     const idSet = new Set(ids);
     const nowIso = new Date().toISOString();
@@ -293,9 +311,23 @@ export function AdminApp() {
       }),
     );
     const count = ids.length;
+    // Toast format reflects which template (or "Custom") landed so
+    // ops can confirm at a glance — keeps the Awaiting-coordination
+    // confirmation consistent across batches. On the Custom path we
+    // surface the outcome label as a fallback (analogous to the
+    // bulk-log-email toast surfacing the free-text subject), since
+    // the outcome dropdown always carries a value and gives ops a
+    // useful "what kind of attempt landed" hint.
+    const trimmedTemplate = templateLabel.trim();
+    const isCustom =
+      trimmedTemplate.length === 0 ||
+      trimmedTemplate.toLowerCase() === "custom";
+    const tail = isCustom
+      ? ` · Custom · ${CALL_OUTCOME_LABEL[outcome]}`
+      : ` · ${trimmedTemplate}`;
     setToast({
       id: `bulk-log-call-${Date.now()}`,
-      message: `Logged call on ${count} booking${count === 1 ? "" : "s"} · ${CALL_OUTCOME_LABEL[outcome]}`,
+      message: `Logged call on ${count} booking${count === 1 ? "" : "s"}${tail}`,
     });
   }
 
@@ -382,6 +414,35 @@ export function AdminApp() {
     setToast({
       id: `log-email-${Date.now()}`,
       message: `Logged email on 1 booking${tail}`,
+    });
+  }
+
+  /**
+   * Per-row counterpart to the {@link bulkLogCall} toast above. Wired
+   * to {@link BookingDetail.onLogCallToast}, which fires after the
+   * detail screen's own `logCall` writes the timeline entry. We
+   * intentionally re-use the same toast format as bulk (with a
+   * `1 booking` count and the same `· {Template}` /
+   * `· Custom · {Outcome}` tail) so a busy admin sees a consistent
+   * confirmation regardless of whether the call was logged from the
+   * detail screen or the Awaiting-coordination bulk action bar. The
+   * detail screen still owns the timeline write — this handler is
+   * purely the toast.
+   */
+  function logCallToast(templateLabel: string, outcomeLabel: string) {
+    const trimmedTemplate = templateLabel.trim();
+    const trimmedOutcome = outcomeLabel.trim();
+    const isCustom =
+      trimmedTemplate.length === 0 ||
+      trimmedTemplate.toLowerCase() === "custom";
+    const tail = isCustom
+      ? trimmedOutcome.length > 0
+        ? ` · Custom · ${trimmedOutcome}`
+        : ` · Custom`
+      : ` · ${trimmedTemplate}`;
+    setToast({
+      id: `log-call-${Date.now()}`,
+      message: `Logged call on 1 booking${tail}`,
     });
   }
 
@@ -1023,6 +1084,7 @@ export function AdminApp() {
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
+                onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
                 emailTemplates={emailTemplates}
               />
@@ -1062,6 +1124,7 @@ export function AdminApp() {
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
                 onAcknowledgeSupersede={acknowledgeSupersede}
+                onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
                 emailTemplates={emailTemplates}
               />
