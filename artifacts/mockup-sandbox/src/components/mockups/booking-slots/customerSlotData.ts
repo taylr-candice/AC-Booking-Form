@@ -12,8 +12,11 @@
  * `CustomerSlot` view-model so the picker components don't have to
  * import admin types directly. The status field (`available` / `full`
  * / `not_enough_time` / `not_yet_open`) is pre-computed via
- * {@link rolloutSlotStatus} so each picker variant renders the exact
- * same disabled-reason for the exact same input — no duplicated rule.
+ * {@link rolloutSlotStatus} so each picker variant agrees on the
+ * exact same selectability decision — the customer-facing tile is
+ * intentionally binary (selectable or greyed out) and never surfaces
+ * a reason text (Task #61); the four-state status is still kept so
+ * admin-side displays and tests can distinguish the cases.
  *
  * The slot pickers are also reachable from the canvas in isolation
  * (no booking session yet → `unit_id === null`). To keep the
@@ -102,27 +105,6 @@ export function resolveCustomerSlotData(
   }));
 
   return { rollout, days };
-}
-
-/**
- * Map the four-state {@link RolloutSlotStatus} to the user-facing
- * disabled-reason copy that the slot tile renders below the window
- * label. Returns `null` for `available` (the tile is enabled and
- * shows no reason at all).
- *
- * The customer view is intentionally binary: a window is either
- * available to select, or it shows "Full". The internal nuance
- * between "the day is fully booked", "your job won't fit in what's
- * left", and "the admin hasn't released this window yet" is not
- * surfaced to the customer — practically, none of those windows
- * are bookable, so we just say "Full". Centralised here so all
- * three picker variants render identical copy.
- */
-export function disabledReasonForStatus(
-  status: RolloutSlotStatus,
-): string | null {
-  if (status === "available") return null;
-  return "Full";
 }
 
 /**

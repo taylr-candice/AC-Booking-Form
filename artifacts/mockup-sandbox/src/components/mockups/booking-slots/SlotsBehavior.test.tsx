@@ -16,11 +16,13 @@
  *     `ac_discrepancy.customer.type === "unsure"` — never on a "split"
  *     or "ducted" answer, and never when there's no discrepancy at all.
  *
- *  3. Disabled slot tiles render exactly one generic, non-numeric reason —
- *     "Full" — and never the old "Won't fit your N-minute service" copy
- *     nor the legacy "Not enough time left for this service" / "Not yet
- *     open for booking" copy. The customer view is intentionally binary:
- *     a window is either selectable or shows "Full".
+ *  3. Disabled slot tiles render NO reason text at all (Task #61).
+ *     The customer view is intentionally binary: a window is either
+ *     selectable or it's greyed out and not selectable. The old
+ *     "Full" / "Not enough time left for this service" / "Not yet open
+ *     for booking" / "Won't fit your N-minute service" copy must never
+ *     reappear. The underlying availability decision still runs — only
+ *     the reason text is suppressed on the customer-facing tile.
  *
  * The store under `../../../state/bookingSession` is module-scoped, so
  * we reset it (and the underlying sessionStorage) between every test
@@ -240,8 +242,8 @@ describe.each(VARIANTS)("$name slot picker", ({
     });
   });
 
-  describe("disabled slot tiles render a generic, non-numeric reason", () => {
-    it("renders only the generic non-numeric reason on every disabled tile", () => {
+  describe("disabled slot tiles render no reason text (Task #61)", () => {
+    it("disables unbookable tiles, prevents selection, and renders no reason text", () => {
       // Force a job size that's larger than every seeded morning AND
       // afternoon window so we're guaranteed at least one disabled tile.
       // 7 systems × 45m = 315m > 300m (afternoon) > 240m (morning).
@@ -260,11 +262,15 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(disabledTiles.length).toBeGreaterThan(0);
 
       for (const tile of disabledTiles) {
+        // The browser must refuse the click — `disabled` is the
+        // single source of truth for "not selectable".
+        expect(tile.disabled).toBe(true);
+
         const tileText = tile.textContent ?? "";
-        // Each disabled tile must surface exactly the generic, non-numeric
-        // reason "Full" — the customer view is binary (selectable or "Full"),
-        // and the legacy nuanced copy must never reappear.
-        expect(tileText).toContain("Full");
+
+        // The reason text must be gone. None of the legacy copy may
+        // reappear, including the previous generic "Full" label.
+        expect(tileText).not.toContain("Full");
         expect(tileText).not.toContain("Not enough time left for this service");
         expect(tileText).not.toContain("Not yet open for booking");
         expect(tileText.toLowerCase()).not.toContain("won't fit");
@@ -275,9 +281,9 @@ describe.each(VARIANTS)("$name slot picker", ({
       }
     });
 
-    it("does not render the disabled-reason copy on enabled tiles", () => {
+    it("never renders the legacy reason text on enabled tiles either", () => {
       // A small job (45m) fits every seeded window, so every tile is
-      // enabled and the disabled-reason text must be absent.
+      // enabled. The legacy reason text must be absent here too.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -294,11 +300,9 @@ describe.each(VARIANTS)("$name slot picker", ({
 
       for (const tile of enabledTiles) {
         const tileText = tile.textContent ?? "";
-        expect(tileText).not.toContain("Not enough time left for this service");
-        // "Full" is the other allowed disabled-reason — it must also be absent
-        // on enabled tiles (enabled tiles render the slot duration label, not
-        // either disabled-reason copy).
         expect(tileText).not.toContain("Full");
+        expect(tileText).not.toContain("Not enough time left for this service");
+        expect(tileText).not.toContain("Not yet open for booking");
       }
     });
   });

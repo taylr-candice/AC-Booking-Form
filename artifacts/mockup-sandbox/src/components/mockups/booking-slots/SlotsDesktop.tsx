@@ -24,7 +24,6 @@ import {
 } from "../../../state/adminMockData";
 import {
   alreadyScheduledByOther,
-  disabledReasonForStatus,
   resolveCustomerSlotData,
   WINDOW_TIME_RANGE,
   type CustomerDay,
@@ -499,11 +498,10 @@ function DesktopSlotCard({
   const isSelected = selected && fits;
 
   // Customer view is intentionally binary: a window is either selectable
-  // or shows "Full". Internal admin distinctions ("not yet open", "not
-  // enough time left for the job", "fully booked") are not surfaced.
-  // Centralised in `disabledReasonForStatus` so all three picker variants
-  // agree.
-  const reason = disabledReasonForStatus(status);
+  // or it's greyed out — the customer sees no reason text. Internal admin
+  // distinctions ("not yet open", "not enough time left for the job",
+  // "fully booked") still drive the availability decision via
+  // `slot.status`, but they are not surfaced to the customer (Task #61).
 
   return (
     <button
@@ -533,9 +531,6 @@ function DesktopSlotCard({
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
       <div className={`text-[10px] ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>{hint}</div>
-      {disabled && (
-        <div className="text-[10px] font-medium text-slate-400">{reason}</div>
-      )}
     </button>
   );
 }
