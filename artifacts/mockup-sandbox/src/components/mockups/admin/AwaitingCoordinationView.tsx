@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownNarrowWide, Clock, Phone, Search } from "lucide-react";
+import { ArrowDownNarrowWide, Clock, Mail, Phone, Search } from "lucide-react";
 
 import {
   bookerAgencyName,
@@ -185,6 +185,7 @@ export function AwaitingCoordinationView({
   onOpen,
   onSchedule,
   onBulkLogCall,
+  onBulkLogEmail,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -208,6 +209,15 @@ export function AwaitingCoordinationView({
    *  Replaces the legacy `onBulkMarkAsChased` (generic chased entry).
    *  Optional so this view stays usable in isolation. */
   onBulkLogCall?: (ids: string[], outcome: CallOutcome, note: string) => void;
+  /** Bulk-log an email against every supplied booking. Mirror of
+   *  `onBulkLogCall` for the email channel — appends a typed
+   *  `kind: "email"` / `status: "logged_email"` timeline entry whose
+   *  label encodes the shared subject and whose optional shared note
+   *  carries any free-text body. Same shape as
+   *  `BookingDetail.logEmail()` so timeline entries are
+   *  interchangeable regardless of how they were created.
+   *  Optional so this view stays usable in isolation. */
+  onBulkLogEmail?: (ids: string[], subject: string, note: string) => void;
 }) {
   // Selection lives entirely in this view — once a bulk action fires
   // we clear it. The live demo row is excluded from selection because
@@ -218,9 +228,22 @@ export function AwaitingCoordinationView({
   // stays a slim pill, expands inline above the bar when ops chooses
   // to log a call. Outcome defaults to "no_answer" to match the
   // per-row LogCallForm behaviour; the shared note is optional.
+  // Only one of the two bulk forms (call / email) can be open at a
+  // time so the action bar never grows two competing panels above it.
   const [showBulkLogCall, setShowBulkLogCall] = useState(false);
   const [bulkOutcome, setBulkOutcome] = useState<CallOutcome>("no_answer");
   const [bulkNote, setBulkNote] = useState("");
+
+  // Bulk-log-email form state — same shape as the per-row
+  // `LogEmailForm` on `BookingDetail` (subject + optional note) so
+  // ops can fire a templated email-out across a batch. Subject is
+  // optional in the form to mirror the per-row form, but the
+  // AdminApp handler will fall back to a plain "Logged email" label
+  // if it's blank.
+  const [showBulkLogEmail, setShowBulkLogEmail] = useState(false);
+  const [bulkEmailSubject, setBulkEmailSubject] = useState("");
+  const [bulkEmailNote, setBulkEmailNote] = useState("");
+
   // Outcome chip filter — local because no other view needs to know
   // which outcome ops are pivoting on, and resetting it on view
   // remount matches how the bulk-action selection behaves.
@@ -385,12 +408,15 @@ export function AwaitingCoordinationView({
 
   function clearSelection() {
     setSelectedIds(new Set());
-    // Closing the form too keeps the bulk-action UI in a clean
+    // Closing the forms too keeps the bulk-action UI in a clean
     // "nothing in flight" state — otherwise re-selecting a different
-    // set would resurface the previous outcome / note.
+    // set would resurface the previous outcome / subject / note.
     setShowBulkLogCall(false);
     setBulkOutcome("no_answer");
     setBulkNote("");
+    setShowBulkLogEmail(false);
+    setBulkEmailSubject("");
+    setBulkEmailNote("");
   }
 
   function handleSubmitBulkLogCall() {
@@ -398,6 +424,17 @@ export function AwaitingCoordinationView({
     onBulkLogCall(Array.from(selectedIds), bulkOutcome, bulkNote);
     clearSelection();
   }
+
+  function handleSubmitBulkLogEmail() {
+    if (!onBulkLogEmail || selectedCount === 0) return;
+    onBulkLogEmail(Array.from(selectedIds), bulkEmailSubject, bulkEmailNote);
+    clearSelection();
+  }
+
+  // The selection column / bulk action bar is mounted whenever either
+  // bulk handler is wired up — the same checkbox column drives both
+  // the call and email affordances.
+  const bulkActionsEnabled = Boolean(onBulkLogCall || onBulkLogEmail);
 
   return (
     <div className="flex flex-col gap-4">
@@ -539,7 +576,7 @@ export function AwaitingCoordinationView({
         <table className="w-full text-left text-[13px]">
           <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
             <tr>
-              {onBulkLogCall && (
+              {bulkActionsEnabled && (
                 <th className="w-10 px-4 py-3 font-semibold">
                   <input
                     type="checkbox"
@@ -573,7 +610,7 @@ export function AwaitingCoordinationView({
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={onBulkLogCall ? 9 : 8}
+                  colSpan={bulkActionsEnabled ? 9 : 8}
                   className="px-4 py-10 text-center text-slate-500"
                 >
                   No coordination bookings match these filters.
@@ -602,7 +639,7 @@ export function AwaitingCoordinationView({
                       isSelected ? "bg-pink-50/60" : ""
                     }`}
                   >
-                    {onBulkLogCall && (
+                    {bulkActionsEnabled && (
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
@@ -611,7 +648,7 @@ export function AwaitingCoordinationView({
                               ? `Booking ${b.id} is read-only and cannot be selected`
                               : b.serviceStatus === "cancelled"
                                 ? `Booking ${b.id} is cancelled and cannot be logged against`
-                                : `Select booking ${b.id} for bulk log call`
+                                : `Select booking ${b.id} for bulk action`
                           }
                           data-testid={`checkbox-coordination-row-${b.id}`}
                           disabled={b.isLive || b.serviceStatus === "cancelled"}
@@ -709,13 +746,16 @@ export function AwaitingCoordinationView({
           selected something. Pinned to the viewport bottom so it's
           reachable even while scrolling a long queue.
 
-          The collapsed state is a slim pill with "Log call" + "Clear".
-          Clicking "Log call" expands an inline form above the pill so
-          ops can pick a shared outcome (No answer / Spoke / Voicemail)
-          and an optional shared note before the entry is appended to
-          every selected row. Same shape as the per-row Log call form
-          on `BookingDetail` so timeline entries are interchangeable. */}
-      {onBulkLogCall && selectedCount > 0 && (
+          The collapsed state is a slim pill with "Log call" / "Log
+          email" / "Clear". Clicking either trigger expands an inline
+          form above the pill so ops can pick a shared outcome /
+          subject and an optional shared note before the entry is
+          appended to every selected row. Both forms mirror the
+          per-row equivalents on `BookingDetail` so timeline entries
+          are interchangeable regardless of how they were created.
+          Only one form can be open at a time — opening the other
+          collapses the first to keep the bar visually calm. */}
+      {bulkActionsEnabled && selectedCount > 0 && (
         <div
           role="region"
           aria-label="Bulk actions for selected coordination bookings"
@@ -723,7 +763,7 @@ export function AwaitingCoordinationView({
           className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
         >
           <div className="pointer-events-auto flex w-full max-w-md flex-col gap-2">
-            {showBulkLogCall && (
+            {showBulkLogCall && onBulkLogCall && (
               <div
                 className="rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
                 data-testid="bulk-log-call-form"
@@ -794,23 +834,115 @@ export function AwaitingCoordinationView({
                 </div>
               </div>
             )}
+            {showBulkLogEmail && onBulkLogEmail && (
+              <div
+                className="rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
+                data-testid="bulk-log-email-form"
+              >
+                <div className="text-[12px] font-semibold text-slate-900">
+                  Log an email for {selectedCount} booking
+                  {selectedCount === 1 ? "" : "s"}
+                </div>
+                <div className="mt-0.5 text-[11px] text-slate-500">
+                  Same subject and note will be added to every selected row.
+                </div>
+                <label
+                  className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+                  htmlFor="bulk-log-email-subject"
+                >
+                  Subject
+                </label>
+                <input
+                  id="bulk-log-email-subject"
+                  type="text"
+                  value={bulkEmailSubject}
+                  onChange={(e) => setBulkEmailSubject(e.target.value)}
+                  placeholder="e.g. Booking access — please confirm window"
+                  data-testid="input-bulk-email-subject"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                />
+                <label
+                  className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
+                  htmlFor="bulk-log-email-note"
+                >
+                  Shared note (optional)
+                </label>
+                <textarea
+                  id="bulk-log-email-note"
+                  value={bulkEmailNote}
+                  onChange={(e) => setBulkEmailNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Sent rebook link + parcel-locker instructions"
+                  data-testid="input-bulk-email-note"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBulkLogEmail(false);
+                      setBulkEmailSubject("");
+                      setBulkEmailNote("");
+                    }}
+                    data-testid="button-bulk-cancel-log-email"
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitBulkLogEmail}
+                    data-testid="button-bulk-confirm-log-email"
+                    className="rounded-lg px-2.5 py-1 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    Save email for {selectedCount}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-lg">
               <span className="text-[13px] font-semibold text-slate-900">
                 {selectedCount} selected
               </span>
               <span className="text-slate-300">·</span>
-              <button
-                type="button"
-                onClick={() => setShowBulkLogCall((v) => !v)}
-                data-testid="button-bulk-log-call"
-                aria-expanded={showBulkLogCall}
-                aria-controls="bulk-log-call-form"
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
-                style={{ backgroundColor: BRAND }}
-              >
-                <Phone className="h-3.5 w-3.5" />
-                Log call
-              </button>
+              {onBulkLogCall && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkLogCall((v) => !v);
+                    // Mutually exclusive — opening Log call collapses
+                    // the email form so only one panel ever floats
+                    // above the pill at a time.
+                    setShowBulkLogEmail(false);
+                  }}
+                  data-testid="button-bulk-log-call"
+                  aria-expanded={showBulkLogCall}
+                  aria-controls="bulk-log-call-form"
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+                  style={{ backgroundColor: BRAND }}
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  Log call
+                </button>
+              )}
+              {onBulkLogEmail && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkLogEmail((v) => !v);
+                    setShowBulkLogCall(false);
+                  }}
+                  data-testid="button-bulk-log-email"
+                  aria-expanded={showBulkLogEmail}
+                  aria-controls="bulk-log-email-form"
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:brightness-110"
+                  style={{ backgroundColor: BRAND }}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Log email
+                </button>
+              )}
               <button
                 type="button"
                 onClick={clearSelection}

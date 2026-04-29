@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  applyBulkLogEmail,
   bookingDurationMinutes,
   buildRescheduledTimelineEntry,
   consumeBookingCapacity,
@@ -247,6 +248,37 @@ export function AdminApp() {
     setToast({
       id: `bulk-log-call-${Date.now()}`,
       message: `Logged call on ${count} booking${count === 1 ? "" : "s"} · ${CALL_OUTCOME_LABEL[outcome]}`,
+    });
+  }
+
+  /**
+   * Bulk-log an email across several coordination bookings in one go.
+   * Mirror of {@link bulkLogCall} for the email channel — appends a
+   * typed `kind: "email"` / `status: "logged_email"` timeline entry to
+   * every selected row and stamps `lastContactedAt`. Same shape as
+   * `BookingDetail.logEmail()` so timeline entries stay
+   * interchangeable regardless of how they were created (per-row vs
+   * bulk). The live demo row is silently skipped — same guard as
+   * `updateBooking` and `bulkLogCall`.
+   *
+   * The shared subject is encoded in the entry label so the timeline
+   * reads as a one-line summary; the optional shared note carries the
+   * body / context. Both are trimmed before they reach the timeline so
+   * stray whitespace from the form doesn't bleed into the audit trail.
+   */
+  function bulkLogEmail(ids: string[], subject: string, note: string) {
+    if (ids.length === 0) return;
+    const nowIso = new Date().toISOString();
+    setSeededBookings((prev) =>
+      applyBulkLogEmail(prev, ids, subject, note, nowIso),
+    );
+    const count = ids.length;
+    const trimmedSubject = subject.trim();
+    setToast({
+      id: `bulk-log-email-${Date.now()}`,
+      message: `Logged email on ${count} booking${count === 1 ? "" : "s"}${
+        trimmedSubject.length > 0 ? ` · ${trimmedSubject}` : ""
+      }`,
     });
   }
 
@@ -940,6 +972,7 @@ export function AdminApp() {
                 onOpen={setSelectedBookingId}
                 onSchedule={openSchedule}
                 onBulkLogCall={bulkLogCall}
+                onBulkLogEmail={bulkLogEmail}
               />
             )
           ) : null}

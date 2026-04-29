@@ -2997,3 +2997,78 @@ export function revertScheduledToCoordinationPatch(
   };
 }
 
+/**
+ * Build the typed timeline entry for a bulk-logged email.
+ *
+ * Mirror of the per-row `BookingDetail.logEmail` shape so timeline
+ * entries stay interchangeable regardless of whether the email was
+ * logged one-at-a-time from the booking detail screen or in a batch
+ * from the Awaiting-coordination bulk action bar.
+ *
+ * Subject is encoded in the entry label so the timeline reads as a
+ * one-line summary; the optional shared note carries the body /
+ * context. Both inputs are trimmed before they hit the entry so
+ * stray whitespace from the form doesn't bleed into the audit
+ * trail. When the trimmed note is empty we omit the `note` field
+ * entirely (consistent with how `BookingDetail.logEmail` builds
+ * the per-row entry).
+ *
+ * Pure / data-only — safe to import from tests or other helpers.
+ */
+export function buildBulkLogEmailEntry({
+  subject,
+  note,
+  by = ADMIN_USER_LABEL,
+  at = "Just now",
+}: {
+  subject: string;
+  note: string;
+  by?: string;
+  at?: string;
+}): TimelineEntry {
+  const trimmedSubject = subject.trim();
+  const trimmedNote = note.trim();
+  return {
+    kind: "email",
+    status: "logged_email",
+    label:
+      trimmedSubject.length > 0
+        ? `Logged email · ${trimmedSubject}`
+        : "Logged email",
+    at,
+    by,
+    ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
+  };
+}
+
+/**
+ * Apply a bulk-logged email to a list of bookings, returning the new
+ * list. Selected bookings get `lastContactedAt` stamped to `nowIso`
+ * and the entry from {@link buildBulkLogEmailEntry} appended to their
+ * service timeline; every other booking is returned unchanged. The
+ * live demo row (`bk-live`) is silently skipped — it mirrors the
+ * customer's session and isn't writable from the admin shell. Pure /
+ * data-only — safe to call from tests.
+ */
+export function applyBulkLogEmail(
+  bookings: readonly AdminBooking[],
+  ids: readonly string[],
+  subject: string,
+  note: string,
+  nowIso: string,
+  by: string = ADMIN_USER_LABEL,
+): AdminBooking[] {
+  if (ids.length === 0) return [...bookings];
+  const idSet = new Set(ids);
+  const entry = buildBulkLogEmailEntry({ subject, note, by });
+  return bookings.map((b) => {
+    if (b.id === "bk-live") return b;
+    if (!idSet.has(b.id)) return b;
+    return {
+      ...b,
+      lastContactedAt: nowIso,
+      serviceTimeline: [...b.serviceTimeline, entry],
+    };
+  });
+}
+
