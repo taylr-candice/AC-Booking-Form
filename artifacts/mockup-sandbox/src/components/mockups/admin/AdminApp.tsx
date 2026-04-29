@@ -24,6 +24,7 @@ import {
   convertCoordinationToScheduledPatch,
   createRollout,
   findRolloutForBooking,
+  formatBookingShortDate,
   getActiveBookingForUnit,
   getRolloutById,
   liveBookingFromSession,
@@ -59,6 +60,7 @@ import { RolloutScheduleEditor } from "./RolloutScheduleEditor";
 import { RolloutsView } from "./RolloutsView";
 import { ScheduleCoordinationModal } from "./ScheduleCoordinationModal";
 import { Sidebar } from "./Sidebar";
+import { Toast } from "./Toast";
 import { TopBar } from "./TopBar";
 import { UnitsView } from "./UnitsView";
 import type { CoordinationKind } from "@/state/adminMockData";
@@ -117,6 +119,14 @@ export function AdminApp() {
   // Coordination → scheduled overlay. Holds the booking id ops is
   // scheduling. `null` means the modal is closed.
   const [schedulingBookingId, setSchedulingBookingId] = useState<string | null>(
+    null,
+  );
+
+  // Bottom-right success toast (Task #78). The `id` field gives each
+  // toast a stable key so the Toast component can reset its 4s
+  // auto-dismiss timer when a second scheduling lands while the
+  // previous toast is still visible.
+  const [toast, setToast] = useState<{ id: string; message: string } | null>(
     null,
   );
 
@@ -526,6 +536,16 @@ export function AdminApp() {
     }
 
     setSchedulingBookingId(null);
+
+    // Confirmation toast so ops sees the outcome even if they're
+    // looking at a different list than the one this booking moved
+    // into. Uses the same short-date formatter as the rollouts list
+    // and timeline labels so the format is consistent across the app.
+    const windowLabel = window === "morning" ? "Morning" : "Afternoon";
+    setToast({
+      id: `${booking.id}-${Date.now()}`,
+      message: `${booking.id} scheduled for ${formatBookingShortDate(date)} · ${windowLabel}`,
+    });
   }
 
   const schedulingBooking =
@@ -703,6 +723,13 @@ export function AdminApp() {
           units={units}
           onCancel={() => setSchedulingBookingId(null)}
           onConfirm={scheduleCoordinationBooking}
+        />
+      )}
+      {toast && (
+        <Toast
+          id={toast.id}
+          message={toast.message}
+          onDismiss={() => setToast(null)}
         />
       )}
     </div>
