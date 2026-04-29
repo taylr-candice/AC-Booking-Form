@@ -146,3 +146,172 @@ test.describe("Admin reschedule swaps rollout capacity", () => {
     expect(afterDest).toBe("1 / 6");
   });
 });
+
+/**
+ * Companion coverage for the "no-op" branches of the Reschedule modal
+ * (gated entirely inside `SchedulingModal.tsx` when `mode === "reschedule"`):
+ *
+ *   1. Re-picking the booking's CURRENT slot must keep the Review /
+ *      Confirm CTA disabled (the `isSameAsCurrent` guard) and must not
+ *      append a service-timeline entry once the modal is dismissed.
+ *
+ *   2. Cells that are admin-closed (`openByAdmin: false`) or fully
+ *      booked must stay unpickable, surface a "no capacity" / "closed"
+ *      affordance, and never enable the Review CTA — this is the
+ *      protection that stops admins from rescheduling onto a window
+ *      the customer-side picker would also refuse.
+ *
+ * Both branches are easy to regress because they live behind the
+ * `canPick` predicate (slot button) and the `canAdvance` predicate
+ * (modal footer); the happy-path test above only spot-checks the
+ * footer's initial disabled state.
+ */
+test.describe("Reschedule modal — same-slot guard", () => {
+  // bk-1042 (Henrik Olsen, Aspen, time-budget rollout) is on a slot
+  // that's openByAdmin and well under its 240-min budget, so the
+  // picker button for the booking's CURRENT slot is clickable. That
+  // lets us actually exercise the guard by picking elsewhere first
+  // and then re-picking the original cell — which is what would
+  // happen if an admin briefly entertained a different window before
+  // changing their mind.
+  const BOOKING_ID = "bk-1042";
+  const CURRENT_DATE = "2026-04-29";
+  const CURRENT_WINDOW = "morning";
+  // Same day, different window — Aspen 4/29 PM has 105/300 mins
+  // booked so a 60-min job (Henrik's: 1 system + 1 additional indoor)
+  // fits comfortably. Picking it flips the Review CTA on.
+  const OTHER_DATE = "2026-04-29";
+  const OTHER_WINDOW = "afternoon";
+
+  test("re-picking the current slot keeps Review disabled and leaves the timeline untouched", async ({
+    page,
+  }) => {
+    await page.goto(ADMIN_URL);
+    await page.getByRole("button", { name: "Bookings", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(`Open booking ${BOOKING_ID}`),
+      })
+      .click();
+
+    // Snapshot the timeline length before opening the modal so we can
+    // assert no Rescheduled entry (or any other side effect) sneaks in
+    // when the admin clicks around and then bails out. Both the
+    // payment + service Timeline cards render `timeline-entry-${i}`
+    // testids, so the combined count covers the whole detail page.
+    const timelineEntries = page.locator('[data-testid^="timeline-entry-"]');
+    const initialCount = await timelineEntries.count();
+
+    await page.getByTestId("button-reschedule-appointment").click();
+
+    const modal = page.getByTestId("modal-reschedule-booking");
+    await expect(modal).toBeVisible();
+    // Header echoes the booking's current slot — sanity-check that
+    // the modal really did open against bk-1042's seeded 4/29 morning.
+    await expect(modal).toContainText(/Currently 29 Apr · Morning/);
+
+    const reviewBtn = modal.getByTestId("button-review-reschedule");
+
+    // Initial state: the modal pre-selects the booking's current slot,
+    // so the same-slot guard is already firing.
+    await expect(reviewBtn).toBeDisabled();
+
+    // Pick a different slot — Review flips on, proving the guard is
+    // the *only* thing keeping it disabled (and not e.g. a missing
+    // pickedDate / pickedWindow).
+    await modal
+      .getByTestId(`rollout-pick-slot-${OTHER_DATE}__${OTHER_WINDOW}`)
+      .click();
+    await expect(reviewBtn).toBeEnabled();
+
+    // Re-pick the booking's CURRENT slot. `setPickedDate` /
+    // `setPickedWindow` write the same values back, but `isSameAsCurrent`
+    // re-evaluates true and the Review CTA must drop back to disabled.
+    await modal
+      .getByTestId(`rollout-pick-slot-${CURRENT_DATE}__${CURRENT_WINDOW}`)
+      .click();
+    await expect(reviewBtn).toBeDisabled();
+
+    // Bail out of the modal — there should be nothing to commit.
+    await modal.getByTestId("button-cancel-reschedule").click();
+    await expect(modal).toBeHidden();
+
+    // No Rescheduled entry, no incidental side effects: the timeline
+    // length must match the pre-modal snapshot exactly.
+    await expect(timelineEntries).toHaveCount(initialCount);
+  });
+});
+
+test.describe("Reschedule modal — closed / full alternative cells", () => {
+  // bk-1041 sits on Marine (slots-per-window) and the seed deliberately
+  // mixes one admin-closed window (5/5 morning, `morningOpen: false`)
+  // and one fully-booked window (5/7 morning, 6/6) into the same
+  // rollout. That lets one spec lock down both branches of the
+  // `rolloutSlotStatus` "unbookable" copy in a single open-modal pass.
+  const BOOKING_ID = "bk-1041";
+  const CLOSED_DATE = "2026-05-05";
+  const CLOSED_WINDOW = "morning";
+  const FULL_DATE = "2026-05-07";
+  const FULL_WINDOW = "morning";
+
+  test("admin-closed and fully-booked cells stay unpickable with a visible reason", async ({
+    page,
+  }) => {
+    await page.goto(ADMIN_URL);
+    await page.getByRole("button", { name: "Bookings", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(`Open booking ${BOOKING_ID}`),
+      })
+      .click();
+
+    // Snapshot timeline length so we can prove nothing is committed
+    // when the admin can't find a bookable cell.
+    const timelineEntries = page.locator('[data-testid^="timeline-entry-"]');
+    const initialCount = await timelineEntries.count();
+
+    await page.getByTestId("button-reschedule-appointment").click();
+
+    const modal = page.getByTestId("modal-reschedule-booking");
+    await expect(modal).toBeVisible();
+
+    const reviewBtn = modal.getByTestId("button-review-reschedule");
+    // Same-slot guard kicks in from the initial pre-selection — Review
+    // starts disabled before we even inspect the closed/full cells.
+    await expect(reviewBtn).toBeDisabled();
+
+    // Admin-closed window — `openByAdmin: false` short-circuits to
+    // "not_yet_open" so the slot button must be disabled and surface
+    // the "Morning not yet open for booking" reason next to the cell.
+    const closedSlot = modal.getByTestId(
+      `rollout-pick-slot-${CLOSED_DATE}__${CLOSED_WINDOW}`,
+    );
+    await expect(closedSlot).toBeVisible();
+    await expect(closedSlot).toBeDisabled();
+    await expect(closedSlot).toContainText(
+      "Morning not yet open for booking",
+    );
+
+    // Fully-booked window (6/6) — slots-per-window mode prints the
+    // exact "is full (booked/total)" copy so an admin can see the
+    // capacity readout without hovering.
+    const fullSlot = modal.getByTestId(
+      `rollout-pick-slot-${FULL_DATE}__${FULL_WINDOW}`,
+    );
+    await expect(fullSlot).toBeVisible();
+    await expect(fullSlot).toBeDisabled();
+    await expect(fullSlot).toContainText("Morning is full (6/6)");
+
+    // Neither cell is pickable, so the Review CTA must stay disabled
+    // for the duration of the modal — there is no path to Confirm.
+    await expect(reviewBtn).toBeDisabled();
+
+    await modal.getByTestId("button-cancel-reschedule").click();
+    await expect(modal).toBeHidden();
+
+    // Nothing was committed — the service timeline is untouched and
+    // the booking is still anchored to its original 4/30 PM slot.
+    await expect(timelineEntries).toHaveCount(initialCount);
+    await expect(page.getByText(FROM_DATE, { exact: true })).toBeVisible();
+  });
+});
