@@ -7,10 +7,10 @@
 import {
   Building2,
   Calendar,
+  CalendarRange,
   CreditCard,
   Home,
   Snowflake,
-  Sparkles,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -21,7 +21,7 @@ import type { ViewId } from "./types";
 const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string; icon: LucideIcon }> = [
   { id: "bookings", label: "Bookings", icon: Calendar },
   { id: "payments", label: "Payments", icon: CreditCard },
-  { id: "calendar", label: "Slot calendar", icon: Sparkles },
+  { id: "rollouts", label: "Rollouts", icon: CalendarRange },
   { id: "buildings", label: "Buildings", icon: Building2 },
   { id: "units", label: "Units", icon: Home },
   { id: "agents", label: "Agents", icon: Users },

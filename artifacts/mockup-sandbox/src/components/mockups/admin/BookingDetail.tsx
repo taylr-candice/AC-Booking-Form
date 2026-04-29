@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import {
   bookerAgencyName,
   getBuildingForUnit,
+  getRolloutById,
   requiresTenantCoordination,
   SERVICE_STATUS_FLOW,
   type AdminAgent,
@@ -167,13 +168,36 @@ export function BookingDetail({
                 <div className="text-[12px] text-slate-500">{unit.addressLine2}</div>
                 {(() => {
                   const building = getBuildingForUnit(unit);
-                  if (!building) return null;
+                  const rollout = getRolloutById(booking.rolloutId);
+                  if (!building && !rollout) return null;
                   return (
-                    <div
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold"
-                      style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
-                    >
-                      {building.name}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {building && (
+                        <div
+                          className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                          style={{
+                            backgroundColor: BRAND_SOFT,
+                            color: BRAND_DEEP,
+                          }}
+                        >
+                          {building.name}
+                        </div>
+                      )}
+                      {rollout ? (
+                        <div
+                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700"
+                          title="Rollout this booking is placed against"
+                        >
+                          Rollout · {rollout.name}
+                        </div>
+                      ) : (
+                        <div
+                          className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500"
+                          title="Booking predates the rollouts feature"
+                        >
+                          No rollout linked
+                        </div>
+                      )}
                     </div>
                   );
                 })()}

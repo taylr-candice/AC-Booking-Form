@@ -11,80 +11,25 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
+import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
 import { isPastDate, unitCity } from "../../../state/bookingHelpers";
+import {
+  disabledReasonForStatus,
+  resolveCustomerSlotData,
+  type CustomerDay,
+  type CustomerSlot,
+} from "./customerSlotData";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
 
-const MORNING_WINDOW_MINUTES = 240; // 8am – 12pm
-const AFTERNOON_WINDOW_MINUTES = 300; // 12pm – 5pm
-
-type Slot = {
-  id: string;
-  window: "morning" | "afternoon";
-  windowMinutes: number;
-  bookedMinutes: number;
-};
-type Day = {
-  date: string;
-  weekday: string;
-  day: number;
-  month: string;
-  morning: Slot;
-  afternoon: Slot;
-};
-
-/** Seed data for the desktop layout — same believable mix as the mobile
- *  variant, just spread across more visible days. The customer never
- *  sees the minute counts; they just see which windows are still
- *  selectable. */
-const ALL_DAYS: Day[] = [
-  { date: "2026-04-27", weekday: "Mon", day: 27, month: "Apr",
-    morning:   { id: "20260427-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 75 },
-    afternoon: { id: "20260427-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 195 } },
-  { date: "2026-04-28", weekday: "Tue", day: 28, month: "Apr",
-    morning:   { id: "20260428-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: MORNING_WINDOW_MINUTES },
-    afternoon: { id: "20260428-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 60 } },
-  { date: "2026-04-29", weekday: "Wed", day: 29, month: "Apr",
-    morning:   { id: "20260429-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260429-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 105 } },
-  { date: "2026-04-30", weekday: "Thu", day: 30, month: "Apr",
-    morning:   { id: "20260430-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 165 },
-    // Almost-full afternoon: 20 min left of a 300-min window. For the
-    // default 45-min job, this triggers the "Not enough time left" state
-    // — visible without the user having to fiddle with the AC step.
-    afternoon: { id: "20260430-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 280 } },
-  { date: "2026-05-01", weekday: "Fri", day: 1, month: "May",
-    morning:   { id: "20260501-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 45 },
-    afternoon: { id: "20260501-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 90 } },
-  { date: "2026-05-02", weekday: "Sat", day: 2, month: "May",
-    morning:   { id: "20260502-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 120 },
-    afternoon: { id: "20260502-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 } },
-  { date: "2026-05-04", weekday: "Mon", day: 4, month: "May",
-    morning:   { id: "20260504-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260504-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 60 } },
-  { date: "2026-05-05", weekday: "Tue", day: 5, month: "May",
-    morning:   { id: "20260505-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: MORNING_WINDOW_MINUTES },
-    afternoon: { id: "20260505-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 30 } },
-  { date: "2026-05-06", weekday: "Wed", day: 6, month: "May",
-    morning:   { id: "20260506-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 105 },
-    afternoon: { id: "20260506-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 240 } },
-  { date: "2026-05-07", weekday: "Thu", day: 7, month: "May",
-    morning:   { id: "20260507-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260507-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-  { date: "2026-05-08", weekday: "Fri", day: 8, month: "May",
-    morning:   { id: "20260508-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 60 },
-    afternoon: { id: "20260508-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 90 } },
-  { date: "2026-05-09", weekday: "Sat", day: 9, month: "May",
-    morning:   { id: "20260509-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 150 },
-    afternoon: { id: "20260509-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-];
+type Slot = CustomerSlot;
+type Day = CustomerDay;
 
 export function SlotsDesktop() {
   const [selected, setSelected] = useState<string | null>(null);
@@ -143,14 +88,21 @@ export function SlotsDesktop() {
   // `unitCity` in bookingHelpers.ts for the full state→city map.
   const cityLabel = unitCity(session.unit_id);
 
-  // Hide any dates that have already passed — customers can never
-  // book a service into the past, and leaving expired rows in the
-  // calendar just pushes the bookable dates further down. The seed
-  // data is anchored to fixed 2026 dates, so as the clock moves
-  // forward the picker shrinks the same way it would in production.
+  // Resolve which rollout this customer is booking against and pull
+  // its day rows. After Task #59 capacity lives on the per-rollout
+  // schedule, not a global slot calendar — so the picker just renders
+  // whatever the admin has opened for this (svc-ac, building) pair.
+  // Past dates are filtered out for the same reason as before — the
+  // seeds are anchored to fixed 2026 dates, so as the clock moves
+  // forward the picker shrinks naturally.
+  const slotData = useMemo(
+    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
+    [session.unit_id, jobMinutes],
+  );
+  const rollout = slotData.rollout;
   const visibleDays = useMemo(
-    () => ALL_DAYS.filter((d) => !isPastDate(d.date)),
-    [],
+    () => slotData.days.filter((d) => !isPastDate(d.date)),
+    [slotData.days],
   );
 
   const weeks = useMemo(() => {
@@ -178,7 +130,7 @@ export function SlotsDesktop() {
     selected && !selectedSlot
       ? false
       : selectedSlot
-        ? slotFitStatus(selectedSlot, jobMinutes) === "available"
+        ? selectedSlot.status === "available"
         : true;
   useEffect(() => {
     if (selected && !selectedSlotFits) setSelected(null);
@@ -303,6 +255,30 @@ export function SlotsDesktop() {
           )}
 
           <div className="flex-1">
+            {/* Empty state: this customer's building hasn't been opened
+                for AC bookings yet (no rollout exists for the building).
+                Match the visual weight of the other callouts so it's
+                impossible to miss, and give the customer a phone-back
+                fallback. */}
+            {!rollout && (
+              <div
+                className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-900"
+                data-testid="empty-no-rollout-desktop"
+              >
+                <div className="text-base font-semibold">
+                  AC services aren't open for booking at this address yet.
+                </div>
+                <div className="mt-2 text-sm text-amber-800">
+                  We're rolling this service out building by building. Call{" "}
+                  <span className="font-medium" style={{ color: BRAND }}>
+                    1300 TAYLR
+                  </span>{" "}
+                  and we'll add you to the waitlist.
+                </div>
+              </div>
+            )}
+
+            {rollout && (<>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-slate-900">{monthLabel} 2026</span>
@@ -345,7 +321,6 @@ export function SlotsDesktop() {
                 <DesktopSlotCard
                   key={`${d.date}-am`}
                   slot={d.morning}
-                  jobMinutes={jobMinutes}
                   icon={<Sunrise className="h-4 w-4" />}
                   label="Morning"
                   hint="8am – 12pm"
@@ -357,7 +332,6 @@ export function SlotsDesktop() {
                 <DesktopSlotCard
                   key={`${d.date}-pm`}
                   slot={d.afternoon}
-                  jobMinutes={jobMinutes}
                   icon={<Sun className="h-4 w-4" />}
                   label="Afternoon"
                   hint="12pm – 5pm"
@@ -391,6 +365,7 @@ export function SlotsDesktop() {
                 </div>
               </div>
             )}
+            </>)}
           </div>
 
           <div className="mt-12 pt-6 border-t border-slate-100 flex items-center justify-between">
@@ -420,28 +395,30 @@ export function SlotsDesktop() {
 }
 
 function DesktopSlotCard({
-  slot, jobMinutes, icon, label, hint, selected, onClick,
+  slot, icon, label, hint, selected, onClick,
 }: {
   slot: Slot;
-  jobMinutes: number;
   icon: React.ReactNode;
   label: string;
   hint: string;
   selected: boolean;
   onClick: () => void;
 }) {
-  // Fit logic stays intact from #27 — only the rendering changes:
-  // customers see slots as plain selectable windows, never minute math.
-  const status = slotFitStatus(slot, jobMinutes);
+  // Status is pre-computed by the rollout resolver so the picker
+  // variants and the admin schedule editor always agree on what's
+  // bookable. Customers see slots as plain selectable windows —
+  // never minute math.
+  const status = slot.status;
   const fits = status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
 
-  // Two distinct reasons so the customer can tell whether the window is
-  // sold out for everyone ("Full") or just too short for THIS particular
-  // booking — the latter hints they could shrink an add-on and try again.
-  const reason =
-    status === "full" ? "Full" : "Not enough time left for this service";
+  // Three distinct reasons so the customer can tell apart "the admin
+  // hasn't released this window yet" ("Not yet open for booking"),
+  // "everyone else booked it" ("Full") and "your job is too long for
+  // what's left" ("Not enough time left ..."). Centralised in
+  // `disabledReasonForStatus` so all three picker variants agree.
+  const reason = disabledReasonForStatus(status);
 
   return (
     <button

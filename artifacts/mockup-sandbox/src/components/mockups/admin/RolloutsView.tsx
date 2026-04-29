@@ -1,0 +1,348 @@
+/**
+ * Rollouts admin view — replaces the legacy global slot calendar.
+ *
+ * Lists every (service × building) rollout in the workspace and lets
+ * admins create new ones. Picking a rollout drops into the per-rollout
+ * schedule editor (see {@link RolloutScheduleEditor}) where the actual
+ * day/window toggles + capacity edits happen.
+ *
+ * Read-only summaries on the list (date range, capacity model, # of
+ * open windows, # of bookings) — destructive edits live in the editor.
+ */
+
+import { CalendarRange, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import {
+  formatRolloutDateRange,
+  getRollouts,
+  getServices,
+  type AdminBooking,
+  type AdminBuilding,
+  type AdminRollout,
+  type ServiceCapacityModel,
+} from "@/state/adminMockData";
+
+import { Card, FormField } from "./atoms";
+import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+
+export function RolloutsView({
+  buildings,
+  bookings,
+  onCreate,
+  onOpen,
+  /** Bumped on every create so the list refreshes from the
+   *  module-level store. */
+  refreshKey,
+}: {
+  buildings: AdminBuilding[];
+  bookings: AdminBooking[];
+  onCreate: (input: {
+    serviceId: string;
+    buildingId: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    capacityModel: ServiceCapacityModel;
+    defaultSlotCount?: number;
+  }) => void;
+  onOpen: (rolloutId: string) => void;
+  refreshKey: number;
+}) {
+  const rollouts = useMemo(() => getRollouts(), [refreshKey]);
+  const services = getServices();
+  const [showCreate, setShowCreate] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <div className="text-[13px] text-slate-500">
+          {rollouts.length} rollout{rollouts.length === 1 ? "" : "s"} ·
+          one (service × building) pairing per row
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCreate((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
+          style={{ backgroundColor: BRAND }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {showCreate ? "Cancel" : "New rollout"}
+        </button>
+      </div>
+
+      {showCreate && (
+        <Card title="New rollout" subtitle="Pick a service, a building, and capacity rules.">
+          <CreateRolloutForm
+            buildings={buildings}
+            services={services}
+            existing={rollouts}
+            onCancel={() => setShowCreate(false)}
+            onCreate={(input) => {
+              onCreate(input);
+              setShowCreate(false);
+            }}
+          />
+        </Card>
+      )}
+
+      <Card>
+        {rollouts.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-[13px] text-slate-500">
+            No rollouts yet — click <strong>New rollout</strong> to open
+            a building for bookings.
+          </div>
+        ) : (
+          <ol className="flex flex-col gap-2">
+            {rollouts.map((r) => (
+              <li key={r.id}>
+                <RolloutListRow
+                  rollout={r}
+                  buildings={buildings}
+                  bookings={bookings}
+                  onOpen={() => onOpen(r.id)}
+                />
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function RolloutListRow({
+  rollout,
+  buildings,
+  bookings,
+  onOpen,
+}: {
+  rollout: AdminRollout;
+  buildings: AdminBuilding[];
+  bookings: AdminBooking[];
+  onOpen: () => void;
+}) {
+  const building = buildings.find((b) => b.id === rollout.buildingId);
+  const openWindows = rollout.days.reduce(
+    (acc, d) =>
+      acc +
+      (d.open && d.morning.openByAdmin ? 1 : 0) +
+      (d.open && d.afternoon.openByAdmin ? 1 : 0),
+    0,
+  );
+  const totalWindows = rollout.days.length * 2;
+  const bookingsHere = bookings.filter((b) => b.rolloutId === rollout.id).length;
+  const modeLabel =
+    rollout.capacityModel === "slots_per_window"
+      ? "Slots per window"
+      : "Time budget per window";
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <CalendarRange className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
+          <div className="truncate text-[14px] font-semibold text-slate-900">
+            {rollout.name}
+          </div>
+        </div>
+        <div className="mt-0.5 text-[12px] text-slate-500">
+          {building ? building.name : rollout.buildingId} ·{" "}
+          {formatRolloutDateRange({
+            from: rollout.startDate,
+            to: rollout.endDate,
+          })}{" "}
+          · {modeLabel}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+          {openWindows}/{totalWindows} windows open
+        </span>
+        <span
+          className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+          style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+        >
+          {bookingsHere} booking{bookingsHere === 1 ? "" : "s"}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// ─── Create rollout form ───────────────────────────────────────────────────
+
+function CreateRolloutForm({
+  buildings,
+  services,
+  existing,
+  onCancel,
+  onCreate,
+}: {
+  buildings: AdminBuilding[];
+  services: { id: string; name: string }[];
+  existing: AdminRollout[];
+  onCancel: () => void;
+  onCreate: (input: {
+    serviceId: string;
+    buildingId: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    capacityModel: ServiceCapacityModel;
+    defaultSlotCount?: number;
+  }) => void;
+}) {
+  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [buildingId, setBuildingId] = useState(buildings[0]?.id ?? "");
+  const [name, setName] = useState("");
+  const [startDate, setStartDate] = useState("2026-05-01");
+  const [endDate, setEndDate] = useState("2026-05-15");
+  const [capacityModel, setCapacityModel] =
+    useState<ServiceCapacityModel>("time_budget_per_window");
+  const [defaultSlotCount, setDefaultSlotCount] = useState(6);
+  const [error, setError] = useState<string | null>(null);
+
+  function submit() {
+    if (!serviceId || !buildingId) {
+      setError("Pick a service and a building.");
+      return;
+    }
+    if (startDate > endDate) {
+      setError("End date must be on or after the start date.");
+      return;
+    }
+    if (existing.some((r) => r.serviceId === serviceId && r.buildingId === buildingId)) {
+      setError(
+        "A rollout for that service + building already exists. Open it from the list instead.",
+      );
+      return;
+    }
+    const building = buildings.find((b) => b.id === buildingId);
+    const service = services.find((s) => s.id === serviceId);
+    const finalName =
+      name.trim() ||
+      `${service?.name ?? "Service"} · ${building?.name ?? "Building"}`;
+    onCreate({
+      serviceId,
+      buildingId,
+      name: finalName,
+      startDate,
+      endDate,
+      capacityModel,
+      defaultSlotCount:
+        capacityModel === "slots_per_window" ? defaultSlotCount : undefined,
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Service">
+          <select
+            value={serviceId}
+            onChange={(e) => setServiceId(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
+          >
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Building">
+          <select
+            value={buildingId}
+            onChange={(e) => setBuildingId(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
+          >
+            {buildings.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Display name (optional)">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Phase 2 — May rollout"
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800 placeholder:text-slate-400"
+          />
+        </FormField>
+        <FormField label="Capacity model">
+          <select
+            value={capacityModel}
+            onChange={(e) =>
+              setCapacityModel(e.target.value as ServiceCapacityModel)
+            }
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
+          >
+            <option value="time_budget_per_window">Time budget per window</option>
+            <option value="slots_per_window">Slots per window</option>
+          </select>
+        </FormField>
+        <FormField label="Start date">
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
+          />
+        </FormField>
+        <FormField label="End date">
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
+          />
+        </FormField>
+        {capacityModel === "slots_per_window" && (
+          <FormField label="Default slots per window">
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={defaultSlotCount}
+              onChange={(e) =>
+                setDefaultSlotCount(
+                  Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1)),
+                )
+              }
+              className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
+            />
+          </FormField>
+        )}
+      </div>
+      {error && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[12px] text-amber-800">
+          {error}
+        </div>
+      )}
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={submit}
+          className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
+          style={{ backgroundColor: BRAND }}
+        >
+          Create rollout
+        </button>
+      </div>
+    </div>
+  );
+}

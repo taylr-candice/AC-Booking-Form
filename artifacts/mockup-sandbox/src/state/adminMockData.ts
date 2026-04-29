@@ -171,6 +171,14 @@ export type AdminBooking = {
   /** True when this row is the customer's current sessionStorage booking
    *  (so the admin UI can flag it as "Live demo"). */
   isLive?: boolean;
+  /** The {@link AdminRollout} this booking was placed against. Resolved
+   *  per (service, building) when the booking is created, so the admin
+   *  UI can show the rollout chip on a booking and the rollout schedule
+   *  editor knows which slots are taken. `null` for legacy seeded rows
+   *  whose unit's building has no rollout in the seed (e.g. bookings on
+   *  Anzac Parade — kept around so the empty-state customer flow has a
+   *  realistic counterpart). */
+  rolloutId: string | null;
 };
 
 // ─── Seeded buildings ───────────────────────────────────────────────────────
@@ -448,6 +456,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "scheduled", label: "Slot booked · 29 Apr · Morning", at: "Apr 26 · 09:15", by: "System" },
     ],
     notes: "Buzzer on left. Lockbox code 4421.",
+    rolloutId: "rl-ac-aspen",
   },
   {
     id: "bk-1041",
@@ -480,6 +489,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "en_route", label: "Technician dispatched", at: "Apr 28 · 12:40", by: "Mia (admin)" },
     ],
     notes: "Customer reported 3 systems but we have 2 on record. Confirm head count on arrival.",
+    rolloutId: "rl-ac-marine",
   },
   {
     id: "bk-1040",
@@ -510,6 +520,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "on_site", label: "Arrived at unit", at: "Apr 28 · 09:05", by: "Tech (Yusuf)" },
     ],
     notes: "Tenant authorised by agent. Concierge to provide trade key.",
+    rolloutId: null,
   },
   {
     id: "bk-1039",
@@ -539,6 +550,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "scheduled", label: "Slot booked · 2 May · Afternoon", at: "Apr 27 · 10:01", by: "System" },
     ],
     notes: "Customer is new — no AC record on file. Update unit catalog after first visit.",
+    rolloutId: "rl-ac-marine",
   },
   {
     id: "bk-1038",
@@ -571,6 +583,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "scheduled", label: "Awaiting tenant coordination", at: "Apr 23 · 11:50", by: "System" },
     ],
     notes: "Tenants will provide access — Taylr to coordinate. 3 tenants on file.",
+    rolloutId: "rl-ac-bourke",
   },
   {
     id: "bk-1037",
@@ -602,6 +615,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "scheduled", label: "Slot booked · 1 May · Morning", at: "Apr 27 · 18:30", by: "System" },
     ],
     notes: "Customer wasn't sure of AC type — tech to confirm on arrival and update catalog.",
+    rolloutId: "rl-ac-bourke",
   },
   {
     id: "bk-1036",
@@ -633,6 +647,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "complete", label: "Service complete · report sent", at: "Apr 22 · 14:45", by: "Tech (Sam)" },
     ],
     notes: "Filter replacement on system 2 — billed separately (see invoice adjustment).",
+    rolloutId: "rl-ac-marine",
   },
   {
     id: "bk-1035",
@@ -663,6 +678,7 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
       { status: "complete", label: "Service complete (running short)", at: "Apr 19 · 11:20", by: "Tech (Yusuf)" },
     ],
     notes: "Tech finished 25 min early; goodwill refund applied for unused time.",
+    rolloutId: null,
   },
 ];
 
@@ -1036,7 +1052,19 @@ export function liveBookingFromSession(
     notes:
       "Live demo booking sourced from the customer's current session. Refresh the customer flow to update.",
     isLive: true,
+    rolloutId: resolveLiveRolloutId(session.unit_id),
   };
+}
+
+/** Mirror of the customer-side rollout lookup so the live booking row in
+ *  the admin UI shows the same rollout chip the customer was booking
+ *  against. The customer flow is currently AC-only, so this hard-codes
+ *  `svc-ac` — when more services land we'll route off the session's
+ *  selected service. Returns `null` when the unit's building has no
+ *  rollout (matches the empty-state branch in the customer pickers). */
+function resolveLiveRolloutId(unitId: string | null): string | null {
+  const rollout = findRolloutForBooking("svc-ac", unitId);
+  return rollout ? rollout.id : null;
 }
 
 function formatJobMinutesShort(min: number): string {
@@ -1442,9 +1470,17 @@ export function buildAdminCreatedBooking(
       ? input.schedule.window
       : "to_be_coordinated";
 
+  // Tie the booking to whichever rollout is open on the unit's
+  // building (mirrors how seeded bookings are anchored to a rollout).
+  // `null` when no rollout exists for the (service, building) pair —
+  // the admin flow forces the coordination branch in that case, but
+  // we still capture the binding for future re-resolution.
+  const rolloutId = findRolloutForBooking("svc-ac", input.unit.id)?.id ?? null;
+
   return {
     id: bookingId,
     unitId: input.unit.id,
+    rolloutId,
     customerName: input.customerName,
     customerEmail: input.customerEmail,
     customerPhone: input.customerPhone,
@@ -1534,4 +1570,471 @@ export function computeAdminAcDiscrepancy(
       additional: captured.additional,
     },
   };
+}
+// ─── Services & per-rollout schedules ──────────────────────────────────────
+//
+// Earlier mockups carried a single "global" slot calendar and assumed that
+// every building shared the same set of openable windows. That broke down
+// the moment we started talking about real rollouts: each building sells
+// itself to one body corporate at a time, on its own date range, with its
+// own capacity rules (a few flagship rollouts run on a strict
+// "X bookings per window" cap, others run on a "Y minutes of tech time
+// per window" budget). The model below makes that explicit:
+//
+//   AdminService           → "Annual AC service" (we only seed one for now;
+//                            more are on the roadmap but out of scope).
+//   ServiceRollout         → one (service × building) pairing, with its
+//                            own date range, capacity model, and per-day
+//                            availability+capacity. Removing the rollout
+//                            removes booking access for that combination.
+//
+// Every per-day window also carries an `openByAdmin` flag so admins can
+// stage a rollout's calendar (publish the date range, then open windows
+// progressively) without having to rebuild the day list. Closed windows
+// surface to the customer as "Not yet open for booking" (distinct from
+// "Full"), and the empty-state branch fires when the (service, building)
+// pair has no rollout at all.
+//
+// Capacity is intentionally split into two shapes — `time_budget_per_window`
+// (consumes minutes from the window, same as the legacy global calendar)
+// and `slots_per_window` (consumes a discrete count) — because pricing &
+// dispatch want to lock different rollouts to different mental models
+// without anyone having to translate.
+
+export type ServiceCapacityModel =
+  | "time_budget_per_window"
+  | "slots_per_window";
+
+export type AdminService = {
+  id: string;
+  name: string;
+  /** Default per-system minutes, used by the live booking → live
+   *  rollout-slot math. Mirrors the customer-side AC defaults so the
+   *  "remaining minutes" display matches what the customer sees. */
+  defaultJobMinutes: number;
+};
+
+export const SEEDED_SERVICES: AdminService[] = [
+  { id: "svc-ac", name: "Annual AC service", defaultJobMinutes: 45 },
+];
+
+/** One window within a {@link RolloutDay}. Carries the capacity counter
+ *  matching the rollout's {@link ServiceCapacityModel} — `bookedMinutes`
+ *  / `windowMinutes` for time-budget rollouts and `bookedCount` /
+ *  `slotCount` for fixed-count rollouts. The "off" mode just leaves the
+ *  unused fields at 0; the schedule editor enforces which fields you can
+ *  edit. `openByAdmin=false` means the window is staged but not yet
+ *  released to customers. */
+export type RolloutSlot = {
+  id: string;
+  window: "morning" | "afternoon";
+  windowMinutes: number;
+  bookedMinutes: number;
+  /** Defined only for `slots_per_window` rollouts. */
+  slotCount?: number;
+  bookedCount?: number;
+  openByAdmin: boolean;
+};
+
+export type RolloutDay = {
+  isoDate: string;
+  /** "27" — bare day-of-month for compact pills. */
+  dayLabel: string;
+  /** "Mon" / "Tue" / ... — short weekday name. */
+  weekdayLabel: string;
+  /** "Apr" / "May" / ... — short month name. */
+  monthLabel: string;
+  /** Day-level on/off — both windows are skipped when false (e.g.
+   *  weekends, public holidays, scheduled tech leave). */
+  open: boolean;
+  morning: RolloutSlot;
+  afternoon: RolloutSlot;
+};
+
+export type AdminRollout = {
+  id: string;
+  serviceId: string;
+  buildingId: string;
+  /** Short label shown in the rollouts list and on the booking detail
+   *  chip — defaults to "<Service> · <Building>" but admins can edit
+   *  it (e.g. "Aspen — Phase 1"). */
+  name: string;
+  /** Inclusive ISO date range — the rollout's "active" window, used
+   *  for the schedule editor's date strip and to bound any new days
+   *  the admin opens. */
+  startDate: string;
+  endDate: string;
+  capacityModel: ServiceCapacityModel;
+  /** Pre-seeded day rows — one per ISO date in the rollout's range
+   *  (admins can't add days outside the range; they can only toggle
+   *  the existing rows on/off). */
+  days: RolloutDay[];
+};
+
+const MORNING_WINDOW_MIN = 240; // 8am – 12pm
+const AFTERNOON_WINDOW_MIN = 300; // 12pm – 5pm
+
+function makeTimeBudgetDay(
+  isoDate: string,
+  morningBooked: number,
+  afternoonBooked: number,
+  options: {
+    open?: boolean;
+    morningOpen?: boolean;
+    afternoonOpen?: boolean;
+  } = {},
+): RolloutDay {
+  const [y, mo, d] = isoDate.split("-").map((s) => parseInt(s, 10));
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  const weekdayLabel = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+    date.getUTCDay()
+  ]!;
+  const monthLabel = SHORT_MONTHS[mo - 1] ?? "";
+  return {
+    isoDate,
+    dayLabel: String(d),
+    weekdayLabel,
+    monthLabel,
+    open: options.open ?? true,
+    morning: {
+      id: `${isoDate.replace(/-/g, "")}-am`,
+      window: "morning",
+      windowMinutes: MORNING_WINDOW_MIN,
+      bookedMinutes: morningBooked,
+      openByAdmin: options.morningOpen ?? true,
+    },
+    afternoon: {
+      id: `${isoDate.replace(/-/g, "")}-pm`,
+      window: "afternoon",
+      windowMinutes: AFTERNOON_WINDOW_MIN,
+      bookedMinutes: afternoonBooked,
+      openByAdmin: options.afternoonOpen ?? true,
+    },
+  };
+}
+
+function makeSlotCountDay(
+  isoDate: string,
+  slotCount: number,
+  morningBookedCount: number,
+  afternoonBookedCount: number,
+  options: {
+    open?: boolean;
+    morningOpen?: boolean;
+    afternoonOpen?: boolean;
+  } = {},
+): RolloutDay {
+  const base = makeTimeBudgetDay(isoDate, 0, 0, options);
+  return {
+    ...base,
+    morning: {
+      ...base.morning,
+      slotCount,
+      bookedCount: morningBookedCount,
+    },
+    afternoon: {
+      ...base.afternoon,
+      slotCount,
+      bookedCount: afternoonBookedCount,
+    },
+  };
+}
+
+// Aspen flagship rollout — time-budget mode, all windows opened. Mirrors
+// the day mix the customer-side picker has shown all along (so the visual
+// regression for the existing unit-1 customer flow is zero), but anchors
+// it to a rollout the admin can now actually edit. The 4/29 morning row
+// reflects bk-1042 (1 system × 45 min).
+const RL_ASPEN_DAYS: RolloutDay[] = [
+  makeTimeBudgetDay("2026-04-27",  75, 195),
+  makeTimeBudgetDay("2026-04-28", MORNING_WINDOW_MIN,  60),
+  makeTimeBudgetDay("2026-04-29",  45, 105),
+  makeTimeBudgetDay("2026-04-30", 165, 280),
+  makeTimeBudgetDay("2026-05-01",  45,  90),
+  makeTimeBudgetDay("2026-05-02", 120,   0),
+  makeTimeBudgetDay("2026-05-04",   0,  60),
+  makeTimeBudgetDay("2026-05-05", MORNING_WINDOW_MIN,  30),
+  makeTimeBudgetDay("2026-05-06", 105, 240),
+  makeTimeBudgetDay("2026-05-07",   0, AFTERNOON_WINDOW_MIN),
+  makeTimeBudgetDay("2026-05-08",  60,  90),
+  makeTimeBudgetDay("2026-05-09", 150, AFTERNOON_WINDOW_MIN),
+];
+
+// Marine — slots-per-window rollout. 6 jobs per window, with two seeded
+// bookings (bk-1041 4/30 PM, bk-1039 5/2 PM) showing as bookedCount=1 and
+// a deliberately-staged future window left closed so the customer-side
+// picker exercises the "Not yet open for booking" branch. Day rows that
+// fall outside the active range or on weekends are marked closed at the
+// day level so the admin's "this day's off" toggle gets a real example.
+const RL_MARINE_DAYS: RolloutDay[] = [
+  makeSlotCountDay("2026-04-27", 6, 0, 1),
+  makeSlotCountDay("2026-04-28", 6, 6, 0),
+  makeSlotCountDay("2026-04-29", 6, 0, 2),
+  makeSlotCountDay("2026-04-30", 6, 4, 1, { afternoonOpen: false }),
+  makeSlotCountDay("2026-05-01", 6, 1, 2),
+  makeSlotCountDay("2026-05-02", 6, 0, 1, { open: false }),
+  makeSlotCountDay("2026-05-04", 6, 0, 0),
+  makeSlotCountDay("2026-05-05", 6, 2, 0, { morningOpen: false }),
+  makeSlotCountDay("2026-05-06", 6, 0, 3),
+  makeSlotCountDay("2026-05-07", 6, 6, 6),
+  makeSlotCountDay("2026-05-08", 6, 0, 0),
+];
+
+// Bourke early-stage rollout — time-budget mode, opens only Mon/Wed/Fri
+// (typical for a smaller building where the tech only swings by a few
+// days a week). bk-1037 lives on the 5/1 morning window.
+const RL_BOURKE_DAYS: RolloutDay[] = [
+  makeTimeBudgetDay("2026-04-29", 0, 0),
+  makeTimeBudgetDay("2026-05-01", 45, 0),
+  makeTimeBudgetDay("2026-05-04", 0, 0),
+  makeTimeBudgetDay("2026-05-06", 0, 0, { afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-08", 0, 0),
+];
+
+const SEEDED_ROLLOUTS: AdminRollout[] = [
+  {
+    id: "rl-ac-aspen",
+    serviceId: "svc-ac",
+    buildingId: "bldg-aspen",
+    name: "Aspen — Phase 1",
+    startDate: "2026-04-27",
+    endDate: "2026-05-09",
+    capacityModel: "time_budget_per_window",
+    days: RL_ASPEN_DAYS,
+  },
+  {
+    id: "rl-ac-marine",
+    serviceId: "svc-ac",
+    buildingId: "bldg-marine",
+    name: "Marine Parade rollout",
+    startDate: "2026-04-27",
+    endDate: "2026-05-08",
+    capacityModel: "slots_per_window",
+    days: RL_MARINE_DAYS,
+  },
+  {
+    id: "rl-ac-bourke",
+    serviceId: "svc-ac",
+    buildingId: "bldg-bourke",
+    name: "Bourke St (Mon/Wed/Fri pilot)",
+    startDate: "2026-04-29",
+    endDate: "2026-05-08",
+    capacityModel: "time_budget_per_window",
+    days: RL_BOURKE_DAYS,
+  },
+];
+
+// Mutable session-scoped store so admin actions (Create rollout / toggle
+// day / edit capacity / reset utilization) survive across re-renders
+// inside the mockup without persisting to disk. Mirrors the pattern used
+// by the existing booking store.
+let rollouts: AdminRollout[] = SEEDED_ROLLOUTS.map(cloneRollout);
+
+function cloneRollout(r: AdminRollout): AdminRollout {
+  return {
+    ...r,
+    days: r.days.map((d) => ({
+      ...d,
+      morning: { ...d.morning },
+      afternoon: { ...d.afternoon },
+    })),
+  };
+}
+
+export function getServices(): AdminService[] {
+  return SEEDED_SERVICES;
+}
+
+export function getServiceById(id: string | null): AdminService | null {
+  if (!id) return null;
+  return SEEDED_SERVICES.find((s) => s.id === id) ?? null;
+}
+
+export function getRollouts(): AdminRollout[] {
+  return rollouts;
+}
+
+export function getRolloutById(id: string | null): AdminRollout | null {
+  if (!id) return null;
+  return rollouts.find((r) => r.id === id) ?? null;
+}
+
+export function getRolloutsForBuilding(buildingId: string): AdminRollout[] {
+  return rollouts.filter((r) => r.buildingId === buildingId);
+}
+
+/**
+ * Resolve which rollout a customer is booking against given the
+ * (service, unit) pair from their session. Returns the rollout for the
+ * unit's building, or `null` when no such rollout exists (which is the
+ * admin's signal that this building hasn't been opened for bookings on
+ * this service yet). Pure / data-only.
+ */
+export function findRolloutForBooking(
+  serviceId: string,
+  unitId: string | null,
+): AdminRollout | null {
+  if (!unitId) return null;
+  const unit = getUnitById(unitId);
+  if (!unit) return null;
+  return (
+    rollouts.find(
+      (r) => r.serviceId === serviceId && r.buildingId === unit.buildingId,
+    ) ?? null
+  );
+}
+
+/**
+ * Per-window classification used by both the customer-side slot picker
+ * and the admin-side rollout schedule editor. Order matters — `closed`
+ * (day off / window not yet opened) takes precedence over `full` so the
+ * customer sees the most actionable reason first ("contact us" vs.
+ * "pick another window").
+ */
+export type RolloutSlotStatus =
+  | "available"
+  | "not_enough_time"
+  | "full"
+  | "not_yet_open";
+
+export function rolloutSlotStatus(
+  day: RolloutDay,
+  slot: RolloutSlot,
+  capacityModel: ServiceCapacityModel,
+  jobMinutes: number,
+): RolloutSlotStatus {
+  if (!day.open || !slot.openByAdmin) return "not_yet_open";
+  if (capacityModel === "slots_per_window") {
+    const total = slot.slotCount ?? 0;
+    const booked = slot.bookedCount ?? 0;
+    return booked >= total ? "full" : "available";
+  }
+  // time_budget_per_window
+  const remaining = slot.windowMinutes - slot.bookedMinutes;
+  if (remaining <= 0) return "full";
+  if (jobMinutes > 0 && remaining < jobMinutes) return "not_enough_time";
+  return "available";
+}
+
+// ── Mutators (used by the rollouts admin views) ────────────────────────────
+
+export function createRollout(input: {
+  serviceId: string;
+  buildingId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  capacityModel: ServiceCapacityModel;
+  defaultSlotCount?: number;
+}): AdminRollout {
+  const id = `rl-${Math.random().toString(36).slice(2, 8)}`;
+  const days: RolloutDay[] = enumerateDates(input.startDate, input.endDate).map(
+    (iso) =>
+      input.capacityModel === "slots_per_window"
+        ? makeSlotCountDay(iso, input.defaultSlotCount ?? 6, 0, 0, {
+            open: !isWeekend(iso),
+          })
+        : makeTimeBudgetDay(iso, 0, 0, { open: !isWeekend(iso) }),
+  );
+  const rollout: AdminRollout = {
+    id,
+    serviceId: input.serviceId,
+    buildingId: input.buildingId,
+    name: input.name,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    capacityModel: input.capacityModel,
+    days,
+  };
+  rollouts = [...rollouts, rollout];
+  return rollout;
+}
+
+export function updateRolloutDay(
+  rolloutId: string,
+  isoDate: string,
+  patch: Partial<Omit<RolloutDay, "isoDate" | "dayLabel" | "weekdayLabel" | "monthLabel" | "morning" | "afternoon">>,
+): void {
+  rollouts = rollouts.map((r) =>
+    r.id !== rolloutId
+      ? r
+      : {
+          ...r,
+          days: r.days.map((d) =>
+            d.isoDate !== isoDate ? d : { ...d, ...patch },
+          ),
+        },
+  );
+}
+
+export function updateRolloutSlot(
+  rolloutId: string,
+  isoDate: string,
+  window: "morning" | "afternoon",
+  patch: Partial<RolloutSlot>,
+): void {
+  rollouts = rollouts.map((r) =>
+    r.id !== rolloutId
+      ? r
+      : {
+          ...r,
+          days: r.days.map((d) =>
+            d.isoDate !== isoDate
+              ? d
+              : { ...d, [window]: { ...d[window], ...patch } },
+          ),
+        },
+  );
+}
+
+/** Used by the "reset utilization" admin action — wipes bookedMinutes /
+ *  bookedCount for a single window so the schedule editor can recover
+ *  from a "I closed off the wrong day" mistake. The original undoable
+ *  values are returned so the caller can implement the toast undo. */
+export function resetRolloutSlotUtilization(
+  rolloutId: string,
+  isoDate: string,
+  window: "morning" | "afternoon",
+): { bookedMinutes: number; bookedCount: number } | null {
+  const r = getRolloutById(rolloutId);
+  if (!r) return null;
+  const day = r.days.find((d) => d.isoDate === isoDate);
+  if (!day) return null;
+  const prev = {
+    bookedMinutes: day[window].bookedMinutes,
+    bookedCount: day[window].bookedCount ?? 0,
+  };
+  updateRolloutSlot(rolloutId, isoDate, window, {
+    bookedMinutes: 0,
+    bookedCount: day[window].slotCount === undefined ? undefined : 0,
+  });
+  return prev;
+}
+
+/** TEST-ONLY helper — restores the seeded rollout list so unit tests are
+ *  isolated from each other. Production code never calls this. */
+export function __resetRolloutsForTests(): void {
+  rollouts = SEEDED_ROLLOUTS.map(cloneRollout);
+}
+
+function enumerateDates(startIso: string, endIso: string): string[] {
+  const out: string[] = [];
+  const [sy, sm, sd] = startIso.split("-").map((s) => parseInt(s, 10));
+  const [ey, em, ed] = endIso.split("-").map((s) => parseInt(s, 10));
+  const start = Date.UTC(sy, sm - 1, sd);
+  const end = Date.UTC(ey, em - 1, ed);
+  for (let t = start; t <= end; t += 24 * 60 * 60 * 1000) {
+    const d = new Date(t);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    out.push(`${y}-${m}-${day}`);
+  }
+  return out;
+}
+
+function isWeekend(iso: string): boolean {
+  const [y, m, d] = iso.split("-").map((s) => parseInt(s, 10));
+  const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return day === 0 || day === 6;
 }

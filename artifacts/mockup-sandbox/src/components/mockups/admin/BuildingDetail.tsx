@@ -3,54 +3,55 @@
  *
  * Left column shows every unit in the building with its current
  * booking status (booked / complete / no booking yet); right column
- * shows a 14-day schedule strip overlaying the building's bookings
- * onto the shared slot calendar, in the same time-based vs.
- * count-based visual language as the slot calendar view.
+ * lists the per-service rollouts running on this building, with a
+ * link into the per-rollout schedule editor where admins actually
+ * open / close days and edit per-window capacity.
  *
- * Read-only — editing schedule, units, etc. happens in their own
- * dedicated screens (Calendar / Units / Booking detail).
+ * Read-only — editing schedule lives in the Rollouts view (per-rollout
+ * editor); editing units / bookings lives in their own screens.
  */
 
-import { ChevronLeft, ChevronRight, Clock, Hash } from "lucide-react";
+import { ArrowRight, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 
 import {
   bookerAgencyName,
   formatRolloutDateRange,
   getBuildingBookings,
   getBuildingUnits,
+  getRolloutsForBuilding,
+  getServiceById,
   latestBookingByUnit,
   summarizeBuildingRollout,
   type AdminBooking,
   type AdminBuilding,
-  type AdminCalendarDay,
-  type AdminSlotMode,
+  type AdminRollout,
   type AdminUnit,
 } from "@/state/adminMockData";
 
 import { Card } from "./atoms";
 import { ServiceChip } from "./chips";
-import { BRAND, BRAND_DEEP, BRAND_SOFT, modeColor } from "./theme";
+import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
 export function BuildingDetail({
   buildingId,
   buildings,
   units,
   bookings,
-  calendar,
   onBack,
   onOpenBooking,
   onOpenAllBookings,
   onNewBooking,
+  onOpenRollout,
 }: {
   buildingId: string;
   buildings: AdminBuilding[];
   units: AdminUnit[];
   bookings: AdminBooking[];
-  calendar: AdminCalendarDay[];
   onBack: () => void;
   onOpenBooking: (bookingId: string) => void;
   onOpenAllBookings: (buildingId: string) => void;
   onNewBooking: (buildingId: string) => void;
+  onOpenRollout: (rolloutId: string) => void;
 }) {
   const building = buildings.find((b) => b.id === buildingId);
 
@@ -172,18 +173,93 @@ export function BuildingDetail({
         </div>
         <div className="col-span-2 flex flex-col gap-4">
           <Card
-            title="Schedule across the next 14 days"
-            subtitle="Where this building's bookings land in the shared slot calendar"
+            title="Rollouts in this building"
+            subtitle="Each rollout has its own date range, capacity model, and per-window schedule"
           >
-            <ScheduleStripLegend />
-            <ScheduleStrip
-              calendar={calendar}
-              bookings={buildingBookings}
+            <RolloutsPanel
+              rollouts={getRolloutsForBuilding(buildingId)}
+              onOpenRollout={onOpenRollout}
             />
           </Card>
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Rollouts panel ────────────────────────────────────────────────────────
+
+function RolloutsPanel({
+  rollouts,
+  onOpenRollout,
+}: {
+  rollouts: AdminRollout[];
+  onOpenRollout: (rolloutId: string) => void;
+}) {
+  if (rollouts.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-500">
+        No rollouts yet. Create one from the Rollouts view to open this
+        building for bookings.
+      </div>
+    );
+  }
+  return (
+    <ol className="flex flex-col gap-2">
+      {rollouts.map((r) => (
+        <li key={r.id}>
+          <RolloutRow rollout={r} onOpen={() => onOpenRollout(r.id)} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function RolloutRow({
+  rollout,
+  onOpen,
+}: {
+  rollout: AdminRollout;
+  onOpen: () => void;
+}) {
+  const service = getServiceById(rollout.serviceId);
+  const modeLabel =
+    rollout.capacityModel === "slots_per_window"
+      ? "Slots per window"
+      : "Time budget per window";
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <CalendarRange
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: BRAND }}
+          />
+          <div className="truncate text-[13px] font-semibold text-slate-900">
+            {rollout.name}
+          </div>
+        </div>
+        <div className="mt-0.5 text-[11px] text-slate-500">
+          {service ? service.name : "Service"} ·{" "}
+          {formatRolloutDateRange({
+            from: rollout.startDate,
+            to: rollout.endDate,
+          })}{" "}
+          · {modeLabel}
+        </div>
+      </div>
+      <span
+        className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+        style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+      >
+        Open schedule
+        <ArrowRight className="h-3 w-3" />
+      </span>
+    </button>
   );
 }
 
@@ -318,154 +394,3 @@ function UnitRow({
   );
 }
 
-// ─── Schedule strip ────────────────────────────────────────────────────────
-
-/**
- * Legend explaining the time-based vs count-based color coding —
- * mirrors the slot calendar's legend so the visual language is
- * consistent.
- */
-function ScheduleStripLegend() {
-  return (
-    <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-      <div className="inline-flex items-center gap-1.5">
-        <Clock className="h-3 w-3" style={{ color: BRAND }} />
-        <span>
-          <strong className="text-slate-900">Time-based</strong> window
-        </span>
-      </div>
-      <div className="inline-flex items-center gap-1.5">
-        <Hash className="h-3 w-3" style={{ color: "#3B82F6" }} />
-        <span>
-          <strong className="text-slate-900">Count-based</strong> window
-        </span>
-      </div>
-      <div className="inline-flex items-center gap-1.5">
-        <span
-          className="inline-block h-2 w-2 rounded-sm"
-          style={{ backgroundColor: BRAND_DEEP }}
-        />
-        <span>This building's bookings</span>
-      </div>
-    </div>
-  );
-}
-
-function ScheduleStrip({
-  calendar,
-  bookings,
-}: {
-  calendar: AdminCalendarDay[];
-  bookings: AdminBooking[];
-}) {
-  // Index bookings per (date, window) for fast lookup while rendering days.
-  const byDayWindow = new Map<string, AdminBooking[]>();
-  for (const b of bookings) {
-    if (!b.serviceDate) continue;
-    if (b.serviceSlot !== "morning" && b.serviceSlot !== "afternoon") continue;
-    const key = `${b.serviceDate}::${b.serviceSlot}`;
-    const arr = byDayWindow.get(key) ?? [];
-    arr.push(b);
-    byDayWindow.set(key, arr);
-  }
-  return (
-    <div className="grid grid-cols-7 gap-2">
-      {calendar.map((day) => {
-        const morningBookings =
-          byDayWindow.get(`${day.isoDate}::morning`) ?? [];
-        const afternoonBookings =
-          byDayWindow.get(`${day.isoDate}::afternoon`) ?? [];
-        return (
-          <div
-            key={day.isoDate}
-            className={`flex flex-col gap-1.5 rounded-lg border p-2 ${
-              day.open
-                ? "border-slate-200 bg-white"
-                : "border-slate-200 bg-slate-50 opacity-70"
-            }`}
-          >
-            <div className="flex items-baseline justify-between">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                {day.weekdayLabel}
-              </div>
-              <div className="text-[14px] font-semibold leading-none text-slate-900">
-                {day.dayLabel}
-              </div>
-            </div>
-            {day.open ? (
-              <>
-                <ScheduleSlotCell
-                  label="AM"
-                  mode={day.morning.mode}
-                  bookingsHere={morningBookings}
-                />
-                <ScheduleSlotCell
-                  label="PM"
-                  mode={day.afternoon.mode}
-                  bookingsHere={afternoonBookings}
-                />
-              </>
-            ) : (
-              <div className="rounded bg-slate-100 px-1.5 py-1 text-center text-[10px] font-medium text-slate-500">
-                Closed
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ScheduleSlotCell({
-  label,
-  mode,
-  bookingsHere,
-}: {
-  label: string;
-  mode: AdminSlotMode;
-  bookingsHere: AdminBooking[];
-}) {
-  const accent = modeColor(mode);
-  const count = bookingsHere.length;
-  const ModeIcon = mode === "count_based" ? Hash : Clock;
-  const hasBooking = count > 0;
-  return (
-    <div
-      className={`rounded border px-1.5 py-1 ${
-        hasBooking ? "" : "border-slate-100"
-      }`}
-      style={
-        hasBooking
-          ? { borderColor: accent, backgroundColor: `${accent}14` }
-          : undefined
-      }
-      title={
-        hasBooking
-          ? `${count} booking${count === 1 ? "" : "s"} in this ${
-              mode === "count_based" ? "count-based" : "time-based"
-            } window`
-          : `No bookings · ${
-              mode === "count_based" ? "count-based" : "time-based"
-            } window`
-      }
-    >
-      <div className="flex items-center justify-between gap-1">
-        <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-600">
-          <ModeIcon className="h-2.5 w-2.5" style={{ color: accent }} />
-          {label}
-        </div>
-        {hasBooking ? (
-          <span
-            className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
-            style={{ backgroundColor: accent }}
-          >
-            {count}
-          </span>
-        ) : (
-          <span className="text-[10px] text-slate-400">·</span>
-        )}
-      </div>
-    </div>
-  );
-}

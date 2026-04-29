@@ -10,57 +10,26 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
+import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
+import {
+  disabledReasonForStatus,
+  resolveCustomerSlotData,
+  type CustomerDay,
+  type CustomerSlot,
+} from "./customerSlotData";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
 
-const MORNING_WINDOW_MINUTES = 240; // 8am – 12pm
-const AFTERNOON_WINDOW_MINUTES = 300; // 12pm – 5pm
+type Slot = CustomerSlot;
+type Day = CustomerDay;
 
-type Slot = {
-  id: string;
-  window: "morning" | "afternoon";
-  windowMinutes: number;
-  bookedMinutes: number;
-};
-type Day = {
-  date: string;
-  weekday: string;
-  day: number;
-  month: string;
-  morning: Slot;
-  afternoon: Slot;
-};
-
-/** Lite layout has only 3 visible dates — seed each one differently so the
- *  mix of empty / partly-full / nearly-full reads at a glance. */
-const DAYS: Day[] = [
-  {
-    date: "2026-05-04", weekday: "Mon", day: 4, month: "May",
-    morning:   { id: "20260504-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 60 },
-    afternoon: { id: "20260504-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 },
-  },
-  {
-    date: "2026-05-06", weekday: "Wed", day: 6, month: "May",
-    // Almost-full morning: 20 min left. For the default 45-min job this
-    // shows the "Not enough time left" state side-by-side with the
-    // fully-booked afternoon on Friday.
-    morning:   { id: "20260506-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 220 },
-    afternoon: { id: "20260506-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 105 },
-  },
-  {
-    date: "2026-05-08", weekday: "Fri", day: 8, month: "May",
-    morning:   { id: "20260508-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260508-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES },
-  },
-];
 
 export function SlotsMobileLite() {
   const [selected, setSelected] = useState<string | null>(null);
@@ -90,32 +59,34 @@ export function SlotsMobileLite() {
       ? "you'll need to coordinate a second visit with the tenant"
       : "you'll need to be home for a second visit";
 
-  // Hide any dates that have already passed — customers can never
-  // book a service into the past, and leaving expired rows in the
-  // calendar just pushes the bookable dates further down.
+  // Resolve the per-(service, building) rollout (Task #59) and pull
+  // its day rows. Past dates are filtered out so customers never see
+  // bookable rows that have already rolled by.
+  const slotData = useMemo(
+    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
+    [session.unit_id, jobMinutes],
+  );
+  const rollout = slotData.rollout;
   const visibleDays = useMemo(
-    () => DAYS.filter((d) => !isPastDate(d.date)),
-    [],
+    () => slotData.days.filter((d) => !isPastDate(d.date)),
+    [slotData.days],
   );
 
-  // If the customer's job size grows (e.g. they edit the AC step in
-  // another iframe via cross-iframe sessionStorage sync), an already-
-  // selected slot might no longer fit. Drop it so the Continue button
-  // can't carry a stale, now-invalid selection forward. Same
-  // `slotFitStatus` source of truth used by the slot tile so the two
-  // can never disagree. We also drop it if the slot's date is no
-  // longer visible (it has rolled into the past).
+  // If the customer's job size grows, an already-selected slot might
+  // no longer fit. Drop it so the Continue button can't carry a stale
+  // selection forward. The slot's pre-computed status is the same
+  // source of truth the tile uses.
   const selectedSlotFits = useMemo(() => {
     if (!selected) return true;
     for (const d of visibleDays) {
       for (const slot of [d.morning, d.afternoon]) {
         if (slot.id === selected) {
-          return slotFitStatus(slot, jobMinutes) === "available";
+          return slot.status === "available";
         }
       }
     }
     return false;
-  }, [selected, jobMinutes, visibleDays]);
+  }, [selected, visibleDays]);
   useEffect(() => {
     if (selected && !selectedSlotFits) setSelected(null);
   }, [selected, selectedSlotFits]);
@@ -236,22 +207,44 @@ export function SlotsMobileLite() {
           </div>
         )}
 
-        <div className="space-y-3">
-          {visibleDays.map((d) => (
-            <DayBlock
-              key={d.date}
-              day={d}
-              jobMinutes={jobMinutes}
-              selected={selected}
-              onSelect={(id) => setSelected(id)}
-            />
-          ))}
-        </div>
+        {!rollout ? (
+          <div
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
+            data-testid="empty-no-rollout-mobile-lite"
+          >
+            <div className="text-[14px] font-semibold">
+              AC services aren't open for booking at this address yet.
+            </div>
+            <div className="mt-1.5 text-[12px] text-amber-800">
+              We're rolling this out building by building. Call{" "}
+              <span className="font-medium" style={{ color: BRAND }}>
+                1300 TAYLR
+              </span>{" "}
+              and we'll add you to the waitlist.
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {visibleDays.map((d) => (
+                <DayBlock
+                  key={d.date}
+                  day={d}
+                  selected={selected}
+                  onSelect={(id) => setSelected(id)}
+                />
+              ))}
+            </div>
 
-        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-[11px] text-slate-500">
-          None of these work? Call us on <span className="font-medium" style={{ color: BRAND }}>1300 TAYLR</span> and
-          we'll look at options outside your area's regular run.
-        </div>
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-[11px] text-slate-500">
+              None of these work? Call us on{" "}
+              <span className="font-medium" style={{ color: BRAND }}>
+                1300 TAYLR
+              </span>{" "}
+              and we'll look at options outside your area's regular run.
+            </div>
+          </>
+        )}
       </div>
 
       <div className="border-t border-slate-100 bg-white px-5 py-3">
@@ -272,8 +265,8 @@ export function SlotsMobileLite() {
 
 
 function DayBlock({
-  day, jobMinutes, selected, onSelect,
-}: { day: Day; jobMinutes: number; selected: string | null; onSelect: (id: string) => void }) {
+  day, selected, onSelect,
+}: { day: Day; selected: string | null; onSelect: (id: string) => void }) {
   return (
     <div className="flex gap-3">
       <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white py-2">
@@ -285,7 +278,6 @@ function DayBlock({
       <div className="grid flex-1 grid-cols-2 gap-2">
         <SlotCard
           slot={day.morning}
-          jobMinutes={jobMinutes}
           icon={<Sunrise className="h-4 w-4" />}
           label="Morning"
           hint="8am – 12pm"
@@ -294,7 +286,6 @@ function DayBlock({
         />
         <SlotCard
           slot={day.afternoon}
-          jobMinutes={jobMinutes}
           icon={<Sun className="h-4 w-4" />}
           label="Afternoon"
           hint="12pm – 5pm"
@@ -307,28 +298,25 @@ function DayBlock({
 }
 
 function SlotCard({
-  slot, jobMinutes, icon, label, hint, selected, onClick,
+  slot, icon, label, hint, selected, onClick,
 }: {
   slot: Slot;
-  jobMinutes: number;
   icon: React.ReactNode;
   label: string;
   hint: string;
   selected: boolean;
   onClick: () => void;
 }) {
-  // Fit logic stays intact from #27 — only the rendering changes:
-  // customers see slots as plain selectable windows, never minute math.
-  const status = slotFitStatus(slot, jobMinutes);
+  // Status comes from the rollout resolver — same source of truth
+  // the admin schedule editor uses.
+  const status = slot.status;
   const fits = status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
 
-  // Two distinct reasons so the customer can tell whether the window is
-  // sold out for everyone ("Full") or just too short for THIS particular
-  // booking — the latter hints they could shrink an add-on and try again.
-  const reason =
-    status === "full" ? "Full" : "Not enough time left for this service";
+  // Three distinct disabled reasons (Full / Not enough time / Not yet
+  // open). Centralised in `disabledReasonForStatus`.
+  const reason = disabledReasonForStatus(status);
 
   return (
     <button

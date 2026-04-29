@@ -7,6 +7,7 @@ import { Sparkles } from "lucide-react";
 
 import {
   getBuildingForUnit,
+  getRolloutById,
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
@@ -19,6 +20,7 @@ export function TopBar({
   view,
   selectedBookingId,
   selectedBuildingId,
+  selectedRolloutId,
   bookings,
   buildings,
   units,
@@ -26,6 +28,7 @@ export function TopBar({
   view: ViewId;
   selectedBookingId: string | null;
   selectedBuildingId: string | null;
+  selectedRolloutId: string | null;
   bookings: AdminBooking[];
   buildings: AdminBuilding[];
   units: AdminUnit[];
@@ -48,9 +51,12 @@ export function TopBar({
     crumb = selectedBookingId
       ? `Payments / ${building ? `${building.name} · ` : ""}${selectedBookingId}`
       : "Bookings filtered by payment status";
-  } else if (view === "calendar") {
-    title = "Slot calendar";
-    crumb = "Open / close days, edit windows";
+  } else if (view === "rollouts") {
+    const rollout = getRolloutById(selectedRolloutId);
+    title = rollout ? rollout.name : "Rollouts";
+    crumb = rollout
+      ? `Rollouts / ${rollout.name}`
+      : "Per-rollout schedules — one (service × building) per row";
   } else if (view === "buildings") {
     const building = buildings.find((b) => b.id === selectedBuildingId);
     title = selectedBuildingId

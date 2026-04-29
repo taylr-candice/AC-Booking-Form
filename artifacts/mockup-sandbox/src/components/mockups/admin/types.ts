@@ -5,7 +5,7 @@
 export type ViewId =
   | "bookings"
   | "payments"
-  | "calendar"
+  | "rollouts"
   | "buildings"
   | "units"
   | "agents";

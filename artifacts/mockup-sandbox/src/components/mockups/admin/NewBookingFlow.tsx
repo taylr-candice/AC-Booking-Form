@@ -10,7 +10,9 @@
  * State is local — cancel-from-anywhere just unmounts the overlay so
  * nothing leaks back into the admin shell. On confirm the parent gets
  * an `AdminBooking` (built via {@link buildAdminCreatedBooking}) plus
- * the schedule choice so it can also bump the global slot calendar.
+ * the schedule choice so it can also bump the matching rollout's
+ * per-window capacity (slots-per-window or time-budget, depending on
+ * the rollout's `capacityModel`).
  */
 
 import { useMemo, useState } from "react";
@@ -30,17 +32,20 @@ import {
   bookingDurationMinutes,
   buildAdminCreatedBooking,
   computeAdminAcDiscrepancy,
+  findRolloutForBooking,
   getBuildingForUnit,
   nextBookingId,
   PRICE_PER_ADDITIONAL_INDOOR_AUD,
   PRICE_PER_SYSTEM_AUD,
-  slotIsAvailable,
+  rolloutSlotStatus,
   type AdminBooking,
   type AdminBuilding,
-  type AdminCalendarDay,
   type AdminCreatedScheduleChoice,
-  type AdminSlot,
+  type AdminRollout,
   type AdminUnit,
+  type RolloutDay,
+  type RolloutSlot,
+  type ServiceCapacityModel,
 } from "@/state/adminMockData";
 import {
   DEMO_MANAGING_AGENCIES,
@@ -53,7 +58,15 @@ import {
 } from "@/state/bookingDerived";
 
 import { FormField } from "./atoms";
-import { BRAND, BRAND_DEEP, BRAND_SOFT, modeColor } from "./theme";
+import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+
+/** Accent color for a rollout's capacity-model pill. Matches the
+ *  per-slot accent used in the customer-side picker — slots-per-window
+ *  rollouts get a blue accent ("count-y"), time-budget rollouts get
+ *  the brand pink ("time-y"). */
+function capacityModelColor(model: ServiceCapacityModel): string {
+  return model === "slots_per_window" ? "#3B82F6" : BRAND;
+}
 
 // ─── Local form state ──────────────────────────────────────────────────────
 
@@ -106,7 +119,7 @@ export function NewBookingFlow({
   units,
   buildings,
   bookings,
-  calendar,
+  rolloutsRefreshKey,
   presetBuildingId,
   onCancel,
   onConfirm,
@@ -114,7 +127,10 @@ export function NewBookingFlow({
   units: AdminUnit[];
   buildings: AdminBuilding[];
   bookings: AdminBooking[];
-  calendar: AdminCalendarDay[];
+  /** Bumped by the admin shell whenever the rollouts store mutates so
+   *  this overlay re-derives the picked unit's rollout (capacity numbers,
+   *  newly-opened windows, etc.) without holding a stale snapshot. */
+  rolloutsRefreshKey: number;
   /** When opened from a building detail screen, the building filter is
    *  pre-applied so the admin only sees units in that building. */
   presetBuildingId: string | null;
@@ -127,6 +143,19 @@ export function NewBookingFlow({
   const selectedUnit = useMemo(
     () => units.find((u) => u.id === form.unitId) ?? null,
     [units, form.unitId],
+  );
+
+  // Resolve which rollout this booking would land on. The admin "New
+  // booking" flow only books the AC service today (matches the customer
+  // flow), so we hard-code the service id. When the picked unit's
+  // building has no rollout, the schedule step is forced into the
+  // "to be coordinated" branch (no slots to pick from).
+  const selectedRollout = useMemo<AdminRollout | null>(
+    () => findRolloutForBooking("svc-ac", form.unitId),
+    // rolloutsRefreshKey participates so capacity edits / new rollouts
+    // made elsewhere in the admin shell flow into this overlay.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form.unitId, rolloutsRefreshKey],
   );
 
   // Whenever the admin picks a unit, pre-fill the AC fields from the
@@ -172,13 +201,23 @@ export function NewBookingFlow({
   // job duration. This guards against the user picking a slot, going
   // back to Step 2, bumping AC counts so the job no longer fits, and
   // then sailing through Continue with a stale (now-disabled) slot.
+  // When the picked unit has no rollout, we force the coordination
+  // branch — there are no concrete slots to pick from.
   const step3Valid = (() => {
     if (form.scheduleMode === "to_be_coordinated") return true;
+    if (!selectedRollout) return false;
     if (form.pickedDate === null || form.pickedWindow === null) return false;
-    const day = calendar.find((d) => d.isoDate === form.pickedDate);
-    if (!day || !day.open) return false;
+    const day = selectedRollout.days.find((d) => d.isoDate === form.pickedDate);
+    if (!day) return false;
     const slot = form.pickedWindow === "morning" ? day.morning : day.afternoon;
-    return slotIsAvailable(slot, derivedJobMinutes(form));
+    return (
+      rolloutSlotStatus(
+        day,
+        slot,
+        selectedRollout.capacityModel,
+        derivedJobMinutes(form),
+      ) === "available"
+    );
   })();
 
   function go(next: 1 | 2 | 3 | 4) {
@@ -189,7 +228,7 @@ export function NewBookingFlow({
     if (!selectedUnit) return;
     // Belt-and-suspenders: even though Step 3 / Continue gating prevents
     // a stale slot from reaching Step 4, re-check at the confirm
-    // boundary so we never write an over-booked slot into the calendar.
+    // boundary so we never write an over-booked slot into the rollout.
     if (!step3Valid) return;
     const schedule: AdminCreatedScheduleChoice =
       form.scheduleMode === "to_be_coordinated"
@@ -267,7 +306,7 @@ export function NewBookingFlow({
           )}
           {step === 3 && (
             <Step3Schedule
-              calendar={calendar}
+              rollout={selectedRollout}
               jobMinutes={derivedJobMinutes(form)}
               form={form}
               setForm={setForm}
@@ -804,16 +843,26 @@ function NumberStepper({
 // ─── Step 3: Schedule ──────────────────────────────────────────────────────
 
 function Step3Schedule({
-  calendar,
+  rollout,
   jobMinutes,
   form,
   setForm,
 }: {
-  calendar: AdminCalendarDay[];
+  /** The rollout the picked unit's building maps to. `null` means no
+   *  rollout is open for this (service, building) pair, so the slot
+   *  picker is disabled and the admin must use the coordination branch. */
+  rollout: AdminRollout | null;
   jobMinutes: number;
   form: FormState;
   setForm: React.Dispatch<React.SetStateAction<FormState>>;
 }) {
+  const canPickSlot = rollout !== null;
+  const accent = rollout ? capacityModelColor(rollout.capacityModel) : "#3B82F6";
+  const ModeIcon = rollout?.capacityModel === "slots_per_window" ? Hash : Clock;
+  const modeLabel =
+    rollout?.capacityModel === "slots_per_window"
+      ? "Slots per window"
+      : "Time budget per window";
   return (
     <div className="flex flex-col gap-4">
       {/* Mode toggle */}
@@ -821,10 +870,16 @@ function Step3Schedule({
         <ModeChoiceCard
           active={form.scheduleMode === "pick_slot"}
           onClick={() =>
+            canPickSlot &&
             setForm((s) => ({ ...s, scheduleMode: "pick_slot" }))
           }
+          disabled={!canPickSlot}
           title="Pick a service window"
-          subtitle="Find a morning or afternoon slot in the next two weeks."
+          subtitle={
+            canPickSlot
+              ? "Find a morning or afternoon slot inside the rollout's date range."
+              : "No rollout is open for this building yet — coordinate manually."
+          }
         />
         <ModeChoiceCard
           active={form.scheduleMode === "to_be_coordinated"}
@@ -841,20 +896,31 @@ function Step3Schedule({
         />
       </div>
 
-      {form.scheduleMode === "pick_slot" ? (
+      {form.scheduleMode === "pick_slot" && rollout ? (
         <>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700">
-            Showing windows that fit a{" "}
-            <strong className="text-slate-900">
-              {formatDurationMinutes(jobMinutes)}
-            </strong>{" "}
-            job. Full or undersized windows are disabled with a reason.
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700">
+            <div>
+              Showing windows that fit a{" "}
+              <strong className="text-slate-900">
+                {formatDurationMinutes(jobMinutes)}
+              </strong>{" "}
+              job. Full, closed, or undersized windows are disabled with a
+              reason.
+            </div>
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+              style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+            >
+              <ModeIcon className="h-3 w-3" style={{ color: accent }} />
+              {rollout.name} · {modeLabel}
+            </div>
           </div>
           <div className="grid grid-cols-7 gap-2">
-            {calendar.map((day) => (
+            {rollout.days.map((day) => (
               <DayPicker
                 key={day.isoDate}
                 day={day}
+                capacityModel={rollout.capacityModel}
                 jobMinutes={jobMinutes}
                 pickedDate={form.pickedDate}
                 pickedWindow={form.pickedWindow}
@@ -868,23 +934,24 @@ function Step3Schedule({
               />
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-            <div className="inline-flex items-center gap-1.5">
-              <Clock className="h-3 w-3" style={{ color: BRAND }} />
-              Time-based
-            </div>
-            <div className="inline-flex items-center gap-1.5">
-              <Hash className="h-3 w-3" style={{ color: "#3B82F6" }} />
-              Count-based
-            </div>
-          </div>
         </>
       ) : (
         <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-[13px] text-slate-700">
-          This booking will land in the bookings list with{" "}
-          <strong>“To coordinate”</strong> — no date or slot is taken on
-          the calendar. You can come back later and reschedule once the
-          customer confirms.
+          {canPickSlot ? (
+            <>
+              This booking will land in the bookings list with{" "}
+              <strong>“To coordinate”</strong> — no date or slot is taken
+              on the rollout. You can come back later and reschedule once
+              the customer confirms.
+            </>
+          ) : (
+            <>
+              No rollout is open on this building yet, so this booking
+              will be saved as{" "}
+              <strong>“To coordinate”</strong>. Open a rollout for this
+              building from the Rollouts view to start booking slots.
+            </>
+          )}
         </div>
       )}
     </div>
@@ -894,11 +961,13 @@ function Step3Schedule({
 function ModeChoiceCard({
   active,
   onClick,
+  disabled,
   title,
   subtitle,
 }: {
   active: boolean;
   onClick: () => void;
+  disabled?: boolean;
   title: string;
   subtitle: string;
 }) {
@@ -906,10 +975,13 @@ function ModeChoiceCard({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition ${
         active
           ? "ring-2"
-          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+          : disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-60"
+            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
       }`}
       style={
         active
@@ -934,12 +1006,14 @@ function ModeChoiceCard({
 
 function DayPicker({
   day,
+  capacityModel,
   jobMinutes,
   pickedDate,
   pickedWindow,
   onPick,
 }: {
-  day: AdminCalendarDay;
+  day: RolloutDay;
+  capacityModel: ServiceCapacityModel;
   jobMinutes: number;
   pickedDate: string | null;
   pickedWindow: "morning" | "afternoon" | null;
@@ -965,14 +1039,18 @@ function DayPicker({
         <>
           <SlotChoice
             label="Morning"
+            day={day}
             slot={day.morning}
+            capacityModel={capacityModel}
             jobMinutes={jobMinutes}
             picked={pickedDate === day.isoDate && pickedWindow === "morning"}
             onPick={() => onPick(day.isoDate, "morning")}
           />
           <SlotChoice
             label="Afternoon"
+            day={day}
             slot={day.afternoon}
+            capacityModel={capacityModel}
             jobMinutes={jobMinutes}
             picked={pickedDate === day.isoDate && pickedWindow === "afternoon"}
             onPick={() => onPick(day.isoDate, "afternoon")}
@@ -989,28 +1067,38 @@ function DayPicker({
 
 function SlotChoice({
   label,
+  day,
   slot,
+  capacityModel,
   jobMinutes,
   picked,
   onPick,
 }: {
   label: string;
-  slot: AdminSlot;
+  day: RolloutDay;
+  slot: RolloutSlot;
+  capacityModel: ServiceCapacityModel;
   jobMinutes: number;
   picked: boolean;
   onPick: () => void;
 }) {
-  const available = slotIsAvailable(slot, jobMinutes);
-  const accent = modeColor(slot.mode);
-  const ModeIcon = slot.mode === "count_based" ? Hash : Clock;
+  const status = rolloutSlotStatus(day, slot, capacityModel, jobMinutes);
+  const available = status === "available";
+  const accent = capacityModelColor(capacityModel);
+  const ModeIcon = capacityModel === "slots_per_window" ? Hash : Clock;
 
-  // Reason text for unbookable windows.
+  // Reason text for unbookable windows. Mirrors the customer-side
+  // picker copy so admins and customers see the same justifications.
   let reason = "";
   if (!available) {
-    if (slot.mode === "count_based") {
+    if (status === "not_yet_open") {
+      reason = `${label} not yet open for booking`;
+    } else if (capacityModel === "slots_per_window") {
+      const total = slot.slotCount ?? 0;
+      const booked = slot.bookedCount ?? 0;
       reason =
-        slot.bookedCount >= slot.slotCount
-          ? `${label} is full (${slot.slotCount}/${slot.slotCount})`
+        booked >= total
+          ? `${label} is full (${total}/${total})`
           : "Not bookable";
     } else {
       const remaining = Math.max(0, slot.windowMinutes - slot.bookedMinutes);
@@ -1024,8 +1112,8 @@ function SlotChoice({
   // Capacity hint shown alongside available windows so the admin can
   // see how tight things are at a glance.
   const capacityHint =
-    slot.mode === "count_based"
-      ? `${slot.bookedCount} / ${slot.slotCount}`
+    capacityModel === "slots_per_window"
+      ? `${slot.bookedCount ?? 0} / ${slot.slotCount ?? 0}`
       : `${formatDurationMinutes(
           Math.max(0, slot.windowMinutes - slot.bookedMinutes),
         )} left`;
@@ -1097,6 +1185,7 @@ function Step4Review({
   const jobMin = bookingDurationMinutes({
     id: "preview",
     unitId: unit.id,
+    rolloutId: null,
     customerName: "",
     customerEmail: "",
     customerPhone: "",
@@ -1191,7 +1280,7 @@ function Step4Review({
               {form.pickedDate} · {form.pickedWindow}
             </div>
             <div className="text-[11px] text-slate-500">
-              Window will be marked busy on the global calendar.
+              Window will be marked busy on the rollout's schedule.
             </div>
           </>
         )}
