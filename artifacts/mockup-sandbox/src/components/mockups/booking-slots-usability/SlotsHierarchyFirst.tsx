@@ -1,69 +1,64 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   Sunrise,
   Sun,
+  Moon,
   CheckCircle2,
   Info,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 
-import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
+import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
+import {
+  getLiveBookingsVersion,
+  subscribeLiveBookings,
+} from "../../../state/adminMockData";
+import {
+  alreadyScheduledByOther,
+  resolveCustomerSlotData,
+  type CustomerDay,
+  type CustomerSlot,
+  WINDOW_TIME_RANGE,
+} from "../booking-slots/customerSlotData";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
 
-const MORNING_WINDOW_MINUTES = 240; // 8am – 12pm
-const AFTERNOON_WINDOW_MINUTES = 300; // 12pm – 5pm
+type Slot = CustomerSlot;
+type Day = CustomerDay;
 
-type Slot = {
-  id: string;
-  window: "morning" | "afternoon";
-  windowMinutes: number;
-  bookedMinutes: number;
-};
-type Day = {
-  date: string;
-  weekday: string;
-  day: number;
-  month: string;
-  morning: Slot;
-  afternoon: Slot;
+function dayWindows(day: Day): Slot[] {
+  const out: Slot[] = [day.morning, day.afternoon];
+  if (day.evening) out.push(day.evening);
+  return out;
+}
+
+const WINDOW_LONG_LABEL: Record<Slot["window"], string> = {
+  morning: "Morning window",
+  afternoon: "Afternoon window",
+  evening: "Evening window",
 };
 
-const DAYS: Day[] = [
-  { date: "2026-04-28", weekday: "Tue", day: 28, month: "Apr",
-    morning:   { id: "20260428-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 60 },
-    afternoon: { id: "20260428-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-  { date: "2026-04-29", weekday: "Wed", day: 29, month: "Apr",
-    morning:   { id: "20260429-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 195 },
-    afternoon: { id: "20260429-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 } },
-  { date: "2026-05-04", weekday: "Mon", day: 4, month: "May",
-    morning:   { id: "20260504-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260504-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 105 } },
-  { date: "2026-05-05", weekday: "Tue", day: 5, month: "May",
-    morning:   { id: "20260505-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 220 },
-    afternoon: { id: "20260505-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 45 } },
-  { date: "2026-05-06", weekday: "Wed", day: 6, month: "May",
-    morning:   { id: "20260506-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 120 },
-    afternoon: { id: "20260506-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 240 } },
-  { date: "2026-05-07", weekday: "Thu", day: 7, month: "May",
-    morning:   { id: "20260507-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260507-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-  { date: "2026-07-06", weekday: "Mon", day: 6, month: "Jul",
-    morning:   { id: "20260706-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260706-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 } },
-  { date: "2026-07-07", weekday: "Tue", day: 7, month: "Jul",
-    morning:   { id: "20260707-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 75 },
-    afternoon: { id: "20260707-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 150 } },
-];
+const WINDOW_COMPACT_LABEL: Record<Slot["window"], string> = {
+  morning: `Morning (${WINDOW_TIME_RANGE.morning})`,
+  afternoon: `Afternoon (${WINDOW_TIME_RANGE.afternoon})`,
+  evening: `Evening (${WINDOW_TIME_RANGE.evening})`,
+};
+
+function windowIcon(window: Slot["window"], className: string) {
+  if (window === "morning") return <Sunrise className={className} />;
+  if (window === "evening") return <Moon className={className} />;
+  return <Sun className={className} />;
+}
 
 export function SlotsHierarchyFirst() {
   const [selected, setSelected] = useState<string | null>(null);
@@ -86,65 +81,89 @@ export function SlotsHierarchyFirst() {
       ? "you'll need to coordinate a second visit with the tenant"
       : "you'll need to be home for a second visit";
 
+  // Resolve the per-(service, building) rollout (Task #59) and pull
+  // its day rows, matching how `SlotsAffordanceForward` is wired.
+  // Past dates are filtered out so customers never see rows that have
+  // rolled by.
+  const slotData = useMemo(
+    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
+    [session.unit_id, jobMinutes],
+  );
+  const rollout = slotData.rollout;
+  const liveBookingsVersion = useSyncExternalStore(
+    subscribeLiveBookings,
+    getLiveBookingsVersion,
+    getLiveBookingsVersion,
+  );
+  const lockedByOther = useMemo(
+    () => {
+      void liveBookingsVersion;
+      return alreadyScheduledByOther(session.unit_id);
+    },
+    [session.unit_id, liveBookingsVersion],
+  );
   const visibleDays = useMemo(
-    () => DAYS.filter((d) => !isPastDate(d.date)),
-    [],
+    () => slotData.days.filter((d) => !isPastDate(d.date)),
+    [slotData.days],
   );
 
-  const selectedSlotFits = useMemo(() => {
-    if (!selected) return true;
-    for (const d of visibleDays) {
-      for (const slot of [d.morning, d.afternoon]) {
-        if (slot.id === selected) {
-          return slotFitStatus(slot, jobMinutes) === "available";
-        }
-      }
-    }
-    return false;
-  }, [selected, jobMinutes, visibleDays]);
-
+  // If the customer's job size grows or the rollout shifts, an
+  // already-selected slot might no longer fit. Drop it so Continue
+  // can't carry stale, now-invalid state forward.
   useEffect(() => {
-    if (selected && !selectedSlotFits) setSelected(null);
-  }, [selected, selectedSlotFits]);
+    if (!selected) return;
+    const stillValid = visibleDays
+      .flatMap(dayWindows)
+      .some((s) => s.id === selected && s.status === "available");
+    if (!stillValid) setSelected(null);
+  }, [selected, visibleDays]);
 
+  // Flat list of every visible {day, slot} pair so we can find the
+  // earliest available slot (morning before afternoon before evening,
+  // earliest day first) and feature it as the hero card.
   const flatSlots = useMemo(() => {
     const slots: { day: Day; slot: Slot }[] = [];
     for (const d of visibleDays) {
-      slots.push({ day: d, slot: d.morning });
-      slots.push({ day: d, slot: d.afternoon });
+      for (const slot of dayWindows(d)) {
+        slots.push({ day: d, slot });
+      }
     }
     return slots;
   }, [visibleDays]);
 
-  const firstAvailableIdx = useMemo(() => {
-    return flatSlots.findIndex(s => slotFitStatus(s.slot, jobMinutes) === "available");
-  }, [flatSlots, jobMinutes]);
+  const heroSlotObj = useMemo(
+    () => flatSlots.find((s) => s.slot.status === "available") ?? null,
+    [flatSlots],
+  );
 
-  const heroSlotObj = firstAvailableIdx !== -1 ? flatSlots[firstAvailableIdx] : null;
-  
-  // Exclude the hero slot from the remaining list if we have one
-  const remainingDays = useMemo<Array<{ day: Day; morning: Slot | null; afternoon: Slot | null }>>(() => {
-    if (!heroSlotObj) {
-      return visibleDays.map((d) => ({ day: d, morning: d.morning, afternoon: d.afternoon }));
-    }
-
-    const out: Array<{ day: Day; morning: Slot | null; afternoon: Slot | null }> = [];
+  // Exclude the hero slot from the remaining list if we have one.
+  // Keeps the same shape the JSX below expects so adding evening
+  // windows in mid-cohort doesn't ripple through every render path.
+  const remainingDays = useMemo<
+    Array<{
+      day: Day;
+      morning: Slot | null;
+      afternoon: Slot | null;
+      evening: Slot | null;
+    }>
+  >(() => {
+    const heroId = heroSlotObj?.slot.id ?? null;
+    const out: Array<{
+      day: Day;
+      morning: Slot | null;
+      afternoon: Slot | null;
+      evening: Slot | null;
+    }> = [];
     for (const d of visibleDays) {
-      const isMorningHero = d.morning.id === heroSlotObj.slot.id;
-      const isAfternoonHero = d.afternoon.id === heroSlotObj.slot.id;
-      
-      if (isMorningHero && isAfternoonHero) {
-        continue; // Should not happen but typescript 
-      }
-      
-      if (!isMorningHero && !isAfternoonHero) {
-        out.push({ day: d, morning: d.morning, afternoon: d.afternoon });
-      } else {
-        const morning = isMorningHero ? null : d.morning;
-        const afternoon = isAfternoonHero ? null : d.afternoon;
-        if (morning || afternoon) {
-          out.push({ day: d, morning, afternoon });
-        }
+      const morning = d.morning.id === heroId ? null : d.morning;
+      const afternoon = d.afternoon.id === heroId ? null : d.afternoon;
+      const evening = d.evening
+        ? d.evening.id === heroId
+          ? null
+          : d.evening
+        : null;
+      if (morning || afternoon || evening) {
+        out.push({ day: d, morning, afternoon, evening });
       }
     }
     return out;
@@ -254,64 +273,132 @@ export function SlotsHierarchyFirst() {
           </div>
         )}
 
-        {/* Hero: Next Available */}
-        {heroSlotObj && (
-          <div className="mb-8">
-            <div className="mb-4 flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">Next available</h2>
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
-                style={{ backgroundColor: BRAND }}
-              >
-                Earliest
-              </span>
-            </div>
-            <HeroSlotCard
-              day={heroSlotObj.day}
-              slot={heroSlotObj.slot}
-              jobMinutes={jobMinutes}
-              selected={selected === heroSlotObj.slot.id}
-              onClick={() => setSelected(heroSlotObj.slot.id)}
-            />
-          </div>
-        )}
-
-        {/* Remaining list */}
-        {remainingDays.length > 0 && (
-          <div>
-            <h2 className="mb-4 text-lg font-bold text-slate-900">More options</h2>
-            <div className="flex flex-col gap-3">
-              {remainingDays.map(({ day, morning, afternoon }) => (
-                <div key={day.date} className="flex flex-col gap-2">
-                  <div className="text-sm font-bold text-slate-800">
-                    {day.weekday}, {day.month} {day.day}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {morning && (
-                      <CompactSlotCard
-                        slot={morning}
-                        jobMinutes={jobMinutes}
-                        icon={<Sunrise className="h-4 w-4" />}
-                        label="Morning (8am – 12pm)"
-                        selected={selected === morning.id}
-                        onClick={() => setSelected(morning.id)}
-                      />
-                    )}
-                    {afternoon && (
-                      <CompactSlotCard
-                        slot={afternoon}
-                        jobMinutes={jobMinutes}
-                        icon={<Sun className="h-4 w-4" />}
-                        label="Afternoon (12pm – 5pm)"
-                        selected={selected === afternoon.id}
-                        onClick={() => setSelected(afternoon.id)}
-                      />
-                    )}
-                  </div>
+        {!rollout ? (
+          <div
+            className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-relaxed text-amber-900"
+            data-testid="empty-no-rollout-mobile"
+          >
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <div>
+                <div className="font-bold text-base text-amber-900">
+                  AC services aren't open for booking at this address yet.
                 </div>
-              ))}
+                <div className="mt-1.5">
+                  We're rolling this out building by building. Call{" "}
+                  <span className="font-bold" style={{ color: BRAND }}>
+                    1300 TAYLR
+                  </span>{" "}
+                  and we'll add you to the waitlist.
+                </div>
+              </div>
             </div>
           </div>
+        ) : lockedByOther ? (
+          <div
+            className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-relaxed text-slate-700"
+            data-testid="banner-locked-by-other-mobile"
+            data-locked-kind={lockedByOther.kind}
+          >
+            <div className="flex items-start gap-2.5">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+              <div className="flex-1">
+                <div className="font-bold text-base text-slate-900">
+                  Already scheduled for this address
+                </div>
+                <div className="mt-1.5">
+                  There's already a confirmed service booked at this property,
+                  so it can't be booked again right now. Only one confirmed
+                  booking is allowed per service run.
+                </div>
+                <div className="mt-2">
+                  If you have any questions or believe this is a mistake,
+                  contact Taylr at{" "}
+                  <a
+                    href="mailto:support@taylr.com.au"
+                    className="font-semibold underline underline-offset-2"
+                    style={{ color: BRAND }}
+                    data-testid="link-locked-support-email-mobile"
+                  >
+                    support@taylr.com.au
+                  </a>{" "}
+                  or call{" "}
+                  <span className="font-semibold" style={{ color: BRAND }}>
+                    1300 TAYLR
+                  </span>
+                  .
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Hero: Next Available */}
+            {heroSlotObj && (
+              <div className="mb-8">
+                <div className="mb-4 flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-slate-900">Next available</h2>
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    Earliest
+                  </span>
+                </div>
+                <HeroSlotCard
+                  day={heroSlotObj.day}
+                  slot={heroSlotObj.slot}
+                  selected={selected === heroSlotObj.slot.id}
+                  onClick={() => setSelected(heroSlotObj.slot.id)}
+                />
+              </div>
+            )}
+
+            {/* Remaining list */}
+            {remainingDays.length > 0 && (
+              <div>
+                <h2 className="mb-4 text-lg font-bold text-slate-900">More options</h2>
+                <div className="flex flex-col gap-3">
+                  {remainingDays.map(({ day, morning, afternoon, evening }) => (
+                    <div key={day.date} className="flex flex-col gap-2">
+                      <div className="text-sm font-bold text-slate-800">
+                        {day.weekday}, {day.month} {day.day}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {morning && (
+                          <CompactSlotCard
+                            slot={morning}
+                            icon={windowIcon("morning", "h-4 w-4")}
+                            label={WINDOW_COMPACT_LABEL.morning}
+                            selected={selected === morning.id}
+                            onClick={() => setSelected(morning.id)}
+                          />
+                        )}
+                        {afternoon && (
+                          <CompactSlotCard
+                            slot={afternoon}
+                            icon={windowIcon("afternoon", "h-4 w-4")}
+                            label={WINDOW_COMPACT_LABEL.afternoon}
+                            selected={selected === afternoon.id}
+                            onClick={() => setSelected(afternoon.id)}
+                          />
+                        )}
+                        {evening && (
+                          <CompactSlotCard
+                            slot={evening}
+                            icon={windowIcon("evening", "h-4 w-4")}
+                            label={WINDOW_COMPACT_LABEL.evening}
+                            selected={selected === evening.id}
+                            onClick={() => setSelected(evening.id)}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="mt-8 border-t border-slate-100 pt-6 text-center text-sm text-slate-500">
@@ -322,7 +409,7 @@ export function SlotsHierarchyFirst() {
       <div className="border-t border-slate-100 bg-white px-5 py-4">
         <button
           type="button"
-          disabled={!selected}
+          disabled={!selected || !!lockedByOther}
           data-testid="button-continue-mobile"
           className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-4 text-[15px] font-semibold text-white transition disabled:opacity-30"
           style={{ backgroundColor: BRAND }}
@@ -338,27 +425,27 @@ export function SlotsHierarchyFirst() {
 function HeroSlotCard({
   day,
   slot,
-  jobMinutes,
   selected,
   onClick,
 }: {
   day: Day;
   slot: Slot;
-  jobMinutes: number;
   selected: boolean;
   onClick: () => void;
 }) {
-  const isMorning = slot.window === "morning";
-  const Icon = isMorning ? Sunrise : Sun;
-  const label = isMorning ? "Morning window" : "Afternoon window";
-  const hint = isMorning ? "8am – 12pm" : "12pm – 5pm";
-  
-  const status = slotFitStatus(slot, jobMinutes);
-  const fits = status === "available";
+  const label = WINDOW_LONG_LABEL[slot.window];
+  const hint = WINDOW_TIME_RANGE[slot.window];
+
+  const fits = slot.status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
   
-  const reason = status === "full" ? "Full" : "Not enough time left for this service";
+  const reason =
+    slot.status === "full"
+      ? "Full"
+      : slot.status === "not_yet_open"
+        ? "Not yet open for booking"
+        : "Not enough time left for this service";
 
   const fullDateStr = new Date(day.date).toLocaleDateString("en-AU", {
     weekday: "long",
@@ -379,6 +466,7 @@ function HeroSlotCard({
       onClick={onClick}
       data-testid={`mobile-slot-${slot.id}`}
       data-next-available={showHeroAccent ? "true" : undefined}
+      data-slot-status={slot.status}
       aria-pressed={isSelected}
       className={`relative flex w-full flex-col items-start rounded-2xl border-2 p-5 text-left transition ${
         disabled
@@ -414,15 +502,16 @@ function HeroSlotCard({
         {fullDateStr}
       </div>
       <div className="flex items-center gap-2 mb-2">
-        <Icon
-          className={`h-5 w-5 ${
+        {windowIcon(
+          slot.window,
+          `h-5 w-5 ${
             isSelected
               ? "text-slate-900"
               : showHeroAccent
                 ? "text-pink-700"
                 : "text-slate-600"
-          }`}
-        />
+          }`,
+        )}
         <span
           className={`text-xl font-bold ${
             isSelected
@@ -457,25 +546,27 @@ function HeroSlotCard({
 
 function CompactSlotCard({
   slot,
-  jobMinutes,
   icon,
   label,
   selected,
   onClick,
 }: {
   slot: Slot;
-  jobMinutes: number;
   icon: React.ReactNode;
   label: string;
   selected: boolean;
   onClick: () => void;
 }) {
-  const status = slotFitStatus(slot, jobMinutes);
-  const fits = status === "available";
+  const fits = slot.status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
 
-  const reason = status === "full" ? "Full" : "Not enough time left for this service";
+  const reason =
+    slot.status === "full"
+      ? "Full"
+      : slot.status === "not_yet_open"
+        ? "Not yet open for booking"
+        : "Not enough time left for this service";
 
   return (
     <button
@@ -484,6 +575,7 @@ function CompactSlotCard({
       onClick={onClick}
       data-testid={`mobile-slot-${slot.id}`}
       aria-pressed={isSelected}
+      data-slot-status={slot.status}
       className={`relative flex w-full items-center justify-between rounded-xl border p-3 text-left transition ${
         disabled
           ? "cursor-not-allowed border-transparent bg-slate-50 text-slate-400"

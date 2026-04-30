@@ -1,73 +1,49 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   Sunrise,
   Sun,
+  Moon,
   Pencil,
   CheckCircle2,
   Info,
   AlertTriangle,
   Lock,
-  XCircle
+  XCircle,
 } from "lucide-react";
 
-import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
+import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
+import {
+  getLiveBookingsVersion,
+  subscribeLiveBookings,
+} from "../../../state/adminMockData";
+import {
+  alreadyScheduledByOther,
+  resolveCustomerSlotData,
+  type CustomerDay,
+  type CustomerSlot,
+  WINDOW_TIME_RANGE,
+} from "../booking-slots/customerSlotData";
 
 const BRAND = "#ED017F";
 const BRAND_DARK = "#B8005F"; // Darkened for AAA contrast against white
 const SELECTED_GREEN = "#5FBB97";
 
-const MORNING_WINDOW_MINUTES = 240; // 8am – 12pm
-const AFTERNOON_WINDOW_MINUTES = 300; // 12pm – 5pm
+type Slot = CustomerSlot;
+type Day = CustomerDay;
 
-type Slot = {
-  id: string;
-  window: "morning" | "afternoon";
-  windowMinutes: number;
-  bookedMinutes: number;
-};
-type Day = {
-  date: string;
-  weekday: string;
-  day: number;
-  month: string;
-  morning: Slot;
-  afternoon: Slot;
-};
-
-const DAYS: Day[] = [
-  { date: "2026-04-28", weekday: "Tue", day: 28, month: "Apr",
-    morning:   { id: "20260428-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 60 },
-    afternoon: { id: "20260428-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-  { date: "2026-04-29", weekday: "Wed", day: 29, month: "Apr",
-    morning:   { id: "20260429-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 195 },
-    afternoon: { id: "20260429-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 } },
-  { date: "2026-05-04", weekday: "Mon", day: 4, month: "May",
-    morning:   { id: "20260504-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260504-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 105 } },
-  { date: "2026-05-05", weekday: "Tue", day: 5, month: "May",
-    morning:   { id: "20260505-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 220 },
-    afternoon: { id: "20260505-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 45 } },
-  { date: "2026-05-06", weekday: "Wed", day: 6, month: "May",
-    morning:   { id: "20260506-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 120 },
-    afternoon: { id: "20260506-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 240 } },
-  { date: "2026-05-07", weekday: "Thu", day: 7, month: "May",
-    morning:   { id: "20260507-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260507-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-  { date: "2026-07-06", weekday: "Mon", day: 6, month: "Jul",
-    morning:   { id: "20260706-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260706-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 } },
-  { date: "2026-07-07", weekday: "Tue", day: 7, month: "Jul",
-    morning:   { id: "20260707-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 75 },
-    afternoon: { id: "20260707-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 150 } },
-];
+function dayWindows(day: Day): Slot[] {
+  const out: Slot[] = [day.morning, day.afternoon];
+  if (day.evening) out.push(day.evening);
+  return out;
+}
 
 const FULL_DAYS: Record<string, string> = {
   Mon: "Monday",
@@ -94,6 +70,12 @@ const FULL_MONTHS: Record<string, string> = {
   Dec: "December",
 };
 
+const WINDOW_LABEL: Record<Slot["window"], string> = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
+};
+
 export function SlotsAccessibleReadable() {
   const [selected, setSelected] = useState<string | null>(null);
   const session = useBookingSession();
@@ -115,39 +97,56 @@ export function SlotsAccessibleReadable() {
       ? "you'll need to coordinate a second visit with the tenant"
       : "you'll need to be home for a second visit";
 
+  // Resolve the per-(service, building) rollout (Task #59) and pull
+  // its day rows, matching how `SlotsAffordanceForward` is wired.
+  // Past dates are filtered out so customers never see rows that have
+  // rolled by.
+  const slotData = useMemo(
+    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
+    [session.unit_id, jobMinutes],
+  );
+  const rollout = slotData.rollout;
+  const liveBookingsVersion = useSyncExternalStore(
+    subscribeLiveBookings,
+    getLiveBookingsVersion,
+    getLiveBookingsVersion,
+  );
+  const lockedByOther = useMemo(
+    () => {
+      void liveBookingsVersion;
+      return alreadyScheduledByOther(session.unit_id);
+    },
+    [session.unit_id, liveBookingsVersion],
+  );
   const visibleDays = useMemo(
-    () => DAYS.filter((d) => !isPastDate(d.date)),
-    [],
+    () => slotData.days.filter((d) => !isPastDate(d.date)),
+    [slotData.days],
   );
 
-  const selectedSlotFits = useMemo(() => {
-    if (!selected) return true;
-    for (const d of visibleDays) {
-      for (const slot of [d.morning, d.afternoon]) {
-        if (slot.id === selected) {
-          return slotFitStatus(slot, jobMinutes) === "available";
-        }
-      }
-    }
-    return false;
-  }, [selected, jobMinutes, visibleDays]);
-
-  // Earliest bookable slot in view (morning before afternoon). Visual
-  // hint only — does not pre-select or change Continue logic.
+  // Earliest bookable slot in view (morning before afternoon before
+  // evening). Visual hint only — does not pre-select or change
+  // Continue logic.
   const nextAvailableSlotId = useMemo<string | null>(() => {
     for (const d of visibleDays) {
-      for (const slot of [d.morning, d.afternoon]) {
-        if (slotFitStatus(slot, jobMinutes) === "available") {
+      for (const slot of dayWindows(d)) {
+        if (slot.status === "available") {
           return slot.id;
         }
       }
     }
     return null;
-  }, [visibleDays, jobMinutes]);
+  }, [visibleDays]);
 
+  // If the customer's job size grows or the rollout shifts, an
+  // already-selected slot might no longer fit. Drop it so Continue
+  // can't carry stale, now-invalid state forward.
   useEffect(() => {
-    if (selected && !selectedSlotFits) setSelected(null);
-  }, [selected, selectedSlotFits]);
+    if (!selected) return;
+    const stillValid = visibleDays
+      .flatMap(dayWindows)
+      .some((s) => s.id === selected && s.status === "available");
+    if (!stillValid) setSelected(null);
+  }, [selected, visibleDays]);
 
   return (
     <div className="flex h-[844px] w-[390px] flex-col overflow-hidden bg-white font-['Inter'] mx-auto border shadow-xl">
@@ -277,18 +276,81 @@ export function SlotsAccessibleReadable() {
           </div>
         )}
 
-        <div className="space-y-8">
-          {visibleDays.map((d) => (
-            <DayBlock
-              key={d.date}
-              day={d}
-              jobMinutes={jobMinutes}
-              selected={selected}
-              onSelect={(id) => setSelected(id)}
-              nextAvailableSlotId={nextAvailableSlotId}
-            />
-          ))}
-        </div>
+        {!rollout ? (
+          <div
+            role="region"
+            aria-label="AC services not yet open at this address"
+            className="rounded-xl border-[3px] border-amber-500 bg-amber-50 p-5 text-[16px] leading-relaxed text-slate-900 shadow-sm"
+            data-testid="empty-no-rollout-mobile"
+          >
+            <div className="flex items-start gap-4">
+              <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-amber-700" aria-hidden="true" />
+              <div>
+                <div className="font-bold text-[18px]">
+                  AC services aren't open for booking at this address yet.
+                </div>
+                <div className="mt-2">
+                  We're rolling this out building by building. Call{" "}
+                  <span className="font-bold underline underline-offset-4" style={{ color: BRAND_DARK }}>
+                    1300 TAYLR
+                  </span>{" "}
+                  and we'll add you to the waitlist.
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : lockedByOther ? (
+          <div
+            role="region"
+            aria-label="Already scheduled for this address"
+            className="rounded-xl border-[3px] border-slate-400 bg-slate-50 p-5 text-[16px] leading-relaxed text-slate-900 shadow-sm"
+            data-testid="banner-locked-by-other-mobile"
+            data-locked-kind={lockedByOther.kind}
+          >
+            <div className="flex items-start gap-4">
+              <Lock className="mt-0.5 h-6 w-6 shrink-0 text-slate-700" aria-hidden="true" />
+              <div className="flex-1">
+                <div className="font-bold text-[18px]">
+                  Already scheduled for this address
+                </div>
+                <div className="mt-2">
+                  There's already a confirmed service booked at this property,
+                  so it can't be booked again right now. Only one confirmed
+                  booking is allowed per service run.
+                </div>
+                <div className="mt-3">
+                  If you have any questions or believe this is a mistake,
+                  contact Taylr at{" "}
+                  <a
+                    href="mailto:support@taylr.com.au"
+                    className="font-bold underline underline-offset-4"
+                    style={{ color: BRAND_DARK }}
+                    data-testid="link-locked-support-email-mobile"
+                  >
+                    support@taylr.com.au
+                  </a>{" "}
+                  or call{" "}
+                  <span className="font-bold underline underline-offset-4" style={{ color: BRAND_DARK }}>
+                    1300 TAYLR
+                  </span>
+                  .
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {visibleDays.map((d) => (
+              <DayBlock
+                key={d.date}
+                day={d}
+                selected={selected}
+                onSelect={(id) => setSelected(id)}
+                nextAvailableSlotId={nextAvailableSlotId}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="mt-8 rounded-xl border-2 border-slate-300 bg-slate-100 p-5 text-[16px] text-slate-800 shadow-sm">
           Need a different date? Call us on{" "}
@@ -302,7 +364,7 @@ export function SlotsAccessibleReadable() {
       <div className="border-t-[3px] border-slate-200 bg-white px-6 py-5 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button
           type="button"
-          disabled={!selected}
+          disabled={!selected || !!lockedByOther}
           data-testid="button-continue-mobile"
           className="flex w-full items-center justify-center gap-3 rounded-xl px-6 py-4 text-[18px] font-bold text-white shadow-md transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-900 disabled:opacity-60 disabled:cursor-not-allowed h-[52px]"
           style={{ backgroundColor: BRAND }}
@@ -316,10 +378,9 @@ export function SlotsAccessibleReadable() {
 }
 
 function DayBlock({
-  day, jobMinutes, selected, onSelect, nextAvailableSlotId,
+  day, selected, onSelect, nextAvailableSlotId,
 }: {
   day: Day;
-  jobMinutes: number;
   selected: string | null;
   onSelect: (id: string) => void;
   nextAvailableSlotId: string | null;
@@ -338,34 +399,42 @@ function DayBlock({
       <div className="flex flex-col gap-4">
         <SlotCard
           slot={day.morning}
-          jobMinutes={jobMinutes}
           icon={<Sunrise className="h-6 w-6 shrink-0" aria-hidden="true" />}
-          label="Morning"
-          hint="8am – 12pm"
+          label={WINDOW_LABEL.morning}
+          hint={WINDOW_TIME_RANGE.morning}
           selected={selected === day.morning.id}
           onClick={() => onSelect(day.morning.id)}
           isNextAvailable={day.morning.id === nextAvailableSlotId}
         />
         <SlotCard
           slot={day.afternoon}
-          jobMinutes={jobMinutes}
           icon={<Sun className="h-6 w-6 shrink-0" aria-hidden="true" />}
-          label="Afternoon"
-          hint="12pm – 5pm"
+          label={WINDOW_LABEL.afternoon}
+          hint={WINDOW_TIME_RANGE.afternoon}
           selected={selected === day.afternoon.id}
           onClick={() => onSelect(day.afternoon.id)}
           isNextAvailable={day.afternoon.id === nextAvailableSlotId}
         />
+        {day.evening && (
+          <SlotCard
+            slot={day.evening}
+            icon={<Moon className="h-6 w-6 shrink-0" aria-hidden="true" />}
+            label={WINDOW_LABEL.evening}
+            hint={WINDOW_TIME_RANGE.evening}
+            selected={selected === day.evening.id}
+            onClick={() => onSelect(day.evening!.id)}
+            isNextAvailable={day.evening.id === nextAvailableSlotId}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 function SlotCard({
-  slot, jobMinutes, icon, label, hint, selected, onClick, isNextAvailable,
+  slot, icon, label, hint, selected, onClick, isNextAvailable,
 }: {
   slot: Slot;
-  jobMinutes: number;
   icon: React.ReactNode;
   label: string;
   hint: string;
@@ -373,8 +442,7 @@ function SlotCard({
   onClick: () => void;
   isNextAvailable: boolean;
 }) {
-  const status = slotFitStatus(slot, jobMinutes);
-  const fits = status === "available";
+  const fits = slot.status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
   // Visual hint only — once the customer picks any slot the
@@ -383,11 +451,17 @@ function SlotCard({
   const showNextAvailable = isNextAvailable && !disabled && !isSelected;
 
   const reason =
-    status === "full" ? "Full" : "Not enough time left for this service";
+    slot.status === "full"
+      ? "Full"
+      : slot.status === "not_yet_open"
+        ? "Not yet open for booking"
+        : "Not enough time left for this service";
 
   let StatusIcon = null;
-  if (status === "full") StatusIcon = <XCircle className="h-6 w-6 shrink-0" aria-hidden="true" />;
-  else if (status === "not_enough_time") StatusIcon = <Lock className="h-6 w-6 shrink-0" aria-hidden="true" />;
+  if (slot.status === "full")
+    StatusIcon = <XCircle className="h-6 w-6 shrink-0" aria-hidden="true" />;
+  else if (slot.status === "not_enough_time" || slot.status === "not_yet_open")
+    StatusIcon = <Lock className="h-6 w-6 shrink-0" aria-hidden="true" />;
 
   return (
     <button
@@ -397,6 +471,7 @@ function SlotCard({
       data-testid={`mobile-slot-${slot.id}`}
       aria-pressed={isSelected}
       data-next-available={showNextAvailable ? "true" : undefined}
+      data-slot-status={slot.status}
       className={`relative flex w-full flex-row items-center gap-4 rounded-xl border-[3px] p-5 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-900 ${
         disabled
           ? "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-600"
