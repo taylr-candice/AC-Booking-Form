@@ -8,22 +8,8 @@ import { useModalA11y } from "../../../hooks/use-modal-a11y";
 const BRAND = "#ED017F";
 
 /**
- * "View terms" modal shown from the Schedule step's cancellation
- * acknowledgement (Task #121). Mirrors the visual pattern of
- * `AcTermsModal` so the two ack flows feel like one family — same
- * a11y hook, backdrop, close affordances and footer button.
- *
- * Body content:
- *  - Re-uses the existing two-paragraph policy from
- *    `CANCELLATION_POLICY_PARAGRAPHS` (48-hour notice, $125 fee,
- *    refund window). These paragraphs were the inline copy on Pay
- *    pre-Task-#121 — moving them here keeps a single source of truth.
- *  - Calls out who the cancellation fee falls to (the unit
- *    owner / leaseholder) so the universal tickbox label outside the
- *    modal stays role-agnostic.
- *  - Closes with a contact line that links the support inbox via
- *    `mailto:` and points back at `CANCELLATION_CONTACT_EMAIL` so the
- *    string lives in one place.
+ * "View terms" modal shown from the Schedule step's cancellation ack.
+ * Mirrors the visual pattern of `AcTermsModal`.
  */
 export function CancellationTermsModal({ onClose }: { onClose: () => void }) {
   const containerRef = useModalA11y<HTMLDivElement>({ onClose });

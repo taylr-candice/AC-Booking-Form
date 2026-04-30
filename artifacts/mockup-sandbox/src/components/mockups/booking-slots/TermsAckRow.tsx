@@ -1,15 +1,8 @@
 /**
  * Reusable "ack with summary + View terms link" panel used on the
- * Schedule step (Step 6). Shared treatment so the cancellation ack
- * (Task #121) and any future ack on this step (e.g. Task #124's
- * access-arrangement ack for unattended methods) read as one
- * "before you confirm" group instead of three different patterns.
- *
- * Visual: tickbox + summary label, with a discreet "View terms" link
- * to the right that opens a focused modal with the full policy.
- * Selected (ticked) state mirrors the picker's selection green
- * (`#5FBB97`) so the customer can tell at a glance which acks they've
- * already cleared.
+ * Schedule step. Tickbox + summary label, with a "View terms" link
+ * that opens a focused modal. Ticked state uses the picker's
+ * selection green (#5FBB97); unticked uses brand pink.
  */
 
 const BRAND = "#ED017F";
@@ -32,8 +25,6 @@ export function TermsAckRow({
   ackTestId: string;
   rowTestId: string;
   viewTermsTestId: string;
-  /** "compact" matches the existing be-there ack on Mobile / MobileLite;
-   *  "regular" gives slightly larger type and padding for Desktop. */
   size?: "compact" | "regular";
 }) {
   const isCompact = size === "compact";

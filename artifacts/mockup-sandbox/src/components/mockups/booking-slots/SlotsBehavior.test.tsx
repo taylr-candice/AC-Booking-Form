@@ -268,9 +268,9 @@ describe.each(VARIANTS)("$name slot picker", ({
 
   describe("be-there ack checkbox gates Confirm (Task #72)", () => {
     it("for be-there access methods: Confirm stays disabled until both the be-there ack and the cancellation ack are ticked", () => {
-      // owner_live_at_unit is a be-there method, so the ack checkbox
-      // must appear and gate Confirm. Task #121 adds a second gate —
-      // the cancellation-terms ack — that must also be ticked.
+      // owner_live_at_unit is a be-there method: the ack checkbox
+      // appears and both it and the cancellation ack must be ticked
+      // before Confirm enables.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -328,8 +328,7 @@ describe.each(VARIANTS)("$name slot picker", ({
     it("for non-be-there access methods: no be-there ack is rendered, but the cancellation ack still gates Confirm", () => {
       // owner_leased_leave_key is a non-be-there (key-holder) method.
       // The be-there ack must NOT be in the DOM, but the cancellation
-      // ack added by Task #121 still gates Confirm — the customer
-      // must tick it before picking the slot is enough.
+      // ack still gates Confirm.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -395,10 +394,6 @@ describe.each(VARIANTS)("$name slot picker", ({
     });
 
     it("uses the universal ack label that drops 'above' so it reads cleanly with the link to the modal", () => {
-      // Task #121: the label moved from "...terms above." (when the
-      // policy was inline above the tickbox on Pay) to a self-
-      // contained sentence so it reads naturally next to the
-      // separate "View terms" affordance on Schedule.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
