@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,23 +14,17 @@ import {
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
-import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
 import {
-  getLiveBookingsVersion,
-  subscribeLiveBookings,
-} from "../../../state/adminMockData";
-import {
-  alreadyScheduledByOther,
-  resolveCustomerSlotData,
   type CustomerDay,
   type CustomerSlot,
   WINDOW_TIME_RANGE,
 } from "../booking-slots/customerSlotData";
+import { useCustomerSlotPicker } from "../booking-slots/useCustomerSlotPicker";
 
 const BRAND = "#ED017F";
 const BRAND_DARK = "#B8005F"; // Darkened for AAA contrast against white
@@ -77,11 +71,10 @@ const WINDOW_LABEL: Record<Slot["window"], string> = {
 };
 
 export function SlotsAccessibleReadable() {
-  const [selected, setSelected] = useState<string | null>(null);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
-  
+
   const accessMethod = session.access_method;
   const unattended = isUnattendedAccessMethod(accessMethod);
   const selfAttended = isBeThereMethod(accessMethod);
@@ -91,37 +84,18 @@ export function SlotsAccessibleReadable() {
       ? "self-attended"
       : "coordinated";
   const showChangeAccess = selfAttended;
-  
+
   const accountabilityNudge =
     session.role === "agent"
       ? "you'll need to coordinate a second visit with the tenant"
       : "you'll need to be home for a second visit";
 
-  // Resolve the per-(service, building) rollout (Task #59) and pull
-  // its day rows, matching how `SlotsAffordanceForward` is wired.
-  // Past dates are filtered out so customers never see rows that have
-  // rolled by.
-  const slotData = useMemo(
-    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
-    [session.unit_id, jobMinutes],
-  );
-  const rollout = slotData.rollout;
-  const liveBookingsVersion = useSyncExternalStore(
-    subscribeLiveBookings,
-    getLiveBookingsVersion,
-    getLiveBookingsVersion,
-  );
-  const lockedByOther = useMemo(
-    () => {
-      void liveBookingsVersion;
-      return alreadyScheduledByOther(session.unit_id);
-    },
-    [session.unit_id, liveBookingsVersion],
-  );
-  const visibleDays = useMemo(
-    () => slotData.days.filter((d) => !isPastDate(d.date)),
-    [slotData.days],
-  );
+  // Shared customer slot-picker wiring (Task #214): rollout
+  // resolution, live-bookings subscription, past-date filtering, and
+  // the selected-slot invalidation effect all live in one place so
+  // every variant stays in sync.
+  const { rollout, visibleDays, lockedByOther, selected, setSelected } =
+    useCustomerSlotPicker(session.unit_id, jobMinutes);
 
   // Earliest bookable slot in view (morning before afternoon before
   // evening). Visual hint only — does not pre-select or change
@@ -136,17 +110,6 @@ export function SlotsAccessibleReadable() {
     }
     return null;
   }, [visibleDays]);
-
-  // If the customer's job size grows or the rollout shifts, an
-  // already-selected slot might no longer fit. Drop it so Continue
-  // can't carry stale, now-invalid state forward.
-  useEffect(() => {
-    if (!selected) return;
-    const stillValid = visibleDays
-      .flatMap(dayWindows)
-      .some((s) => s.id === selected && s.status === "available");
-    if (!stillValid) setSelected(null);
-  }, [selected, visibleDays]);
 
   return (
     <div className="flex h-[844px] w-[390px] flex-col overflow-hidden bg-white font-['Inter'] mx-auto border shadow-xl">
