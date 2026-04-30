@@ -93,13 +93,27 @@ const FILTER_CHIPS: ReadonlyArray<{ key: Filter; label: string }> = [
  * all ("Never logged"). Composed on top of the waiting-on chip,
  * building filter, and search.
  */
-type OutcomeFilter =
+export type OutcomeFilter =
   | "all"
   | "spoke"
   | "no_answer"
   | "voicemail"
   | "email"
   | "never_logged";
+
+/** Allow-list of every {@link OutcomeFilter} value the toolbar
+ *  knows how to render. Exported so the AdminApp URL-seed helper
+ *  can validate `?outcome=…` against the same source of truth the
+ *  chip row renders from — a stale or hand-edited param then
+ *  drops back to the reset rather than crashing the chip lookup. */
+export const OUTCOME_FILTER_VALUES: ReadonlyArray<OutcomeFilter> = [
+  "all",
+  "spoke",
+  "no_answer",
+  "voicemail",
+  "email",
+  "never_logged",
+];
 
 const OUTCOME_FILTER_CHIPS: ReadonlyArray<{
   key: OutcomeFilter;
@@ -275,6 +289,8 @@ export function AwaitingCoordinationView({
   onBuildingFilter,
   templateFilter,
   onTemplateFilter,
+  outcomeFilter,
+  onOutcomeFilter,
   search,
   onSearch,
   onOpen,
@@ -301,6 +317,16 @@ export function AwaitingCoordinationView({
    *  isolated tests. */
   templateFilter?: BookingsTemplateFilter;
   onTemplateFilter?: (filter: BookingsTemplateFilter) => void;
+  /** Active outcome chip (Spoke / No answer / Voicemail / Email /
+   *  Never logged) or `"all"` for the toolbar's reset state. Same
+   *  controlled-or-local pattern as `templateFilter`: when AdminApp
+   *  mounts us it lifts the state into shell-owned React state so
+   *  the chip can round-trip through `?outcome=…` (Task #227); when
+   *  a standalone test renders the view without wiring the prop,
+   *  the existing local fallback keeps the chip working in
+   *  isolation. */
+  outcomeFilter?: OutcomeFilter;
+  onOutcomeFilter?: (next: OutcomeFilter) => void;
   search: string;
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
@@ -458,10 +484,17 @@ export function AwaitingCoordinationView({
     () => findDefaultEmailTemplate(emailTemplates)?.note ?? "",
   );
 
-  // Outcome chip filter — local because no other view needs to know
-  // which outcome ops are pivoting on, and resetting it on view
-  // remount matches how the bulk-action selection behaves.
-  const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
+  // Outcome chip filter — controlled-or-local. AdminApp lifts this
+  // into shell state so the chip round-trips through `?outcome=…`
+  // (Task #227, mirroring the rest of the toolbar's URL-persisted
+  // filters); when neither prop is wired (standalone test harness)
+  // the local fallback below keeps the chip working in isolation.
+  const [localOutcomeFilter, setLocalOutcomeFilter] =
+    useState<OutcomeFilter>("all");
+  const activeOutcomeFilter: OutcomeFilter =
+    outcomeFilter !== undefined ? outcomeFilter : localOutcomeFilter;
+  const setOutcomeFilter: (next: OutcomeFilter) => void =
+    onOutcomeFilter ?? setLocalOutcomeFilter;
   // "Template used" filter — supports controlled (Bookings list shares
   // its lifted state with us via `templateFilter` / `onTemplateFilter`)
   // and uncontrolled (standalone test harnesses keep using the local
@@ -595,7 +628,7 @@ export function AwaitingCoordinationView({
   const filtered = coordinating.filter(
     ({ b, kind }) =>
       matchesNonOutcomeFilters(b, kind) &&
-      matchesOutcomeFilter(b, outcomeFilter),
+      matchesOutcomeFilter(b, activeOutcomeFilter),
   );
 
   // Pre-rollup of per-waiting-on counts. Mirror image of
@@ -610,7 +643,8 @@ export function AwaitingCoordinationView({
   const waitingOnCounts: Record<Filter, number> = (() => {
     const base = coordinating.filter(
       ({ b }) =>
-        matchesBuildingAndSearch(b) && matchesOutcomeFilter(b, outcomeFilter),
+        matchesBuildingAndSearch(b) &&
+        matchesOutcomeFilter(b, activeOutcomeFilter),
     );
     return {
       all: base.length,
@@ -1108,7 +1142,7 @@ export function AwaitingCoordinationView({
           Last attempt
         </span>
         {OUTCOME_FILTER_CHIPS.map((chip) => {
-          const active = outcomeFilter === chip.key;
+          const active = activeOutcomeFilter === chip.key;
           const count = outcomeCounts[chip.key];
           // Mute + disable chips with nothing in their queue so the
           // non-empty buckets stand out at a glance. The "Any outcome"

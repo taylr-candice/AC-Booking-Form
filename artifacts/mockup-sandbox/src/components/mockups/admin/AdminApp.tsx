@@ -86,7 +86,11 @@ import { writeLiveOtherServices } from "@/state/liveOtherServices";
 import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
-import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
+import {
+  AwaitingCoordinationView,
+  OUTCOME_FILTER_VALUES,
+  type OutcomeFilter,
+} from "./AwaitingCoordinationView";
 import {
   decodeTemplateFilter,
   encodeTemplateFilter,
@@ -144,6 +148,7 @@ const BOOKINGS_STATUS_FILTER_PARAM = "status";
 const BOOKINGS_BUILDING_FILTER_PARAM = "building";
 const BOOKINGS_SEARCH_PARAM = "q";
 const COORDINATION_FILTER_PARAM = "coordination";
+const OUTCOME_FILTER_PARAM = "outcome";
 
 /**
  * Generic single-param read/write pair the per-filter helpers
@@ -294,6 +299,35 @@ export function readCoordinationFilterFromURL(): "all" | CoordinationKind {
 
 function writeCoordinationFilterToURL(value: "all" | CoordinationKind): void {
   writeUrlParam(COORDINATION_FILTER_PARAM, value === "all" ? null : value);
+}
+
+/** Whitelist of every outcome chip the Awaiting-coordination toolbar
+ *  knows how to render, sourced directly from the chip row's own
+ *  source of truth ({@link OUTCOME_FILTER_VALUES}) so a future chip
+ *  added there is automatically allow-listed here too. Used by
+ *  {@link readOutcomeFilterFromURL} to drop unknown / stale
+ *  `?outcome=…` values back to the reset (`"all"`) instead of
+ *  smuggling an out-of-catalog string into the chip's `aria-pressed`
+ *  / count lookup. */
+const VALID_OUTCOME_FILTERS: ReadonlySet<string> = new Set<string>(
+  OUTCOME_FILTER_VALUES,
+);
+
+/** Read / write the Awaiting-coordination outcome chip from the URL.
+ *  Same reset-as-omitted contract as the rest of the queue toolbar:
+ *  picking the "Any outcome" chip removes the param so the URL of a
+ *  fresh visit is byte-identical to one where every filter was
+ *  manually cleared. Stale / malformed values fall back to `"all"`
+ *  the same way the status chip helper does (Task #207). */
+export function readOutcomeFilterFromURL(): OutcomeFilter {
+  const raw = readUrlParam(OUTCOME_FILTER_PARAM);
+  if (raw === null) return "all";
+  if (!VALID_OUTCOME_FILTERS.has(raw)) return "all";
+  return raw as OutcomeFilter;
+}
+
+function writeOutcomeFilterToURL(value: OutcomeFilter): void {
+  writeUrlParam(OUTCOME_FILTER_PARAM, value === "all" ? null : value);
 }
 
 /**
@@ -926,6 +960,19 @@ export function AdminApp() {
   useEffect(() => {
     writeCoordinationFilterToURL(coordinationFilter);
   }, [coordinationFilter]);
+  // Awaiting-coordination outcome chip (Spoke / No answer / Voicemail
+  // / Email / Never logged) — lifted into shell state so it
+  // round-trips through `?outcome=…` the same way the rest of the
+  // queue toolbar does (Task #227). Was previously component-local
+  // on AwaitingCoordinationView and reset on every refresh; now the
+  // initialiser seeds from the URL on first mount and the companion
+  // effect mirrors any subsequent state change back into the param.
+  const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>(() =>
+    readOutcomeFilterFromURL(),
+  );
+  useEffect(() => {
+    writeOutcomeFilterToURL(outcomeFilter);
+  }, [outcomeFilter]);
 
   function handleNav(id: ViewId) {
     setView(id);
@@ -947,6 +994,12 @@ export function AdminApp() {
     // identical to a fresh visit — otherwise a refresh would silently
     // re-apply a stale waiting-on filter from a prior session.
     setCoordinationFilter("all");
+    // Mirror the rest of the toolbar resets for the outcome chip
+    // too (Task #227): sidebar nav clears `?outcome=…` in lockstep
+    // with `?coordination=…`, `?building=…`, `?q=…`, etc., so a
+    // refresh after the explicit "fresh start" gesture re-mounts
+    // with no stale lens applied.
+    setOutcomeFilter("all");
     // Sidebar nav is an explicit "fresh start" gesture, so clear any
     // pending source-row highlight seed from a BookingDetail timeline
     // pivot — otherwise a later visit could light up the wrong row.
@@ -2215,6 +2268,8 @@ export function AdminApp() {
                 onBuildingFilter={setBookingsBuildingFilter}
                 templateFilter={bookingsTemplateFilter}
                 onTemplateFilter={setBookingsTemplateFilter}
+                outcomeFilter={outcomeFilter}
+                onOutcomeFilter={setOutcomeFilter}
                 search={search}
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}

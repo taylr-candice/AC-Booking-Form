@@ -37,6 +37,7 @@ import {
   readBookingsBuildingFilterFromURL,
   readBookingsStatusFilterFromURL,
   readCoordinationFilterFromURL,
+  readOutcomeFilterFromURL,
   readSearchFromURL,
 } from "./AdminApp";
 
@@ -198,6 +199,7 @@ describe("AdminApp · queue toolbar filters URL round-trip (Task #207)", () => {
     expect(readBookingsBuildingFilterFromURL()).toBe("all");
     expect(readSearchFromURL()).toBe("");
     expect(readCoordinationFilterFromURL()).toBe("all");
+    expect(readOutcomeFilterFromURL()).toBe("all");
   });
 
   it("the URL → state seed helpers all parse their respective params", () => {
@@ -211,12 +213,50 @@ describe("AdminApp · queue toolbar filters URL round-trip (Task #207)", () => {
     // boundary, mirroring how `readBookingsTemplateFilterFromURL`
     // is the symmetry boundary for the existing chip.
     setUrl(
-      "?status=cancelled&building=bldg-aspen&q=hello&coordination=awaiting_agent",
+      "?status=cancelled&building=bldg-aspen&q=hello&coordination=awaiting_agent" +
+        "&outcome=voicemail",
     );
     expect(readBookingsStatusFilterFromURL()).toBe("cancelled");
     expect(readBookingsBuildingFilterFromURL()).toBe("bldg-aspen");
     expect(readSearchFromURL()).toBe("hello");
     expect(readCoordinationFilterFromURL()).toBe("awaiting_agent");
+    expect(readOutcomeFilterFromURL()).toBe("voicemail");
+  });
+
+  it("ignores an unknown `?outcome=` value and falls back to All", () => {
+    // Mirror of the `?status=` / `?coordination=` defensive tests:
+    // a stale or hand-edited param shouldn't smuggle an out-of-
+    // catalog string into the chip's `aria-pressed` / count lookup.
+    setUrl("?outcome=spamoutcome");
+    render(<AdminApp />);
+    gotoAwaitingCoordination();
+
+    // The "Any outcome" chip is the only one pressed.
+    expect(screen.getByTestId("chip-outcome-all")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("writes `?outcome=` when an outcome chip is picked, removes it on Any outcome", () => {
+    render(<AdminApp />);
+    gotoAwaitingCoordination();
+    expect(readParam("outcome")).toBeNull();
+
+    // "Never logged" is the only outcome chip guaranteed to be
+    // enabled against the seeded data — most awaiting-coordination
+    // rows have no logged attempts yet, so its bucket is never zero.
+    // (The other outcome chips disable themselves when their
+    // bucket is empty, and the seeded queue only has a single
+    // logged email; an enabled chip is the contract we're pinning.)
+    fireEvent.click(screen.getByTestId("chip-outcome-never_logged"));
+    expect(readParam("outcome")).toBe("never_logged");
+
+    // Picking the "Any outcome" chip is the toolbar's reset value —
+    // the param must be removed so the URL is identical to a fresh
+    // visit, matching the rest of the queue-toolbar convention.
+    fireEvent.click(screen.getByTestId("chip-outcome-all"));
+    expect(readParam("outcome")).toBeNull();
   });
 
   it("writes `?coordination=` when the awaiting chip is picked, removes it on All", () => {
@@ -238,6 +278,7 @@ describe("AdminApp · queue toolbar filters URL round-trip (Task #207)", () => {
     // wipe Task #195 already pinned.
     setUrl(
       "?status=scheduled&building=bldg-aspen&q=aspen&coordination=awaiting_agent" +
+        "&outcome=voicemail" +
         `&template=${encodeURIComponent("email::Sent agent intro")}`,
     );
     render(<AdminApp />);
@@ -245,6 +286,7 @@ describe("AdminApp · queue toolbar filters URL round-trip (Task #207)", () => {
     expect(readParam("building")).toBe("bldg-aspen");
     expect(readParam("q")).toBe("aspen");
     expect(readParam("coordination")).toBe("awaiting_agent");
+    expect(readParam("outcome")).toBe("voicemail");
     expect(readParam("template")).toBe("email::Sent agent intro");
 
     gotoAwaitingCoordination();
@@ -258,6 +300,7 @@ describe("AdminApp · queue toolbar filters URL round-trip (Task #207)", () => {
     expect(readParam("building")).toBeNull();
     expect(readParam("q")).toBeNull();
     expect(readParam("coordination")).toBeNull();
+    expect(readParam("outcome")).toBeNull();
     expect(readParam("template")).toBeNull();
 
     gotoBookings();
