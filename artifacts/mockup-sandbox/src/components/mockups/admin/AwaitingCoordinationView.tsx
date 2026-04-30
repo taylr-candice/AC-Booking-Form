@@ -42,6 +42,7 @@ import {
   EMAIL_TEMPLATES,
   findDefaultCallTemplate,
   findDefaultEmailTemplate,
+  findUsageBookingsForTemplateOnDay,
   formatAttemptRecency,
   formatCoordinationWaiting,
   formatLastContacted,
@@ -49,12 +50,14 @@ import {
   getTemplateUsageTrend,
   latestCoordinationAttempt,
   SEEDED_AGENTS,
+  summarizeTemplateUsageBooking,
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
   type CallTemplate,
   type CoordinationKind,
   type EmailTemplate,
+  type TemplateUsageBooking,
   type TemplateUsageTrendPoint,
 } from "@/state/adminMockData";
 
@@ -269,6 +272,13 @@ type BulkTemplateOption = {
   label: string;
   isDefault: boolean;
   trend?: ReadonlyArray<TemplateUsageTrendPoint>;
+  /** Per-day list of bookings whose timeline touched this template on
+   *  each UTC day in the trend window (Task #209). Outer key is the
+   *  same `YYYY-MM-DD` date key the matching `trend` entry carries.
+   *  Drives the sparkline's day-scoped drill-down popover so admins
+   *  can investigate a spike from the bulk picker without bouncing
+   *  back to the Templates panel. Omit to leave bars non-interactive. */
+  bookingsByDay?: Readonly<Record<string, ReadonlyArray<TemplateUsageBooking>>>;
 };
 
 // Custom-dropdown picker for the bulk Log call / Log email forms.
@@ -285,6 +295,7 @@ function BulkTemplatePickerDropdown({
   options,
   value,
   onChange,
+  onOpenBooking,
 }: {
   triggerId: string;
   triggerTestId: string;
@@ -295,6 +306,12 @@ function BulkTemplatePickerDropdown({
   options: ReadonlyArray<BulkTemplateOption>;
   value: string;
   onChange: (id: string) => void;
+  /** Click-through handler for a booking row inside a sparkline's
+   *  day-scoped drill-down popover (Task #209). Wired to the same
+   *  `onOpen` the queue rows use so the admin lands on the matching
+   *  BookingDetail — consistent with the Templates panel behaviour.
+   *  Omit to leave the sparkline bars non-interactive. */
+  onOpenBooking?: (bookingId: string) => void;
 }) {
   const allRows: BulkTemplateOption[] = [
     { id: customId, label: customLabel, isDefault: false },
@@ -308,7 +325,25 @@ function BulkTemplatePickerDropdown({
     if (!open) return;
     function handlePointerDown(e: MouseEvent) {
       if (!containerRef.current) return;
-      if (!containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (containerRef.current.contains(target)) return;
+      // The per-option sparkline's day-scoped drill-down popover is
+      // portaled outside this dropdown's container (Task #209). Treat
+      // clicks landing inside it as inside the dropdown so the
+      // listbox stays mounted long enough for a booking-row click to
+      // fire its onClick before unmounting — otherwise the React
+      // re-render triggered by `setOpen(false)` here would unmount
+      // the popover before the click event lands on the row.
+      if (
+        target instanceof Element &&
+        target.closest(
+          `[data-testid^="${kind}-template-usage-sparkline-popover-"]`,
+        )
+      ) {
+        return;
+      }
+      setOpen(false);
     }
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -319,7 +354,7 @@ function BulkTemplatePickerDropdown({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [open]);
+  }, [open, kind]);
 
   return (
     <div ref={containerRef} className="relative flex-1">
@@ -350,18 +385,32 @@ function BulkTemplatePickerDropdown({
             const isSelected = row.id === value;
             return (
               <li key={row.id} className="m-0 list-none">
-                <button
-                  type="button"
+                {/* Option row is a `div` (not a `button`) so the
+                    sparkline's day-scoped drill-down popover (Task #209)
+                    — which renders its own nested `<button>` bars and
+                    booking-row buttons — can sit legally inside this
+                    row without nesting buttons. Click + Enter/Space
+                    keep the same picker semantics the original
+                    `<button role="option">` carried. */}
+                <div
                   role="option"
                   aria-selected={isSelected}
+                  tabIndex={-1}
                   onClick={() => {
                     onChange(row.id);
                     setOpen(false);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onChange(row.id);
+                      setOpen(false);
+                    }
+                  }}
                   data-testid={`${optionTestIdPrefix}-${row.id}`}
                   data-value={row.id}
                   data-selected={isSelected ? "true" : "false"}
-                  className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-slate-50"
+                  className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-slate-50"
                   style={
                     isSelected
                       ? {
@@ -387,15 +436,26 @@ function BulkTemplatePickerDropdown({
                     ) : null}
                   </span>
                   {row.trend ? (
-                    <span className="flex-none">
+                    /* Stop click propagation so a sparkline-bar click
+                       (open day-scoped popover) doesn't bubble up and
+                       trigger this option row's `onClick`, which would
+                       select the template and close the listbox before
+                       the popover ever opens. */
+                    <span
+                      className="flex-none"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <TemplateUsageSparkline
                         kind={kind}
                         templateId={`bulk-${row.id}`}
                         trend={row.trend}
+                        templateName={row.label}
+                        bookingsByDay={row.bookingsByDay}
+                        onOpenBooking={onOpenBooking}
                       />
                     </span>
                   ) : null}
-                </button>
+                </div>
               </li>
             );
           })}
@@ -1079,6 +1139,57 @@ export function AwaitingCoordinationView({
     }
     return out;
   }, [bookings, emailTemplates]);
+  // Per-template, per-day list of bookings whose timeline touched
+  // each template on each UTC day in the sparkline window (Task #209
+  // — mirror of `*TemplateUsageBookingsByDay` in AdminApp). Drives
+  // the click-to-drill-down popover the bulk template picker exposes
+  // alongside its sparkline so admins can investigate a spike from
+  // the Awaiting Coordination queue without bouncing back to the
+  // Templates panel. Only days with non-zero counts are pre-built —
+  // mirrors the sparkline's own zero-day skip so the two surfaces
+  // stay in lockstep.
+  const callTemplateBookingsByDay = useMemo(() => {
+    const out: Record<
+      string,
+      Record<string, TemplateUsageBooking[]>
+    > = {};
+    for (const t of callTemplates) {
+      const days = callTemplateTrends[t.id] ?? [];
+      const perDay: Record<string, TemplateUsageBooking[]> = {};
+      for (const point of days) {
+        if (point.count === 0) continue;
+        perDay[point.date] = findUsageBookingsForTemplateOnDay(
+          bookings,
+          "call",
+          t.name,
+          point.date,
+        ).map((b) => summarizeTemplateUsageBooking(b, units));
+      }
+      out[t.id] = perDay;
+    }
+    return out;
+  }, [bookings, callTemplates, callTemplateTrends, units]);
+  const emailTemplateBookingsByDay = useMemo(() => {
+    const out: Record<
+      string,
+      Record<string, TemplateUsageBooking[]>
+    > = {};
+    for (const t of emailTemplates) {
+      const days = emailTemplateTrends[t.id] ?? [];
+      const perDay: Record<string, TemplateUsageBooking[]> = {};
+      for (const point of days) {
+        if (point.count === 0) continue;
+        perDay[point.date] = findUsageBookingsForTemplateOnDay(
+          bookings,
+          "email",
+          t.name,
+          point.date,
+        ).map((b) => summarizeTemplateUsageBooking(b, units));
+      }
+      out[t.id] = perDay;
+    }
+    return out;
+  }, [bookings, emailTemplates, emailTemplateTrends, units]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -1644,9 +1755,11 @@ export function AwaitingCoordinationView({
                       label: tpl.name,
                       isDefault: tpl.isDefault ?? false,
                       trend: callTemplateTrends[tpl.id],
+                      bookingsByDay: callTemplateBookingsByDay[tpl.id],
                     }))}
                     value={bulkCallTemplateId}
                     onChange={handleSelectCallTemplate}
+                    onOpenBooking={onOpen}
                   />
                   {bulkSelectedCallIsDefault ? (
                     <span
@@ -1777,9 +1890,11 @@ export function AwaitingCoordinationView({
                       label: tpl.name,
                       isDefault: tpl.isDefault ?? false,
                       trend: emailTemplateTrends[tpl.id],
+                      bookingsByDay: emailTemplateBookingsByDay[tpl.id],
                     }))}
                     value={bulkEmailTemplateId}
                     onChange={handleSelectEmailTemplate}
+                    onOpenBooking={onOpen}
                   />
                   {bulkSelectedEmailIsDefault ? (
                     <span
