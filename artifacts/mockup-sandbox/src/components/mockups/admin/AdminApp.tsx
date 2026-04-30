@@ -20,7 +20,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   applyBulkLogEmail,
-  bookingDurationMinutes,
   buildRescheduledTimelineEntry,
   CALL_TEMPLATES,
   consumeBookingCapacity,
@@ -65,7 +64,6 @@ import {
   setLiveServiceCatalogueSource,
   setLiveUnitsSource,
   summarizeTemplateUsageBooking,
-  updateRolloutSlot,
   type AdminAgent,
   type AdminBooking,
   type AdminBuilding,
@@ -2081,28 +2079,23 @@ export function AdminApp() {
     setSeededBookings((prev) => [booking, ...prev]);
     if (schedule.kind === "slot") {
       const rollout = findRolloutForBooking("svc-ac", booking.unitId);
-      if (rollout) {
-        const day = rollout.days.find((d) => d.isoDate === schedule.date);
-        const slot = day
-          ? schedule.window === "morning"
-            ? day.morning
-            : schedule.window === "afternoon"
-              ? day.afternoon
-              : day.evening
-          : null;
-        if (slot) {
-          if (rollout.capacityModel === "slots_per_window") {
-            updateRolloutSlot(rollout.id, schedule.date, schedule.window, {
-              bookedCount: (slot.bookedCount ?? 0) + 1,
-            });
-          } else {
-            const jobMin = bookingDurationMinutes(booking);
-            updateRolloutSlot(rollout.id, schedule.date, schedule.window, {
-              bookedMinutes: slot.bookedMinutes + jobMin,
-            });
-          }
-          bumpRolloutsRefreshKey();
-        }
+      // Funnel admin phone-booking capacity bumps through the same
+      // helper as Coordination → Scheduled and reschedule. That is
+      // what re-evaluates the rollout's release strategy after every
+      // confirm and writes a `system` audit row when an auto-flip
+      // lands. Calling `updateRolloutSlot` directly here would skip
+      // `evaluateAutoRelease` and the new admin booking would never
+      // trip the auto-release ladder. (Task #123, T005.)
+      if (
+        rollout &&
+        consumeBookingCapacity(
+          booking,
+          rollout.id,
+          schedule.date,
+          schedule.window,
+        )
+      ) {
+        bumpRolloutsRefreshKey();
       }
     }
     closeNewBooking();
