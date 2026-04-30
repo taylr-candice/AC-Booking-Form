@@ -11,7 +11,6 @@
  */
 
 import { Building2, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 
 import {
   formatRolloutDateRange,
@@ -22,6 +21,7 @@ import {
 } from "@/state/adminMockData";
 
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+import { useFocusedRowHighlight } from "./useFocusedRowHighlight";
 
 export function BuildingsView({
   buildings,
@@ -52,69 +52,19 @@ export function BuildingsView({
    *  RolloutsView callback. */
   onFocusedRowConsumed?: () => void;
 }) {
-  // Source-row highlight (Task #216): mirror of the same machinery
-  // in {@link BookingsView} / {@link AwaitingCoordinationView} /
-  // {@link RolloutsView} so an admin pivoting back into this list
-  // (via the BuildingDetail "Back to buildings" button) lands on a
-  // visibly highlighted source row instead of losing their place on
-  // a long buildings list. Persistent BRAND_SOFT tint + one-shot
-  // pulse + scroll-into-view, dismissed on first interaction
-  // (scroll / mousedown / keydown). Seeded from
-  // `initialFocusedRowId` so first paint already carries the
-  // highlight; re-seeded via the effect below when a fresh non-null
-  // value lands mid-life.
-  const [focusedRowId, setFocusedRowId] = useState<string | null>(
-    initialFocusedRowId ?? null,
-  );
-  const [pulseRowId, setPulseRowId] = useState<string | null>(null);
-  const rowRefs = useRef<Map<string, HTMLElement | null>>(new Map());
-  // Re-apply when the parent hands us a fresh non-null seed mid-life
-  // (admin pivots, dismisses, navigates away, pivots again into the
-  // same component instance). Notify the parent so it can clear its
-  // slot — otherwise unrelated re-renders would re-apply the
-  // highlight after dismissal.
-  useEffect(() => {
-    if (initialFocusedRowId) {
-      setFocusedRowId(initialFocusedRowId);
-      setPulseRowId(initialFocusedRowId);
-      onFocusedRowConsumed?.();
-    }
-    // Depend on seed value only, not callback identity — re-running
-    // on consume-callback re-creation would defeat the one-shot
-    // handoff invariant. Mirrors RolloutsView's approach.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialFocusedRowId]);
-  useEffect(() => {
-    if (!focusedRowId) return;
-    const row = rowRefs.current.get(focusedRowId);
-    if (row && typeof row.scrollIntoView === "function") {
-      row.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
-  }, [focusedRowId]);
-  // Drop the pulse marker after the keyframe plays (1100ms = 1s
-  // animation + small buffer so the class survives the final frame).
-  useEffect(() => {
-    if (!pulseRowId) return;
-    const t = setTimeout(() => setPulseRowId(null), 1100);
-    return () => clearTimeout(t);
-  }, [pulseRowId]);
-  // Dismiss on first interaction. Listeners are scoped to the
-  // focus-id lifecycle so the originating click can't dismiss
-  // mid-flight, and a subsequent pivot re-arms a fresh dismissal.
-  useEffect(() => {
-    if (!focusedRowId) return;
-    function dismiss() {
-      setFocusedRowId(null);
-    }
-    window.addEventListener("scroll", dismiss, { passive: true, capture: true });
-    window.addEventListener("mousedown", dismiss, true);
-    window.addEventListener("keydown", dismiss, true);
-    return () => {
-      window.removeEventListener("scroll", dismiss, true);
-      window.removeEventListener("mousedown", dismiss, true);
-      window.removeEventListener("keydown", dismiss, true);
-    };
-  }, [focusedRowId]);
+  // Source-row highlight (Task #216 + #217): shared with
+  // {@link BookingsView} / {@link AwaitingCoordinationView} /
+  // {@link RolloutsView} via {@link useFocusedRowHighlight} so an
+  // admin pivoting back into this list (via the BuildingDetail
+  // "Back to buildings" button) lands on a visibly highlighted
+  // source row instead of losing their place on a long buildings
+  // list. Persistent BRAND_SOFT tint + one-shot pulse + scroll-
+  // into-view, dismissed on first interaction (scroll / mousedown
+  // / keydown), never re-applied on subsequent re-renders.
+  const { focusedRowProps } = useFocusedRowHighlight<HTMLTableRowElement>({
+    initialFocusedRowId,
+    onFocusedRowConsumed,
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -166,14 +116,11 @@ export function BuildingsView({
                         (summary.bookedUnits / summary.totalUnits) * 100,
                       )
                     : 0;
-                const isFocused = focusedRowId === building.id;
-                const isPulsing = pulseRowId === building.id;
+                const focusProps = focusedRowProps(building.id);
                 return (
                   <tr
                     key={building.id}
-                    ref={(el) => {
-                      rowRefs.current.set(building.id, el);
-                    }}
+                    ref={focusProps.ref}
                     onClick={() => onOpen(building.id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -185,14 +132,10 @@ export function BuildingsView({
                     role="button"
                     aria-label={`Open ${building.name}`}
                     data-testid={`buildings-row-${building.id}`}
-                    data-focused={isFocused ? "true" : undefined}
-                    data-pulsing={isPulsing ? "true" : undefined}
-                    className={`cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500${
-                      isPulsing ? " template-row-focus-pulse" : ""
-                    }`}
-                    style={
-                      isFocused ? { backgroundColor: BRAND_SOFT } : undefined
-                    }
+                    data-focused={focusProps["data-focused"]}
+                    data-pulsing={focusProps["data-pulsing"]}
+                    className={`cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500${focusProps.pulseClassName}`}
+                    style={focusProps.style}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
