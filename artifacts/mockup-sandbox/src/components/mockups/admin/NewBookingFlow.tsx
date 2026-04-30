@@ -15,7 +15,7 @@
  * the rollout's `capacityModel`).
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -53,6 +53,12 @@ import {
   formatDurationMinutes,
   getBookingDurationMinutes,
 } from "@/state/bookingDerived";
+
+import { useLiveAcCaps } from "@/components/mockups/booking-pages/acStepShared";
+import {
+  DEFAULT_AC_INDOOR_CAPS,
+  type LiveAcCaps,
+} from "@/state/liveAcServices";
 
 import { FormField } from "./atoms";
 import { capacityModelColor, RolloutDayCell } from "./rolloutSlotPicker";
@@ -699,6 +705,31 @@ function Step2Ac({
   });
   const jobMin = derivedJobMinutes(form);
 
+  // Per-AC-type cap on the "Additional indoor units" stepper —
+  // mirrors the customer-facing AC step (Task #222 / #232) so ops
+  // only has one knob (Admin → Services) and a staff member can't
+  // book a quantity the customer flow would refuse. Reads the live
+  // bridge via {@link useLiveAcCaps} so edits in Admin → Services
+  // flow through to this stepper without remounting. `null` while
+  // the staff still has "Not sure" selected — the stepper isn't
+  // rendered in that branch.
+  const liveAcCaps = useLiveAcCaps();
+  const additionalMaxQty: number | null =
+    form.acType === "split" || form.acType === "ducted"
+      ? resolveAdditionalCap(liveAcCaps, form.acType)
+      : null;
+  const additionalAtCap =
+    additionalMaxQty !== null && form.acAdditional >= additionalMaxQty;
+
+  // If the catalogue cap shrinks while the staff is mid-form (or
+  // they switch from ducted → split where the cap is lower), clamp
+  // the local count down so it never sits above the live cap.
+  useEffect(() => {
+    if (additionalMaxQty !== null && form.acAdditional > additionalMaxQty) {
+      setForm((s) => ({ ...s, acAdditional: additionalMaxQty }));
+    }
+  }, [additionalMaxQty, form.acAdditional, setForm]);
+
   return (
     <div className="grid gap-5 md:grid-cols-2">
       <div className="flex flex-col gap-3">
@@ -797,9 +828,19 @@ function Step2Ac({
               <NumberStepper
                 value={form.acAdditional}
                 min={0}
-                max={10}
+                max={additionalMaxQty ?? 10}
                 onChange={(n) => setForm((s) => ({ ...s, acAdditional: n }))}
+                incrementTitle={
+                  additionalAtCap && additionalMaxQty !== null
+                    ? `Max ${additionalMaxQty} — call us for more`
+                    : undefined
+                }
               />
+              {additionalAtCap && additionalMaxQty !== null && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Max {additionalMaxQty} — call us for more.
+                </p>
+              )}
             </FormField>
           </div>
         )}
@@ -852,11 +893,16 @@ function NumberStepper({
   min,
   max,
   onChange,
+  incrementTitle,
 }: {
   value: number;
   min: number;
   max: number;
   onChange: (n: number) => void;
+  /** Hover hint for the "+" button — used to surface the
+   *  per-AC-type cap message ("Max N — call us for more") at the
+   *  cap, mirroring the customer-facing AC stepper (Task #232). */
+  incrementTitle?: string;
 }) {
   return (
     <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white">
@@ -875,12 +921,31 @@ function NumberStepper({
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
+        title={incrementTitle}
         className="rounded-r-lg px-3 py-1.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
       >
         +
       </button>
     </div>
   );
+}
+
+/**
+ * Resolve the "Additional indoor units" cap for the given AC type
+ * from the live AC services bridge (Task #232). Mirrors the
+ * customer-facing wiring in `acStepShared.tsx`: prefer the live
+ * projection from Admin → Services, otherwise fall back to
+ * {@link DEFAULT_AC_INDOOR_CAPS} so the cap still applies in
+ * canvas-isolated previews and on fresh loads before AdminApp's
+ * `useEffect` has projected its catalogue values.
+ */
+function resolveAdditionalCap(
+  caps: LiveAcCaps,
+  acTypeKey: "split" | "ducted",
+): number {
+  const live = caps[acTypeKey];
+  if (live != null && live > 0) return Math.floor(live);
+  return DEFAULT_AC_INDOOR_CAPS[acTypeKey];
 }
 
 // ─── Step 3: Schedule ──────────────────────────────────────────────────────
