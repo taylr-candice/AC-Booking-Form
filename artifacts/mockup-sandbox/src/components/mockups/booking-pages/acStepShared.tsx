@@ -667,39 +667,33 @@ export function UnsureMergedCard({
   variant: Variant;
 }) {
   const isMobile = variant === "mobile";
-  const padding = isMobile ? "p-4" : "p-6";
-  const iconBox = isMobile ? "h-9 w-9" : "h-10 w-10";
-  const headingSize = isMobile ? "text-[15px]" : "text-lg";
-  const bodySize = isMobile ? "text-[12px]" : "text-sm";
-  const actionMt = isMobile ? "mt-3" : "mt-3";
+  const padding = isMobile ? "p-3" : "p-4";
+  const headingSize = isMobile ? "text-[13px]" : "text-sm";
+  const bodySize = isMobile ? "text-[12px]" : "text-[13px]";
   const actionSize = isMobile ? "text-[11px]" : "text-xs";
-  const contextSize = isMobile ? "text-[11px]" : "text-xs";
+  const contextSize = isMobile ? "text-[10px]" : "text-[11px]";
 
   return (
     <div
-      className={`rounded-xl border border-slate-200 bg-white ${padding} shadow-sm`}
+      className={`rounded-lg border border-slate-200 bg-slate-50 ${padding}`}
       data-testid="card-unsure-merged"
     >
-      <div className="flex items-start gap-3">
-        <div
-          className={`grid ${iconBox} shrink-0 place-items-center rounded-full bg-slate-100 text-slate-500`}
-        >
-          <RefreshCw className="h-4 w-4" />
-        </div>
-        <div className="flex-1">
-          <h3 className={`font-semibold text-slate-900 ${headingSize}`}>
+      <div className="flex items-start gap-2.5">
+        <RefreshCw className="h-3.5 w-3.5 shrink-0 mt-0.5 text-slate-400" />
+        <div className="flex-1 min-w-0">
+          <h3 className={`font-semibold text-slate-700 ${headingSize}`}>
             We’ll confirm your setup during the service
           </h3>
           {contextLine && (
             <p
-              className={`mt-1 ${contextSize} font-medium uppercase tracking-wide text-slate-500`}
+              className={`mt-1 ${contextSize} font-medium uppercase tracking-wide text-slate-400`}
               data-testid="text-unsure-context"
             >
               {contextLine}
             </p>
           )}
           <p
-            className={`mt-2 ${bodySize} text-slate-600 leading-relaxed`}
+            className={`mt-1.5 ${bodySize} text-slate-500 leading-relaxed`}
           >
             We’ll book a default of 1 system (${SYSTEM_PRICE}). If our
             technician finds extras on the day, we’ll invoice you for
@@ -708,33 +702,35 @@ export function UnsureMergedCard({
               type="button"
               onClick={onViewTerms}
               data-testid="link-view-terms-unsure"
-              className="font-medium underline underline-offset-2 hover:opacity-80"
-              style={{ color: BRAND }}
+              className="underline underline-offset-2 text-slate-600 hover:text-slate-900"
             >
               see terms
             </button>
             .
           </p>
-          {onUndoCount && (
-            <button
-              type="button"
-              onClick={onUndoCount}
-              data-testid="button-undo-not-sure"
-              className={`${actionMt} ${actionSize} font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900`}
-            >
-              ← I’d like to enter the count myself
-            </button>
-          )}
-          {onChangeType && (
-            <button
-              type="button"
-              onClick={onChangeType}
-              data-testid="button-change-ac-type-unsure"
-              className={`${actionMt} ${actionSize} font-medium underline underline-offset-2 hover:opacity-80`}
-              style={{ color: BRAND }}
-            >
-              Change AC type
-            </button>
+          {(onUndoCount || onChangeType) && (
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              {onUndoCount && (
+                <button
+                  type="button"
+                  onClick={onUndoCount}
+                  data-testid="button-undo-not-sure"
+                  className={`${actionSize} text-slate-500 underline underline-offset-2 hover:text-slate-900`}
+                >
+                  ← I’d like to enter the count myself
+                </button>
+              )}
+              {onChangeType && (
+                <button
+                  type="button"
+                  onClick={onChangeType}
+                  data-testid="button-change-ac-type-unsure"
+                  className={`${actionSize} text-slate-500 underline underline-offset-2 hover:text-slate-900`}
+                >
+                  Change AC type
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
