@@ -22,7 +22,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { accessOnTheDayDescription } from "@/state/accessMethodCatalog";
 import {
@@ -35,6 +35,7 @@ import {
   EMAIL_TEMPLATE_CUSTOM_LABEL,
   findDefaultCallTemplate,
   findDefaultEmailTemplate,
+  getTemplateUsageTrend,
   isCustomCallTemplateLabel,
   isCustomEmailTemplateLabel,
   EMAIL_TEMPLATES,
@@ -53,12 +54,14 @@ import {
   type CoordinationContact,
   type EmailTemplate,
   type ServiceStatus,
+  type TemplateUsageTrendPoint,
   type TimelineEntry,
 } from "@/state/adminMockData";
 
 import { Card, Field } from "./atoms";
 import { CancelBookingModal } from "./CancelBookingModal";
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
+import { TemplatePickerDropdown } from "./TemplatePickerDropdown";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 import { UndoConflictDialog, type UndoConflictTakenBy } from "./UndoConflictDialog";
 
@@ -256,6 +259,29 @@ export function BookingDetail({
   useEffect(() => {
     setNotes(booking?.notes ?? "");
   }, [booking?.id, booking?.notes]);
+
+  // Per-template rolling 7-day usage trends, keyed by template id —
+  // computed live off the full bookings list so the per-row Log call /
+  // Log email pickers can show the same sparkline + "+N this week"
+  // delta the bulk pickers and templates panels do (Task #205). Same
+  // snapshot-on-use semantics: matches by the snapshot `templateLabel`
+  // each timeline entry already carries, so a renamed template surfaces
+  // its current name in the picker while historical entries keep their
+  // original label.
+  const callTemplateTrends = useMemo(() => {
+    const out: Record<string, ReadonlyArray<TemplateUsageTrendPoint>> = {};
+    for (const t of callTemplates) {
+      out[t.id] = getTemplateUsageTrend(bookings, "call", t.name);
+    }
+    return out;
+  }, [bookings, callTemplates]);
+  const emailTemplateTrends = useMemo(() => {
+    const out: Record<string, ReadonlyArray<TemplateUsageTrendPoint>> = {};
+    for (const t of emailTemplates) {
+      out[t.id] = getTemplateUsageTrend(bookings, "email", t.name);
+    }
+    return out;
+  }, [bookings, emailTemplates]);
 
   if (!booking) {
     return (
@@ -686,6 +712,8 @@ export function BookingDetail({
                 }
                 emailTemplates={emailTemplates}
                 callTemplates={callTemplates}
+                callTemplateTrends={callTemplateTrends}
+                emailTemplateTrends={emailTemplateTrends}
               />
             ) : (
               <AccessOnTheDayPanel
@@ -1256,6 +1284,8 @@ function CoordinationCoordinatePanel({
   onScheduleCoordination,
   emailTemplates,
   callTemplates,
+  callTemplateTrends,
+  emailTemplateTrends,
 }: {
   booking: AdminBooking;
   contact: CoordinationContact | null;
@@ -1281,6 +1311,13 @@ function CoordinationCoordinatePanel({
   onScheduleCoordination?: () => void;
   emailTemplates: ReadonlyArray<EmailTemplate>;
   callTemplates: ReadonlyArray<CallTemplate>;
+  /** Per-template rolling 7-day usage trends, keyed by template id —
+   *  threaded down from {@link BookingDetail} so the per-row Log call
+   *  picker can show the same sparkline + "+N this week" delta the
+   *  bulk picker on Awaiting-coordination shows (Task #205). */
+  callTemplateTrends: Record<string, ReadonlyArray<TemplateUsageTrendPoint>>;
+  /** Mirror of {@link callTemplateTrends} for the email channel. */
+  emailTemplateTrends: Record<string, ReadonlyArray<TemplateUsageTrendPoint>>;
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
   const lastContacted = formatLastContacted(booking.lastContactedAt);
@@ -1397,6 +1434,7 @@ function CoordinationCoordinatePanel({
           onCancel={onCloseLogCall}
           onSubmit={onLogCall}
           callTemplates={callTemplates}
+          callTemplateTrends={callTemplateTrends}
         />
       )}
       {showLogEmail && canLog && (
@@ -1404,6 +1442,7 @@ function CoordinationCoordinatePanel({
           onCancel={onCloseLogEmail}
           onSubmit={onLogEmail}
           emailTemplates={emailTemplates}
+          emailTemplateTrends={emailTemplateTrends}
         />
       )}
     </div>
@@ -1526,6 +1565,7 @@ function LogCallForm({
   onCancel,
   onSubmit,
   callTemplates,
+  callTemplateTrends,
 }: {
   onCancel: () => void;
   onSubmit: (
@@ -1541,6 +1581,11 @@ function LogCallForm({
    *  literal strings — never a template id — so editing or removing
    *  a template later never rewrites the historical timeline entry. */
   callTemplates: ReadonlyArray<CallTemplate>;
+  /** Per-template rolling 7-day usage trends, keyed by template id —
+   *  rendered as the per-option sparkline in the visual dropdown so a
+   *  single-row Log call shows the same usage hint the bulk picker
+   *  shows on the Awaiting-coordination queue (Task #205). */
+  callTemplateTrends: Record<string, ReadonlyArray<TemplateUsageTrendPoint>>;
 }) {
   // Template picker mirrors the bulk-log-call form on
   // `AwaitingCoordinationView` (and the per-row Log email form
@@ -1620,13 +1665,22 @@ function LogCallForm({
       >
         Template
       </label>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-1 flex items-start gap-2">
+        {/* Sr-only mirror of the dropdown's selection so the form-
+            control plumbing and existing change-event tests
+            (`select-call-template`) keep working. The visible
+            {@link TemplatePickerDropdown} below is the rich picker
+            that carries the per-option sparkline + "+N this week"
+            delta — same shared component the bulk picker on
+            Awaiting-coordination uses (Task #205). */}
         <select
           id="log-call-template"
           value={templateId}
           onChange={(e) => handleSelectTemplate(e.target.value)}
           data-testid="select-call-template"
-          className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+          className="sr-only"
+          aria-hidden="true"
+          tabIndex={-1}
         >
           <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
           {callTemplates.map((tpl) => (
@@ -1635,10 +1689,27 @@ function LogCallForm({
             </option>
           ))}
         </select>
+        <TemplatePickerDropdown
+          triggerId="log-call-template-trigger"
+          triggerTestId="trigger-row-call-template"
+          optionTestIdPrefix="option-row-call-template"
+          sparklineTemplateIdPrefix="row-"
+          kind="call"
+          customId={CALL_TEMPLATE_CUSTOM_ID}
+          customLabel="Custom…"
+          options={callTemplates.map((tpl) => ({
+            id: tpl.id,
+            label: tpl.name,
+            isDefault: tpl.isDefault ?? false,
+            trend: callTemplateTrends[tpl.id],
+          }))}
+          value={templateId}
+          onChange={handleSelectTemplate}
+        />
         {selectedCallIsDefault ? (
           <span
             data-testid="pill-default-selected-call-template"
-            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+            className="inline-flex flex-none items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
             title="Default Call template"
           >
             <Star className="h-2.5 w-2.5" fill="currentColor" />
@@ -1706,6 +1777,7 @@ function LogEmailForm({
   onCancel,
   onSubmit,
   emailTemplates,
+  emailTemplateTrends,
 }: {
   onCancel: () => void;
   /** Receives the literal subject + note typed into the form, plus the
@@ -1728,6 +1800,11 @@ function LogEmailForm({
    *  editing or removing a template later never rewrites the
    *  historical timeline entry. */
   emailTemplates: ReadonlyArray<EmailTemplate>;
+  /** Per-template rolling 7-day usage trends, keyed by template id —
+   *  rendered as the per-option sparkline in the visual dropdown so a
+   *  single-row Log email shows the same usage hint the bulk picker
+   *  shows on the Awaiting-coordination queue (Task #205). */
+  emailTemplateTrends: Record<string, ReadonlyArray<TemplateUsageTrendPoint>>;
 }) {
   // Template picker mirrors the bulk-log-email form on
   // `AwaitingCoordinationView` so a single-booking email logged here
@@ -1828,13 +1905,22 @@ function LogEmailForm({
       >
         Template
       </label>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-1 flex items-start gap-2">
+        {/* Sr-only mirror of the dropdown's selection so the form-
+            control plumbing and existing change-event tests
+            (`select-email-template`) keep working. The visible
+            {@link TemplatePickerDropdown} below is the rich picker
+            that carries the per-option sparkline + "+N this week"
+            delta — same shared component the bulk picker on
+            Awaiting-coordination uses (Task #205). */}
         <select
           id="log-email-template"
           value={templateId}
           onChange={(e) => handleSelectTemplate(e.target.value)}
           data-testid="select-email-template"
-          className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+          className="sr-only"
+          aria-hidden="true"
+          tabIndex={-1}
         >
           <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
           {emailTemplates.map((tpl) => (
@@ -1843,10 +1929,27 @@ function LogEmailForm({
             </option>
           ))}
         </select>
+        <TemplatePickerDropdown
+          triggerId="log-email-template-trigger"
+          triggerTestId="trigger-row-email-template"
+          optionTestIdPrefix="option-row-email-template"
+          sparklineTemplateIdPrefix="row-"
+          kind="email"
+          customId={EMAIL_TEMPLATE_CUSTOM_ID}
+          customLabel="Custom…"
+          options={emailTemplates.map((tpl) => ({
+            id: tpl.id,
+            label: tpl.name,
+            isDefault: tpl.isDefault ?? false,
+            trend: emailTemplateTrends[tpl.id],
+          }))}
+          value={templateId}
+          onChange={handleSelectTemplate}
+        />
         {selectedEmailIsDefault ? (
           <span
             data-testid="pill-default-selected-email-template"
-            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+            className="inline-flex flex-none items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
             title="Default Email template"
           >
             <Star className="h-2.5 w-2.5" fill="currentColor" />
