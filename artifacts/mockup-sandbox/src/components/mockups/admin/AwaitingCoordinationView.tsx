@@ -67,15 +67,13 @@ import {
   type CallOutcome,
 } from "./BookingDetail";
 import {
-  decodeTemplateFilter,
-  encodeTemplateFilter,
   matchesTemplateFilter,
-  TEMPLATE_FILTER_ALL_VALUE,
   templateFilterIsMissingFromCatalogs,
   type BookingsTemplateFilter,
 } from "./bookingsTemplateFilter";
 import { CustomerCell } from "./BookingsView";
 import { PaymentChip } from "./chips";
+import { TemplateFilterSelect } from "./TemplateFilterSelect";
 import { TemplateUsageSparkline } from "./TemplateUsageSparkline";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
@@ -1385,74 +1383,20 @@ export function AwaitingCoordinationView({
               `matchesTemplateFilter`). Composes with the existing
               waiting-on chip, building filter, search, and outcome
               chip. The sentinel "All templates" value is the
-              toolbar's reset / clearable affordance. */}
-          {(emailTemplates.length > 0 ||
-            callTemplates.length > 0 ||
-            activeFilterIsMissing) && (
-            <select
-              value={encodeTemplateFilter(activeTemplateFilter)}
-              onChange={(e) =>
-                setTemplateFilter(decodeTemplateFilter(e.target.value))
-              }
-              aria-label="Filter by template used"
-              data-testid="coordination-filter-template"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
-            >
-              <option value={TEMPLATE_FILTER_ALL_VALUE}>All templates</option>
-              {/* Synthetic option for an active filter whose snapshot
-                  name no longer maps to any catalog row in its
-                  channel. Mirrors the BookingsView dropdown
-                  (Task #162) — without this, the controlled
-                  `<select>` silently displays the wrong row
-                  (browsers render the first option when the bound
-                  value matches no option), so the dropdown would
-                  lie about what's filtering the queue. The
-                  "(no longer in catalog)" suffix lets an ops lead
-                  notice the lens has gone stale at a glance. The
-                  chip below (`coordination-template-filter-chip`)
-                  carries the same signal in long-form. The render
-                  gate above also includes `activeFilterIsMissing`
-                  so the dropdown stays mounted even when both
-                  catalogs are empty — otherwise the only "switch
-                  templates" affordance would disappear from the
-                  toolbar exactly when the lens is most confusing. */}
-              {activeFilterIsMissing && (
-                <optgroup label="No longer in catalog">
-                  <option
-                    key="missing-active-filter"
-                    value={encodeTemplateFilter(activeTemplateFilter)}
-                    data-testid="coordination-filter-template-missing-option"
-                  >
-                    {activeTemplateFilter!.name} (no longer in catalog)
-                  </option>
-                </optgroup>
-              )}
-              {callTemplates.length > 0 && (
-                <optgroup label="Call templates">
-                  {callTemplates.map((t) => (
-                    <option
-                      key={`call-${t.id}`}
-                      value={encodeTemplateFilter({ kind: "call", name: t.name })}
-                    >
-                      {t.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {emailTemplates.length > 0 && (
-                <optgroup label="Email templates">
-                  {emailTemplates.map((t) => (
-                    <option
-                      key={`email-${t.id}`}
-                      value={encodeTemplateFilter({ kind: "email", name: t.name })}
-                    >
-                      {t.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          )}
+              toolbar's reset / clearable affordance. The picker
+              itself is the shared `TemplateFilterSelect` the
+              Bookings list also mounts, so the render gate (length
+              gate plus `activeFilterIsMissing`), synthetic missing
+              option, optgroup ordering, and encode/decode wiring
+              can never drift between the two toolbars (Task #220). */}
+          <TemplateFilterSelect
+            value={activeTemplateFilter}
+            onChange={setTemplateFilter}
+            callTemplates={callTemplates}
+            emailTemplates={emailTemplates}
+            activeFilterIsMissing={activeFilterIsMissing}
+            testIdPrefix="coordination-filter-template"
+          />
         </div>
         <div
           className="flex flex-wrap items-center gap-1.5"

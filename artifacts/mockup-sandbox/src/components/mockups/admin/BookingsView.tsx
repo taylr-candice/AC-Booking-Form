@@ -23,13 +23,11 @@ import {
 } from "@/state/adminMockData";
 
 import {
-  decodeTemplateFilter,
-  encodeTemplateFilter,
   matchesTemplateFilter,
-  TEMPLATE_FILTER_ALL_VALUE,
   templateFilterIsMissingFromCatalogs,
   type BookingsTemplateFilter,
 } from "./bookingsTemplateFilter";
+import { TemplateFilterSelect } from "./TemplateFilterSelect";
 import type { UndoCancelResult } from "./BookingDetail";
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
 import { InvoiceVoidAlerts } from "./InvoiceVoidAlerts";
@@ -541,72 +539,22 @@ export function BookingsView({
               usage popover). Composes with the existing status,
               building, and search filters. The sentinel "All
               templates" value is the toolbar's reset / clearable
-              affordance — admins flip back to it to drop the lens. */}
-          {(emailTemplateOptions.length > 0 ||
-            callTemplateOptions.length > 0 ||
-            activeFilterIsMissing) && (
-            <select
-              value={encodeTemplateFilter(activeTemplateFilter)}
-              onChange={(e) =>
-                setTemplateFilter(decodeTemplateFilter(e.target.value))
-              }
-              aria-label="Filter by template used"
-              data-testid="bookings-filter-template"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
-            >
-              <option value={TEMPLATE_FILTER_ALL_VALUE}>All templates</option>
-              {/* Synthetic option for an active filter whose snapshot
-                  name no longer maps to any catalog row in its
-                  channel. Without this, the controlled `<select>`
-                  silently displays the wrong row (browsers render
-                  the first option when the bound value matches no
-                  option) — the dropdown would lie about what's
-                  actively filtering the table. The "(no longer in
-                  catalog)" suffix lets an ops lead notice the lens
-                  has gone stale at a glance. The chip below
-                  (`bookings-template-filter-chip`) carries the same
-                  signal in long-form; AdminApp also auto-clears the
-                  filter when the rename / remove happens in-app
-                  (Task #162), so this is the defensive fallback for
-                  call-sites that don't auto-clear (e.g. tests or
-                  external state pivots). */}
-              {activeFilterIsMissing && (
-                <optgroup label="No longer in catalog">
-                  <option
-                    key="missing-active-filter"
-                    value={encodeTemplateFilter(activeTemplateFilter)}
-                    data-testid="bookings-filter-template-missing-option"
-                  >
-                    {activeTemplateFilter!.name} (no longer in catalog)
-                  </option>
-                </optgroup>
-              )}
-              {callTemplateOptions.length > 0 && (
-                <optgroup label="Call templates">
-                  {callTemplateOptions.map((t) => (
-                    <option
-                      key={`call-${t.id}`}
-                      value={encodeTemplateFilter({ kind: "call", name: t.name })}
-                    >
-                      {t.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {emailTemplateOptions.length > 0 && (
-                <optgroup label="Email templates">
-                  {emailTemplateOptions.map((t) => (
-                    <option
-                      key={`email-${t.id}`}
-                      value={encodeTemplateFilter({ kind: "email", name: t.name })}
-                    >
-                      {t.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          )}
+              affordance — admins flip back to it to drop the lens.
+              The picker itself is the shared `TemplateFilterSelect`
+              the Awaiting-coordination queue also mounts, so the
+              render gate, synthetic missing option, optgroup
+              ordering, and encode/decode wiring can never drift
+              between the two toolbars (Task #220). The per-view
+              testid prefix keeps `BookingsView.templateFilter.test.tsx`
+              selectors unchanged. */}
+          <TemplateFilterSelect
+            value={activeTemplateFilter}
+            onChange={setTemplateFilter}
+            callTemplates={callTemplateOptions}
+            emailTemplates={emailTemplateOptions}
+            activeFilterIsMissing={activeFilterIsMissing}
+            testIdPrefix="bookings-filter-template"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {!paymentMode && (
