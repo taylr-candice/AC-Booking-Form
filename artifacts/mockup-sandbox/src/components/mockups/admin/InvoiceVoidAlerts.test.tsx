@@ -49,7 +49,7 @@ const UNIT: AdminUnit = {
   id: "u-test-1",
   addressLine1: "G01 / 1 Test Street",
   addressLine2: "Testville NSW 2000",
-  ac: { type: "split", systems: 1, additional: 0 },
+  ac: { type: "split", brand: "", systems: 1, additional: 0 },
   agentId: null,
   buildingId: "bldg-test",
 };
@@ -59,7 +59,9 @@ const BUILDING: AdminBuilding = {
   name: "Test Building",
   addressLine1: "1 Test Street",
   addressLine2: "Testville NSW 2000",
-};
+      acType: "split",
+      acBrand: "Daikin",
+    };
 
 const AGENTS: AdminAgent[] = [];
 

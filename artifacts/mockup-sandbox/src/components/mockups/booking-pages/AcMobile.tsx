@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
+  getAcBrand,
   getAcMode,
   getAcRecord,
   getAcType,
@@ -22,14 +23,10 @@ import { AcTermsModal } from "./AcTermsModal";
 import {
   ADDON_PRICE,
   BRAND,
-  ChoicePanel,
   ERROR_PURPLE,
   formatSystemsIncludes,
   getAddonHelperLines,
   type KnownType,
-  OverrideBanner,
-  overrideBannerDetail,
-  overrideBannerTitle,
   PriceBlock,
   SYSTEM_PRICE,
   UnsureMergedCard,
@@ -42,6 +39,7 @@ export function AcMobile() {
   const unitId = useBookingSelector((s) => s.unit_id);
   const overrideActive = useBookingSelector((s) => s.ac_override_active);
   const acTypeFromUnit = getAcType(unitId);
+  const acBrandFromUnit = getAcBrand(unitId);
   const recorded = getAcRecord(unitId);
   const mode: AcMode = getAcMode(unitId, overrideActive);
 
@@ -54,19 +52,23 @@ export function AcMobile() {
     return (
       <OnFileView
         recorded={recorded}
+        brand={acBrandFromUnit}
         cameFromSlotPicker={cameFromSlotPicker}
       />
     );
   }
 
   // ─── OVERRIDDEN / NO-RECORD MODE — full configuration UI ────────────────
+  // Task #110: SlotPickerCallout is intentionally NOT forwarded here —
+  // the override view's "Update the details" surface drops the pink
+  // "you've come back to update" callout along with the other noisy
+  // affordances (ChoicePanel, "Use what's on file", OverrideBanner).
   return (
     <FullConfigView
       unitId={unitId}
       mode={mode}
       acTypeFromUnit={acTypeFromUnit}
       recorded={recorded}
-      cameFromSlotPicker={cameFromSlotPicker}
     />
   );
 }
@@ -75,9 +77,11 @@ export function AcMobile() {
 
 function OnFileView({
   recorded,
+  brand,
   cameFromSlotPicker,
 }: {
   recorded: AcRecord;
+  brand: string;
   cameFromSlotPicker: boolean;
 }) {
   useAcOnFileSync(recorded);
@@ -132,6 +136,14 @@ function OnFileView({
                   </>
                 )}
               </p>
+              {brand && (
+                <p
+                  className="mt-1 text-[12px] font-medium text-slate-700"
+                  data-testid="text-on-file-brand-mobile"
+                >
+                  {brand} brand
+                </p>
+              )}
               <p className="mt-1 text-[12px] text-pink-900/80 leading-relaxed">
                 Based on prior services or building data for this unit.
               </p>
@@ -183,25 +195,21 @@ function FullConfigView({
   mode,
   acTypeFromUnit,
   recorded,
-  cameFromSlotPicker,
 }: {
   unitId: string | null;
   mode: AcMode;
   acTypeFromUnit: AcType;
   recorded: AcRecord | null;
-  cameFromSlotPicker: boolean;
 }) {
   const ac = useAcStep({ unitId, mode, acTypeFromUnit, recorded });
   const {
     override,
-    setOpenPanel,
     notSureCount,
     setNotSureCount,
     effectiveType,
     knownType,
     needsTypePick,
     isUnsureMode,
-    hasOverride,
     copy,
     systems,
     setSystems,
@@ -223,8 +231,8 @@ function FullConfigView({
     heading,
     intro,
     liveDiscrepancy,
-    resetOverride,
-    handleTypeChoice,
+    toggleType,
+    oppositeType,
   } = ac;
 
   return (
@@ -247,75 +255,29 @@ function FullConfigView({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
-        {cameFromSlotPicker && <SlotPickerCallout />}
-
         {!isUnsureMode && <p className="mb-4 text-sm text-slate-500">{intro}</p>}
 
-        {/* "Use what's on file" link — only when we have a record (overridden mode). */}
-        {mode === "overridden" && (
+        {/* Task #110 — single small "I now have a [opposite type]
+            system" link beneath the type heading. The building always
+            tells us a type now, so we replaced the noisier ChoicePanel
+            + "Use what's on file" + "Change AC type" + OverrideBanner
+            stack with this one affordance. The link is suppressed in
+            unsure mode (where the AC type isn't part of the
+            conversation) and when we somehow don't have a known type
+            yet (defensive — should not happen with the new building
+            data contract). */}
+        {!isUnsureMode && knownType && (
           <div className="mb-4">
             <button
               type="button"
-              onClick={() => bookingActions.setAcOverrideActive(false)}
-              data-testid="link-use-on-file"
+              onClick={toggleType}
+              data-testid="link-toggle-ac-type"
               className="text-[12px] font-medium underline underline-offset-2 hover:opacity-80"
               style={{ color: BRAND }}
             >
-              ← Use what's on file
+              I now have a {oppositeType} system
             </button>
           </div>
-        )}
-
-        {needsTypePick && (
-          <ChoicePanel
-            eyebrow="AC type"
-            title="What type of AC does the apartment have?"
-            options={[
-              { value: "ducted", label: "Ducted (ceiling vents)" },
-              { value: "split", label: "Split system (wall units)" },
-              { value: "unsure", label: "Not sure — technician to confirm on-site" },
-            ]}
-            onSelect={handleTypeChoice}
-            onClose={
-              // Allow closing the picker when it was opened via
-              // "Change AC type" — but never when we genuinely have no
-              // type yet (acTypeFromUnit unknown + no override picked),
-              // because in that case the customer must pick something.
-              acTypeFromUnit === "unknown" && override === null
-                ? undefined
-                : () => setOpenPanel(null)
-            }
-            variant="mobile"
-          />
-        )}
-
-        {/* "Change AC type" affordance — visible whenever we have a
-            known effective type (so the customer has something to
-            change FROM), the type picker isn't already open, and the
-            customer isn't currently in "unsure" mode. Available in both
-            overridden and no-record modes per Task #50 acceptance. */}
-        {!needsTypePick && knownType && !isUnsureMode && (
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={() => setOpenPanel("type")}
-              data-testid="link-change-ac-type"
-              className="text-[12px] font-medium underline underline-offset-2 hover:opacity-80"
-              style={{ color: BRAND }}
-            >
-              Change AC type
-            </button>
-          </div>
-        )}
-
-        {hasOverride && !isUnsureMode && (
-          <OverrideBanner
-            title={overrideBannerTitle(acTypeFromUnit, override)}
-            detail={overrideBannerDetail(override)}
-            onReset={resetOverride}
-            resetLabel={acTypeFromUnit === "unknown" ? "Change" : "Reset"}
-            variant="mobile"
-          />
         )}
 
         {knownType && !isUnsureMode && copy && (
@@ -371,18 +333,25 @@ function FullConfigView({
                 </button>
               </div>
 
-              {(acTypeFromUnit === "unknown" || hasOverride) && (
-                <div className="mt-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setNotSureCount(true)}
-                    data-testid="link-not-sure-count"
-                    className="text-[11px] font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
-                  >
-                    Not sure? We can confirm this on-site
-                  </button>
-                </div>
-              )}
+              {/* Task #110 — the count is the only thing the building
+                  data CAN'T tell us, so the "Not sure?" affordance is
+                  always available beneath the systems stepper in the
+                  override view (we used to gate it on `acTypeFromUnit
+                  === "unknown" || hasOverride`, but the building now
+                  always supplies a known type and the override view
+                  is shown for both no-record and explicit override
+                  modes — there's no remaining state where this link
+                  shouldn't be reachable). */}
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setNotSureCount(true)}
+                  data-testid="link-not-sure-count"
+                  className="text-[11px] font-medium text-slate-500 underline underline-offset-2 hover:text-slate-900 transition-colors"
+                >
+                  Not sure? We can confirm this on-site
+                </button>
+              </div>
             </div>
 
             {/* Additional indoor units (split) / return-air grilles (ducted) */}
@@ -466,9 +435,13 @@ function FullConfigView({
                 ? () => setNotSureCount(false)
                 : undefined
             }
-            onChangeType={
-              override === "unsure" ? resetOverride : undefined
-            }
+            // Task #110 — `override === "unsure"` is no longer
+            // reachable from the customer flow (the only override
+            // entry point is the type-toggle link, which flips to a
+            // known type). The `onChangeType` prop on UnsureMergedCard
+            // would have surfaced "Change AC type" inside the merged
+            // card for the type-level unsure path; that path is gone,
+            // so we leave the prop unset.
             onViewTerms={() => setTermsOpen(true)}
             variant="mobile"
           />

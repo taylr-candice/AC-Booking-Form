@@ -52,7 +52,7 @@ const UNIT: AdminUnit = {
   id: "u-coord-tpl",
   addressLine1: "12 / 100 Pitt Street",
   addressLine2: "Sydney NSW 2000",
-  ac: { type: "split", systems: 2, additional: 0 },
+  ac: { type: "split", brand: "", systems: 2, additional: 0 },
   agentId: null,
   buildingId: "bldg-coord-tpl",
 };

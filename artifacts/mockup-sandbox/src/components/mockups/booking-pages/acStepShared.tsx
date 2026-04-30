@@ -342,6 +342,32 @@ export function useAcStep({
     setOpenPanel(null);
   };
 
+  /**
+   * Task #110 — flip the effective AC type for this booking when the
+   * customer reports they've swapped systems since we last looked.
+   * Uses the same `override` slot that the (now-removed) ChoicePanel
+   * used to write into, so the discrepancy capture effect picks the
+   * change up unchanged. Counts reset to the new type's prefill
+   * defaults because the previous counts no longer apply (a 3-system
+   * split doesn't translate cleanly to a 3-system ducted etc.).
+   *
+   * The opposite type is computed off `effectiveType` rather than
+   * `acTypeFromUnit` so that consecutive flips bounce back and forth
+   * predictably even after the first flip has stuck. The link copy in
+   * the views uses `oppositeType()` so the label and the action stay
+   * in lockstep without each render-site re-deriving the toggle.
+   */
+  const toggleType = () => {
+    const next: KnownType =
+      effectiveType === "ducted" ? "split" : "ducted";
+    setOverride(next);
+    setOpenPanel(null);
+    setNotSureCount(false);
+  };
+
+  const oppositeType: KnownType =
+    effectiveType === "ducted" ? "split" : "ducted";
+
   const heading = needsTypePick
     ? "Tell us about the AC setup"
     : copy?.heading ?? "Tell us about the AC setup";
@@ -392,6 +418,8 @@ export function useAcStep({
     // actions
     resetOverride,
     handleTypeChoice,
+    toggleType,
+    oppositeType,
   };
 }
 

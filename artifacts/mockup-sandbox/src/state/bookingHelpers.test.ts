@@ -15,25 +15,51 @@
  *   out of confirming a known recorded type).
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   computeAcDiscrepancy,
+  getAcBrand,
   getAcMode,
   getAcRecord,
+  getAcType,
   isPastDate,
   unitCity,
   type AcRecord,
 } from "./bookingHelpers";
+import {
+  setLiveBuildingsSource,
+  setLiveUnitsSource,
+  type AdminBuilding,
+  type AdminUnit,
+} from "./adminMockData";
 
 describe("getAcRecord", () => {
   it("returns the recorded snapshot for known split units", () => {
-    expect(getAcRecord("u2")).toEqual({ type: "split", systems: 2, additional: 0 });
+    expect(getAcRecord("u2")).toEqual({
+      type: "split",
+      brand: "Mitsubishi",
+      systems: 2,
+      additional: 0,
+    });
   });
 
   it("returns the recorded snapshot for known ducted units", () => {
-    expect(getAcRecord("u1")).toEqual({ type: "ducted", systems: 1, additional: 1 });
-    expect(getAcRecord("u5")).toEqual({ type: "ducted", systems: 2, additional: 0 });
+    expect(getAcRecord("u1")).toEqual({
+      type: "ducted",
+      brand: "Daikin",
+      systems: 1,
+      additional: 1,
+    });
+    // u5 is in the Anzac Parade building, which is seeded as
+    // ducted/Panasonic — the brand inherits from the building since
+    // u5's own `ac.brand` is empty (Task #110).
+    expect(getAcRecord("u5")).toEqual({
+      type: "ducted",
+      brand: "Panasonic",
+      systems: 2,
+      additional: 0,
+    });
   });
 
   it("treats the legacy alias for u1 the same as the canonical id", () => {
@@ -208,3 +234,86 @@ describe("isPastDate", () => {
     expect(isPastDate("2027-01-01", newYearsEve)).toBe(false);
   });
 });
+
+
+describe("getAcType / getAcBrand — unit override + building inheritance (Task #110)", () => {
+  // Helper: build minimal building + unit fixtures and register them as
+  // the live source so the helpers read from them.
+  const make = (
+    buildingPatch: Partial<AdminBuilding>,
+    unitPatch: Partial<AdminUnit> & { ac: AdminUnit["ac"] },
+  ): { building: AdminBuilding; unit: AdminUnit } => {
+    const building: AdminBuilding = {
+      id: "bldg-x",
+      name: "Test Tower",
+      addressLine1: "1 Test St",
+      addressLine2: "Suburb NSW 2000",
+      acType: "split",
+      acBrand: "Daikin",
+      ...buildingPatch,
+    };
+    const unit: AdminUnit = {
+      id: "u-x",
+      addressLine1: "1 / 1 Test St",
+      addressLine2: "Suburb NSW 2000",
+      agentId: null,
+      buildingId: building.id,
+      ...unitPatch,
+    } as AdminUnit;
+    return { building, unit };
+  };
+
+  afterEach(() => {
+    // Restore default getters so other test files start clean.
+    setLiveBuildingsSource(null);
+    setLiveUnitsSource(null);
+  });
+
+  it("uses the unit's own type even when its counts are blank (does not fall back to the building's type)", () => {
+    const { building, unit } = make(
+      { acType: "split", acBrand: "Mitsubishi" },
+      { ac: { type: "ducted", brand: "", systems: null, additional: null } },
+    );
+    setLiveBuildingsSource(() => [building]);
+    setLiveUnitsSource(() => [unit]);
+
+    // The unit overrides type to "ducted" — even though counts are
+    // blank (no record on file), the type must stay "ducted" so the
+    // customer never sees the type picker for a known unit.
+    expect(getAcType(unit.id)).toBe("ducted");
+    // Brand is blank on the unit, so it inherits from the building.
+    expect(getAcBrand(unit.id)).toBe("Mitsubishi");
+    // Counts are blank, so the on-file record is null (no-record mode).
+    expect(getAcRecord(unit.id)).toBeNull();
+  });
+
+  it("falls back to the building's type when the unit's type is 'unknown'", () => {
+    const { building, unit } = make(
+      { acType: "ducted", acBrand: "Panasonic" },
+      { ac: { type: "unknown", brand: "", systems: null, additional: null } },
+    );
+    setLiveBuildingsSource(() => [building]);
+    setLiveUnitsSource(() => [unit]);
+
+    expect(getAcType(unit.id)).toBe("ducted");
+    expect(getAcBrand(unit.id)).toBe("Panasonic");
+  });
+
+  it("uses the unit's own brand when set (overrides the building's brand)", () => {
+    const { building, unit } = make(
+      { acType: "split", acBrand: "Daikin" },
+      { ac: { type: "split", brand: "Fujitsu", systems: 1, additional: 0 } },
+    );
+    setLiveBuildingsSource(() => [building]);
+    setLiveUnitsSource(() => [unit]);
+
+    expect(getAcBrand(unit.id)).toBe("Fujitsu");
+    expect(getAcRecord(unit.id)).toEqual({
+      type: "split",
+      brand: "Fujitsu",
+      systems: 1,
+      additional: 0,
+    });
+  });
+});
+

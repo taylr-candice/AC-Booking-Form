@@ -74,8 +74,14 @@ describe("CSV unit edits flow through to customer AC pre-fill", () => {
       const startUnits: readonly AdminUnit[] = SEEDED_UNITS;
       const u2Before = startUnits.find((u) => u.id === "u2");
       expect(u2Before).toBeDefined();
+      // Task #110 — units carry an empty `brand` by default and
+      // inherit the brand from their building (Marine = Mitsubishi)
+      // through `lookupLiveUnitAc`. The raw `ac.brand` here is "" on
+      // purpose; the customer-facing on-file summary still reads
+      // "Mitsubishi" because of that inheritance.
       expect(u2Before!.ac).toEqual({
         type: "split",
+        brand: "",
         systems: 2,
         additional: 0,
       });
@@ -87,9 +93,12 @@ describe("CSV unit edits flow through to customer AC pre-fill", () => {
       // u2's row by string-replacing the recognisable cell signature
       // rather than parsing/regenerating the row by hand. This keeps
       // the test honest about going through the real CSV text.
+      // Column order is id,addressLine1,addressLine2,acType,acBrand,
+      // systems,additional,agentId — see UNITS_CSV_COLUMNS. The empty
+      // acBrand cell shows up as the consecutive `split,,2` segment.
       const editedCsv = exported.replace(
-        /u2,12 \/ 88 Marine Parade,Coogee NSW 2034,split,2,0,/,
-        "u2,12 / 88 Marine Parade,Coogee NSW 2034,ducted,3,2,",
+        /u2,12 \/ 88 Marine Parade,Coogee NSW 2034,split,,2,0,/,
+        "u2,12 / 88 Marine Parade,Coogee NSW 2034,ducted,Daikin,3,2,",
       );
       expect(editedCsv).not.toBe(exported); // sanity: replacement landed
 
@@ -109,6 +118,7 @@ describe("CSV unit edits flow through to customer AC pre-fill", () => {
       const u2After = updatedUnits.find((u) => u.id === "u2");
       expect(u2After?.ac).toEqual({
         type: "ducted",
+        brand: "Daikin",
         systems: 3,
         additional: 2,
       });
@@ -144,9 +154,11 @@ describe("CSV unit edits flow through to customer AC pre-fill", () => {
       // via our nextId() generator, so we read it back from the result
       // before driving the customer flow.
       const exported = formatUnitsCsv(SEEDED_UNITS);
+      // Column order matches UNITS_CSV_COLUMNS:
+      // id,addressLine1,addressLine2,acType,acBrand,systems,additional,agentId
       const newRowCsv =
         exported +
-        ",7B / 901 Sunrise Drive,Bondi NSW 2026,split,2,1,ag-002\n";
+        ",7B / 901 Sunrise Drive,Bondi NSW 2026,split,Mitsubishi,2,1,ag-002\n";
 
       const preview = parseUnitsImport(newRowCsv, SEEDED_UNITS, SEEDED_AGENTS);
       expect(preview.fatal).toBeUndefined();
@@ -160,8 +172,12 @@ describe("CSV unit edits flow through to customer AC pre-fill", () => {
       );
       const added = updatedUnits.find((u) => u.id === "csv-added-unit-1");
       expect(added).toBeDefined();
+      // The CSV row sets brand to "Mitsubishi" explicitly, so the new
+      // unit carries that brand verbatim instead of inheriting from a
+      // building (it has no buildingId yet).
       expect(added!.ac).toEqual({
         type: "split",
+        brand: "Mitsubishi",
         systems: 2,
         additional: 1,
       });
@@ -196,7 +212,7 @@ describe("CSV unit edits flow through to customer AC pre-fill", () => {
         id: "u3",
         addressLine1: "5B / 14 Bayview Avenue",
         addressLine2: "Mosman NSW 2088",
-        ac: { type: "split", systems: 4, additional: 1 },
+        ac: { type: "split", brand: "", systems: 4, additional: 1 },
         agentId: null,
         buildingId: SEEDED_UNITS.find((u) => u.id === "u3")!.buildingId,
       };

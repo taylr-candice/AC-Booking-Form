@@ -47,7 +47,7 @@ const UNITS: AdminUnit[] = [
     id: "u1",
     addressLine1: "G01 / 335 Aspen Village",
     addressLine2: "Lot 3 · Greenway ACT 2900",
-    ac: { type: "ducted", systems: 1, additional: 1 },
+    ac: { type: "ducted", brand: "", systems: 1, additional: 1 },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -55,7 +55,7 @@ const UNITS: AdminUnit[] = [
     id: "u2",
     addressLine1: "12 / 88 Marine Parade",
     addressLine2: "Lot 12 · Coogee NSW 2034",
-    ac: { type: "split", systems: 2, additional: 0 },
+    ac: { type: "split", brand: "", systems: 2, additional: 0 },
     agentId: "ag-002",
     buildingId: "bldg-marine",
   },
@@ -147,7 +147,7 @@ describe("formatUnitsCsv", () => {
       id: "u9",
       addressLine1: "10, Example St",
       addressLine2: "Lot 9 · Suburb 2000",
-      ac: { type: "split", systems: 1, additional: 0 },
+      ac: { type: "split", brand: "", systems: 1, additional: 0 },
       agentId: null,
     };
     const csv = formatUnitsCsv([unit]);
@@ -205,20 +205,24 @@ describe("parseUnitsImport", () => {
     expect(preview.rows[0].parsed).toMatchObject({
       addressLine1: "99 New Street",
       addressLine2: "Lot 99 · Suburb 2000",
-      ac: { type: "split", systems: 3, additional: 1 },
+      ac: { type: "split", brand: "", systems: 3, additional: 1 },
       agentId: "ag-002",
     });
   });
 
-  it("treats blank acType as unknown and blank counts as 0", () => {
+  it("treats blank acType as unknown and blank counts as null (not on file)", () => {
+    // Task #110 — buildings carry the AC type/brand, units may not yet
+    // have systems/additional. Importing blank cells must preserve
+    // "not on file" rather than coercing to 0, otherwise the customer
+    // pre-fill would silently report "0 systems on file".
     const csv = [
-      "id,addressLine1,addressLine2,acType,systems,additional,agentId",
-      ",10 New Lane,,,,,",
+      "id,addressLine1,addressLine2,acType,acBrand,systems,additional,agentId",
+      ",10 New Lane,,,,,,",
     ].join("\n");
     const preview = parseUnitsImport(csv, UNITS, AGENTS);
     expect(preview.counts.error).toBe(0);
     expect(preview.rows[0].parsed).toMatchObject({
-      ac: { type: "unknown", systems: 0, additional: 0 },
+      ac: { type: "unknown", brand: "", systems: null, additional: null },
       agentId: null,
     });
   });
@@ -356,7 +360,12 @@ describe("applyUnitsImport", () => {
 
     expect(next).toHaveLength(UNITS.length + 1);
     const updated = next.find((u) => u.id === "u1");
-    expect(updated?.ac).toEqual({ type: "split", systems: 3, additional: 2 });
+    expect(updated?.ac).toEqual({
+      type: "split",
+      brand: "",
+      systems: 3,
+      additional: 2,
+    });
     const created = next.find((u) => u.addressLine1 === "99 Brand New Lane");
     expect(created?.id).toBe("u-test-1");
   });

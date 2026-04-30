@@ -117,6 +117,7 @@ export function UnitsView({
             <tr>
               <th className="px-4 py-3 font-semibold">Address</th>
               <th className="px-4 py-3 font-semibold">AC type</th>
+              <th className="px-4 py-3 font-semibold">Brand</th>
               <th className="px-4 py-3 font-semibold">Systems</th>
               <th className="px-4 py-3 font-semibold">Extras</th>
               <th className="px-4 py-3 font-semibold">Managing agent</th>
@@ -127,6 +128,19 @@ export function UnitsView({
             {units.map((u) => {
               const agent = u.agentId ? agents.find((a) => a.id === u.agentId) ?? null : null;
               const building = buildings.find((b) => b.id === u.buildingId) ?? null;
+              // The unit shows its own override if set; otherwise it
+              // inherits from the building. Bricks marked "(building)"
+              // make the source explicit so the admin doesn't think
+              // it's stored on the unit row itself.
+              const typeOverridden =
+                u.ac.type === "split" || u.ac.type === "ducted";
+              const brandOverridden = u.ac.brand.trim().length > 0;
+              const displayType = typeOverridden
+                ? u.ac.type
+                : building?.acType ?? "—";
+              const displayBrand = brandOverridden
+                ? u.ac.brand
+                : building?.acBrand ?? "—";
               return (
                 <tr key={u.id} className="border-b border-slate-100 last:border-b-0">
                   <td className="px-4 py-3">
@@ -139,14 +153,27 @@ export function UnitsView({
                     )}
                   </td>
                   <td className="px-4 py-3 capitalize">
-                    {u.ac.type === "unknown" ? (
-                      <span className="text-slate-500">No record</span>
-                    ) : (
-                      u.ac.type
+                    {displayType}
+                    {!typeOverridden && building && (
+                      <div className="text-[10px] font-normal text-slate-500">
+                        from building
+                      </div>
                     )}
                   </td>
-                  <td className="px-4 py-3">{u.ac.systems || "—"}</td>
-                  <td className="px-4 py-3">{u.ac.additional || "—"}</td>
+                  <td className="px-4 py-3">
+                    {displayBrand}
+                    {!brandOverridden && building?.acBrand && (
+                      <div className="text-[10px] text-slate-500">
+                        from building
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.ac.systems !== null ? u.ac.systems : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.ac.additional !== null ? u.ac.additional : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     {agent ? (
                       <div className="font-medium text-slate-900">
@@ -182,7 +209,17 @@ export function UnitsView({
                   id: `u${Date.now()}`,
                   addressLine1: "",
                   addressLine2: "",
-                  ac: { type: "split", systems: 1, additional: 0 },
+                  // New units inherit the AC type and brand from their
+                  // building by default — `unknown` + `""` are the
+                  // sentinel values for "use the building's setting"
+                  // (Task #110). Counts start blank so the booking flow
+                  // prompts the customer for them.
+                  ac: {
+                    type: "unknown",
+                    brand: "",
+                    systems: null,
+                    additional: null,
+                  },
                   agentId: null,
                   buildingId: buildings[0]?.id ?? "",
                 }
@@ -229,6 +266,16 @@ function UnitEditor({
   isCreate: boolean;
 }) {
   const [draft, setDraft] = useState<AdminUnit>(unit);
+  // The unit's AC type can be `unknown` (sentinel for "inherit from
+  // building") or one of the two real types. Brand inherits the same
+  // way using an empty string.
+  const overrideType =
+    draft.ac.type === "split" || draft.ac.type === "ducted";
+  const overrideBrand = draft.ac.brand.trim().length > 0;
+  const countsKnown =
+    draft.ac.systems !== null && draft.ac.additional !== null;
+  const inheritedBuilding =
+    buildings.find((b) => b.id === draft.buildingId) ?? null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
@@ -266,16 +313,59 @@ function UnitEditor({
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
             />
           </FormField>
-          <div className="grid grid-cols-3 gap-3">
-            <FormField label="AC type">
+          {inheritedBuilding && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
+              <div className="font-semibold text-slate-700">
+                Inherits from {inheritedBuilding.name}
+              </div>
+              <div className="mt-0.5 capitalize">
+                {inheritedBuilding.acType}
+                {inheritedBuilding.acBrand
+                  ? ` · ${inheritedBuilding.acBrand}`
+                  : ""}
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+            <div>
+              <div className="text-[12px] font-semibold text-slate-700">
+                Different AC type for this unit
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Only set this when the unit's system differs from its building.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={overrideType}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  ac: {
+                    ...draft.ac,
+                    type: e.target.checked
+                      ? inheritedBuilding?.acType ?? "split"
+                      : "unknown",
+                  },
+                })
+              }
+              className="h-4 w-4"
+            />
+          </div>
+          {overrideType && (
+            <FormField label="AC type override">
               <select
-                value={draft.ac.type}
+                value={
+                  draft.ac.type === "split" || draft.ac.type === "ducted"
+                    ? draft.ac.type
+                    : "split"
+                }
                 onChange={(e) =>
                   setDraft({
                     ...draft,
                     ac: {
                       ...draft.ac,
-                      type: e.target.value as AdminUnit["ac"]["type"],
+                      type: e.target.value as "split" | "ducted",
                     },
                   })
                 }
@@ -283,40 +373,112 @@ function UnitEditor({
               >
                 <option value="split">Split</option>
                 <option value="ducted">Ducted</option>
-                <option value="unknown">No record</option>
               </select>
             </FormField>
-            <FormField label="Systems">
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={draft.ac.systems}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    ac: { ...draft.ac, systems: Number(e.target.value) },
-                  })
-                }
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
-              />
-            </FormField>
-            <FormField label="Extras">
-              <input
-                type="number"
-                min={0}
-                max={29}
-                value={draft.ac.additional}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    ac: { ...draft.ac, additional: Number(e.target.value) },
-                  })
-                }
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
-              />
-            </FormField>
+          )}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+            <div>
+              <div className="text-[12px] font-semibold text-slate-700">
+                Different brand for this unit
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Only set this when the unit's brand differs from its building.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={overrideBrand}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  ac: {
+                    ...draft.ac,
+                    brand: e.target.checked
+                      ? inheritedBuilding?.acBrand ?? ""
+                      : "",
+                  },
+                })
+              }
+              className="h-4 w-4"
+            />
           </div>
+          {overrideBrand && (
+            <FormField label="Brand override">
+              <input
+                type="text"
+                value={draft.ac.brand}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    ac: { ...draft.ac, brand: e.target.value },
+                  })
+                }
+                placeholder="Daikin, Mitsubishi, Fujitsu, Panasonic…"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+              />
+            </FormField>
+          )}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+            <div>
+              <div className="text-[12px] font-semibold text-slate-700">
+                Counts on file
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Leave off when you don't yet know how many systems are installed.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={countsKnown}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  ac: {
+                    ...draft.ac,
+                    systems: e.target.checked ? draft.ac.systems ?? 1 : null,
+                    additional: e.target.checked
+                      ? draft.ac.additional ?? 0
+                      : null,
+                  },
+                })
+              }
+              className="h-4 w-4"
+            />
+          </div>
+          {countsKnown && (
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Systems">
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={draft.ac.systems ?? 1}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      ac: { ...draft.ac, systems: Number(e.target.value) },
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+                />
+              </FormField>
+              <FormField label="Extras">
+                <input
+                  type="number"
+                  min={0}
+                  max={29}
+                  value={draft.ac.additional ?? 0}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      ac: { ...draft.ac, additional: Number(e.target.value) },
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+                />
+              </FormField>
+            </div>
+          )}
           <FormField label="Building">
             <select
               value={draft.buildingId}

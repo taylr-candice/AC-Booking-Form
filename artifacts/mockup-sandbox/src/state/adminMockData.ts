@@ -37,11 +37,31 @@ import { getBookingSession } from "./bookingSession";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+/**
+ * AC config recorded against a unit.
+ *
+ * Every field is optional — the building always carries the
+ * authoritative AC type and brand (Task #110), so a unit's record only
+ * needs to spell out the parts that override the building default:
+ *
+ *  - `type` absent / `"unknown"` → inherit the building's type.
+ *  - `brand` absent / empty       → inherit the building's brand.
+ *  - `systems` / `additional` `null` → blank on file. The customer is
+ *    asked to confirm during booking; "no-record" mode renders.
+ *
+ * When `type` and `brand` are set on the unit they override the
+ * building default — useful when an owner has swapped systems.
+ */
 export type AdminUnit = {
   id: string;
   addressLine1: string;
   addressLine2: string;
-  ac: { type: "split" | "ducted" | "unknown"; systems: number; additional: number };
+  ac: {
+    type: "split" | "ducted" | "unknown";
+    brand: string;
+    systems: number | null;
+    additional: number | null;
+  };
   agentId: string | null;
   /**
    * The building this unit belongs to. Required: every unit must live
@@ -76,6 +96,24 @@ export type AdminBuilding = {
   addressLine1: string;
   /** Suburb + state + postcode, e.g. "Greenway ACT 2900". */
   addressLine2: string;
+  /**
+   * Authoritative AC type for the building (Task #110). Required —
+   * Taylr only opens a rollout once the building's AC fit-out is
+   * known, so every building in this list has been confirmed to be
+   * either split or ducted across the board. Individual units can
+   * still override this via {@link AdminUnit.ac.type} when an owner
+   * has swapped systems.
+   */
+  acType: "split" | "ducted";
+  /**
+   * Authoritative AC brand for the building (Task #110). Required —
+   * matches the install Taylr surveyed before opening the rollout.
+   * Free-text so unusual brands aren't excluded; the admin edit modal
+   * offers Daikin / Mitsubishi / Fujitsu / Panasonic as one-click
+   * suggestions. Individual units can override via
+   * {@link AdminUnit.ac.brand}.
+   */
+  acBrand: string;
 };
 
 /**
@@ -281,24 +319,32 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     name: "Aspen Village",
     addressLine1: "335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
+    acType: "ducted",
+    acBrand: "Daikin",
   },
   {
     id: "bldg-marine",
     name: "Marine Parade Apartments",
     addressLine1: "88 Marine Parade",
     addressLine2: "Coogee NSW 2034",
+    acType: "split",
+    acBrand: "Mitsubishi",
   },
   {
     id: "bldg-bourke",
     name: "Bourke Street Residences",
     addressLine1: "21 Bourke Street",
     addressLine2: "Surry Hills NSW 2010",
+    acType: "split",
+    acBrand: "Fujitsu",
   },
   {
     id: "bldg-anzac",
     name: "Anzac Parade Apartments",
     addressLine1: "142 Anzac Parade",
     addressLine2: "Kensington NSW 2033",
+    acType: "ducted",
+    acBrand: "Panasonic",
   },
 ];
 
@@ -322,7 +368,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u1",
     addressLine1: "G01 / 335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
-    ac: { type: "ducted", systems: 1, additional: 1 },
+    ac: { type: "ducted", brand: "", systems: 1, additional: 1 },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -330,7 +376,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-aspen-02",
     addressLine1: "G02 / 335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
-    ac: { type: "ducted", systems: 1, additional: 0 },
+    ac: { type: "ducted", brand: "", systems: 1, additional: 0 },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -338,7 +384,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-aspen-03",
     addressLine1: "101 / 335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
-    ac: { type: "split", systems: 2, additional: 0 },
+    ac: { type: "split", brand: "", systems: 2, additional: 0 },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -346,7 +392,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-aspen-04",
     addressLine1: "102 / 335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
-    ac: { type: "split", systems: 2, additional: 0 },
+    ac: { type: "split", brand: "", systems: 2, additional: 0 },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -354,7 +400,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-aspen-05",
     addressLine1: "201 / 335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
-    ac: { type: "ducted", systems: 1, additional: 1 },
+    ac: { type: "ducted", brand: "", systems: 1, additional: 1 },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -362,7 +408,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-aspen-06",
     addressLine1: "202 / 335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
-    ac: { type: "unknown", systems: 0, additional: 0 },
+    ac: { type: "unknown", brand: "", systems: null, additional: null },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -370,7 +416,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-aspen-07",
     addressLine1: "301 / 335 Aspen Boulevard",
     addressLine2: "Greenway ACT 2900",
-    ac: { type: "split", systems: 1, additional: 0 },
+    ac: { type: "split", brand: "", systems: 1, additional: 0 },
     agentId: "ag-001",
     buildingId: "bldg-aspen",
   },
@@ -380,7 +426,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u2",
     addressLine1: "12 / 88 Marine Parade",
     addressLine2: "Coogee NSW 2034",
-    ac: { type: "split", systems: 2, additional: 0 },
+    ac: { type: "split", brand: "", systems: 2, additional: 0 },
     agentId: "ag-002",
     buildingId: "bldg-marine",
   },
@@ -388,7 +434,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u3",
     addressLine1: "3 / 88 Marine Parade",
     addressLine2: "Coogee NSW 2034",
-    ac: { type: "unknown", systems: 0, additional: 0 },
+    ac: { type: "unknown", brand: "", systems: null, additional: null },
     agentId: null,
     buildingId: "bldg-marine",
   },
@@ -396,7 +442,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-marine-04",
     addressLine1: "8 / 88 Marine Parade",
     addressLine2: "Coogee NSW 2034",
-    ac: { type: "split", systems: 1, additional: 0 },
+    ac: { type: "split", brand: "", systems: 1, additional: 0 },
     agentId: "ag-002",
     buildingId: "bldg-marine",
   },
@@ -404,7 +450,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-marine-05",
     addressLine1: "14 / 88 Marine Parade",
     addressLine2: "Coogee NSW 2034",
-    ac: { type: "split", systems: 2, additional: 0 },
+    ac: { type: "split", brand: "", systems: 2, additional: 0 },
     agentId: "ag-002",
     buildingId: "bldg-marine",
   },
@@ -412,7 +458,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-marine-06",
     addressLine1: "21 / 88 Marine Parade",
     addressLine2: "Coogee NSW 2034",
-    ac: { type: "split", systems: 1, additional: 1 },
+    ac: { type: "split", brand: "", systems: 1, additional: 1 },
     agentId: "ag-002",
     buildingId: "bldg-marine",
   },
@@ -420,7 +466,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-marine-07",
     addressLine1: "22 / 88 Marine Parade",
     addressLine2: "Coogee NSW 2034",
-    ac: { type: "unknown", systems: 0, additional: 0 },
+    ac: { type: "unknown", brand: "", systems: null, additional: null },
     agentId: null,
     buildingId: "bldg-marine",
   },
@@ -430,7 +476,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u4",
     addressLine1: "705 / 21 Bourke Street",
     addressLine2: "Surry Hills NSW 2010",
-    ac: { type: "unknown", systems: 0, additional: 0 },
+    ac: { type: "unknown", brand: "", systems: null, additional: null },
     agentId: "ag-001",
     buildingId: "bldg-bourke",
   },
@@ -438,7 +484,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u6",
     addressLine1: "504 / 21 Bourke Street",
     addressLine2: "Surry Hills NSW 2010",
-    ac: { type: "split", systems: 3, additional: 1 },
+    ac: { type: "split", brand: "", systems: 3, additional: 1 },
     agentId: "ag-002",
     buildingId: "bldg-bourke",
   },
@@ -446,7 +492,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-bourke-03",
     addressLine1: "302 / 21 Bourke Street",
     addressLine2: "Surry Hills NSW 2010",
-    ac: { type: "split", systems: 2, additional: 0 },
+    ac: { type: "split", brand: "", systems: 2, additional: 0 },
     agentId: "ag-001",
     buildingId: "bldg-bourke",
   },
@@ -454,7 +500,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-bourke-04",
     addressLine1: "404 / 21 Bourke Street",
     addressLine2: "Surry Hills NSW 2010",
-    ac: { type: "unknown", systems: 0, additional: 0 },
+    ac: { type: "unknown", brand: "", systems: null, additional: null },
     agentId: null,
     buildingId: "bldg-bourke",
   },
@@ -462,7 +508,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-bourke-05",
     addressLine1: "606 / 21 Bourke Street",
     addressLine2: "Surry Hills NSW 2010",
-    ac: { type: "split", systems: 1, additional: 0 },
+    ac: { type: "split", brand: "", systems: 1, additional: 0 },
     agentId: "ag-002",
     buildingId: "bldg-bourke",
   },
@@ -472,7 +518,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u5",
     addressLine1: "18 / 142 Anzac Parade",
     addressLine2: "Kensington NSW 2033",
-    ac: { type: "ducted", systems: 2, additional: 0 },
+    ac: { type: "ducted", brand: "", systems: 2, additional: 0 },
     agentId: "ag-003",
     buildingId: "bldg-anzac",
   },
@@ -480,7 +526,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u7",
     addressLine1: "11 / 142 Anzac Parade",
     addressLine2: "Kensington NSW 2033",
-    ac: { type: "split", systems: 1, additional: 0 },
+    ac: { type: "split", brand: "", systems: 1, additional: 0 },
     agentId: null,
     buildingId: "bldg-anzac",
   },
@@ -488,7 +534,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-anzac-03",
     addressLine1: "5 / 142 Anzac Parade",
     addressLine2: "Kensington NSW 2033",
-    ac: { type: "split", systems: 1, additional: 0 },
+    ac: { type: "split", brand: "", systems: 1, additional: 0 },
     agentId: "ag-003",
     buildingId: "bldg-anzac",
   },
@@ -496,7 +542,7 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     id: "u-anzac-04",
     addressLine1: "9 / 142 Anzac Parade",
     addressLine2: "Kensington NSW 2033",
-    ac: { type: "ducted", systems: 1, additional: 0 },
+    ac: { type: "ducted", brand: "", systems: 1, additional: 0 },
     agentId: "ag-003",
     buildingId: "bldg-anzac",
   },
@@ -1822,10 +1868,13 @@ export function bookingDurationMinutes(b: AdminBooking): number {
 
 // ─── Building joins / rollout summary ──────────────────────────────────────
 
-/** Look a building up by id. Returns `null` for an unknown / null id. */
+/** Look a building up by id. Returns `null` for an unknown / null id.
+ *  Reads from the live-buildings source (registered by the admin shell)
+ *  so admin edits to the building's AC type / brand flow through to the
+ *  customer-side AC step pre-fill the same render. */
 export function getBuildingById(id: string | null): AdminBuilding | null {
   if (!id) return null;
-  return SEEDED_BUILDINGS.find((b) => b.id === id) ?? null;
+  return getLiveBuildings().find((b) => b.id === id) ?? null;
 }
 
 /** Convenience: from a unit (or null), follow `buildingId` to its building. */
@@ -2680,16 +2729,18 @@ export function computeAdminAcDiscrepancy(
   recorded: AdminUnit["ac"],
   captured: { type: "split" | "ducted" | "unsure"; systems: number; additional: number },
 ): AcDiscrepancy | null {
+  // No recorded type, or counts are blank — there's nothing reliable to
+  // compare against, so don't surface a discrepancy. The captured
+  // values land directly on the booking row.
   if (recorded.type === "unknown") return null;
+  if (recorded.systems === null || recorded.additional === null) return null;
+  const recordedSnapshot = {
+    type: recorded.type,
+    systems: recorded.systems,
+    additional: recorded.additional,
+  };
   if (captured.type === "unsure") {
-    return {
-      recorded: {
-        type: recorded.type,
-        systems: recorded.systems,
-        additional: recorded.additional,
-      },
-      customer: { type: "unsure" },
-    };
+    return { recorded: recordedSnapshot, customer: { type: "unsure" } };
   }
   if (
     captured.type === recorded.type &&
@@ -2699,11 +2750,7 @@ export function computeAdminAcDiscrepancy(
     return null;
   }
   return {
-    recorded: {
-      type: recorded.type,
-      systems: recorded.systems,
-      additional: recorded.additional,
-    },
+    recorded: recordedSnapshot,
     customer: {
       type: captured.type,
       systems: captured.systems,
@@ -3212,6 +3259,43 @@ export function subscribeLiveUnits(listener: () => void): () => void {
 }
 export function getLiveUnitsVersion(): number {
   return liveUnitsVersion;
+}
+
+/**
+ * Live-buildings source registration — same pattern as live-units above.
+ *
+ * Buildings now carry the authoritative AC type + brand for their
+ * units (Task #110), so admin edits to the building's AC config need
+ * to flow through to the customer-side AC step pre-fill the same way
+ * unit edits do. The default returns `SEEDED_BUILDINGS` so the
+ * canvas-isolated mode (no admin shell mounted) keeps working.
+ */
+export type LiveBuildingsSource = () => readonly AdminBuilding[];
+let liveBuildingsSource: LiveBuildingsSource = () => SEEDED_BUILDINGS;
+let liveBuildingsVersion = 0;
+const liveBuildingsListeners = new Set<() => void>();
+
+export function setLiveBuildingsSource(
+  source: LiveBuildingsSource | null,
+): void {
+  liveBuildingsSource = source ?? (() => SEEDED_BUILDINGS);
+  notifyLiveBuildingsChanged();
+}
+export function getLiveBuildings(): readonly AdminBuilding[] {
+  return liveBuildingsSource();
+}
+export function notifyLiveBuildingsChanged(): void {
+  liveBuildingsVersion += 1;
+  for (const fn of liveBuildingsListeners) fn();
+}
+export function subscribeLiveBuildings(listener: () => void): () => void {
+  liveBuildingsListeners.add(listener);
+  return () => {
+    liveBuildingsListeners.delete(listener);
+  };
+}
+export function getLiveBuildingsVersion(): number {
+  return liveBuildingsVersion;
 }
 
 /**

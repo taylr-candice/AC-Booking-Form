@@ -33,6 +33,7 @@ export const UNITS_CSV_COLUMNS = [
   "addressLine1",
   "addressLine2",
   "acType",
+  "acBrand",
   "systems",
   "additional",
   "agentId",
@@ -178,8 +179,12 @@ function unitToRow(unit: AdminUnit): readonly string[] {
     unit.addressLine1,
     unit.addressLine2,
     unit.ac.type,
-    String(unit.ac.systems),
-    String(unit.ac.additional),
+    unit.ac.brand,
+    // Counts can be blank (Task #110) — emit empty cells so a
+    // round-trip preserves "not on file" instead of writing the string
+    // "null".
+    unit.ac.systems === null ? "" : String(unit.ac.systems),
+    unit.ac.additional === null ? "" : String(unit.ac.additional),
     unit.agentId ?? "",
   ];
 }
@@ -197,13 +202,17 @@ export function formatUnitsCsv(units: readonly AdminUnit[]): string {
  *  show both an "add new unit" row (blank id) and an "update existing
  *  unit" row (id populated). */
 export function unitsCsvTemplate(): string {
+  // Showcases inheritance: example 1 leaves acType/acBrand/systems/
+  // additional blank to inherit from the building (Task #110); example
+  // 2 overrides them on the unit row.
   const example1: readonly string[] = [
     "",
     "10 / 25 Example Street",
     "Lot 10 · Suburb NSW 2000",
-    "split",
-    "2",
-    "0",
+    "",
+    "",
+    "",
+    "",
     "",
   ];
   const example2: readonly string[] = [
@@ -211,6 +220,7 @@ export function unitsCsvTemplate(): string {
     "G01 / 335 Aspen Village",
     "Lot 3 · Greenway ACT 2900",
     "ducted",
+    "Daikin",
     "1",
     "1",
     "ag-001",
@@ -239,25 +249,30 @@ const COLUMN_LOOKUP: Record<string, UnitsCsvColumn> = (() => {
   return lookup;
 })();
 
-function parseNonNegativeInt(
+/**
+ * Parse a count cell. Returns `null` for blank cells, which the import
+ * apply step preserves so the unit's stored value stays "not on file"
+ * (Task #110). Non-numeric values still raise an error.
+ */
+function parseNullableNonNegativeInt(
   raw: string,
   fieldLabel: string,
   errors: string[],
-): number {
+): number | null {
   const trimmed = raw.trim();
-  if (trimmed === "") return 0;
+  if (trimmed === "") return null;
   if (!/^\d+$/.test(trimmed)) {
     errors.push(
-      `${fieldLabel} must be a non-negative whole number (got "${raw}").`,
+      `${fieldLabel} must be a non-negative whole number or blank (got "${raw}").`,
     );
-    return 0;
+    return null;
   }
   const n = Number(trimmed);
   if (!Number.isFinite(n) || n < 0) {
     errors.push(
-      `${fieldLabel} must be a non-negative whole number (got "${raw}").`,
+      `${fieldLabel} must be a non-negative whole number or blank (got "${raw}").`,
     );
-    return 0;
+    return null;
   }
   return n;
 }
@@ -282,6 +297,7 @@ function unitsEqual(a: AdminUnit, b: AdminUnit): boolean {
     a.addressLine1 === b.addressLine1 &&
     a.addressLine2 === b.addressLine2 &&
     a.ac.type === b.ac.type &&
+    a.ac.brand === b.ac.brand &&
     a.ac.systems === b.ac.systems &&
     a.ac.additional === b.ac.additional &&
     a.agentId === b.agentId
@@ -311,18 +327,25 @@ function diffUnits(before: AdminUnit, after: AdminUnit): UnitDiffField[] {
       after: after.ac.type,
     });
   }
+  if (before.ac.brand !== after.ac.brand) {
+    out.push({
+      field: "acBrand",
+      before: before.ac.brand,
+      after: after.ac.brand,
+    });
+  }
   if (before.ac.systems !== after.ac.systems) {
     out.push({
       field: "systems",
-      before: String(before.ac.systems),
-      after: String(after.ac.systems),
+      before: before.ac.systems === null ? "" : String(before.ac.systems),
+      after: after.ac.systems === null ? "" : String(after.ac.systems),
     });
   }
   if (before.ac.additional !== after.ac.additional) {
     out.push({
       field: "additional",
-      before: String(before.ac.additional),
-      after: String(after.ac.additional),
+      before: before.ac.additional === null ? "" : String(before.ac.additional),
+      after: after.ac.additional === null ? "" : String(after.ac.additional),
     });
   }
   if (before.agentId !== after.agentId) {
@@ -412,8 +435,13 @@ export function parseUnitsImport(
     }
 
     const acType = parseAcType(raw.acType, errors);
-    const systems = parseNonNegativeInt(raw.systems, "systems", errors);
-    const additional = parseNonNegativeInt(raw.additional, "additional", errors);
+    const acBrand = raw.acBrand.trim();
+    const systems = parseNullableNonNegativeInt(raw.systems, "systems", errors);
+    const additional = parseNullableNonNegativeInt(
+      raw.additional,
+      "additional",
+      errors,
+    );
 
     let agentId: string | null = null;
     if (agentIdRaw !== "") {
@@ -496,7 +524,7 @@ export function parseUnitsImport(
       id: before ? before.id : "",
       addressLine1: addr1,
       addressLine2: addr2,
-      ac: { type: acType, systems, additional },
+      ac: { type: acType, brand: acBrand, systems, additional },
       agentId,
       buildingId,
     };

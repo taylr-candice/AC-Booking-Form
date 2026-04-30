@@ -879,13 +879,20 @@ function AcDiscrepancyBlock({
   booking: AdminBooking;
   unit: AdminUnit | null;
 }) {
-  const recordedSummary = unit
-    ? unit.ac.type === "unknown"
-      ? "No record on file"
-      : `${unit.ac.type} · ${unit.ac.systems} system${unit.ac.systems === 1 ? "" : "s"}${
-          unit.ac.additional > 0 ? ` + ${unit.ac.additional} extra` : ""
-        }`
-    : "—";
+  // Counts can be blank on the unit (Task #110 — buildings carry the
+  // type, units may not have systems/additional yet).
+  const recordedSummary = (() => {
+    if (!unit) return "—";
+    if (unit.ac.type === "unknown") return "No record on file";
+    const sys = unit.ac.systems;
+    const extra = unit.ac.additional;
+    if (sys === null || extra === null) {
+      return `${unit.ac.type} · counts not on file`;
+    }
+    return `${unit.ac.type} · ${sys} system${sys === 1 ? "" : "s"}${
+      extra > 0 ? ` + ${extra} extra` : ""
+    }`;
+  })();
   const customerSummary =
     booking.acType === "unsure"
       ? "Customer wasn't sure"

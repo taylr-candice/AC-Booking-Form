@@ -17,7 +17,7 @@ import {
   type Role,
 } from "./bookingSession";
 import { isCoordinationFlow } from "./bookingDerived";
-import { getLiveUnits } from "./adminMockData";
+import { getBuildingById, getLiveUnits } from "./adminMockData";
 
 // ─── Pricing ───────────────────────────────────────────────────────────────
 
@@ -139,60 +139,141 @@ export function unitCity(unit_id: string | null): string {
  */
 export type AcType = "split" | "ducted" | "unknown";
 
-/** Full AC record on file for a unit — type + recorded counts. The AC
- *  step seeds its steppers from these values when the customer hasn't
- *  overridden the type. Undefined for units with no record (their type
- *  shows as `"unknown"` and the customer is asked to pick one). */
+/** Full AC record on file for a unit — type + recorded counts + brand.
+ *  The AC step seeds its steppers from these values when the customer
+ *  hasn't overridden the type. `null` from {@link getAcRecord} when the
+ *  on-file counts are blank (the customer is asked to enter them).
+ *
+ *  `brand` is always populated for live admin units because every
+ *  building carries a mandatory brand (Task #110); empty string only
+ *  appears for legacy fallback entries below where the brand isn't
+ *  known. */
 export type AcRecord = {
   type: "split" | "ducted";
   systems: number;
   additional: number;
+  brand: string;
 };
 
-type UnitAcCatalogEntry = AcRecord | { type: "unknown" };
+type UnitAcCatalogEntry =
+  | AcRecord
+  | { type: "unknown"; brand?: string };
 
 /**
- * Legacy fallback table — used only when a unit id is NOT present in the
- * admin shell's live units list (`getLiveUnits()` from `adminMockData`).
- * The admin units list is the source of truth: when an admin edits a
- * unit's AC config (single editor or bulk CSV import) the customer's
- * Step 3 pre-fill should reflect that immediately. This fallback exists
- * to keep the legacy alias `unit-g01-335-aspen` working for old demo
- * deep-links and to keep tests of the customer flow green when the
- * admin shell isn't mounted.
+ * Legacy fallback table — used only when a unit id is NOT present in
+ * the admin shell's live units list (`getLiveUnits()` from
+ * `adminMockData`). The admin units list is the source of truth: when
+ * an admin edits a unit's AC config (single editor or bulk CSV import)
+ * the customer's AC step pre-fill reflects that immediately. This
+ * fallback exists to keep the legacy alias `unit-g01-335-aspen`
+ * working for old demo deep-links and to keep tests of the customer
+ * flow green when the admin shell isn't mounted.
  */
 const UNIT_AC_CATALOG: Readonly<Record<string, UnitAcCatalogEntry>> = {
   // G01 / 335 Aspen Village (legacy alias for u1).
-  "unit-g01-335-aspen": { type: "ducted", systems: 1, additional: 1 },
+  "unit-g01-335-aspen": {
+    type: "ducted",
+    systems: 1,
+    additional: 1,
+    brand: "Daikin",
+  },
 };
 
-function lookupLiveUnitAc(unit_id: string): UnitAcCatalogEntry | null {
+/**
+ * Resolve a live unit's full AC record, inheriting type + brand from
+ * the unit's building when the unit doesn't override them (Task #110).
+ *
+ * Returns `null` when:
+ *   - the unit isn't in the live list (caller should fall back to
+ *     {@link UNIT_AC_CATALOG}), or
+ *   - either of the recorded counts is blank (`null`) — these units
+ *     have "no record on file" semantics and the customer is asked to
+ *     enter the counts themselves, or
+ *   - the resolved type is still `"unknown"` (only happens for
+ *     malformed seed data without a building default).
+ *
+ * For type/brand-only resolution that should NOT be gated on counts,
+ * use {@link getAcType} and {@link getAcBrand} directly — they consult
+ * the live unit + building independently of count completeness.
+ */
+function lookupLiveUnitAcRecord(unit_id: string): AcRecord | null {
   const live = getLiveUnits().find((u) => u.id === unit_id);
   if (!live) return null;
-  if (live.ac.type === "unknown") return { type: "unknown" };
+  if (live.ac.systems === null || live.ac.additional === null) return null;
+
+  const building = getBuildingById(live.buildingId);
+  const resolvedType: "split" | "ducted" | "unknown" =
+    live.ac.type === "split" || live.ac.type === "ducted"
+      ? live.ac.type
+      : building?.acType ?? "unknown";
+  if (resolvedType === "unknown") return null;
+
+  const resolvedBrand: string =
+    live.ac.brand && live.ac.brand.trim().length > 0
+      ? live.ac.brand
+      : building?.acBrand ?? "";
+
   return {
-    type: live.ac.type,
+    type: resolvedType,
     systems: live.ac.systems,
     additional: live.ac.additional,
+    brand: resolvedBrand,
   };
 }
 
+/**
+ * The AC type the customer should see for this unit. Resolves the
+ * unit's own `ac.type` first (split / ducted), then falls back to the
+ * building's mandatory `acType` (Task #110). Independent of count
+ * completeness — a unit with blank counts still inherits its known
+ * type so the customer never sees the type picker for a known unit.
+ * Defaults to "split" only for unknown unit ids.
+ */
 export function getAcType(unit_id: string | null): AcType {
   if (!unit_id) return "split";
-  const fromLive = lookupLiveUnitAc(unit_id);
-  if (fromLive) return fromLive.type;
+  const live = getLiveUnits().find((u) => u.id === unit_id);
+  if (live) {
+    if (live.ac.type === "split" || live.ac.type === "ducted") {
+      return live.ac.type;
+    }
+    const building = getBuildingById(live.buildingId);
+    if (building) return building.acType;
+    return "split";
+  }
   return UNIT_AC_CATALOG[unit_id]?.type ?? "split";
 }
 
+/**
+ * The AC brand the customer should see for this unit. Resolves the
+ * unit's own `ac.brand` first (when non-empty), then falls back to the
+ * building's mandatory `acBrand` (Task #110). Returns an empty string
+ * only for legacy / unknown unit ids where neither source is
+ * available.
+ */
+export function getAcBrand(unit_id: string | null): string {
+  if (!unit_id) return "";
+  const live = getLiveUnits().find((u) => u.id === unit_id);
+  if (live) {
+    if (live.ac.brand && live.ac.brand.trim().length > 0) {
+      return live.ac.brand;
+    }
+    const building = getBuildingById(live.buildingId);
+    if (building) return building.acBrand ?? "";
+    return "";
+  }
+  return UNIT_AC_CATALOG[unit_id]?.brand ?? "";
+}
+
 /** Returns the recorded AC details for a unit, or `null` when there are
- *  no records on file (type === "unknown") or the unit isn't in the
- *  catalog. The Step 4 page uses this to (a) seed the steppers from the
- *  recorded counts, (b) render the "we have on record" panel content,
- *  and (c) compute the discrepancy snapshot. */
+ *  no records on file (counts are blank, or the unit isn't in the
+ *  catalog and the legacy fallback doesn't carry full counts). The AC
+ *  step uses this to (a) seed the steppers from the recorded counts,
+ *  (b) render the "we have on record" panel content, and (c) compute
+ *  the discrepancy snapshot. */
 export function getAcRecord(unit_id: string | null): AcRecord | null {
   if (!unit_id) return null;
-  const fromLive = lookupLiveUnitAc(unit_id);
-  if (fromLive) return fromLive.type === "unknown" ? null : fromLive;
+  const fromLive = lookupLiveUnitAcRecord(unit_id);
+  if (fromLive) return fromLive;
   const entry = UNIT_AC_CATALOG[unit_id];
   if (!entry || entry.type === "unknown") return null;
   return entry;

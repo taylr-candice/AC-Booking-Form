@@ -30,7 +30,7 @@ const recordedDuctedUnit: AdminUnit = {
   id: "u-test-1",
   addressLine1: "Test 101",
   addressLine2: "Sydney NSW",
-  ac: { type: "ducted", systems: 1, additional: 1 },
+  ac: { type: "ducted", brand: "", systems: 1, additional: 1 },
   agentId: null,
   buildingId: "bldg-aspen",
 };
@@ -39,7 +39,7 @@ const unknownAcUnit: AdminUnit = {
   id: "u-test-2",
   addressLine1: "Test 202",
   addressLine2: "Sydney NSW",
-  ac: { type: "unknown", systems: 0, additional: 0 },
+  ac: { type: "unknown", brand: "", systems: 0, additional: 0 },
   agentId: null,
   buildingId: "bldg-aspen",
 };
@@ -180,7 +180,7 @@ describe("buildAdminCreatedBooking", () => {
     const b = buildAdminCreatedBooking(
       {
         ...baseInput,
-        ac: { type: "split", systems: 2, additional: 1 },
+        ac: { type: "split", brand: "", systems: 2, additional: 1 },
         schedule: { kind: "slot", date: "2026-05-01", window: "afternoon" },
       },
       "bk-9002",
@@ -208,7 +208,7 @@ describe("buildAdminCreatedBooking", () => {
       {
         ...baseInput,
         unit: SEEDED_UNITS.find((u) => u.id === "u1")!, // ducted 1+1
-        ac: { type: "split", systems: 2, additional: 0 },
+        ac: { type: "split", brand: "", systems: 2, additional: 0 },
         schedule: { kind: "slot", date: "2026-05-02", window: "morning" },
       },
       "bk-9004",

@@ -39,6 +39,7 @@ import {
   normalizeCallTemplateDraft,
   normalizeEmailTemplateDraft,
   notifyLiveBookingsChanged,
+  notifyLiveBuildingsChanged,
   notifyLiveUnitsChanged,
   priorServiceStatusFromTimeline,
   releaseBookingCapacity,
@@ -50,6 +51,7 @@ import {
   SEEDED_BUILDINGS,
   SEEDED_UNITS,
   setLiveBookingsSource,
+  setLiveBuildingsSource,
   setLiveUnitsSource,
   summarizeTemplateUsageBooking,
   updateRolloutSlot,
@@ -1064,6 +1066,13 @@ export function AdminApp() {
     notifyLiveBookingsChanged();
     setLiveUnitsSource(() => units);
     notifyLiveUnitsChanged();
+    // Task #110: customer-side helpers (`getAcType`/`getAcBrand`/
+    // `lookupLiveUnitAc`) inherit the AC type and brand from the unit's
+    // building when the unit hasn't overridden them. Register the live
+    // buildings list so those helpers see admin edits in lockstep with
+    // the unit changes registered just above.
+    setLiveBuildingsSource(() => buildings);
+    notifyLiveBuildingsChanged();
     setUniquenessGuard((sess, newBookingReference) => {
       if (!sess.unit_id) return "ok";
       const rollout = findRolloutForBooking("svc-ac", sess.unit_id);
@@ -1125,8 +1134,9 @@ export function AdminApp() {
       setUniquenessGuard(null);
       setLiveBookingsSource(null);
       setLiveUnitsSource(null);
+      setLiveBuildingsSource(null);
     };
-  }, [seededBookings, units]);
+  }, [seededBookings, units, buildings]);
 
   function openNewBooking(buildingId: string | null) {
     setNewBookingBuildingId(buildingId);

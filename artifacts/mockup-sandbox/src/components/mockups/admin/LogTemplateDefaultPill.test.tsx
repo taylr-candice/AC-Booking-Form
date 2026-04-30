@@ -32,7 +32,7 @@ const UNIT: AdminUnit = {
   id: "u-pill",
   addressLine1: "1 / 1 Pill Lane",
   addressLine2: "Sydney NSW 2000",
-  ac: { type: "split", systems: 1, additional: 0 },
+  ac: { type: "split", brand: "", systems: 1, additional: 0 },
   agentId: null,
   buildingId: "bldg-pill",
 };
@@ -42,7 +42,9 @@ const BUILDING: AdminBuilding = {
   name: "Pill Tower",
   addressLine1: "1 Pill Lane",
   addressLine2: "Sydney NSW 2000",
-};
+      acType: "split",
+      acBrand: "Daikin",
+    };
 
 const AGENTS: AdminAgent[] = [];
 

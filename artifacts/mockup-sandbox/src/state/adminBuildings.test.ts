@@ -27,7 +27,7 @@ function makeUnit(over: Partial<AdminUnit> = {}): AdminUnit {
     id: "u-test",
     addressLine1: "1 Test Street",
     addressLine2: "Sydney NSW 2000",
-    ac: { type: "split", systems: 1, additional: 0 },
+    ac: { type: "split", brand: "", systems: 1, additional: 0 },
     agentId: null,
     buildingId: "bldg-test",
     ...over,

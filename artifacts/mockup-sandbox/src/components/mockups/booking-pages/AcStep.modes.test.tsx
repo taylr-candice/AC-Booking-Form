@@ -138,7 +138,9 @@ describe.each(VARIANTS)(
 
     it(
       "overridden mode renders the full configuration UI, ack checkbox, " +
-        "'View terms' link and '← Use what's on file' reset",
+        "'View terms' link and the type-toggle link — the old " +
+        "'Use what's on file' / 'Change AC type' / OverrideBanner stack " +
+        "is gone (Task #110)",
       () => {
         // Same unit as on-file, but with the override flag flipped on
         // — that's exactly what `link-update-details`'s onClick does.
@@ -150,7 +152,13 @@ describe.each(VARIANTS)(
         // Required UI for overridden mode
         expect(getByTestId("checkbox-ac-ack")).toBeInTheDocument();
         expect(getByTestId("link-view-terms")).toBeInTheDocument();
-        expect(getByTestId("link-use-on-file")).toBeInTheDocument();
+        // Task #110 — the only type-affecting affordance is the new
+        // toggle link; the chunky reset/change-type/banner stack is
+        // gone.
+        expect(getByTestId("link-toggle-ac-type")).toBeInTheDocument();
+        expect(queryByTestId("link-use-on-file")).toBeNull();
+        expect(queryByTestId("link-change-ac-type")).toBeNull();
+        expect(queryByTestId("button-override-reset")).toBeNull();
         // Full configuration UI — steppers for systems + additional.
         expect(getByTestId("btn-systems-plus")).toBeInTheDocument();
         expect(getByTestId("btn-systems-minus")).toBeInTheDocument();
@@ -163,37 +171,39 @@ describe.each(VARIANTS)(
     );
 
     it(
-      "no-record mode renders the full configuration UI but no " +
-        "'← Use what's on file' link",
+      "no-record mode (counts blank, type inherited from the building) " +
+        "renders the steppers + ack directly — no AC-type ChoicePanel, " +
+        "no 'Use what's on file' link, and no on-file summary card",
       () => {
-        // Unit `u3` has `type: "unknown"` — no record on file.
+        // Task #110 — `u3` has no `systems`/`additional` on file but its
+        // building (Bourke) carries `acType: "split"` + `acBrand:
+        // "Fujitsu"`, so the type/brand are pre-filled and the customer
+        // is taken straight to the count steppers. The old ChoicePanel
+        // is gone (the building always knows the type) and there's
+        // nothing to reset back to (no counts on file).
         bookingActions.setUnit(UNIT_WITHOUT_RECORD);
 
         const { getByTestId, queryByTestId } = render(<Component />);
 
-        // The full configuration view starts with the AC type picker
-        // when we genuinely don't know the type — that's part of the
-        // full UI, not a separate gate. There's no on-file summary
-        // and (critically) no "Use what's on file" reset because
-        // there's nothing to reset to.
-        expect(getByTestId("choice-ducted")).toBeInTheDocument();
-        expect(getByTestId("choice-split")).toBeInTheDocument();
-        expect(queryByTestId("link-use-on-file")).toBeNull();
-        expect(queryByTestId(onFileSummaryTestid)).toBeNull();
-
-        // Once the customer picks a known type, the steppers + ack +
-        // view-terms link become visible — still in no-record mode,
-        // and still WITHOUT the "Use what's on file" reset.
-        act(() => {
-          fireEvent.click(getByTestId("choice-split"));
-        });
-
+        // Steppers + ack + view-terms link are visible directly because
+        // the type is pre-filled from the building — no picker needed.
         expect(getByTestId("btn-systems-plus")).toBeInTheDocument();
         expect(getByTestId("btn-additional-plus")).toBeInTheDocument();
         expect(getByTestId("checkbox-ac-ack")).toBeInTheDocument();
         expect(getByTestId("link-view-terms")).toBeInTheDocument();
+
+        // Affordances that Task #110 explicitly removed.
+        expect(queryByTestId("choice-ducted")).toBeNull();
+        expect(queryByTestId("choice-split")).toBeNull();
         expect(queryByTestId("link-use-on-file")).toBeNull();
+        expect(queryByTestId("link-change-ac-type")).toBeNull();
+        expect(queryByTestId("button-override-reset")).toBeNull();
+        // No on-file summary card — there are no counts on file.
         expect(queryByTestId(onFileSummaryTestid)).toBeNull();
+
+        // The replacement affordance: a single "I now have a [opposite
+        // type] system" link that flips the type for this booking.
+        expect(getByTestId("link-toggle-ac-type")).toBeInTheDocument();
       },
     );
   },
@@ -235,58 +245,45 @@ describe.each(VARIANTS)(
           fireEvent.click(getByTestId("btn-systems-plus"));
         });
 
+        // Task #110 — recorded snapshot now carries the AC brand
+        // alongside the type/counts, so admin views (and any future
+        // ops surface that reads the discrepancy) can show the full
+        // "Split · Mitsubishi" context without a separate lookup.
         expect(getBookingSession().ac_discrepancy).toEqual({
-          recorded: { type: "split", systems: 2, additional: 0 },
+          recorded: {
+            type: "split",
+            brand: "Mitsubishi",
+            systems: 2,
+            additional: 0,
+          },
           customer: { type: "split", systems: 3, additional: 0 },
         });
       },
     );
 
-    it(
-      "overridden → '← Use what's on file' → flips back to on-file mode " +
-        "and wipes any captured discrepancy",
-      () => {
-        bookingActions.setUnit(UNIT_WITH_RECORD);
-        bookingActions.setAcOverrideActive(true);
+    // Task #110 — the "← Use what's on file" reset lifecycle test
+    // used to live here. The link was removed from the override view
+    // (along with ChoicePanel / "Change AC type" / OverrideBanner) so
+    // the override view is one-way from the customer's perspective:
+    // the way "back" to on-file is to navigate Step 3 with the
+    // override flag off, which is what the on-file path already
+    // covers (first test in this describe). The store-level guarantee
+    // that `setAcOverrideActive(false)` wipes any captured discrepancy
+    // is still pinned down at the store level (see
+    // `bookingSession.test.ts`), so we don't lose coverage by
+    // dropping this UI-driven duplicate.
 
-        const { getByTestId } = render(<Component />);
-
-        // Capture a discrepancy first by adjusting the count away
-        // from the recorded value — exercises the same effect the
-        // previous test pinned down.
-        act(() => {
-          fireEvent.click(getByTestId("btn-systems-plus"));
-        });
-
-        expect(getBookingSession().ac_override_active).toBe(true);
-        expect(getBookingSession().ac_discrepancy).not.toBeNull();
-
-        // Click the reset link — `setAcOverrideActive(false)` both
-        // flips the mode back to on-file and clears the captured
-        // discrepancy in a single store write (so the booking is
-        // recorded as matching the on-file record exactly).
-        act(() => {
-          fireEvent.click(getByTestId("link-use-on-file"));
-        });
-
-        expect(getBookingSession().ac_override_active).toBe(false);
-        expect(getBookingSession().ac_discrepancy).toBeNull();
-      },
-    );
 
     it(
       "no-record → adjust counts → no discrepancy is ever written",
       () => {
+        // Task #110 — `u3` has no `systems`/`additional` on file but
+        // its building pre-fills the type, so the steppers are visible
+        // straight away (no ChoicePanel step required).
         bookingActions.setUnit(UNIT_WITHOUT_RECORD);
 
         const { getByTestId } = render(<Component />);
 
-        expect(getBookingSession().ac_discrepancy).toBeNull();
-
-        // Pick a type so the steppers appear.
-        act(() => {
-          fireEvent.click(getByTestId("choice-split"));
-        });
         expect(getBookingSession().ac_discrepancy).toBeNull();
 
         // Adjust the counts repeatedly — there's nothing on file to
@@ -312,7 +309,7 @@ describe.each(VARIANTS)(
   },
 );
 
-// ─── (3) Unsure mode — streamlined-view contract (Task #101 / #109) ─────────
+// ─── (3) Unsure mode — streamlined-view contract (Task #101/#109/#110) ─────
 //
 // Task #101 streamlined the AC step in unsure mode so the UnsureCard is
 // the leading content: the page heading ("Tell us about the AC setup"),
@@ -320,65 +317,36 @@ describe.each(VARIANTS)(
 // The acknowledgement checkbox, Continue button, and (on mobile) Back
 // button must still be present so the customer can finish the step.
 //
-// There are two ways the customer enters unsure mode and both must yield
-// the same streamlined view:
-//   - `override === "unsure"` — picked "Not sure" from the type picker.
-//   - `notSureCount === true` — picked a known type, then tapped
-//     "Not sure? We can confirm this on-site" under the systems stepper.
-//
-// We use the no-record unit (`u3`) for both entry points because it
-// surfaces the type picker as the leading content out of the box, so
-// each entry route can be driven entirely from inside the rendered
-// component without extra store priming.
-
-const UNSURE_ENTRIES: ReadonlyArray<{
-  label: string;
-  enter: (q: { getByTestId: (id: string) => HTMLElement }) => void;
-  /** Whether the "← I'd like to enter the count myself" undo affordance
-   *  on the UnsureCard is expected — it only renders when the customer
-   *  arrived via `notSureCount` (so they can back out to the stepper),
-   *  not when they explicitly picked "Not sure" as the AC type. */
-  expectUndo: boolean;
-}> = [
-  {
-    label: 'override === "unsure" (picked from the type picker)',
-    enter: ({ getByTestId }) => {
-      act(() => {
-        fireEvent.click(getByTestId("choice-unsure"));
-      });
-    },
-    expectUndo: false,
-  },
-  {
-    label:
-      'notSureCount (picked a known type, then "Not sure? We can confirm this on-site")',
-    enter: ({ getByTestId }) => {
-      act(() => {
-        fireEvent.click(getByTestId("choice-split"));
-      });
-      act(() => {
-        fireEvent.click(getByTestId("link-not-sure-count"));
-      });
-    },
-    expectUndo: true,
-  },
-];
+// Task #110 removed the AC-type ChoicePanel from the customer flow (the
+// building always knows the type now), which also removes the
+// type-level unsure entry route — the only reachable unsure path is the
+// count-level "Not sure? We can confirm this on-site" link under the
+// systems stepper. The streamlined-view + merged-card contract still
+// applies, so we exercise it via that single entry route.
 
 describe.each(VARIANTS)(
   "$label — unsure mode streamlined-view contract",
   ({ Component, label }) => {
-    it.each(UNSURE_ENTRIES)(
-      "entered via $label: suppresses the page heading, intro paragraph " +
-        "and pink OverrideBanner; renders the UnsureCard; and keeps the " +
-        "ack checkbox, Continue button (and on mobile, Back button)",
-      ({ enter, expectUndo }) => {
+    it(
+      "entered via 'notSureCount' (tapped 'Not sure? We can confirm " +
+        "this on-site' under the systems stepper): suppresses the page " +
+        "heading, intro paragraph and pink OverrideBanner; renders the " +
+        "UnsureCard; and keeps the ack checkbox, Continue button " +
+        "(and on mobile, Back button)",
+      () => {
+        // Task #110 — `u3` inherits its AC type from the building, so
+        // the steppers are visible directly without a ChoicePanel step
+        // in between. The only unsure entry left is `link-not-sure-
+        // count` under the systems stepper.
         bookingActions.setUnit(UNIT_WITHOUT_RECORD);
 
         const { getByTestId, queryByTestId, queryByText } = render(
           <Component />,
         );
 
-        enter({ getByTestId });
+        act(() => {
+          fireEvent.click(getByTestId("link-not-sure-count"));
+        });
 
         // Suppressed by the unsure-mode gate (Task #101).
         expect(
@@ -395,17 +363,13 @@ describe.each(VARIANTS)(
 
         // UnsureCard is the leading content in unsure mode. It has no
         // wrapper testid so we assert via its heading copy. The undo
-        // affordance ("I'd like to enter the count myself") only shows
-        // for the `notSureCount` entry route — see UnsureCard's `onUndo`
-        // prop in AcMobile / AcDesktop.
+        // affordance ("I'd like to enter the count myself") shows
+        // because the customer arrived via `notSureCount` (so they
+        // can back out to the stepper).
         expect(
           queryByText(/confirm your setup during the service/i),
         ).toBeInTheDocument();
-        if (expectUndo) {
-          expect(getByTestId("button-undo-not-sure")).toBeInTheDocument();
-        } else {
-          expect(queryByTestId("button-undo-not-sure")).toBeNull();
-        }
+        expect(getByTestId("button-undo-not-sure")).toBeInTheDocument();
 
         // The ack + Continue must remain available so the customer can
         // still complete the step from the streamlined view.
@@ -420,102 +384,34 @@ describe.each(VARIANTS)(
   },
 );
 
-// ─── (4) Merged UnsureCard — per-path content contract (Task #102/#144) ────
+// ─── (4) Merged UnsureCard — per-path content contract (Task #102/#110) ────
 //
 // Task #102 collapsed the old OverrideBanner + UnsureCard pair into a
-// single `card-unsure-merged` shown above the price block in BOTH unsure
-// entry routes. This section pins down the per-path content of that card
-// and the price block beside it, so a future refactor of the unsure
-// paths can't silently regress the affordances or the price reassurance:
-//
-//   - Type-level (`override === "unsure"`):
-//       * `card-unsure-merged` rendered
-//       * "Change AC type" affordance (`button-change-ac-type-unsure`) —
-//         lets the customer back out to the type picker
-//       * NO undo-count affordance (there's no count to undo to)
-//       * Price block total reads "$179" (1 default system × $179)
-//       * Price block qualifier reads "Default — confirmed on the day"
-//         (the type-specific qualifier is intentionally suppressed
-//         because the customer has told us they don't know the type)
-//
-//   - Count-level (`notSureCount === true` after a known type):
-//       * `card-unsure-merged` rendered
-//       * "← I'd like to enter the count myself" affordance
-//         (`button-undo-not-sure`) — returns to the systems stepper
-//       * NO change-ac-type affordance (the type is already known)
-//       * Context line "Showing split setup" (or "Showing ducted setup")
-//       * Price block total reads "$179" (1 default system × $179)
-//
-//   - In NEITHER unsure path does the pink OverrideBanner render —
-//     `button-override-reset` is its tell-tale testid (asserted in the
-//     streamlined-view contract above and re-asserted here as a guard
-//     against a future banner sneaking back into the merged-card path).
+// single `card-unsure-merged` shown above the price block. Task #110
+// removed the AC-type ChoicePanel — and with it the type-level unsure
+// entry — so only the count-level path remains. We pin down the
+// content of that card and the price block beside it so a future
+// refactor of the unsure path can't silently regress the affordances
+// or the price reassurance.
 
 describe.each(VARIANTS)(
   "$label — merged UnsureCard per-path content",
   ({ Component }) => {
-    it(
-      "type-level unsure: card-unsure-merged contains " +
-        "button-change-ac-type-unsure (and no undo affordance), the " +
-        "price block total is $179 with the 'Default — confirmed on the " +
-        "day' qualifier, and no OverrideBanner reset is shown",
-      () => {
-        // u3 has no record on file, so the type picker is the leading
-        // content — picking "Not sure" puts us in the type-level
-        // unsure path (override === "unsure", notSureCount === false).
-        bookingActions.setUnit(UNIT_WITHOUT_RECORD);
-
-        const { getByTestId, queryByTestId, getByText } = render(
-          <Component />,
-        );
-
-        act(() => {
-          fireEvent.click(getByTestId("choice-unsure"));
-        });
-
-        // Merged card is rendered with the type-level affordance only.
-        const card = getByTestId("card-unsure-merged");
-        expect(card).toBeInTheDocument();
-        expect(getByTestId("button-change-ac-type-unsure")).toBeInTheDocument();
-        expect(queryByTestId("button-undo-not-sure")).toBeNull();
-        // No type context line in the type-level path — there's no
-        // known type to "show".
-        expect(queryByTestId("text-unsure-context")).toBeNull();
-
-        // No pink OverrideBanner in the merged-card path.
-        expect(queryByTestId("button-override-reset")).toBeNull();
-
-        // Price block — default 1 × $179 with the type-agnostic
-        // qualifier (the type-specific "1 outdoor + 1 indoor unit per
-        // system" line is intentionally suppressed in the type-level
-        // unsure state — see PriceBlock's `knownType={null}` branch).
-        const price = getByTestId("block-price");
-        expect(price).toBeInTheDocument();
-        expect(getByTestId("text-price-total")).toHaveTextContent("$179");
-        expect(
-          getByText(/Default\s*—\s*confirmed on the day/i),
-        ).toBeInTheDocument();
-      },
-    );
-
     it(
       "count-level unsure (split): card-unsure-merged contains " +
         "button-undo-not-sure and the 'Showing split setup' context " +
         "line, the price block total is $179, and no OverrideBanner " +
         "reset is shown",
       () => {
-        // u3 surfaces the type picker out of the box. Pick split, then
-        // tap the "Not sure? We can confirm this on-site" link under
-        // the systems stepper to enter the count-level unsure path
-        // with a known type (override === "split", notSureCount ===
-        // true).
+        // Task #110 — `u3` inherits its AC type ("split") from the
+        // building, so the steppers are visible immediately. Tap the
+        // "Not sure? We can confirm this on-site" link under the
+        // systems stepper to enter the count-level unsure path
+        // (effectiveType === "split", notSureCount === true).
         bookingActions.setUnit(UNIT_WITHOUT_RECORD);
 
         const { getByTestId, queryByTestId } = render(<Component />);
 
-        act(() => {
-          fireEvent.click(getByTestId("choice-split"));
-        });
         act(() => {
           fireEvent.click(getByTestId("link-not-sure-count"));
         });
@@ -540,6 +436,85 @@ describe.each(VARIANTS)(
         // 1 in unsure mode regardless of any prior stepper state).
         expect(getByTestId("block-price")).toBeInTheDocument();
         expect(getByTestId("text-price-total")).toHaveTextContent("$179");
+      },
+    );
+  },
+);
+
+// ─── (5) Task #110 — type-toggle link contract ────────────────────────────
+//
+// The override view now sports a single small "I now have a [opposite
+// type] system" link beneath the type heading. Clicking it flips the
+// effective type for the booking, records a discrepancy for ops to
+// review (in overridden mode where there's something to compare
+// against), and updates the steppers' addon labels accordingly. It
+// must not silently overwrite the unit record.
+
+describe.each(VARIANTS)(
+  "$label — type-toggle link",
+  ({ Component }) => {
+    it(
+      "shows 'I now have a [opposite type] system' beneath the type " +
+        "heading and flips the effective type when clicked",
+      () => {
+        // u3 inherits split from its building (Bourke). The toggle
+        // link should advertise the OPPOSITE — ducted — and clicking
+        // it should flip the steppers' addon label from 'Extra indoor
+        // units' (split) to 'Extra return-air grilles' (ducted).
+        bookingActions.setUnit(UNIT_WITHOUT_RECORD);
+
+        const { getByTestId, queryByTestId } = render(<Component />);
+
+        const toggle = getByTestId("link-toggle-ac-type");
+        expect(toggle).toBeInTheDocument();
+        expect(toggle).toHaveTextContent(/I now have a ducted system/i);
+
+        // Steppers reflect split before the click.
+        expect(queryByTestId("text-extras-helper")).toHaveTextContent(
+          /indoor unit/i,
+        );
+
+        act(() => {
+          fireEvent.click(toggle);
+        });
+
+        // After the flip the toggle now offers the reverse direction
+        // and the steppers' addon helper switches to the ducted copy.
+        expect(getByTestId("link-toggle-ac-type")).toHaveTextContent(
+          /I now have a split system/i,
+        );
+        expect(queryByTestId("text-extras-helper")).toHaveTextContent(
+          /return-air grille/i,
+        );
+      },
+    );
+
+    it(
+      "in overridden mode, clicking the toggle records a discrepancy " +
+        "with the new type so ops can decide whether to promote it",
+      () => {
+        // u2 is on file as split + Mitsubishi + 2 systems + 0 extras.
+        // Open the override view and flip the type.
+        bookingActions.setUnit(UNIT_WITH_RECORD);
+        bookingActions.setAcOverrideActive(true);
+
+        const { getByTestId } = render(<Component />);
+
+        // Baseline — same type as recorded ⇒ no discrepancy yet.
+        expect(getBookingSession().ac_discrepancy).toBeNull();
+
+        act(() => {
+          fireEvent.click(getByTestId("link-toggle-ac-type"));
+        });
+
+        // Discrepancy snapshot now reflects the type flip — the
+        // recorded side keeps the on-file split + brand + counts; the
+        // customer side drops to the ducted defaults (1 system, 0
+        // extras) since the previous split counts no longer apply.
+        const snap = getBookingSession().ac_discrepancy;
+        expect(snap).not.toBeNull();
+        expect(snap?.recorded.type).toBe("split");
+        expect(snap?.customer.type).toBe("ducted");
       },
     );
   },

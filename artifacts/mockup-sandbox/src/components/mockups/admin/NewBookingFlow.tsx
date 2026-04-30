@@ -154,13 +154,28 @@ export function NewBookingFlow({
   function selectUnit(unitId: string) {
     const u = units.find((x) => x.id === unitId);
     if (!u) return;
-    const recordedKnown = u.ac.type === "split" || u.ac.type === "ducted";
+    // Type pre-fills from the unit when set, otherwise from the unit's
+    // building (Task #110 — buildings carry the authoritative AC type).
+    // Counts pre-fill from the unit only when both are populated; a
+    // null on either means the on-file numbers are blank and the admin
+    // should enter them manually (the steppers default to 1 / 0).
+    const building = buildings.find((b) => b.id === u.buildingId) ?? null;
+    const resolvedType: AcType =
+      u.ac.type === "split" || u.ac.type === "ducted"
+        ? u.ac.type
+        : building?.acType ?? "unsure";
+    const countsKnown =
+      u.ac.systems !== null && u.ac.additional !== null;
     setForm((prev) => ({
       ...prev,
       unitId,
-      acType: recordedKnown ? (u.ac.type as AcType) : "unsure",
-      acSystems: recordedKnown ? Math.max(1, u.ac.systems) : 1,
-      acAdditional: recordedKnown ? u.ac.additional : 0,
+      acType: resolvedType,
+      acSystems:
+        countsKnown && u.ac.systems !== null
+          ? Math.max(1, u.ac.systems)
+          : 1,
+      acAdditional:
+        countsKnown && u.ac.additional !== null ? u.ac.additional : 0,
     }));
   }
 
@@ -298,7 +313,14 @@ export function NewBookingFlow({
             />
           )}
           {step === 2 && selectedUnit && (
-            <Step2Ac unit={selectedUnit} form={form} setForm={setForm} />
+            <Step2Ac
+              unit={selectedUnit}
+              building={
+                buildings.find((b) => b.id === selectedUnit.buildingId) ?? null
+              }
+              form={form}
+              setForm={setForm}
+            />
           )}
           {step === 3 && (
             <Step3Schedule
@@ -521,7 +543,9 @@ function Step1UnitCustomer({
                     )}
                   </div>
                   <div className="text-right text-[10px] uppercase tracking-wider text-slate-500">
-                    {u.ac.type === "unknown" ? "No AC record" : u.ac.type}
+                    {u.ac.type === "split" || u.ac.type === "ducted"
+                      ? u.ac.type
+                      : building?.acType ?? "—"}
                   </div>
                 </button>
               );
@@ -645,14 +669,29 @@ function Step1UnitCustomer({
 
 function Step2Ac({
   unit,
+  building,
   form,
   setForm,
 }: {
   unit: AdminUnit;
+  building: AdminBuilding | null;
   form: FormState;
   setForm: React.Dispatch<React.SetStateAction<FormState>>;
 }) {
-  const recordedKnown = unit.ac.type === "split" || unit.ac.type === "ducted";
+  // Type is taken from the unit's AC override when set, otherwise from
+  // the building's mandatory `acType` (Task #110).
+  const resolvedType: "split" | "ducted" | null =
+    unit.ac.type === "split" || unit.ac.type === "ducted"
+      ? unit.ac.type
+      : building?.acType ?? null;
+  const recordedKnown = resolvedType !== null;
+  const countsKnown =
+    unit.ac.systems !== null && unit.ac.additional !== null;
+  // Brand: unit override wins, otherwise inherit from the building.
+  const resolvedBrand: string =
+    unit.ac.brand && unit.ac.brand.trim().length > 0
+      ? unit.ac.brand
+      : building?.acBrand ?? "";
   const discrepancy = computeAdminAcDiscrepancy(unit.ac, {
     type: form.acType,
     systems: form.acSystems,
@@ -671,13 +710,21 @@ function Step2Ac({
             {unit.addressLine1}
           </div>
           <div className="text-[11px] text-slate-500">{unit.addressLine2}</div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-[12px]">
+          <div className="mt-3 grid grid-cols-4 gap-2 text-[12px]">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-slate-500">
                 Type
               </div>
               <div className="font-semibold capitalize text-slate-900">
-                {recordedKnown ? unit.ac.type : "No record"}
+                {recordedKnown ? resolvedType : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">
+                Brand
+              </div>
+              <div className="font-semibold text-slate-900">
+                {resolvedBrand || "—"}
               </div>
             </div>
             <div>
@@ -685,7 +732,7 @@ function Step2Ac({
                 Systems
               </div>
               <div className="font-semibold text-slate-900">
-                {recordedKnown ? unit.ac.systems : "—"}
+                {countsKnown ? unit.ac.systems : "—"}
               </div>
             </div>
             <div>
@@ -693,13 +740,13 @@ function Step2Ac({
                 Extras
               </div>
               <div className="font-semibold text-slate-900">
-                {recordedKnown ? unit.ac.additional : "—"}
+                {countsKnown ? unit.ac.additional : "—"}
               </div>
             </div>
           </div>
-          {!recordedKnown && (
+          {!countsKnown && (
             <div className="mt-2 text-[11px] text-slate-500">
-              No AC record on file — capture what the customer reports.
+              On-file counts are blank — capture what the customer reports.
             </div>
           )}
         </div>

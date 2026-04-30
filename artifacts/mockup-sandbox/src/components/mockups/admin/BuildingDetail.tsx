@@ -123,6 +123,12 @@ export function BuildingDetail({
             <div className="mt-0.5 text-[13px] text-slate-500">
               {building.addressLine1} · {building.addressLine2}
             </div>
+            <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium capitalize text-slate-700">
+              {building.acType} · {building.acBrand}
+              <span className="text-[10px] font-normal text-slate-500">
+                pre-fills new bookings
+              </span>
+            </div>
           </div>
         </div>
         <div className="mt-4 grid grid-cols-5 gap-3 border-t border-slate-100 pt-4">

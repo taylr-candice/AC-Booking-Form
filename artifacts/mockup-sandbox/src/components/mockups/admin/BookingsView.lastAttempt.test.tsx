@@ -31,6 +31,8 @@ function makeBuildings(): AdminBuilding[] {
       name: "Test Tower",
       addressLine1: "1 Test St",
       addressLine2: "Suburb NSW 2000",
+      acType: "split",
+      acBrand: "Daikin",
     },
   ];
 }
@@ -41,7 +43,7 @@ function makeUnits(): AdminUnit[] {
       id: "u1",
       addressLine1: "1 / 1 Test St",
       addressLine2: "Suburb NSW 2000",
-      ac: { type: "split", systems: 1, additional: 0 },
+      ac: { type: "split", brand: "", systems: 1, additional: 0 },
       agentId: null,
       buildingId: "bldg-test",
     },
