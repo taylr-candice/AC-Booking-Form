@@ -2315,6 +2315,38 @@ export function countTimelineUsageForTemplate(
 }
 
 /**
+ * Per-booking predicate: does this booking's service timeline
+ * reference `templateName` for the given `kind`? Snapshot-on-use
+ * match against the entry's `templateLabel`, trim-tolerant on the
+ * `templateName` side so a stray space from a future call site
+ * doesn't silently miss every entry.
+ *
+ * Shared by {@link findUsageBookingsForTemplate} (the popover's
+ * "Bookings using this template" drill-down) and the Bookings list's
+ * "Template used" filter so the two surfaces can never disagree
+ * about which bookings count.
+ *
+ * Returns `false` when `templateName` is blank — matches the existing
+ * "no filter applied / no name to compare against" semantics of the
+ * surrounding helpers, and gives the BookingsView filter a single
+ * place to short-circuit the empty-name case.
+ */
+export function bookingTimelineReferencesTemplate(
+  booking: AdminBooking,
+  kind: "call" | "email",
+  templateName: string,
+): boolean {
+  const trimmed = templateName.trim();
+  if (trimmed.length === 0) return false;
+  for (const entry of booking.serviceTimeline) {
+    if (entry.kind === kind && entry.templateLabel === trimmed) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Find every booking whose service timeline references `templateName`
  * for the given `kind`. Sibling of {@link countTimelineUsageForTemplate}
  * — same snapshot-on-use match against the entry's `templateLabel`,
@@ -2322,6 +2354,12 @@ export function countTimelineUsageForTemplate(
  *
  * A booking is included at most once even if its timeline references
  * the template multiple times. Input order is preserved.
+ *
+ * Implemented in terms of {@link bookingTimelineReferencesTemplate}
+ * so the per-row predicate the BookingsView filter uses and the
+ * collection helper the templates popover uses stay byte-for-byte
+ * consistent — no chance of one surface listing a booking that the
+ * other quietly excludes.
  */
 export function findUsageBookingsForTemplate(
   bookings: ReadonlyArray<AdminBooking>,
@@ -2332,14 +2370,9 @@ export function findUsageBookingsForTemplate(
   if (trimmed.length === 0) return [];
   const out: AdminBooking[] = [];
   for (const b of bookings) {
-    let matched = false;
-    for (const entry of b.serviceTimeline) {
-      if (entry.kind === kind && entry.templateLabel === trimmed) {
-        matched = true;
-        break;
-      }
+    if (bookingTimelineReferencesTemplate(b, kind, trimmed)) {
+      out.push(b);
     }
-    if (matched) out.push(b);
   }
   return out;
 }

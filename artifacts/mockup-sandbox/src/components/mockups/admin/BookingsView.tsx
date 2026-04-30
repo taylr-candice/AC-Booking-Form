@@ -6,16 +6,19 @@
  */
 
 import { Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
   bookerAgencyName,
+  bookingTimelineReferencesTemplate,
   formatAttemptRecency,
   getBuildingForUnit,
   latestCoordinationAttempt,
   type AdminBooking,
   type AdminBuilding,
   type AdminUnit,
+  type CallTemplate,
+  type EmailTemplate,
   type PaymentStatus,
   type ServiceStatus,
 } from "@/state/adminMockData";
@@ -82,6 +85,69 @@ function attemptTimestamp(booking: AdminBooking): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/**
+ * Identifies a Call/Email template by `kind` + snapshot-on-use `name`,
+ * the same shape `findUsageBookingsForTemplate` matches against. The
+ * "Template used" filter on the bookings toolbar reuses this so an
+ * ops lead can audit every booking whose timeline references a given
+ * template — same matching rule as the per-template usage popover, so
+ * the two surfaces never disagree about which bookings count.
+ *
+ * `null` means "no template filter" — the toolbar's reset state.
+ */
+export type BookingsTemplateFilter = {
+  kind: "call" | "email";
+  name: string;
+} | null;
+
+/**
+ * Predicate for the "Template used" filter. A `null` filter is
+ * treated as "no filter applied" so this can be composed alongside
+ * the building / search / status filters without a separate guard
+ * at every call site. The match itself delegates to the shared
+ * {@link bookingTimelineReferencesTemplate} helper so this filter
+ * and the templates popover's "Bookings using this template"
+ * drill-down can never disagree about which bookings count — both
+ * read from the same predicate.
+ *
+ * Blank-name filters are also treated as "no filter applied" (the
+ * shared predicate would return `false` for every row otherwise,
+ * which would surprise an admin who somehow ended up with an
+ * unnamed selection).
+ */
+function matchesTemplateFilter(
+  booking: AdminBooking,
+  filter: BookingsTemplateFilter,
+): boolean {
+  if (filter === null) return true;
+  if (filter.name.trim().length === 0) return true;
+  return bookingTimelineReferencesTemplate(booking, filter.kind, filter.name);
+}
+
+/**
+ * Encode / decode the {@link BookingsTemplateFilter} as a single
+ * `<select>` value so the dropdown stays a controlled component
+ * without a custom popover. We prefix the channel so a Call template
+ * and an Email template that happen to share a name (admins can
+ * rename freely) stay distinguishable. `"all"` is the toolbar's
+ * reset value.
+ */
+const TEMPLATE_FILTER_ALL_VALUE = "all";
+function encodeTemplateFilter(filter: BookingsTemplateFilter): string {
+  if (filter === null) return TEMPLATE_FILTER_ALL_VALUE;
+  return `${filter.kind}::${filter.name}`;
+}
+function decodeTemplateFilter(value: string): BookingsTemplateFilter {
+  if (value === TEMPLATE_FILTER_ALL_VALUE) return null;
+  const sepIdx = value.indexOf("::");
+  if (sepIdx <= 0) return null;
+  const kind = value.slice(0, sepIdx);
+  const name = value.slice(sepIdx + 2);
+  if (kind !== "call" && kind !== "email") return null;
+  if (name.length === 0) return null;
+  return { kind, name };
+}
+
 export function BookingsView({
   bookings,
   units,
@@ -90,6 +156,10 @@ export function BookingsView({
   onStatusFilter,
   buildingFilter,
   onBuildingFilter,
+  templateFilter,
+  onTemplateFilter,
+  emailTemplates,
+  callTemplates,
   search,
   onSearch,
   onOpen,
@@ -98,8 +168,6 @@ export function BookingsView({
   onAcknowledgeSupersede,
   onUndoCancelBooking,
   onUndoCancelBookingAndReschedule,
-  initialTemplateFilter,
-  onTemplateFilterConsumed,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -108,6 +176,22 @@ export function BookingsView({
   onStatusFilter: (s: "all" | ServiceStatus | PaymentStatus) => void;
   buildingFilter: string;
   onBuildingFilter: (id: string) => void;
+  /** Active "Template used" filter (Call/Email + template name) or
+   *  `null` for the toolbar's reset state. Lets an ops lead audit
+   *  every booking whose timeline references a given seeded or
+   *  admin-edited template, composed with the existing status /
+   *  building / search filters. */
+  templateFilter?: BookingsTemplateFilter;
+  onTemplateFilter?: (filter: BookingsTemplateFilter) => void;
+  /** Email template catalog driving the dropdown options on the
+   *  "Template used" filter. Defaults to an empty list so callers
+   *  that don't yet wire the filter (e.g. older test harnesses)
+   *  still render. Pulled from `EMAIL_TEMPLATES` + admin edits in
+   *  the AdminApp shell. */
+  emailTemplates?: ReadonlyArray<EmailTemplate>;
+  /** Call template catalog driving the dropdown options on the
+   *  "Template used" filter. Mirror of `emailTemplates`. */
+  callTemplates?: ReadonlyArray<CallTemplate>;
   search: string;
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
@@ -125,31 +209,15 @@ export function BookingsView({
    *  The AdminApp shell performs the atomic restore + reschedule on
    *  confirm. */
   onUndoCancelBookingAndReschedule?: (id: string) => void;
-  /** Optional one-shot seed for the local template filter — used when
-   *  the admin pivots into BookingsView from a BookingDetail timeline
-   *  entry's "View other bookings using this template" link
-   *  (Task #159). The view applies the seed via {@link useState}'s
-   *  initial value so the very first render already filters the
-   *  table, and additionally re-applies it via {@link useEffect}
-   *  whenever the prop transitions to a non-null value (handles the
-   *  edge case where the same component instance receives a fresh
-   *  pivot — e.g. the admin opens another booking from the filtered
-   *  list, clicks a different template chip, and lands back here).
-   *  Once consumed, the view fires {@link onTemplateFilterConsumed}
-   *  so the parent can clear the seed and avoid re-applying it on
-   *  unrelated re-renders (e.g. the admin clears the chip themselves
-   *  and we don't want a sidebar nav to re-seed). Optional so older
-   *  call-sites and tests that don't care about the pivot remain
-   *  valid — the local "click suffix → filter" path inside the view
-   *  is unchanged. */
-  initialTemplateFilter?: string | null;
-  /** Fires once after BookingsView has applied {@link initialTemplateFilter}
-   *  to its local state, so the parent (AdminApp) can clear its
-   *  pending seed slot. See {@link initialTemplateFilter} for the
-   *  full pivot-handoff rationale. Optional / inert when the seed
-   *  prop isn't wired. */
-  onTemplateFilterConsumed?: () => void;
 }) {
+  // Default the template filter to "no filter applied" + a no-op
+  // setter so the prop stays strictly optional — older harnesses
+  // (and the AwaitingCoordinationView's own unrelated tests) keep
+  // rendering without having to thread template state through.
+  const activeTemplateFilter: BookingsTemplateFilter = templateFilter ?? null;
+  const setTemplateFilter = onTemplateFilter ?? (() => {});
+  const emailTemplateOptions = emailTemplates ?? [];
+  const callTemplateOptions = callTemplates ?? [];
   // "Show cancelled" is OFF by default — cancelled rows are an audit-trail
   // artefact, not the day-to-day work, so we hide them unless the admin
   // opts in. The toggle is local to this list (not lifted to AdminApp)
@@ -174,35 +242,6 @@ export function BookingsView({
   const [attemptSort, setAttemptSort] = useState<
     "default" | "stalest_first" | "freshest_first"
   >("default");
-  // "Latest call/email touch used this template" pivot. Local to this
-  // view so it doesn't bleed across surfaces. Seeded from the
-  // `initialTemplateFilter` prop on first render so a pivot from a
-  // BookingDetail timeline entry's "View other bookings using this
-  // template" link (Task #159) lands the admin straight on a filtered
-  // table instead of having to re-click anything.
-  const [templateFilter, setTemplateFilter] = useState<string | null>(
-    initialTemplateFilter ?? null,
-  );
-  // Re-apply the seed if the parent hands us a fresh non-null value
-  // mid-life (e.g. the admin clears the chip themselves, opens another
-  // booking from the filtered list, clicks a different template chip,
-  // and lands back here on the same component instance). After
-  // applying we notify the parent so it can clear its pending slot —
-  // otherwise an unrelated re-render later (sidebar nav, search edit,
-  // etc.) would re-seed and undo the admin's manual clear. The
-  // `null`/`undefined` paths are no-ops so the view's own
-  // suffix-click handler remains the source of truth in normal use.
-  useEffect(() => {
-    if (initialTemplateFilter) {
-      setTemplateFilter(initialTemplateFilter);
-      onTemplateFilterConsumed?.();
-    }
-    // We deliberately depend only on the seed value, not on the
-    // callback identity — re-running this effect when a parent
-    // re-renders the consume callback would defeat the
-    // one-shot-handoff invariant above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTemplateFilter]);
   // Inline-undo pivot state. When the row-level "Undo" affordance hits
   // a "slot_taken" verdict we surface the same conflict dialog the
   // detail page uses; clicking "Open Reschedule" then asks the
@@ -241,19 +280,21 @@ export function BookingsView({
         { key: "cancelled", label: "Cancelled" },
       ];
 
-  // Building + search + template-filter predicate, folded into the
-  // chip counts so they reflect the visible rows.
+  // Predicate for the "global" filters that aren't tied to the
+  // status chip row — building filter, search, and the active
+  // "Template used" filter. Mirrors the helper on
+  // AwaitingCoordinationView so each chip's count answers
+  // "how many rows would survive if I clicked me?" without
+  // double-counting against its own selection. The template filter
+  // is folded in here (rather than re-checked at every chip site)
+  // so chip counts shrink when an ops lead pivots to a specific
+  // template — same way they already shrink for building / search.
   function matchesBuildingAndSearch(b: AdminBooking) {
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
     }
-    if (templateFilter !== null) {
-      const latest = latestCoordinationAttempt(b.serviceTimeline);
-      if (latest === null || latest.templateLabel !== templateFilter) {
-        return false;
-      }
-    }
+    if (!matchesTemplateFilter(b, activeTemplateFilter)) return false;
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
       const unit = units.find((u) => u.id === b.unitId);
@@ -337,12 +378,7 @@ export function BookingsView({
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
     }
-    if (templateFilter !== null) {
-      const latest = latestCoordinationAttempt(b.serviceTimeline);
-      if (latest === null || latest.templateLabel !== templateFilter) {
-        return false;
-      }
-    }
+    if (!matchesTemplateFilter(b, activeTemplateFilter)) return false;
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
       const unit = units.find((u) => u.id === b.unitId);
@@ -455,6 +491,53 @@ export function BookingsView({
             <option value="stalest_first">Last attempt: stalest first</option>
             <option value="freshest_first">Last attempt: freshest first</option>
           </select>
+          {/* "Template used" filter. Pulls Call + Email options from
+              the seeded + admin-edited template catalogs threaded down
+              from AdminApp; selecting a template narrows the table to
+              bookings whose service timeline references that template
+              by snapshot name (same matching rule as the per-template
+              usage popover). Composes with the existing status,
+              building, and search filters. The sentinel "All
+              templates" value is the toolbar's reset / clearable
+              affordance — admins flip back to it to drop the lens. */}
+          {(emailTemplateOptions.length > 0 ||
+            callTemplateOptions.length > 0) && (
+            <select
+              value={encodeTemplateFilter(activeTemplateFilter)}
+              onChange={(e) =>
+                setTemplateFilter(decodeTemplateFilter(e.target.value))
+              }
+              aria-label="Filter by template used"
+              data-testid="bookings-filter-template"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+            >
+              <option value={TEMPLATE_FILTER_ALL_VALUE}>All templates</option>
+              {callTemplateOptions.length > 0 && (
+                <optgroup label="Call templates">
+                  {callTemplateOptions.map((t) => (
+                    <option
+                      key={`call-${t.id}`}
+                      value={encodeTemplateFilter({ kind: "call", name: t.name })}
+                    >
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {emailTemplateOptions.length > 0 && (
+                <optgroup label="Email templates">
+                  {emailTemplateOptions.map((t) => (
+                    <option
+                      key={`email-${t.id}`}
+                      value={encodeTemplateFilter({ kind: "email", name: t.name })}
+                    >
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {!paymentMode && (
@@ -534,12 +617,15 @@ export function BookingsView({
         </div>
       </div>
 
-      {templateFilter !== null && (
+      {activeTemplateFilter !== null && (
         <div
           className="flex items-center gap-2 text-[12px]"
           data-testid="bookings-template-filter-chip"
         >
-          <span className="text-slate-500">Filtered by template:</span>
+          <span className="text-slate-500">
+            Filtered by{" "}
+            {activeTemplateFilter.kind === "call" ? "call" : "email"} template:
+          </span>
           <button
             type="button"
             onClick={() => setTemplateFilter(null)}
@@ -550,9 +636,9 @@ export function BookingsView({
               color: BRAND_DEEP,
             }}
             title="Clear template filter"
-            aria-label={`Clear template filter "${templateFilter}"`}
+            aria-label={`Clear template filter "${activeTemplateFilter.name}"`}
           >
-            <span>{templateFilter}</span>
+            <span>{activeTemplateFilter.name}</span>
             <X className="h-3 w-3" />
           </button>
         </div>
@@ -774,9 +860,13 @@ export function BookingsView({
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setTemplateFilter(
-                                      latestAttempt.templateLabel,
-                                    );
+                                    const label = latestAttempt.templateLabel;
+                                    if (label) {
+                                      setTemplateFilter({
+                                        kind: latestAttempt.kind,
+                                        name: label,
+                                      });
+                                    }
                                   }}
                                   onKeyDown={(e) => e.stopPropagation()}
                                   className="cursor-pointer rounded text-slate-500 underline decoration-dotted decoration-slate-400 underline-offset-2 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"

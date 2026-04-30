@@ -184,7 +184,7 @@ export function BookingDetail({
    *  tests that don't care about the pivot) can omit it — the link
    *  is then suppressed and the chip alone (when {@link onOpenTemplate}
    *  is wired) still gives admins their templates-panel jump. */
-  onPivotToBookingsFilteredByTemplate?: (templateLabel: string) => void;
+  onPivotToBookingsFilteredByTemplate?: (kind: "call" | "email", templateLabel: string) => void;
   /** Live email-template catalog the per-row Log-email form's
    *  template dropdown reads from. Defaults to the seeded
    *  {@link EMAIL_TEMPLATES} so the screen stays usable in isolation
@@ -984,7 +984,7 @@ function Timeline({
    *  in Task #153). When omitted the link is suppressed; the chip
    *  alone (when {@link onOpenTemplate} is wired) still gives admins
    *  their templates-panel jump. */
-  onPivotToBookingsFilteredByTemplate?: (templateLabel: string) => void;
+  onPivotToBookingsFilteredByTemplate?: (kind: "call" | "email", templateLabel: string) => void;
 }) {
   if (entries.length === 0) {
     return <div className="text-[12px] text-slate-500">No events yet.</div>;
@@ -1067,7 +1067,10 @@ function Timeline({
                     <button
                       type="button"
                       onClick={() =>
-                        onPivotToBookingsFilteredByTemplate(e.templateLabel!)
+                        onPivotToBookingsFilteredByTemplate(
+                          templateChipKind,
+                          e.templateLabel!,
+                        )
                       }
                       data-testid={`timeline-entry-${i}-pivot-bookings`}
                       data-template-label={e.templateLabel}

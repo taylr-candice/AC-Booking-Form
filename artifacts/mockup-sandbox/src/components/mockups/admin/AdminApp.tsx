@@ -336,19 +336,19 @@ export function AdminApp() {
   // When jumping to Payments, default the bookings list to the payments filter.
   const [bookingsStatusFilter, setBookingsStatusFilter] =
     useState<"all" | ServiceStatus | PaymentStatus>("all");
-  // One-shot seed handed to BookingsView's local templateFilter when
-  // the admin pivots in from a BookingDetail timeline entry's
-  // "View other bookings using this template" link (Task #159).
-  // BookingsView consumes the seed on its first render after the
-  // pivot and immediately calls back so we clear this slot —
-  // subsequent re-renders (sidebar nav, search edit, etc.) must not
-  // re-seed and clobber an admin's manual chip-clear.
-  const [bookingsTemplateFilterSeed, setBookingsTemplateFilterSeed] =
-    useState<string | null>(null);
   const [search, setSearch] = useState("");
   // Active building filter on the Bookings list ("all" = no filter).
   const [bookingsBuildingFilter, setBookingsBuildingFilter] =
     useState<string>("all");
+  // Active "Template used" filter on the Bookings list (Task #156).
+  // `null` is the toolbar's reset state — no filter applied. The
+  // template is identified by its snapshot `name` + channel, the
+  // same shape `findUsageBookingsForTemplate` matches against, so
+  // a renamed template doesn't silently drag historical bookings
+  // out of view (their timeline entries keep the old name).
+  const [bookingsTemplateFilter, setBookingsTemplateFilter] = useState<
+    { kind: "call" | "email"; name: string } | null
+  >(null);
   // Awaiting-coordination view filter — independent from the bookings
   // status filter so an admin can flip between views without losing
   // their coordination grouping. "all" shows both queues at once.
@@ -368,12 +368,6 @@ export function AdminApp() {
     setSearch("");
     setBookingsBuildingFilter("all");
     // Sidebar nav is an explicit "fresh start" gesture, so clear any
-    // pending pivot seed from a BookingDetail "View other bookings
-    // using this template" link (Task #159). Without this, navigating
-    // to the bookings list via the sidebar after a half-completed
-    // pivot would mysteriously land on a filtered table.
-    setBookingsTemplateFilterSeed(null);
-    // Sidebar nav is an explicit "fresh start" gesture, so clear any
     // template focus left behind by a chip click — the templates
     // panel should open in its default unfocused state when the user
     // navigates here themselves rather than via a booking chip.
@@ -382,6 +376,7 @@ export function AdminApp() {
     // Drop dismiss-on-nav toasts (the missing-template hint) — other
     // toasts persist so ops can flip view without losing them.
     setToast((t) => (t && t.dismissOnNav ? null : t));
+    setBookingsTemplateFilter(null);
   }
 
   /**
@@ -396,6 +391,7 @@ export function AdminApp() {
     setBookingsStatusFilter("all");
     setSearch("");
     setBookingsBuildingFilter(buildingId);
+    setBookingsTemplateFilter(null);
   }
 
   /**
@@ -410,6 +406,7 @@ export function AdminApp() {
     setBookingsStatusFilter("all");
     setSearch("");
     setBookingsBuildingFilter("all");
+    setBookingsTemplateFilter(null);
     setSelectedBookingId(bookingId);
     // Drop any template focus on the way out — the next visit to a
     // templates panel should open in its default unfocused state
@@ -478,17 +475,21 @@ export function AdminApp() {
    * Implementation: clears the building / status / search filters and
    * the selected booking so the template lens is the sole filter
    * applied (matches `openBookingsForBuilding`'s "single lens"
-   * convention), then stashes the template label as a one-shot seed
-   * the freshly-mounted BookingsView reads on first render. The view
-   * calls back via `onTemplateFilterConsumed` once it's applied, so
-   * subsequent re-renders never re-seed and clobber an admin's
-   * manual chip-clear.
+   * convention), then sets the (now-lifted, Task #156) bookings
+   * template filter directly with the timeline entry's channel +
+   * template-label snapshot. The lifted state is shared with the
+   * toolbar select on BookingsView, so the dropdown / clear chip
+   * already reflect the active filter on first render — no separate
+   * one-shot seed handoff needed.
    *
    * Always switches to "bookings" view (not "payments") regardless of
    * where the admin came from — the destination is the bookings list,
    * matching the BookingsView pivot-chip wording the link mirrors.
    */
-  function pivotToBookingsFilteredByTemplate(templateLabel: string) {
+  function pivotToBookingsFilteredByTemplate(
+    kind: "call" | "email",
+    templateLabel: string,
+  ) {
     setView("bookings");
     setSelectedBookingId(null);
     setSelectedBuildingId(null);
@@ -496,7 +497,7 @@ export function AdminApp() {
     setBookingsStatusFilter("all");
     setSearch("");
     setBookingsBuildingFilter("all");
-    setBookingsTemplateFilterSeed(templateLabel);
+    setBookingsTemplateFilter({ kind, name: templateLabel });
     // Drop any template focus on the way out — the next visit to a
     // templates panel should open in its default unfocused state.
     setFocusedCallTemplateId(null);
@@ -1204,6 +1205,7 @@ export function AdminApp() {
     setBookingsStatusFilter("all");
     setSearch("");
     setBookingsBuildingFilter("all");
+    setBookingsTemplateFilter(null);
   }
 
   /**
@@ -1389,6 +1391,10 @@ export function AdminApp() {
                 onStatusFilter={setBookingsStatusFilter}
                 buildingFilter={bookingsBuildingFilter}
                 onBuildingFilter={setBookingsBuildingFilter}
+                templateFilter={bookingsTemplateFilter}
+                onTemplateFilter={setBookingsTemplateFilter}
+                emailTemplates={emailTemplates}
+                callTemplates={callTemplates}
                 search={search}
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}
@@ -1397,10 +1403,6 @@ export function AdminApp() {
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
-                initialTemplateFilter={bookingsTemplateFilterSeed}
-                onTemplateFilterConsumed={() =>
-                  setBookingsTemplateFilterSeed(null)
-                }
               />
             )
           ) : null}
@@ -1488,6 +1490,7 @@ export function AdminApp() {
                   setBookingsStatusFilter("all");
                   setSearch("");
                   setBookingsBuildingFilter("all");
+                  setBookingsTemplateFilter(null);
                   setSelectedBookingId(bookingId);
                 }}
                 onOpenAllBookings={openBookingsForBuilding}

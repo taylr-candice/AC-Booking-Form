@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import "@testing-library/jest-dom/vitest";
@@ -12,7 +13,36 @@ import type {
   TimelineEntry,
 } from "@/state/adminMockData";
 
-import { BookingsView } from "./BookingsView";
+import { BookingsView, type BookingsTemplateFilter } from "./BookingsView";
+
+type HarnessProps = {
+  bookings: AdminBooking[];
+  onOpen?: (id: string) => void;
+};
+
+function Harness({ bookings, onOpen }: HarnessProps) {
+  const [templateFilter, setTemplateFilter] =
+    useState<BookingsTemplateFilter>(null);
+  return (
+    <BookingsView
+      bookings={bookings}
+      units={makeUnits()}
+      buildings={makeBuildings()}
+      statusFilter="all"
+      onStatusFilter={() => {}}
+      buildingFilter="all"
+      onBuildingFilter={() => {}}
+      search=""
+      onSearch={() => {}}
+      onOpen={onOpen ?? (() => {})}
+      onNewBooking={() => {}}
+      paymentMode={false}
+      onAcknowledgeSupersede={() => {}}
+      templateFilter={templateFilter}
+      onTemplateFilter={setTemplateFilter}
+    />
+  );
+}
 
 afterEach(cleanup);
 
@@ -96,23 +126,7 @@ function makeBooking(overrides: Partial<AdminBooking>): AdminBooking {
 }
 
 function renderView(bookings: AdminBooking[]) {
-  return render(
-    <BookingsView
-      bookings={bookings}
-      units={makeUnits()}
-      buildings={makeBuildings()}
-      statusFilter="all"
-      onStatusFilter={() => {}}
-      buildingFilter="all"
-      onBuildingFilter={() => {}}
-      search=""
-      onSearch={() => {}}
-      onOpen={() => {}}
-      onNewBooking={() => {}}
-      paymentMode={false}
-      onAcknowledgeSupersede={() => {}}
-    />,
-  );
+  return render(<Harness bookings={bookings} />);
 }
 
 function visibleBookingIds(): string[] {
@@ -228,22 +242,11 @@ describe("BookingsView — template filter pivot", () => {
     ];
     let opened: string | null = null;
     render(
-      <BookingsView
+      <Harness
         bookings={bookings}
-        units={makeUnits()}
-        buildings={makeBuildings()}
-        statusFilter="all"
-        onStatusFilter={() => {}}
-        buildingFilter="all"
-        onBuildingFilter={() => {}}
-        search=""
-        onSearch={() => {}}
         onOpen={(id) => {
           opened = id;
         }}
-        onNewBooking={() => {}}
-        paymentMode={false}
-        onAcknowledgeSupersede={() => {}}
       />,
     );
 
