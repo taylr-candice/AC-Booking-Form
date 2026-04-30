@@ -53,6 +53,18 @@ describe("convertCoordinationToScheduledPatch", () => {
     expect(last.label).toBe("Coordinated · 4 May · Afternoon");
   });
 
+  it("uses the Evening label when the window is evening (Task #187)", () => {
+    const b = findCoordinationBooking();
+    const patch = convertCoordinationToScheduledPatch(b, {
+      date: "2026-05-04",
+      window: "evening",
+    });
+
+    expect(patch.serviceSlot).toBe("evening");
+    const last = patch.serviceTimeline[patch.serviceTimeline.length - 1];
+    expect(last.label).toBe("Coordinated · 4 May · Evening");
+  });
+
   it("does not mutate the source booking's timeline", () => {
     const b = findCoordinationBooking();
     const before = b.serviceTimeline.length;

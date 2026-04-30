@@ -222,6 +222,19 @@ describe("buildAdminCreatedBooking", () => {
     });
   });
 
+  it("accepts an evening slot and stamps it on the booking (Task #187)", () => {
+    const b = buildAdminCreatedBooking(
+      {
+        ...baseInput,
+        schedule: { kind: "slot", date: "2026-04-29", window: "evening" },
+      },
+      "bk-9006",
+    );
+    expect(b.serviceDate).toBe("2026-04-29");
+    expect(b.serviceSlot).toBe("evening");
+    expect(b.serviceStatus).toBe("scheduled");
+  });
+
   it("encodes the 'to be coordinated' outcome with no date and the coordination slot", () => {
     const b = buildAdminCreatedBooking(
       {

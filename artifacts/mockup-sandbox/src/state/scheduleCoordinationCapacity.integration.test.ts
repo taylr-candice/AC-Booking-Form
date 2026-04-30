@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   __resetRolloutsForTests,
+  addRolloutEveningWindow,
   consumeBookingCapacity,
   getRolloutById,
   releaseBookingCapacity,
@@ -56,26 +57,36 @@ function findRolloutId(model: "slots_per_window" | "time_budget_per_window") {
 function getSlot(
   rolloutId: string,
   date: string,
-  window: "morning" | "afternoon",
+  window: "morning" | "afternoon" | "evening",
 ) {
   const r = getRolloutById(rolloutId);
   if (!r) throw new Error("rollout missing");
   const day = r.days.find((d) => d.isoDate === date);
   if (!day) throw new Error("day missing");
-  const slot = window === "morning" ? day.morning : day.afternoon;
+  const slot =
+    window === "morning"
+      ? day.morning
+      : window === "afternoon"
+        ? day.afternoon
+        : day.evening;
   if (!slot) throw new Error("slot missing");
   return slot;
 }
 
 function pickOpenDate(
   rolloutId: string,
-  window: "morning" | "afternoon",
+  window: "morning" | "afternoon" | "evening",
 ): string {
   const r = getRolloutById(rolloutId)!;
   const day = r.days.find((d) => {
     if (!d.open) return false;
-    const s = window === "morning" ? d.morning : d.afternoon;
-    return s.openByAdmin;
+    const s =
+      window === "morning"
+        ? d.morning
+        : window === "afternoon"
+          ? d.afternoon
+          : d.evening;
+    return s !== undefined && s.openByAdmin;
   });
   if (!day) throw new Error("no open day on this rollout");
   return day.isoDate;
@@ -149,5 +160,59 @@ describe("schedule + undo rollout capacity round-trip", () => {
       serviceSlot: window,
     });
     expect(getSlot(rolloutId, date, window).bookedMinutes).toBe(before);
+  });
+
+  // Task #187 — evening windows are now first-class admin slots, so
+  // the same consume/release symmetry must hold against `day.evening`.
+  it("returns bookedMinutes to its pre-schedule value on an evening time_budget window", () => {
+    const booking = findCoordinationBooking();
+    const rolloutId = findRolloutId("time_budget_per_window");
+    const window = "evening" as const;
+    // Aspen seeds an evening window on 2026-04-29 with bookedMinutes=0.
+    const date = "2026-04-29";
+    // The seeded evening slot starts released; belt-and-suspenders.
+    updateRolloutSlot(rolloutId, date, window, { openByAdmin: true });
+    const before = getSlot(rolloutId, date, window).bookedMinutes;
+
+    expect(consumeBookingCapacity(booking, rolloutId, date, window)).toBe(true);
+    const afterConsume = getSlot(rolloutId, date, window).bookedMinutes;
+    expect(afterConsume).toBeGreaterThan(before);
+
+    expect(
+      releaseBookingCapacity({
+        ...booking,
+        rolloutId,
+        serviceDate: date,
+        serviceSlot: window,
+      }),
+    ).toBe(true);
+    expect(getSlot(rolloutId, date, window).bookedMinutes).toBe(before);
+  });
+
+  it("returns bookedCount to its pre-schedule value on an evening slots_per_window window", () => {
+    const booking = findCoordinationBooking();
+    const rolloutId = findRolloutId("slots_per_window");
+    const window = "evening" as const;
+    // The slots-mode seed (Marine) has no evening window seeded — add
+    // one via the production mutator so we exercise the same code path
+    // an admin would create. The mutator stages the slot, so we
+    // release it before booking.
+    const date = "2026-04-27";
+    expect(addRolloutEveningWindow(rolloutId, date)).not.toBeNull();
+    updateRolloutSlot(rolloutId, date, window, { openByAdmin: true });
+    const before = getSlot(rolloutId, date, window).bookedCount ?? 0;
+
+    expect(consumeBookingCapacity(booking, rolloutId, date, window)).toBe(true);
+    expect(getSlot(rolloutId, date, window).bookedCount).toBe(before + 1);
+
+    expect(
+      releaseBookingCapacity({
+        ...booking,
+        rolloutId,
+        serviceDate: date,
+        serviceSlot: window,
+      }),
+    ).toBe(true);
+    expect(getSlot(rolloutId, date, window).bookedCount ?? 0).toBe(before);
   });
 });
