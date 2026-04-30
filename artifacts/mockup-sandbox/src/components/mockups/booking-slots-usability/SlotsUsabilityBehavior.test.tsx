@@ -48,10 +48,10 @@ describe.each(VARIANTS)(
   "$name — live wiring regression (Tasks #168 + #178)",
   ({ Component }) => {
     it("(a) renders the no-rollout empty state when the unit's building has no svc-ac rollout", () => {
-      // u5 lives at bldg-anzac. SEEDED_ROLLOUTS only opens svc-ac on
-      // bldg-aspen / bldg-marine / bldg-bourke, so anzac units resolve
-      // to a null rollout.
-      bookingActions.setUnit("u5");
+      // u-pyrmont-01 lives at bldg-pyrmont. SEEDED_ROLLOUTS does not
+      // open svc-ac on Pyrmont (it is the dedicated no-rollout seed
+      // building), so the lookup resolves to a null rollout.
+      bookingActions.setUnit("u-pyrmont-01");
 
       const { getByTestId, queryByTestId } = render(<Component />);
 

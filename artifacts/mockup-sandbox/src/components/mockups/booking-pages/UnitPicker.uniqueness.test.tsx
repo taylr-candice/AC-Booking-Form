@@ -145,12 +145,15 @@ describe.each(VARIANTS)(
       expect(getBookingSession().unit_id).toBeNull();
     });
 
-    it("a NORMAL unit (no rollout) commits cleanly: no modal, no warning panel", async () => {
+    it("a NORMAL unit (no blocking booking on its rollout) commits cleanly: no modal, no warning panel", async () => {
       const user = userEvent.setup();
       render(<Picker />);
 
       await user.click(screen.getByTestId("dropdown-unit-trigger"));
-      // u5 (Anzac Gardens) has no rollout → status `{ kind: "none" }`.
+      // u5 (Anzac Gardens) is on rl-ac-anzac but its only seeded
+      // booking (bk-1040) is a legacy ad-hoc row with `rolloutId: null`,
+      // which the picker skips when computing per-rollout uniqueness →
+      // status `{ kind: "none" }`.
       await user.click(screen.getByTestId("dropdown-unit-u5"));
 
       expect(getBookingSession().unit_id).toBe("u5");

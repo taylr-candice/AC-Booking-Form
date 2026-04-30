@@ -13,7 +13,9 @@
  * provide:
  *   - u1 → an already-paid booking on `rl-ac-aspen`        (paid)
  *   - u3 → a pending-invoice booking on `rl-ac-marine`     (invoice_pending)
- *   - u5 → no rollout for `svc-ac` exists (Anzac)          (none)
+ *   - u5 → only a legacy ad-hoc booking (rolloutId: null), so the
+ *          picker treats it as having no blocking booking on the
+ *          current `svc-ac` rollout (rl-ac-anzac).              (none)
  *
  * The store under `../../../state/bookingSession` is module-scoped, so
  * we reset it (and sessionStorage) between every test.
@@ -81,8 +83,10 @@ describe.each(VARIANTS)(
     it("commits the unit and shows no modal when an unbooked unit is picked", () => {
       render(<Component />);
 
-      // u5 is at Anzac Parade — no `svc-ac` rollout exists for that
-      // building, so it cannot be "already booked" from the picker's POV.
+      // u5 is at Anzac Parade. Its only seeded booking (bk-1040) is a
+      // legacy ad-hoc one with `rolloutId: null`, so it is invisible
+      // to the picker's per-rollout uniqueness check on rl-ac-anzac
+      // and the unit commits cleanly.
       fireEvent.click(screen.getByTestId("dropdown-unit-trigger"));
       fireEvent.click(screen.getByTestId("dropdown-unit-u5"));
 

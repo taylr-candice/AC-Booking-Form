@@ -163,8 +163,10 @@ describe("rollout lookup helpers", () => {
     expect(marine[0]?.capacityModel).toBe("slots_per_window");
   });
 
-  it("getRolloutsForBuilding returns [] for buildings without a rollout (Anzac)", () => {
-    expect(getRolloutsForBuilding("bldg-anzac")).toEqual([]);
+  it("getRolloutsForBuilding returns [] for buildings without a rollout (Pyrmont)", () => {
+    // bldg-pyrmont is the dedicated no-rollout building seeded for the
+    // empty-state coverage — it has units but no svc-ac rollout opened.
+    expect(getRolloutsForBuilding("bldg-pyrmont")).toEqual([]);
   });
 
   it("findRolloutForBooking resolves a unit to its building's rollout", () => {
@@ -173,9 +175,10 @@ describe("rollout lookup helpers", () => {
     expect(r?.id).toBe("rl-ac-aspen");
   });
 
-  it("findRolloutForBooking returns null for buildings with no rollout (Anzac)", () => {
-    // Pick any Anzac unit — none should resolve since Anzac has no rollout.
-    const r = findRolloutForBooking("svc-ac", "u-anzac-03");
+  it("findRolloutForBooking returns null for buildings with no rollout (Pyrmont)", () => {
+    // Pick the Pyrmont seed unit — its building has no rollout so the
+    // lookup must resolve to null.
+    const r = findRolloutForBooking("svc-ac", "u-pyrmont-01");
     expect(r).toBeNull();
   });
 

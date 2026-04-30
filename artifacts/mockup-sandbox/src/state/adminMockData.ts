@@ -412,6 +412,22 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   },
+  // Pyrmont — intentionally has NO svc-ac rollout. Seeds the
+  // "we haven't opened bookings on this building yet" empty state for
+  // both the customer-side slot picker and the admin shell. Every
+  // empty-state regression test (adminRollouts, SlotsUsabilityBehavior,
+  // etc.) targets this building so that the four real rollouts can
+  // grow without breaking the no-rollout coverage.
+  {
+    id: "bldg-pyrmont",
+    name: "Pyrmont Quay Residences",
+    addressLine1: "55 Pyrmont Street",
+    addressLine2: "Pyrmont NSW 2009",
+    acType: "split",
+    acBrand: "LG",
+    outdoorPlacement: "in_property",
+    rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+  },
 ];
 
 // ─── Seeded units ───────────────────────────────────────────────────────────
@@ -611,6 +627,17 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     ac: { type: "ducted", brand: "", systems: 1, additional: 0 },
     agentId: "ag-003",
     buildingId: "bldg-anzac",
+  },
+
+  // ── Pyrmont Quay Residences (Pyrmont NSW) — no rollout opened yet
+  // (intentional empty-state seed for the no-rollout regression tests).
+  {
+    id: "u-pyrmont-01",
+    addressLine1: "604 / 55 Pyrmont Street",
+    addressLine2: "Pyrmont NSW 2009",
+    ac: { type: "split", brand: "", systems: 1, additional: 0 },
+    agentId: null,
+    buildingId: "bldg-pyrmont",
   },
 ];
 
@@ -3592,6 +3619,25 @@ const RL_BOURKE_DAYS: RolloutDay[] = [
   makeTimeBudgetDay("2026-05-08", 0, 0),
 ];
 
+// Anzac — nearly-wrapped slots-per-window rollout. Most past windows are
+// fully booked (5/5) and the few remaining future windows have just one
+// or two slots left. The pre-rollout in-progress booking (bk-1040 on u5)
+// stays on rolloutId=null intentionally — it represents an ad-hoc job
+// that was scheduled before the building was onboarded — so the
+// customer-side u5 row still reads as bookable in the unit picker.
+const RL_ANZAC_DAYS: RolloutDay[] = [
+  makeSlotCountDay("2026-04-27", 5, 5, 5),
+  makeSlotCountDay("2026-04-28", 5, 5, 5),
+  makeSlotCountDay("2026-04-29", 5, 5, 5),
+  makeSlotCountDay("2026-04-30", 5, 5, 5),
+  makeSlotCountDay("2026-05-01", 5, 5, 3),
+  makeSlotCountDay("2026-05-04", 5, 4, 5),
+  makeSlotCountDay("2026-05-05", 5, 2, 5),
+  makeSlotCountDay("2026-05-06", 5, 0, 4),
+  makeSlotCountDay("2026-05-07", 5, 0, 0),
+  makeSlotCountDay("2026-05-08", 5, 0, 0),
+];
+
 // Aspen: standard 8am start, but the afternoon block is sized to the
 // tech's actual 12:30–4:30 shift, and the evening (when opted in)
 // runs 5–8:30. The last two days are staged so the release ladder
@@ -3631,6 +3677,15 @@ const BOURKE_WINDOW_DEFAULTS: RolloutWindowDefaults = {
   morning: { start: "09:00", end: "12:00" },
   afternoon: { start: "12:30", end: "17:00" },
   evening: { start: "17:00", end: "20:00" },
+};
+
+// Anzac: suburban wrap-up rollout — slightly later start than Marine,
+// shorter afternoon and evening blocks because the building manager
+// only allows tech access until 8pm.
+const ANZAC_WINDOW_DEFAULTS: RolloutWindowDefaults = {
+  morning: { start: "09:00", end: "12:30" },
+  afternoon: { start: "13:00", end: "17:00" },
+  evening: { start: "17:30", end: "20:00" },
 };
 
 const SEEDED_ROLLOUTS: AdminRollout[] = [
@@ -3685,6 +3740,24 @@ const SEEDED_ROLLOUTS: AdminRollout[] = [
       thresholdPct: 80,
       unit: "days",
       batchSize: 1,
+      audit: [],
+    },
+  },
+  {
+    id: "rl-ac-anzac",
+    serviceId: "svc-ac",
+    buildingId: "bldg-anzac",
+    name: "Anzac Parade (wrap-up)",
+    startDate: "2026-04-27",
+    endDate: "2026-05-08",
+    capacityModel: "slots_per_window",
+    days: RL_ANZAC_DAYS,
+    windowDefaults: ANZAC_WINDOW_DEFAULTS,
+    releaseStrategy: {
+      mode: "auto_when_full",
+      thresholdPct: 80,
+      unit: "windows",
+      batchSize: 2,
       audit: [],
     },
   },
