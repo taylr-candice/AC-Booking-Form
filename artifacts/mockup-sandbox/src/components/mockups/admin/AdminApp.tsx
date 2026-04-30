@@ -29,6 +29,7 @@ import {
   createRollout,
   EMAIL_TEMPLATES,
   findRolloutForBooking,
+  findUsageBookingsForTemplate,
   formatBookingShortDate,
   getActiveBookingForUnit,
   isCustomCallTemplateLabel,
@@ -50,6 +51,7 @@ import {
   SEEDED_UNITS,
   setLiveBookingsSource,
   setLiveUnitsSource,
+  summarizeTemplateUsageBooking,
   updateRolloutSlot,
   type AdminAgent,
   type AdminBooking,
@@ -227,6 +229,28 @@ export function AdminApp() {
     return out;
   }, [allBookings, callTemplates]);
 
+  // Per-template list of bookings that reference each template,
+  // pre-summarised so the templates panels stay agnostic of the units
+  // list. Drives the drill-down popover on each template row.
+  const emailTemplateUsageBookings = useMemo(() => {
+    const out: Record<string, ReturnType<typeof summarizeTemplateUsageBooking>[]> = {};
+    for (const t of emailTemplates) {
+      out[t.id] = findUsageBookingsForTemplate(allBookings, "email", t.name).map(
+        (b) => summarizeTemplateUsageBooking(b, units),
+      );
+    }
+    return out;
+  }, [allBookings, emailTemplates, units]);
+  const callTemplateUsageBookings = useMemo(() => {
+    const out: Record<string, ReturnType<typeof summarizeTemplateUsageBooking>[]> = {};
+    for (const t of callTemplates) {
+      out[t.id] = findUsageBookingsForTemplate(allBookings, "call", t.name).map(
+        (b) => summarizeTemplateUsageBooking(b, units),
+      );
+    }
+    return out;
+  }, [allBookings, callTemplates, units]);
+
   const [view, setView] = useState<ViewId>("bookings");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
@@ -310,6 +334,21 @@ export function AdminApp() {
     setBookingsStatusFilter("all");
     setSearch("");
     setBookingsBuildingFilter(buildingId);
+  }
+
+  /**
+   * Jump to a single booking's detail screen from the Call / Email
+   * templates drill-down popover. Clears the list filters / search /
+   * building lens so the booking is unambiguously selected.
+   */
+  function openBookingFromTemplate(bookingId: string) {
+    setView("bookings");
+    setSelectedBuildingId(null);
+    setSelectedRolloutId(null);
+    setBookingsStatusFilter("all");
+    setSearch("");
+    setBookingsBuildingFilter("all");
+    setSelectedBookingId(bookingId);
   }
 
   // Service-status advance / payment status / notes edits flow back into
@@ -1304,6 +1343,8 @@ export function AdminApp() {
             <EmailTemplatesView
               templates={emailTemplates}
               usageCounts={emailTemplateUsageCounts}
+              usageBookings={emailTemplateUsageBookings}
+              onOpenBooking={openBookingFromTemplate}
               onCreate={createEmailTemplate}
               onUpdate={updateEmailTemplate}
               onRemove={removeEmailTemplate}
@@ -1315,6 +1356,8 @@ export function AdminApp() {
             <CallTemplatesView
               templates={callTemplates}
               usageCounts={callTemplateUsageCounts}
+              usageBookings={callTemplateUsageBookings}
+              onOpenBooking={openBookingFromTemplate}
               onCreate={createCallTemplate}
               onUpdate={updateCallTemplate}
               onRemove={removeCallTemplate}

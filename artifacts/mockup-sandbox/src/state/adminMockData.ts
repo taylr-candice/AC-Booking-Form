@@ -2260,6 +2260,80 @@ export function countTimelineUsageForTemplate(
 }
 
 /**
+ * Find every booking whose service timeline references `templateName`
+ * for the given `kind`. Sibling of {@link countTimelineUsageForTemplate}
+ * — same snapshot-on-use match against the entry's `templateLabel`,
+ * but returns the matching booking objects.
+ *
+ * A booking is included at most once even if its timeline references
+ * the template multiple times. Input order is preserved.
+ */
+export function findUsageBookingsForTemplate(
+  bookings: ReadonlyArray<AdminBooking>,
+  kind: "call" | "email",
+  templateName: string,
+): AdminBooking[] {
+  const trimmed = templateName.trim();
+  if (trimmed.length === 0) return [];
+  const out: AdminBooking[] = [];
+  for (const b of bookings) {
+    let matched = false;
+    for (const entry of b.serviceTimeline) {
+      if (entry.kind === kind && entry.templateLabel === trimmed) {
+        matched = true;
+        break;
+      }
+    }
+    if (matched) out.push(b);
+  }
+  return out;
+}
+
+/**
+ * Compact, view-friendly summary of a booking surfaced in the
+ * "Bookings using this template" drill-down popover. Lets the
+ * templates view stay agnostic of the units list.
+ */
+export type TemplateUsageBooking = {
+  bookingId: string;
+  customerName: string;
+  /** Unit street address line, e.g. "12 Marine Parade, Apt 5". */
+  addressLine1: string;
+  /** Service date + slot summary, e.g. "30 Apr · Morning", or
+   *  "To be coordinated" when no slot is locked yet. */
+  whenLabel: string;
+};
+
+/**
+ * Build a {@link TemplateUsageBooking} summary from a booking + the
+ * shared units list. Pure helper so AdminApp can pre-compute the
+ * popover payload alongside the existing usage counts in a single
+ * memoised pass.
+ */
+export function summarizeTemplateUsageBooking(
+  booking: AdminBooking,
+  units: ReadonlyArray<AdminUnit>,
+): TemplateUsageBooking {
+  const unit = units.find((u) => u.id === booking.unitId);
+  const addressLine1 = unit?.addressLine1 ?? "—";
+  const slot = booking.serviceSlot;
+  const date = booking.serviceDate;
+  let whenLabel: string;
+  if (!date || slot === null || slot === "to_be_coordinated") {
+    whenLabel = "To be coordinated";
+  } else {
+    const slotLabel = slot.charAt(0).toUpperCase() + slot.slice(1);
+    whenLabel = `${formatBookingShortDate(date)} · ${slotLabel}`;
+  }
+  return {
+    bookingId: booking.id,
+    customerName: booking.customerName,
+    addressLine1,
+    whenLabel,
+  };
+}
+
+/**
  * Trim a draft email template's three free-text fields. Used by both
  * the create + edit code paths in the admin "Email templates" panel
  * so stray whitespace from the form never reaches the saved list (and

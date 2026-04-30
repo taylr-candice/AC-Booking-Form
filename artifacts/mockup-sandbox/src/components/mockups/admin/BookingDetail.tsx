@@ -374,7 +374,10 @@ export function BookingDetail({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div
+      className="flex flex-col gap-4"
+      data-testid={`booking-detail-${booking.id}`}
+    >
       {booking.supersededByBookingId && onAcknowledgeSupersede && (
         <SupersedeAlert
           booking={booking}

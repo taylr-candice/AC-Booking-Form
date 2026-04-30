@@ -28,9 +28,11 @@ import { useState } from "react";
 import {
   normalizeCallTemplateDraft,
   type CallTemplate,
+  type TemplateUsageBooking,
 } from "@/state/adminMockData";
 
 import { FormField } from "./atoms";
+import { TemplateUsagePopover } from "./TemplateUsagePopover";
 import { BRAND } from "./theme";
 
 /**
@@ -53,17 +55,23 @@ export function buildCallTemplateRemoveConfirm(
 export function CallTemplatesView({
   templates,
   usageCounts,
+  usageBookings,
+  onOpenBooking,
   onCreate,
   onUpdate,
   onRemove,
   onSetDefault,
 }: {
   templates: CallTemplate[];
-  /** Per-template count of timeline entries referencing each template
-   *  (keyed by {@link CallTemplate.id}). Optional; defaults to 0 per
-   *  template so harnesses can mount the view without computing
-   *  counts. */
+  /** Per-template count of timeline entries referencing each template,
+   *  keyed by template id. Defaults to 0 per template. */
   usageCounts?: Readonly<Record<string, number>>;
+  /** Per-template list of bookings referencing each template, keyed
+   *  by template id. Drives the drill-down popover. */
+  usageBookings?: Readonly<Record<string, ReadonlyArray<TemplateUsageBooking>>>;
+  /** Called when a booking row inside the drill-down popover is
+   *  clicked. */
+  onOpenBooking?: (bookingId: string) => void;
   /** Append a new template to the catalog. The handler is responsible
    *  for stamping a fresh id (via {@link nextCallTemplateId}) so the
    *  view doesn't have to know how the rest of the catalog is keyed. */
@@ -130,6 +138,7 @@ export function CallTemplatesView({
             <tbody>
               {templates.map((t) => {
                 const usage = usageCounts?.[t.id] ?? 0;
+                const bookings = usageBookings?.[t.id] ?? [];
                 return (
                   <tr
                     key={t.id}
@@ -167,14 +176,14 @@ export function CallTemplatesView({
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{t.name}</div>
-                      <div
-                        data-testid={`call-template-usage-${t.id}`}
-                        className="mt-0.5 text-[11px] text-slate-500"
-                      >
-                        {usage === 0
-                          ? "No timeline entries reference this template"
-                          : `Referenced by ${usage} timeline ${usage === 1 ? "entry" : "entries"}`}
-                      </div>
+                      <TemplateUsagePopover
+                        kind="call"
+                        testIdSuffix={t.id}
+                        templateName={t.name}
+                        usage={usage}
+                        bookings={bookings}
+                        onOpenBooking={onOpenBooking}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-[12px] text-slate-600 whitespace-pre-wrap">
