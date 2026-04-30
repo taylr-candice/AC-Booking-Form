@@ -424,6 +424,61 @@ function writePersistedSortMode(key: string, mode: string): void {
   }
 }
 
+/** Query-string param name for the active sidebar view (Task #208).
+ *  Mirrors the Task #195 `?template=…` round-trip so a refresh
+ *  restores both the view and the chip on the same paint. */
+const VIEW_PARAM = "view";
+
+/** View assumed when `?view=` is absent. Omitted from the URL by
+ *  {@link writeViewToURL} so a fresh visit and a deliberate
+ *  nav-back-to-default produce identical URLs. */
+const DEFAULT_VIEW: ViewId = "bookings";
+
+/** Allow-list for the URL decoder. The `satisfies Record<ViewId, true>`
+ *  fails the build if a future {@link ViewId} is added without being
+ *  listed here, so the decoder can never silently miss a new view. */
+const VALID_VIEW_IDS: ReadonlySet<ViewId> = new Set(
+  Object.keys({
+    bookings: true,
+    payments: true,
+    awaiting_coordination: true,
+    rollouts: true,
+    buildings: true,
+    units: true,
+    services: true,
+    agents: true,
+    email_templates: true,
+    call_templates: true,
+  } satisfies Record<ViewId, true>) as ViewId[],
+);
+
+/** Read the initial {@link ViewId} from the URL on mount. Returns
+ *  {@link DEFAULT_VIEW} when the param is missing, unrecognised, or
+ *  we're not in a browser. Exported for the round-trip tests. */
+export function readViewFromURL(): ViewId {
+  if (typeof window === "undefined") return DEFAULT_VIEW;
+  const raw = new URLSearchParams(window.location.search).get(VIEW_PARAM);
+  if (raw === null) return DEFAULT_VIEW;
+  return VALID_VIEW_IDS.has(raw as ViewId) ? (raw as ViewId) : DEFAULT_VIEW;
+}
+
+/** Mirror the {@link ViewId} state back into the URL with
+ *  `replaceState` (no extra history entry per nav). The default
+ *  view is omitted so the URL stays clean. */
+function writeViewToURL(view: ViewId): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  const current = url.searchParams.get(VIEW_PARAM);
+  if (view === DEFAULT_VIEW) {
+    if (current === null) return;
+    url.searchParams.delete(VIEW_PARAM);
+  } else {
+    if (current === view) return;
+    url.searchParams.set(VIEW_PARAM, view);
+  }
+  window.history.replaceState(window.history.state, "", url.toString());
+}
+
 /**
  * Copy for the missing-template hint toast: ops clicked a
  * `From template: <name>` chip but the catalog no longer has a row
@@ -783,7 +838,13 @@ export function AdminApp() {
     return out;
   }, [allBookings, callTemplates, units, callTemplateUsageTrends]);
 
-  const [view, setView] = useState<ViewId>("bookings");
+  // Active sidebar view. Seeded from `?view=…` (Task #208) so a
+  // refresh restores both the active screen and the Task #195
+  // template chip on first paint; the effect mirrors changes back.
+  const [view, setView] = useState<ViewId>(() => readViewFromURL());
+  useEffect(() => {
+    writeViewToURL(view);
+  }, [view]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
     null,
