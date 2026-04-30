@@ -451,7 +451,7 @@ function DayCell({
               onClick={onAddEvening}
               data-testid={`rollout-add-evening-${day.isoDate}`}
               className="inline-flex items-center justify-center gap-1 rounded border border-dashed border-slate-200 px-1.5 py-1 text-[10px] font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
-              title="Add an Evening window (5pm – 8pm) to this day"
+              title="Add an Evening window to this day"
             >
               <Plus className="h-2.5 w-2.5" />
               Add EV

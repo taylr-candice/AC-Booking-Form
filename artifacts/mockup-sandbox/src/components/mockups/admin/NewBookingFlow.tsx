@@ -873,7 +873,7 @@ function Step3Schedule({
           title="Pick a service window"
           subtitle={
             canPickSlot
-              ? "Find a morning or afternoon slot inside the rollout's date range."
+              ? "Find an available service window inside the rollout's date range."
               : "No rollout is open for this building yet — coordinate manually."
           }
         />
