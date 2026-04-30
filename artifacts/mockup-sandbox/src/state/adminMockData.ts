@@ -856,6 +856,26 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     serviceTimeline: [
       { status: "scheduled", label: "Awaiting agent coordination", at: "Apr 28 · 09:30", by: "System" },
+      // Seeded "Sent agent intro" email so the bookings list +
+      // Awaiting-coordination queue show the Task #141 email-template
+      // suffix ("· Sent agent intro") on a demo row out of the box,
+      // instead of only after an admin drives the per-row Log email
+      // form (Task #146). Subject + note mirror the seeded
+      // `EMAIL_TEMPLATES["agent_intro"]` entry so the timeline reads
+      // exactly the way it would after picking that template through
+      // the live form. `loggedAt` lines up with `lastContactedAt`
+      // above so the "last chased" hint and the per-row "Last
+      // attempt" recency stay in sync.
+      {
+        kind: "email",
+        status: "logged_email",
+        label: "Logged email · Coordinating your AC service — quick intro",
+        at: "Apr 28 · 11:00",
+        by: "Mia (admin)",
+        note: "Intro email to the managing agent with the booking summary and a request to confirm a window.",
+        loggedAt: "2026-04-28T11:00:00+10:00",
+        templateLabel: "Sent agent intro",
+      },
     ],
     notes: "Owner asked us to arrange access via Vantage Strata Management. Agent contacted Apr 28 — awaiting reply.",
     rolloutId: "rl-ac-aspen",
