@@ -21,6 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownNarrowWide,
+  ChevronDown,
   Clock,
   Info,
   Mail,
@@ -45,6 +46,7 @@ import {
   formatCoordinationWaiting,
   formatLastContacted,
   getBuildingForUnit,
+  getTemplateUsageTrend,
   latestCoordinationAttempt,
   SEEDED_AGENTS,
   type AdminBooking,
@@ -53,6 +55,7 @@ import {
   type CallTemplate,
   type CoordinationKind,
   type EmailTemplate,
+  type TemplateUsageTrendPoint,
 } from "@/state/adminMockData";
 
 import {
@@ -69,6 +72,7 @@ import {
 } from "./bookingsTemplateFilter";
 import { CustomerCell } from "./BookingsView";
 import { PaymentChip } from "./chips";
+import { TemplateUsageSparkline } from "./TemplateUsageSparkline";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
 type Filter = "all" | CoordinationKind;
@@ -255,6 +259,147 @@ function CoordinatingWithCell({
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+type BulkTemplateOption = {
+  id: string;
+  label: string;
+  isDefault: boolean;
+  trend?: ReadonlyArray<TemplateUsageTrendPoint>;
+};
+
+// Custom-dropdown picker for the bulk Log call / Log email forms.
+// Shows the same per-template sparkline the templates panels render,
+// which a native <option> can't hold. Paired at each call site with
+// an sr-only <select> that owns the form-control plumbing.
+function BulkTemplatePickerDropdown({
+  triggerId,
+  triggerTestId,
+  optionTestIdPrefix,
+  kind,
+  customId,
+  customLabel,
+  options,
+  value,
+  onChange,
+}: {
+  triggerId: string;
+  triggerTestId: string;
+  optionTestIdPrefix: string;
+  kind: "call" | "email";
+  customId: string;
+  customLabel: string;
+  options: ReadonlyArray<BulkTemplateOption>;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const allRows: BulkTemplateOption[] = [
+    { id: customId, label: customLabel, isDefault: false },
+    ...options,
+  ];
+  const selected = allRows.find((r) => r.id === value) ?? allRows[0]!;
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(e: MouseEvent) {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative flex-1">
+      <button
+        type="button"
+        id={triggerId}
+        data-testid={triggerTestId}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-left text-[12px] text-slate-800 hover:border-slate-400"
+      >
+        <span className="truncate">{selected.label}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 flex-none text-slate-500 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+      {open ? (
+        <ul
+          role="listbox"
+          aria-labelledby={triggerId}
+          data-testid={`${optionTestIdPrefix}-listbox`}
+          className="absolute z-20 mt-1 flex w-full flex-col gap-0.5 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+        >
+          {allRows.map((row) => {
+            const isSelected = row.id === value;
+            return (
+              <li key={row.id} className="m-0 list-none">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => {
+                    onChange(row.id);
+                    setOpen(false);
+                  }}
+                  data-testid={`${optionTestIdPrefix}-${row.id}`}
+                  data-value={row.id}
+                  data-selected={isSelected ? "true" : "false"}
+                  className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-slate-50"
+                  style={
+                    isSelected
+                      ? {
+                          backgroundColor: BRAND_SOFT,
+                          boxShadow: `inset 0 0 0 1px ${BRAND}`,
+                        }
+                      : undefined
+                  }
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="truncate font-medium text-slate-800">
+                      {row.label}
+                    </span>
+                    {row.isDefault ? (
+                      <span
+                        className="inline-flex flex-none items-center gap-0.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                        title={`Default ${kind === "call" ? "Call" : "Email"} template`}
+                        aria-label="Default template"
+                      >
+                        <Star className="h-2.5 w-2.5" fill="currentColor" />
+                        Default
+                      </span>
+                    ) : null}
+                  </span>
+                  {row.trend ? (
+                    <span className="flex-none">
+                      <TemplateUsageSparkline
+                        kind={kind}
+                        templateId={`bulk-${row.id}`}
+                        trend={row.trend}
+                      />
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -915,6 +1060,25 @@ export function AwaitingCoordinationView({
     emailTemplates.find((t) => t.id === bulkEmailTemplateId)?.isDefault ??
     false;
 
+  // Per-template rolling 7-day usage trends, keyed by template id.
+  // Same series the templates panels render next to "Used in N
+  // bookings" — computed live off the bookings prop with snapshot-on-
+  // use semantics.
+  const callTemplateTrends = useMemo(() => {
+    const out: Record<string, ReadonlyArray<TemplateUsageTrendPoint>> = {};
+    for (const t of callTemplates) {
+      out[t.id] = getTemplateUsageTrend(bookings, "call", t.name);
+    }
+    return out;
+  }, [bookings, callTemplates]);
+  const emailTemplateTrends = useMemo(() => {
+    const out: Record<string, ReadonlyArray<TemplateUsageTrendPoint>> = {};
+    for (const t of emailTemplates) {
+      out[t.id] = getTemplateUsageTrend(bookings, "email", t.name);
+    }
+    return out;
+  }, [bookings, emailTemplates]);
+
   return (
     <div className="flex flex-col gap-4">
       {/* Summary */}
@@ -1449,13 +1613,18 @@ export function AwaitingCoordinationView({
                 >
                   Template
                 </label>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1 flex items-start gap-2">
+                  {/* Sr-only mirror of the dropdown's selection so the
+                      form-control plumbing and existing change-event
+                      tests keep working. */}
                   <select
                     id="bulk-log-call-template"
                     value={bulkCallTemplateId}
                     onChange={(e) => handleSelectCallTemplate(e.target.value)}
                     data-testid="select-bulk-call-template"
-                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
                   >
                     <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
                     {callTemplates.map((tpl) => (
@@ -1464,10 +1633,26 @@ export function AwaitingCoordinationView({
                       </option>
                     ))}
                   </select>
+                  <BulkTemplatePickerDropdown
+                    triggerId="bulk-log-call-template-trigger"
+                    triggerTestId="trigger-bulk-call-template"
+                    optionTestIdPrefix="option-bulk-call-template"
+                    kind="call"
+                    customId={CALL_TEMPLATE_CUSTOM_ID}
+                    customLabel="Custom…"
+                    options={callTemplates.map((tpl) => ({
+                      id: tpl.id,
+                      label: tpl.name,
+                      isDefault: tpl.isDefault ?? false,
+                      trend: callTemplateTrends[tpl.id],
+                    }))}
+                    value={bulkCallTemplateId}
+                    onChange={handleSelectCallTemplate}
+                  />
                   {bulkSelectedCallIsDefault ? (
                     <span
                       data-testid="pill-default-selected-bulk-call-template"
-                      className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                      className="inline-flex flex-none items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
                       title="Default Call template"
                     >
                       <Star className="h-2.5 w-2.5" fill="currentColor" />
@@ -1563,13 +1748,16 @@ export function AwaitingCoordinationView({
                 >
                   Template
                 </label>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-1 flex items-start gap-2">
+                  {/* Sr-only mirror; see Call picker above. */}
                   <select
                     id="bulk-log-email-template"
                     value={bulkEmailTemplateId}
                     onChange={(e) => handleSelectEmailTemplate(e.target.value)}
                     data-testid="select-bulk-email-template"
-                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                    className="sr-only"
+                    aria-hidden="true"
+                    tabIndex={-1}
                   >
                     <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
                     {emailTemplates.map((tpl) => (
@@ -1578,10 +1766,26 @@ export function AwaitingCoordinationView({
                       </option>
                     ))}
                   </select>
+                  <BulkTemplatePickerDropdown
+                    triggerId="bulk-log-email-template-trigger"
+                    triggerTestId="trigger-bulk-email-template"
+                    optionTestIdPrefix="option-bulk-email-template"
+                    kind="email"
+                    customId={EMAIL_TEMPLATE_CUSTOM_ID}
+                    customLabel="Custom…"
+                    options={emailTemplates.map((tpl) => ({
+                      id: tpl.id,
+                      label: tpl.name,
+                      isDefault: tpl.isDefault ?? false,
+                      trend: emailTemplateTrends[tpl.id],
+                    }))}
+                    value={bulkEmailTemplateId}
+                    onChange={handleSelectEmailTemplate}
+                  />
                   {bulkSelectedEmailIsDefault ? (
                     <span
                       data-testid="pill-default-selected-bulk-email-template"
-                      className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                      className="inline-flex flex-none items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
                       title="Default Email template"
                     >
                       <Star className="h-2.5 w-2.5" fill="currentColor" />
