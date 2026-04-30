@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   Sunrise,
   Sun,
+  Moon,
   Pencil,
   CheckCircle2,
   Info,
@@ -13,68 +14,43 @@ import {
   Key,
 } from "lucide-react";
 
-import { getBookingDurationMinutes, slotFitStatus } from "../../../state/bookingDerived";
+import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import {
   isBeThereMethod,
   isUnattendedAccessMethod,
 } from "../../../state/accessMethodCatalog";
+import {
+  getLiveBookingsVersion,
+  subscribeLiveBookings,
+} from "../../../state/adminMockData";
+import {
+  alreadyScheduledByOther,
+  resolveCustomerSlotData,
+  type CustomerDay,
+  type CustomerSlot,
+  WINDOW_TIME_RANGE,
+} from "../booking-slots/customerSlotData";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
 
-const MORNING_WINDOW_MINUTES = 240;
-const AFTERNOON_WINDOW_MINUTES = 300;
+type Slot = CustomerSlot;
+type Day = CustomerDay;
 
-type Slot = {
-  id: string;
-  window: "morning" | "afternoon";
-  windowMinutes: number;
-  bookedMinutes: number;
-};
-type Day = {
-  date: string;
-  weekday: string;
-  day: number;
-  month: string;
-  morning: Slot;
-  afternoon: Slot;
-};
-
-const DAYS: Day[] = [
-  { date: "2026-04-28", weekday: "Tue", day: 28, month: "Apr",
-    morning:   { id: "20260428-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 60 },
-    afternoon: { id: "20260428-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-  { date: "2026-04-29", weekday: "Wed", day: 29, month: "Apr",
-    morning:   { id: "20260429-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 195 },
-    afternoon: { id: "20260429-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 } },
-  { date: "2026-05-04", weekday: "Mon", day: 4, month: "May",
-    morning:   { id: "20260504-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260504-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 105 } },
-  { date: "2026-05-05", weekday: "Tue", day: 5, month: "May",
-    morning:   { id: "20260505-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 220 },
-    afternoon: { id: "20260505-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 45 } },
-  { date: "2026-05-06", weekday: "Wed", day: 6, month: "May",
-    morning:   { id: "20260506-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 120 },
-    afternoon: { id: "20260506-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 240 } },
-  { date: "2026-05-07", weekday: "Thu", day: 7, month: "May",
-    morning:   { id: "20260507-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260507-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: AFTERNOON_WINDOW_MINUTES } },
-  { date: "2026-07-06", weekday: "Mon", day: 6, month: "Jul",
-    morning:   { id: "20260706-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 0 },
-    afternoon: { id: "20260706-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 0 } },
-  { date: "2026-07-07", weekday: "Tue", day: 7, month: "Jul",
-    morning:   { id: "20260707-am", window: "morning",   windowMinutes: MORNING_WINDOW_MINUTES,   bookedMinutes: 75 },
-    afternoon: { id: "20260707-pm", window: "afternoon", windowMinutes: AFTERNOON_WINDOW_MINUTES, bookedMinutes: 150 } },
-];
+function dayWindows(day: Day): Slot[] {
+  const out: Slot[] = [day.morning, day.afternoon];
+  if (day.evening) out.push(day.evening);
+  return out;
+}
 
 export function SlotsAffordanceForward() {
   const [selected, setSelected] = useState<string | null>(null);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
-  
+
   const accessMethod = session.access_method;
   const unattended = isUnattendedAccessMethod(accessMethod);
   const selfAttended = isBeThereMethod(accessMethod);
@@ -84,46 +60,60 @@ export function SlotsAffordanceForward() {
       ? "self-attended"
       : "coordinated";
   const showChangeAccess = selfAttended;
-  
+
   const accountabilityNudge =
     session.role === "agent"
       ? "you'll need to coordinate a second visit with the tenant"
       : "you'll need to be home for a second visit";
 
+  // Resolve the per-(service, building) rollout (Task #59) and pull
+  // its day rows, matching how `SlotsMobile` is wired. Past dates are
+  // filtered out so customers never see rows that have rolled by.
+  const slotData = useMemo(
+    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
+    [session.unit_id, jobMinutes],
+  );
+  const rollout = slotData.rollout;
+  const liveBookingsVersion = useSyncExternalStore(
+    subscribeLiveBookings,
+    getLiveBookingsVersion,
+    getLiveBookingsVersion,
+  );
+  const lockedByOther = useMemo(
+    () => {
+      void liveBookingsVersion;
+      return alreadyScheduledByOther(session.unit_id);
+    },
+    [session.unit_id, liveBookingsVersion],
+  );
   const visibleDays = useMemo(
-    () => DAYS.filter((d) => !isPastDate(d.date)),
-    [],
+    () => slotData.days.filter((d) => !isPastDate(d.date)),
+    [slotData.days],
   );
 
   // Earliest bookable slot across the visible days — first day with at
-  // least one `available` window, picking morning before afternoon.
-  // Purely visual: doesn't pre-select, doesn't change Continue logic.
+  // least one `available` window, picking morning before afternoon
+  // before evening. Purely visual: doesn't pre-select, doesn't change
+  // Continue logic.
   const nextAvailableSlotId = useMemo<string | null>(() => {
     for (const d of visibleDays) {
-      for (const slot of [d.morning, d.afternoon]) {
-        if (slotFitStatus(slot, jobMinutes) === "available") {
-          return slot.id;
-        }
+      for (const slot of dayWindows(d)) {
+        if (slot.status === "available") return slot.id;
       }
     }
     return null;
-  }, [visibleDays, jobMinutes]);
+  }, [visibleDays]);
 
-  const selectedSlotFits = useMemo(() => {
-    if (!selected) return true;
-    for (const d of visibleDays) {
-      for (const slot of [d.morning, d.afternoon]) {
-        if (slot.id === selected) {
-          return slotFitStatus(slot, jobMinutes) === "available";
-        }
-      }
-    }
-    return false;
-  }, [selected, jobMinutes, visibleDays]);
-
+  // If the customer's job size grows or the rollout shifts, an
+  // already-selected slot might no longer fit. Drop it so Continue
+  // can't carry stale, now-invalid state forward.
   useEffect(() => {
-    if (selected && !selectedSlotFits) setSelected(null);
-  }, [selected, selectedSlotFits]);
+    if (!selected) return;
+    const stillValid = visibleDays
+      .flatMap(dayWindows)
+      .some((s) => s.id === selected && s.status === "available");
+    if (!stillValid) setSelected(null);
+  }, [selected, visibleDays]);
 
   // Handle scroll for sticky header compression
   const [scrolled, setScrolled] = useState(false);
@@ -274,18 +264,82 @@ export function SlotsAffordanceForward() {
           </h2>
         </div>
 
-        <div className="space-y-2">
-          {visibleDays.map((d) => (
-            <DayBlock
-              key={d.date}
-              day={d}
-              jobMinutes={jobMinutes}
-              selected={selected}
-              onSelect={(id) => setSelected(id)}
-              nextAvailableSlotId={nextAvailableSlotId}
-            />
-          ))}
-        </div>
+        {!rollout ? (
+          <div
+            className="rounded-2xl border-2 px-4 py-4 shadow-sm"
+            style={{ borderColor: "#FCD34D", backgroundColor: "#FFFBEB", color: "#92400E" }}
+            data-testid="empty-no-rollout-mobile"
+          >
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-amber-100 p-1.5 mt-0.5 shrink-0">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="text-[13px] leading-relaxed">
+                <div className="font-bold text-amber-900">
+                  AC services aren't open for booking at this address yet.
+                </div>
+                <div className="mt-1.5">
+                  We're rolling this out building by building. Call{" "}
+                  <span className="font-bold" style={{ color: BRAND }}>
+                    1300 TAYLR
+                  </span>{" "}
+                  and we'll add you to the waitlist.
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : lockedByOther ? (
+          <div
+            className="rounded-2xl border-2 border-slate-200 bg-white px-4 py-4 shadow-sm"
+            data-testid="banner-locked-by-other-mobile"
+            data-locked-kind={lockedByOther.kind}
+          >
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-slate-100 p-1.5 mt-0.5 shrink-0">
+                <Lock className="h-5 w-5 text-slate-500" />
+              </div>
+              <div className="flex-1 text-[13px] leading-relaxed text-slate-700">
+                <div className="font-bold text-slate-900">
+                  Already scheduled for this address
+                </div>
+                <div className="mt-1.5">
+                  There's already a confirmed service booked at this
+                  property, so it can't be booked again right now. Only
+                  one confirmed booking is allowed per service run.
+                </div>
+                <div className="mt-2">
+                  If you have any questions or believe this is a mistake,
+                  contact Taylr at{" "}
+                  <a
+                    href="mailto:support@taylr.com.au"
+                    className="font-bold underline"
+                    style={{ color: BRAND }}
+                    data-testid="link-locked-support-email-mobile"
+                  >
+                    support@taylr.com.au
+                  </a>{" "}
+                  or call{" "}
+                  <span className="font-bold" style={{ color: BRAND }}>
+                    1300 TAYLR
+                  </span>
+                  .
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visibleDays.map((d) => (
+              <DayBlock
+                key={d.date}
+                day={d}
+                selected={selected}
+                onSelect={(id) => setSelected(id)}
+                nextAvailableSlotId={nextAvailableSlotId}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="mt-8 mb-4 rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm font-medium text-slate-600 shadow-sm">
           Need a different date? <br/>
@@ -302,7 +356,7 @@ export function SlotsAffordanceForward() {
         </div>
         <button
           type="button"
-          disabled={!selected}
+          disabled={!selected || !!lockedByOther}
           data-testid="button-continue-mobile"
           className={`flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-[17px] font-bold text-white shadow-md transition-all duration-300 disabled:opacity-40 disabled:shadow-none active:scale-[0.98] ${
             selected ? "hover:opacity-95" : ""
@@ -327,14 +381,14 @@ export function SlotsAffordanceForward() {
 }
 
 function DayBlock({
-  day, jobMinutes, selected, onSelect, nextAvailableSlotId,
+  day, selected, onSelect, nextAvailableSlotId,
 }: {
   day: Day;
-  jobMinutes: number;
   selected: string | null;
   onSelect: (id: string) => void;
   nextAvailableSlotId: string | null;
 }) {
+  const hasEvening = !!day.evening;
   return (
     <div className="flex items-stretch gap-2 relative">
       {/* Compact date pill */}
@@ -344,47 +398,59 @@ function DayBlock({
         <div className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-none">{day.month}</div>
       </div>
 
-      {/* AM/PM 2-column grid */}
-      <div className="grid flex-1 grid-cols-2 gap-2">
+      {/* Window grid — 2 columns by default, 3 when an evening
+          window is opened so all three windows fit on one row. */}
+      <div className={`grid flex-1 gap-2 ${hasEvening ? "grid-cols-3" : "grid-cols-2"}`}>
         <SlotCard
           slot={day.morning}
-          jobMinutes={jobMinutes}
           icon={<Sunrise className="h-4 w-4" />}
           label="Morning"
-          hint="8am – 12pm"
+          hint={WINDOW_TIME_RANGE.morning}
           selected={selected === day.morning.id}
           onClick={() => onSelect(day.morning.id)}
           isNextAvailable={day.morning.id === nextAvailableSlotId}
+          compact={hasEvening}
         />
         <SlotCard
           slot={day.afternoon}
-          jobMinutes={jobMinutes}
           icon={<Sun className="h-4 w-4" />}
           label="Afternoon"
-          hint="12pm – 5pm"
+          hint={WINDOW_TIME_RANGE.afternoon}
           selected={selected === day.afternoon.id}
           onClick={() => onSelect(day.afternoon.id)}
           isNextAvailable={day.afternoon.id === nextAvailableSlotId}
+          compact={hasEvening}
         />
+        {day.evening && (
+          <SlotCard
+            slot={day.evening}
+            icon={<Moon className="h-4 w-4" />}
+            label="Evening"
+            hint={WINDOW_TIME_RANGE.evening}
+            selected={selected === day.evening.id}
+            onClick={() => onSelect(day.evening!.id)}
+            isNextAvailable={day.evening.id === nextAvailableSlotId}
+            compact={hasEvening}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 function SlotCard({
-  slot, jobMinutes, icon, label, hint, selected, onClick, isNextAvailable,
+  slot, icon, label, hint, selected, onClick, isNextAvailable, compact,
 }: {
   slot: Slot;
-  jobMinutes: number;
   icon: React.ReactNode;
   label: string;
   hint: string;
   selected: boolean;
   onClick: () => void;
   isNextAvailable: boolean;
+  compact: boolean;
 }) {
-  const status = slotFitStatus(slot, jobMinutes);
-  const fits = status === "available";
+  const fits = slot.status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
   // Visual accent only — once the customer picks any slot the
@@ -392,7 +458,12 @@ function SlotCard({
   // tile is the chosen one.
   const showNextBadge = isNextAvailable && !disabled && !isSelected;
 
-  const reason = status === "full" ? "Full" : "Not enough time";
+  const reason =
+    slot.status === "full"
+      ? "Full"
+      : slot.status === "not_yet_open"
+        ? "Not yet open"
+        : "Not enough time";
 
   return (
     <button
@@ -402,7 +473,8 @@ function SlotCard({
       data-testid={`mobile-slot-${slot.id}`}
       aria-pressed={isSelected}
       data-next-available={showNextBadge ? "true" : undefined}
-      className={`relative w-full rounded-xl text-left transition-all duration-150 outline-none select-none flex flex-col justify-center px-2.5 py-2 min-h-[64px]
+      data-slot-status={slot.status}
+      className={`relative w-full rounded-xl text-left transition-all duration-150 outline-none select-none flex flex-col justify-center ${compact ? "px-2 py-2" : "px-2.5 py-2"} min-h-[64px]
         ${disabled
           ? "cursor-not-allowed border-2 border-slate-200"
           : isSelected
@@ -449,12 +521,12 @@ function SlotCard({
             {icon}
           </div>
           <div className="min-w-0">
-            <div className={`text-[13px] font-bold leading-tight ${
+            <div className={`${compact ? "text-[12px]" : "text-[13px]"} font-bold leading-tight ${
               disabled ? "text-slate-400" : isSelected ? "text-white" : showNextBadge ? "text-pink-900" : "text-slate-900"
             }`}>
               {label}
             </div>
-            <div className={`mt-0.5 text-[10px] font-medium leading-tight ${
+            <div className={`mt-0.5 ${compact ? "text-[9px]" : "text-[10px]"} font-medium leading-tight ${
               disabled ? "text-slate-400" : isSelected ? "text-white/90" : showNextBadge ? "text-pink-700/80" : "text-slate-500"
             }`}>
               {hint}
