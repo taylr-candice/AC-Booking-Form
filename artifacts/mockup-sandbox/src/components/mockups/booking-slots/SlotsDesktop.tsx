@@ -31,7 +31,6 @@ import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 
 type Slot = CustomerSlot;
 type Day = CustomerDay;
@@ -351,7 +350,7 @@ function DayCard({
       }`}
       style={
         isSelected
-          ? { borderColor: SELECTED_GREEN, backgroundColor: SELECTED_GREEN }
+          ? { borderColor: BRAND, backgroundColor: BRAND }
           : undefined
       }
     >
@@ -404,7 +403,7 @@ function DesktopSlotCard({
       }`}
       style={
         isSelected
-          ? { borderColor: SELECTED_GREEN, backgroundColor: SELECTED_GREEN }
+          ? { borderColor: BRAND, backgroundColor: BRAND }
           : undefined
       }
     >

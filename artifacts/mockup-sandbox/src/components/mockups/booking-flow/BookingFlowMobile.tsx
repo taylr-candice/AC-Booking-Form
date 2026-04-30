@@ -14,7 +14,7 @@ import {
 import { BookingFlowConfirmation } from "./BookingFlowConfirmation";
 
 const BRAND = "#ED017F";
-const COMPLETE = "#5FBB97";
+const COMPLETE = "#ED017F";
 
 const NAV_FORWARD = new Set([
   "button-continue",

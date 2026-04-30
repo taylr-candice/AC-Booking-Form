@@ -28,7 +28,6 @@ import {
 import { useCustomerSlotPicker } from "../booking-slots/useCustomerSlotPicker";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 
 type Slot = CustomerSlot;
 type Day = CustomerDay;
@@ -412,7 +411,7 @@ function SlotCard({
   const disabled = !fits;
   const isSelected = selected && fits;
   // Visual accent only — once the customer picks any slot the
-  // selected-green state should win, so we hide the badge while this
+  // selected-pink state should win, so we hide the badge while this
   // tile is the chosen one.
   const showNextBadge = isNextAvailable && !disabled && !isSelected;
 
@@ -444,9 +443,9 @@ function SlotCard({
       `}
       style={{
         ...(isSelected ? {
-          backgroundColor: SELECTED_GREEN,
-          borderColor: SELECTED_GREEN,
-          boxShadow: `0 6px 16px -6px ${SELECTED_GREEN}80`,
+          backgroundColor: BRAND,
+          borderColor: BRAND,
+          boxShadow: `0 6px 16px -6px ${BRAND}80`,
         } : {}),
         ...(showNextBadge ? {
           backgroundColor: "#FFF1F8",

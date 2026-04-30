@@ -37,7 +37,6 @@ import {
 } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 
 export function AccessMobile() {
   const session = useBookingSelector((s) => s);
@@ -247,7 +246,7 @@ function ResidenceCard({
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+        style={selected ? { backgroundColor: BRAND } : undefined}
       >
         {icon}
       </span>
@@ -256,7 +255,7 @@ function ResidenceCard({
         <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5" style={{ color: SELECTED_GREEN }} />
+        <CheckCircle2 className="h-5 w-5" style={{ color: BRAND }} />
       )}
     </button>
   );
@@ -293,7 +292,7 @@ function AccessCard({
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+        style={selected ? { backgroundColor: BRAND } : undefined}
       >
         {icon}
       </span>
@@ -302,7 +301,7 @@ function AccessCard({
         <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{option.subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_GREEN }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: BRAND }} />
       )}
     </button>
   );
@@ -418,12 +417,12 @@ function CoordinationChoiceCard({
     >
       <span
         className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2"
-        style={{ borderColor: selected ? SELECTED_GREEN : "#CBD5E1" }}
+        style={{ borderColor: selected ? BRAND : "#CBD5E1" }}
       >
         {selected && (
           <span
             className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: SELECTED_GREEN }}
+            style={{ backgroundColor: BRAND }}
           />
         )}
       </span>
@@ -555,7 +554,7 @@ function ReturnMethodCard({
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+        style={selected ? { backgroundColor: BRAND } : undefined}
       >
         {icon}
       </span>
@@ -564,7 +563,7 @@ function ReturnMethodCard({
         <span className="mt-0.5 text-[12px] leading-snug text-slate-500">{subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: SELECTED_GREEN }} />
+        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
       )}
     </button>
   );

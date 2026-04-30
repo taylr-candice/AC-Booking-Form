@@ -251,7 +251,7 @@ function CountChip({
   tone: "new" | "update" | "unchanged" | "error";
 }) {
   const palette: Record<typeof tone, { bg: string; fg: string }> = {
-    new: { bg: "bg-emerald-50", fg: "text-emerald-700" },
+    new: { bg: "bg-pink-50", fg: "text-pink-700" },
     update: { bg: "bg-amber-50", fg: "text-amber-700" },
     unchanged: { bg: "bg-slate-100", fg: "text-slate-600" },
     error: { bg: "bg-red-50", fg: "text-red-700" },
@@ -269,7 +269,7 @@ function CountChip({
 
 function StatusChip({ status }: { status: UnitImportRow["status"] }) {
   const map: Record<UnitImportRow["status"], { label: string; cls: string }> = {
-    new: { label: "New", cls: "bg-emerald-50 text-emerald-700" },
+    new: { label: "New", cls: "bg-pink-50 text-pink-700" },
     update: { label: "Update", cls: "bg-amber-50 text-amber-700" },
     unchanged: { label: "Unchanged", cls: "bg-slate-100 text-slate-600" },
     error: { label: "Error", cls: "bg-red-50 text-red-700" },

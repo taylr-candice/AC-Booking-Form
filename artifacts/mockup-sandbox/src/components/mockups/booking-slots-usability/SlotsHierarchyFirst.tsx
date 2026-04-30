@@ -25,7 +25,6 @@ import {
 import { useCustomerSlotPicker } from "../booking-slots/useCustomerSlotPicker";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 
 type Slot = CustomerSlot;
 type Day = CustomerDay;
@@ -442,7 +441,7 @@ function HeroSlotCard({
       }`}
       style={
         isSelected
-          ? { borderColor: SELECTED_GREEN }
+          ? { borderColor: BRAND }
           : showHeroAccent
             ? { borderColor: "#F9A8D4", backgroundColor: "#FFF1F8" }
             : undefined
@@ -450,7 +449,7 @@ function HeroSlotCard({
     >
       {isSelected && (
         <div className="absolute right-4 top-4">
-          <CheckCircle2 className="h-6 w-6" style={{ color: SELECTED_GREEN }} />
+          <CheckCircle2 className="h-6 w-6" style={{ color: BRAND }} />
         </div>
       )}
       <div
@@ -548,7 +547,7 @@ function CompactSlotCard({
       }`}
       style={
         isSelected
-          ? { borderColor: SELECTED_GREEN, backgroundColor: "#F2FBF7" }
+          ? { borderColor: BRAND, backgroundColor: "#FCE7F0" }
           : undefined
       }
     >
@@ -566,7 +565,7 @@ function CompactSlotCard({
         </div>
       </div>
       {isSelected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_GREEN }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: BRAND }} />
       )}
     </button>
   );

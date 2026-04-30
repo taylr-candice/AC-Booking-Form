@@ -201,7 +201,7 @@ export function BookingFlowConfirmation() {
     }
 
     case "coordination":
-      icon = <CheckCircle2 className="h-7 w-7 text-emerald-500" />;
+      icon = <CheckCircle2 className="h-7 w-7 text-[#ED017F]" />;
       title = "Payment received";
       body = (
         <>
@@ -229,7 +229,7 @@ export function BookingFlowConfirmation() {
 
     case "scheduled":
     default:
-      icon = <CheckCircle2 className="h-7 w-7 text-emerald-500" />;
+      icon = <CheckCircle2 className="h-7 w-7 text-[#ED017F]" />;
       title = "Booking confirmed";
       body = (
         <>

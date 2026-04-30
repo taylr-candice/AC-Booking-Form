@@ -28,7 +28,6 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -78,7 +77,7 @@ export function PayDesktop() {
                 }}
                 data-testid="banner-coordination"
               >
-                <Info className="h-5 w-5 shrink-0 mt-0.5" style={{ color: SELECTED_GREEN }} />
+                <Info className="h-5 w-5 shrink-0 mt-0.5" style={{ color: BRAND }} />
                 <span>{COORDINATION_NOTE}</span>
               </div>
             )}
@@ -94,7 +93,7 @@ export function PayDesktop() {
                 <SummaryRow label="Slot" value={
                   isCoordination ? "To be coordinated" : (
                     <span className="flex items-center justify-end gap-1.5">
-                      <CheckCircle2 className="h-4 w-4" style={{ color: SELECTED_GREEN }} />
+                      <CheckCircle2 className="h-4 w-4" style={{ color: BRAND }} />
                       {schedule.primary} <span className="text-slate-500 text-xs ml-1 capitalize">{schedule.secondary}</span>
                     </span>
                   )
@@ -149,7 +148,7 @@ export function PayDesktop() {
                   <span className="text-sm font-semibold text-slate-900">{PAY_NOW_LABEL}</span>
                   <span className="text-[11px] font-medium text-slate-500">{PAY_NOW_SUBLABEL}</span>
                   {method === "pay_now" && (
-                    <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
+                    <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: BRAND }} />
                   )}
                 </button>
 
@@ -174,7 +173,7 @@ export function PayDesktop() {
                     <span className="text-sm font-semibold text-slate-900">{INVOICE_LABEL}</span>
                     <span className="text-[11px] font-medium text-slate-500">{INVOICE_SUBLABEL}</span>
                     {method === "invoice" && (
-                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_GREEN }} />
+                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: BRAND }} />
                     )}
                   </button>
                 )}

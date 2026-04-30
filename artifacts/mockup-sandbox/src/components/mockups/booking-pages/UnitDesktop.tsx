@@ -31,7 +31,6 @@ import {
 import { UnitAlreadyBookedModal } from "./UnitAlreadyBookedModal";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 const ERROR_PURPLE = "#9747FF";
 
 const UNITS = [
@@ -675,7 +674,7 @@ function RoleCard({
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+        style={selected ? { backgroundColor: BRAND } : undefined}
       >
         {icon}
       </span>
@@ -688,7 +687,7 @@ function RoleCard({
       {selected && (
         <CheckCircle2
           className="absolute right-3 top-3 h-5 w-5"
-          style={{ color: SELECTED_GREEN }}
+          style={{ color: BRAND }}
         />
       )}
     </button>

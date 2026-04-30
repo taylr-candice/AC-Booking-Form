@@ -1585,7 +1585,7 @@ function Terminal({
   if (state.terminal === "confirmed") {
     return (
       <TerminalShell
-        icon={<CheckCircle2 className="h-7 w-7 text-emerald-500" />}
+        icon={<CheckCircle2 className="h-7 w-7 text-[#ED017F]" />}
         title="Booking confirmed"
         body={
           <>
@@ -1602,7 +1602,7 @@ function Terminal({
   // coordination
   return (
     <TerminalShell
-      icon={<CheckCircle2 className="h-7 w-7 text-emerald-500" />}
+      icon={<CheckCircle2 className="h-7 w-7 text-[#ED017F]" />}
       title="Payment received"
       body={
         <>

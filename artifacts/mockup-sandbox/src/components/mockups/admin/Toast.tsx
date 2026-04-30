@@ -19,7 +19,7 @@
  *     dismiss X, styled the same as the inline undo toast in
  *     RolloutScheduleEditor. Clicking it runs the callback and then
  *     dismisses the toast.
- *   - Optional `variant` prop — "success" (default, emerald) or
+ *   - Optional `variant` prop — "success" (default, brand pink) or
  *     "info" (amber tint with an Info icon) for non-blocking hints.
  *     Both share layout, auto-dismiss, and dismiss controls.
  */
@@ -57,7 +57,7 @@ export function Toast({
   const isInfo = variant === "info";
   const containerClass = isInfo
     ? "fixed bottom-6 right-6 z-50 flex cursor-pointer items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg"
-    : "fixed bottom-6 right-6 z-50 flex cursor-pointer items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-lg";
+    : "fixed bottom-6 right-6 z-50 flex cursor-pointer items-center gap-3 rounded-xl border border-pink-200 bg-white px-4 py-3 shadow-lg";
   const messageClass = isInfo
     ? "text-[13px] font-medium text-amber-900"
     : "text-[13px] font-medium text-slate-800";
@@ -77,7 +77,7 @@ export function Toast({
       {isInfo ? (
         <Info className="h-4 w-4 shrink-0 text-amber-600" />
       ) : (
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-[#ED017F]" />
       )}
       <span className={messageClass}>{message}</span>
       {onUndo && (

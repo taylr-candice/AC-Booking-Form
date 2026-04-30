@@ -28,7 +28,6 @@ import { useCustomerSlotPicker } from "../booking-slots/useCustomerSlotPicker";
 
 const BRAND = "#ED017F";
 const BRAND_DARK = "#B8005F"; // Darkened for AAA contrast against white
-const SELECTED_GREEN = "#5FBB97";
 
 type Slot = CustomerSlot;
 type Day = CustomerDay;
@@ -403,7 +402,7 @@ function SlotCard({
   const disabled = !fits;
   const isSelected = selected && fits;
   // Visual hint only — once the customer picks any slot the
-  // selected-green state should win, so we hide the next-available
+  // selected-pink state should win, so we hide the next-available
   // accent while this tile is the chosen one.
   const showNextAvailable = isNextAvailable && !disabled && !isSelected;
 
@@ -433,7 +432,7 @@ function SlotCard({
         disabled
           ? "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-600"
           : isSelected
-            ? "border-[#5FBB97] bg-[#E6F5EE] text-slate-900 shadow-md"
+            ? "border-[#ED017F] bg-[#FCE7F0] text-slate-900 shadow-md"
             : showNextAvailable
               ? "bg-white text-slate-900 shadow-md hover:bg-pink-50"
               : "border-slate-300 bg-white text-slate-900 hover:border-slate-500 hover:bg-slate-50"
@@ -453,7 +452,7 @@ function SlotCard({
         disabled
           ? "bg-slate-200 text-slate-500"
           : isSelected
-            ? "bg-[#5FBB97] text-white"
+            ? "bg-[#ED017F] text-white"
             : showNextAvailable
               ? "bg-pink-100 text-pink-900"
               : "bg-slate-100 text-slate-700"
@@ -483,7 +482,7 @@ function SlotCard({
       </div>
 
       {isSelected && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5FBB97] text-white">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ED017F] text-white">
           <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
         </div>
       )}

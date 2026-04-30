@@ -41,7 +41,6 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -107,7 +106,7 @@ export function PayMobile() {
             }}
             data-testid="banner-coordination"
           >
-            <Info className="h-4 w-4 shrink-0 mt-0.5" style={{ color: SELECTED_GREEN }} />
+            <Info className="h-4 w-4 shrink-0 mt-0.5" style={{ color: BRAND }} />
             <span>{COORDINATION_NOTE}</span>
           </div>
         )}
@@ -149,7 +148,7 @@ export function PayMobile() {
                 <span
                   data-testid="text-summary-schedule"
                   className="inline-flex items-center gap-1.5 font-medium"
-                  style={{ color: SELECTED_GREEN }}
+                  style={{ color: BRAND }}
                 >
                   <Clock className="h-3.5 w-3.5" />
                   To be coordinated
@@ -433,7 +432,7 @@ function MethodCard({
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_GREEN } : undefined}
+        style={selected ? { backgroundColor: BRAND } : undefined}
       >
         {icon}
       </span>
@@ -444,7 +443,7 @@ function MethodCard({
         )}
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_GREEN }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: BRAND }} />
       )}
     </button>
   );

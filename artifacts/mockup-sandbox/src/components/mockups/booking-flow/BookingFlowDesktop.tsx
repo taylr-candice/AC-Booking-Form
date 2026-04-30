@@ -14,7 +14,7 @@ import {
 import { BookingFlowConfirmation } from "./BookingFlowConfirmation";
 
 const BRAND = "#ED017F";
-const COMPLETE = "#5FBB97";
+const COMPLETE = "#ED017F";
 
 const NAV_FORWARD = new Set([
   "button-continue",
@@ -201,7 +201,7 @@ export function BookingFlowDesktop() {
                 {idx < visible.length - 1 && (
                   <div 
                     className="mx-1.5 h-px w-6" 
-                    style={{ backgroundColor: isComplete ? "#5FBB97" : "#E2E8F0" }} 
+                    style={{ backgroundColor: isComplete ? "#ED017F" : "#E2E8F0" }} 
                   />
                 )}
               </div>
