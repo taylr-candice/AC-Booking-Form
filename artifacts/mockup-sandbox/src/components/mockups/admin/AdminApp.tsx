@@ -1613,6 +1613,8 @@ export function AdminApp() {
                 onFilter={setCoordinationFilter}
                 buildingFilter={bookingsBuildingFilter}
                 onBuildingFilter={setBookingsBuildingFilter}
+                templateFilter={bookingsTemplateFilter}
+                onTemplateFilter={setBookingsTemplateFilter}
                 search={search}
                 onSearch={setSearch}
                 onOpen={setSelectedBookingId}

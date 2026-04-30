@@ -15,6 +15,7 @@ import type {
   TimelineEntry,
 } from "@/state/adminMockData";
 
+import type { BookingsTemplateFilter } from "./bookingsTemplateFilter";
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
 
 afterEach(cleanup);
@@ -131,12 +132,12 @@ function callEntry(templateLabel: string | null): TimelineEntry {
 
 function Harness({
   initial,
-  callTemplates,
   emailTemplates,
+  callTemplates,
 }: {
   initial: AdminBooking[];
-  callTemplates?: ReadonlyArray<CallTemplate>;
   emailTemplates?: ReadonlyArray<EmailTemplate>;
+  callTemplates?: ReadonlyArray<CallTemplate>;
 }) {
   const [filter, setFilter] = useState<
     "all" | "awaiting_tenant" | "awaiting_agent"
@@ -155,8 +156,8 @@ function Harness({
       search={search}
       onSearch={setSearch}
       onOpen={() => {}}
-      callTemplates={callTemplates}
       emailTemplates={emailTemplates}
+      callTemplates={callTemplates}
     />
   );
 }
@@ -290,6 +291,218 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
     ).toBeNull();
   });
 
+  it("toolbar dropdown narrows the queue to rows whose timeline references the selected template", () => {
+    const emailTemplates: EmailTemplate[] = [
+      {
+        id: "rebook_link",
+        name: "Sent rebook link",
+        subject: "Booking access — please pick a new window",
+        note: "rebook",
+      },
+      {
+        id: "agent_intro",
+        name: "Sent agent intro",
+        subject: "Coordinating your AC service",
+        note: "intro",
+      },
+    ];
+    const callTemplates: CallTemplate[] = [
+      {
+        id: "spoke",
+        name: "Spoke — confirmed window",
+        note: "ok",
+      },
+    ];
+    render(
+      <Harness
+        emailTemplates={emailTemplates}
+        callTemplates={callTemplates}
+        initial={[
+          makeBooking({
+            id: "bk-rebook",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Sent rebook link")],
+          }),
+          makeBooking({
+            id: "bk-intro",
+            unitId: "u-a2",
+            serviceTimeline: [emailEntry("Sent agent intro")],
+          }),
+          makeBooking({
+            id: "bk-spoke",
+            unitId: "u-a3",
+            serviceTimeline: [callEntry("Spoke — confirmed window")],
+          }),
+        ]}
+      />,
+    );
+
+    // Sanity: dropdown is rendered with the catalog options and the
+    // sentinel "All templates" reset.
+    const dropdown = screen.getByTestId(
+      "coordination-filter-template",
+    ) as HTMLSelectElement;
+    expect(
+      within(dropdown).getByRole("option", { name: "All templates" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dropdown).getByRole("option", {
+        name: "Spoke — confirmed window",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(dropdown).getByRole("option", { name: "Sent rebook link" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dropdown).getByRole("option", { name: "Sent agent intro" }),
+    ).toBeInTheDocument();
+
+    // Pivot via the dropdown — only the matching email row stays.
+    const rebookOption = within(dropdown).getByRole("option", {
+      name: "Sent rebook link",
+    }) as HTMLOptionElement;
+    fireEvent.change(dropdown, { target: { value: rebookOption.value } });
+    expect(renderedBookingIds()).toEqual(["bk-rebook"]);
+    expect(
+      screen.getByTestId("coordination-template-filter-chip"),
+    ).toBeInTheDocument();
+
+    // Switching to a call template pivots to the call row instead.
+    const spokeOption = within(dropdown).getByRole("option", {
+      name: "Spoke — confirmed window",
+    }) as HTMLOptionElement;
+    fireEvent.change(dropdown, { target: { value: spokeOption.value } });
+    expect(renderedBookingIds()).toEqual(["bk-spoke"]);
+
+    // "All templates" clears the pivot.
+    const allOption = within(dropdown).getByRole("option", {
+      name: "All templates",
+    }) as HTMLOptionElement;
+    fireEvent.change(dropdown, { target: { value: allOption.value } });
+    expect(new Set(renderedBookingIds())).toEqual(
+      new Set(["bk-rebook", "bk-intro", "bk-spoke"]),
+    );
+    expect(
+      screen.queryByTestId("coordination-template-filter-chip"),
+    ).toBeNull();
+  });
+
+  it("toolbar dropdown is omitted when both template catalogs are empty", () => {
+    render(
+      <Harness
+        emailTemplates={[]}
+        callTemplates={[]}
+        initial={[
+          makeBooking({
+            id: "bk-a",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Sent rebook link")],
+          }),
+        ]}
+      />,
+    );
+    expect(
+      screen.queryByTestId("coordination-filter-template"),
+    ).toBeNull();
+  });
+
+  it("controlled mode: in-row pivot click and toolbar dropdown drive the same lifted state", () => {
+    function ControlledHarness() {
+      const [filter, setFilter] = useState<
+        "all" | "awaiting_tenant" | "awaiting_agent"
+      >("all");
+      const [buildingFilter, setBuildingFilter] = useState("all");
+      const [search, setSearch] = useState("");
+      const [tplFilter, setTplFilter] =
+        useState<BookingsTemplateFilter>(null);
+      return (
+        <>
+          <div data-testid="lifted-state">
+            {tplFilter === null
+              ? "(none)"
+              : `${tplFilter.kind}:${tplFilter.name}`}
+          </div>
+          <AwaitingCoordinationView
+            bookings={[
+              makeBooking({
+                id: "bk-rebook",
+                unitId: "u-a1",
+                serviceTimeline: [emailEntry("Sent rebook link")],
+              }),
+              makeBooking({
+                id: "bk-intro",
+                unitId: "u-a2",
+                serviceTimeline: [emailEntry("Sent agent intro")],
+              }),
+            ]}
+            units={makeUnits()}
+            buildings={makeBuildings()}
+            filter={filter}
+            onFilter={setFilter}
+            buildingFilter={buildingFilter}
+            onBuildingFilter={setBuildingFilter}
+            search={search}
+            onSearch={setSearch}
+            onOpen={() => {}}
+            templateFilter={tplFilter}
+            onTemplateFilter={setTplFilter}
+            emailTemplates={[
+              {
+                id: "rebook_link",
+                name: "Sent rebook link",
+                subject: "x",
+                note: "y",
+              },
+              {
+                id: "agent_intro",
+                name: "Sent agent intro",
+                subject: "x",
+                note: "y",
+              },
+            ]}
+            callTemplates={[]}
+          />
+        </>
+      );
+    }
+    render(<ControlledHarness />);
+
+    expect(screen.getByTestId("lifted-state").textContent).toBe("(none)");
+
+    // 1) Clicking the in-row pivot suffix updates the lifted state.
+    const suffixes = screen.getAllByTestId(
+      "coordinating-with-last-attempt-template",
+    );
+    const rebookSuffix = suffixes.find(
+      (el) => el.getAttribute("data-template-label") === "Sent rebook link",
+    );
+    fireEvent.click(rebookSuffix!);
+    expect(screen.getByTestId("lifted-state").textContent).toBe(
+      "email:Sent rebook link",
+    );
+    expect(renderedBookingIds()).toEqual(["bk-rebook"]);
+
+    // 2) The dropdown reflects the lifted state and switching it
+    //    drives the same setter.
+    const dropdown = screen.getByTestId(
+      "coordination-filter-template",
+    ) as HTMLSelectElement;
+    const introOption = within(dropdown).getByRole("option", {
+      name: "Sent agent intro",
+    }) as HTMLOptionElement;
+    fireEvent.change(dropdown, { target: { value: introOption.value } });
+    expect(screen.getByTestId("lifted-state").textContent).toBe(
+      "email:Sent agent intro",
+    );
+    expect(renderedBookingIds()).toEqual(["bk-intro"]);
+
+    // 3) Clearing the chip clears the lifted state.
+    fireEvent.click(
+      screen.getByTestId("button-clear-coordination-template-filter"),
+    );
+    expect(screen.getByTestId("lifted-state").textContent).toBe("(none)");
+  });
+
   it("clicking the template suffix doesn't open the booking", () => {
     let opened: string | null = null;
     function HarnessWithOpen() {
@@ -402,11 +615,14 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
     ).toBeNull();
   });
 
-  it("does NOT show the hint when the chip's name matches a template in the OTHER channel's catalog", () => {
-    // The snapshot was logged from an email entry, but the same name
+  it("DOES show the hint when only the OTHER channel's catalog has a same-named template (Task #161)", () => {
+    // The snapshot was logged from an email entry, and the same name
     // happens to exist in the call catalog. Since the queue's chip
-    // doesn't carry a `kind`, we treat a hit in either catalog as
-    // "still in catalog" so the hint stays quiet.
+    // now carries a `kind` (Task #161), the catalog check narrows to
+    // the matching channel — so a missing email template stays
+    // flagged as missing even when a call template shares the
+    // snapshot name. This matches how BookingsView's chip already
+    // behaves.
     const callTemplates: CallTemplate[] = [
       { id: "c1", name: "Cross channel name", note: "" },
     ];
@@ -431,9 +647,11 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
     expect(
       screen.getByTestId("coordination-template-filter-chip"),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("coordination-template-filter-missing-hint"),
-    ).toBeNull();
+    const hint = screen.getByTestId(
+      "coordination-template-filter-missing-hint",
+    );
+    expect(hint).toBeInTheDocument();
+    expect(hint.getAttribute("aria-label")).toContain("Cross channel name");
   });
 
   it("clearing the chip removes the missing-template hint", () => {

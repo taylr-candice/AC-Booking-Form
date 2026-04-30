@@ -60,6 +60,13 @@ import {
   CALL_OUTCOME_ORDER,
   type CallOutcome,
 } from "./BookingDetail";
+import {
+  decodeTemplateFilter,
+  encodeTemplateFilter,
+  matchesTemplateFilter,
+  TEMPLATE_FILTER_ALL_VALUE,
+  type BookingsTemplateFilter,
+} from "./bookingsTemplateFilter";
 import { CustomerCell } from "./BookingsView";
 import { PaymentChip } from "./chips";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
@@ -120,8 +127,11 @@ function CoordinatingWithCell({
   units: AdminUnit[];
   kind: CoordinationKind | null;
   /** When set, the template-name suffix renders as a button that
-   *  pivots the queue to that template. */
-  onTemplateClick?: (templateLabel: string) => void;
+   *  pivots the queue to that template. Receives the channel + the
+   *  snapshot name so the matching rule on the queue can stay
+   *  byte-for-byte aligned with the Bookings list — same shape used
+   *  by the toolbar's "Template used" dropdown. */
+  onTemplateClick?: (filter: { kind: "call" | "email"; name: string }) => void;
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
   const lastContacted = formatLastContacted(booking.lastContactedAt);
@@ -218,13 +228,16 @@ function CoordinatingWithCell({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onTemplateClick(latestAttempt.templateLabel!);
+                      onTemplateClick({
+                        kind: latestAttempt.kind,
+                        name: latestAttempt.templateLabel!,
+                      });
                     }}
                     onKeyDown={(e) => e.stopPropagation()}
                     data-testid="coordinating-with-last-attempt-template"
                     data-template-label={latestAttempt.templateLabel}
                     className="cursor-pointer rounded text-slate-500 underline decoration-dotted decoration-slate-400 underline-offset-2 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
-                    title={`Filter the queue to bookings whose latest touch used "${latestAttempt.templateLabel}"`}
+                    title={`Filter the queue to bookings whose timeline references "${latestAttempt.templateLabel}"`}
                     aria-label={`Filter by template "${latestAttempt.templateLabel}"`}
                   >
                     {latestAttempt.templateLabel}
@@ -254,6 +267,8 @@ export function AwaitingCoordinationView({
   onFilter,
   buildingFilter,
   onBuildingFilter,
+  templateFilter,
+  onTemplateFilter,
   search,
   onSearch,
   onOpen,
@@ -272,6 +287,14 @@ export function AwaitingCoordinationView({
   onFilter: (f: Filter) => void;
   buildingFilter: string;
   onBuildingFilter: (id: string) => void;
+  /** Active "Template used" filter (Call/Email + template name) or
+   *  `null` for the toolbar's reset state. Same lifted state the
+   *  Bookings list uses so an admin's pivot survives a switch
+   *  between the two queues; if neither prop is wired this view
+   *  falls back to its own local state for standalone usage in
+   *  isolated tests. */
+  templateFilter?: BookingsTemplateFilter;
+  onTemplateFilter?: (filter: BookingsTemplateFilter) => void;
   search: string;
   onSearch: (s: string) => void;
   onOpen: (id: string) => void;
@@ -482,9 +505,20 @@ export function AwaitingCoordinationView({
   // which outcome ops are pivoting on, and resetting it on view
   // remount matches how the bulk-action selection behaves.
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
-  // "Latest call/email touch used this template" pivot. Local to this
-  // view; the bookings list owns its own equivalent.
-  const [templateFilter, setTemplateFilter] = useState<string | null>(null);
+  // "Template used" filter — supports controlled (Bookings list shares
+  // its lifted state with us via `templateFilter` / `onTemplateFilter`)
+  // and uncontrolled (standalone test harnesses keep using the local
+  // fallback) operation. Same shape as the Bookings toolbar so the in-
+  // row "Last attempt" template suffix and the new toolbar dropdown
+  // share one source of truth and the matching rule
+  // (`matchesTemplateFilter` → snapshot `templateLabel` across every
+  // timeline entry) stays byte-for-byte aligned with the Bookings list.
+  const [localTemplateFilter, setLocalTemplateFilter] =
+    useState<BookingsTemplateFilter>(null);
+  const activeTemplateFilter: BookingsTemplateFilter =
+    templateFilter !== undefined ? templateFilter : localTemplateFilter;
+  const setTemplateFilter: (next: BookingsTemplateFilter) => void =
+    onTemplateFilter ?? setLocalTemplateFilter;
   // Pre-compute the kind for each coordination booking so we don't
   // recompute it on every filter / search keystroke. We include every
   // booking whose serviceSlot is `to_be_coordinated`; rows whose
@@ -531,18 +565,16 @@ export function AwaitingCoordinationView({
   const totalCount = coordinating.length;
 
   // Building + search + template-filter predicate, folded into the
-  // chip count rollups so they reflect the visible rows.
+  // chip count rollups so they reflect the visible rows. The
+  // template match goes through the shared `matchesTemplateFilter`
+  // so the in-row pivot suffix and the new toolbar dropdown agree
+  // with the Bookings list down to the snapshot string.
   function matchesBuildingAndSearch(b: AdminBooking) {
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
     }
-    if (templateFilter !== null) {
-      const latest = latestCoordinationAttempt(b.serviceTimeline);
-      if (latest === null || latest.templateLabel !== templateFilter) {
-        return false;
-      }
-    }
+    if (!matchesTemplateFilter(b, activeTemplateFilter)) return false;
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
       const unit = units.find((u) => u.id === b.unitId);
@@ -946,6 +978,54 @@ export function AwaitingCoordinationView({
               </option>
             ))}
           </select>
+          {/* "Template used" filter — mirror of the Bookings toolbar
+              dropdown. Pulls Call + Email options from the seeded +
+              admin-edited template catalogs threaded down from
+              AdminApp; selecting a template narrows the queue to
+              bookings whose service timeline references that
+              template by snapshot name (same matching rule the
+              Bookings list uses, via the shared
+              `matchesTemplateFilter`). Composes with the existing
+              waiting-on chip, building filter, search, and outcome
+              chip. The sentinel "All templates" value is the
+              toolbar's reset / clearable affordance. */}
+          {(emailTemplates.length > 0 || callTemplates.length > 0) && (
+            <select
+              value={encodeTemplateFilter(activeTemplateFilter)}
+              onChange={(e) =>
+                setTemplateFilter(decodeTemplateFilter(e.target.value))
+              }
+              aria-label="Filter by template used"
+              data-testid="coordination-filter-template"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+            >
+              <option value={TEMPLATE_FILTER_ALL_VALUE}>All templates</option>
+              {callTemplates.length > 0 && (
+                <optgroup label="Call templates">
+                  {callTemplates.map((t) => (
+                    <option
+                      key={`call-${t.id}`}
+                      value={encodeTemplateFilter({ kind: "call", name: t.name })}
+                    >
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {emailTemplates.length > 0 && (
+                <optgroup label="Email templates">
+                  {emailTemplates.map((t) => (
+                    <option
+                      key={`email-${t.id}`}
+                      value={encodeTemplateFilter({ kind: "email", name: t.name })}
+                    >
+                      {t.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          )}
         </div>
         <div
           className="flex flex-wrap items-center gap-1.5"
@@ -1053,7 +1133,7 @@ export function AwaitingCoordinationView({
         })}
       </div>
 
-      {templateFilter !== null && (() => {
+      {activeTemplateFilter !== null && (() => {
         // Mirror of the BookingsView chip's "no longer in catalog"
         // hint (Task #173). The chip's name is a snapshot — it was
         // captured onto the timeline entry when the call/email was
@@ -1061,28 +1141,35 @@ export function AwaitingCoordinationView({
         // string. If the template has since been renamed or removed
         // in the templates panel, the filter still works for any
         // other timeline entries that share that snapshot, but the
-        // chip's name won't show up in either templates catalog
+        // chip's name won't show up in the matching catalog
         // anymore. We surface a small icon + label in that case so
         // admins on the coordination queue get the same context as
         // those on the bookings list, without breaking the
         // snapshot-based match.
         //
-        // Unlike BookingsView's chip, this view's templateFilter is a
-        // bare string with no `kind`, so we check both the call and
-        // the email catalog: only flag as missing when neither
-        // catalog has a template with this name. Both catalogs are
-        // always defined here (default to the seeded constants), so
-        // we don't need BookingsView's "haveCatalog" guard.
-        const stillExists =
-          callTemplates.some((t) => t.name === templateFilter) ||
-          emailTemplates.some((t) => t.name === templateFilter);
+        // Now that the queue's `activeTemplateFilter` carries a
+        // `kind` (Task #161), we narrow the catalog lookup to the
+        // matching channel — a renamed-away email template stays
+        // flagged as missing even if a call template happens to
+        // share the snapshot name, matching how BookingsView's chip
+        // already behaves.
+        const matchingCatalog =
+          activeTemplateFilter.kind === "call"
+            ? callTemplates
+            : emailTemplates;
+        const stillExists = matchingCatalog.some(
+          (t) => t.name === activeTemplateFilter.name,
+        );
         const isMissing = !stillExists;
         return (
           <div
             className="flex items-center gap-2 text-[12px]"
             data-testid="coordination-template-filter-chip"
           >
-            <span className="text-slate-500">Filtered by template:</span>
+            <span className="text-slate-500">
+              Filtered by{" "}
+              {activeTemplateFilter.kind === "call" ? "call" : "email"} template:
+            </span>
             <button
               type="button"
               onClick={() => setTemplateFilter(null)}
@@ -1093,16 +1180,16 @@ export function AwaitingCoordinationView({
                 color: BRAND_DEEP,
               }}
               title="Clear template filter"
-              aria-label={`Clear template filter "${templateFilter}"`}
+              aria-label={`Clear template filter "${activeTemplateFilter.name}"`}
             >
-              <span>{templateFilter}</span>
+              <span>{activeTemplateFilter.name}</span>
               <X className="h-3 w-3" />
             </button>
             {isMissing && (
               <span
                 role="img"
-                aria-label={`"${templateFilter}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
-                title={`"${templateFilter}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+                aria-label={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+                title={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
                 data-testid="coordination-template-filter-missing-hint"
                 className="inline-flex items-center gap-1 text-slate-500"
               >

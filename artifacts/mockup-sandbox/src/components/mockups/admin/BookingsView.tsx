@@ -10,7 +10,6 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   bookerAgencyName,
-  bookingTimelineReferencesTemplate,
   formatAttemptRecency,
   getBuildingForUnit,
   latestCoordinationAttempt,
@@ -23,11 +22,25 @@ import {
   type ServiceStatus,
 } from "@/state/adminMockData";
 
+import {
+  decodeTemplateFilter,
+  encodeTemplateFilter,
+  matchesTemplateFilter,
+  TEMPLATE_FILTER_ALL_VALUE,
+  type BookingsTemplateFilter,
+} from "./bookingsTemplateFilter";
 import type { UndoCancelResult } from "./BookingDetail";
 import { PaymentChip, ServiceChip, SlotCell } from "./chips";
 import { InvoiceVoidAlerts } from "./InvoiceVoidAlerts";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 import { UndoConflictDialog, type UndoConflictTakenBy } from "./UndoConflictDialog";
+
+// Re-export the filter shape so existing consumers (tests, AdminApp)
+// can keep importing it from BookingsView. The canonical definition
+// now lives in `./bookingsTemplateFilter` so the bookings list and
+// the awaiting-coordination queue can share the matching rule
+// without copy-paste drift.
+export type { BookingsTemplateFilter };
 
 /**
  * Customer column cell.
@@ -83,69 +96,6 @@ function attemptTimestamp(booking: AdminBooking): number | null {
   if (latest === null || latest.loggedAt === null) return null;
   const ms = new Date(latest.loggedAt).getTime();
   return Number.isFinite(ms) ? ms : null;
-}
-
-/**
- * Identifies a Call/Email template by `kind` + snapshot-on-use `name`,
- * the same shape `findUsageBookingsForTemplate` matches against. The
- * "Template used" filter on the bookings toolbar reuses this so an
- * ops lead can audit every booking whose timeline references a given
- * template — same matching rule as the per-template usage popover, so
- * the two surfaces never disagree about which bookings count.
- *
- * `null` means "no template filter" — the toolbar's reset state.
- */
-export type BookingsTemplateFilter = {
-  kind: "call" | "email";
-  name: string;
-} | null;
-
-/**
- * Predicate for the "Template used" filter. A `null` filter is
- * treated as "no filter applied" so this can be composed alongside
- * the building / search / status filters without a separate guard
- * at every call site. The match itself delegates to the shared
- * {@link bookingTimelineReferencesTemplate} helper so this filter
- * and the templates popover's "Bookings using this template"
- * drill-down can never disagree about which bookings count — both
- * read from the same predicate.
- *
- * Blank-name filters are also treated as "no filter applied" (the
- * shared predicate would return `false` for every row otherwise,
- * which would surprise an admin who somehow ended up with an
- * unnamed selection).
- */
-function matchesTemplateFilter(
-  booking: AdminBooking,
-  filter: BookingsTemplateFilter,
-): boolean {
-  if (filter === null) return true;
-  if (filter.name.trim().length === 0) return true;
-  return bookingTimelineReferencesTemplate(booking, filter.kind, filter.name);
-}
-
-/**
- * Encode / decode the {@link BookingsTemplateFilter} as a single
- * `<select>` value so the dropdown stays a controlled component
- * without a custom popover. We prefix the channel so a Call template
- * and an Email template that happen to share a name (admins can
- * rename freely) stay distinguishable. `"all"` is the toolbar's
- * reset value.
- */
-const TEMPLATE_FILTER_ALL_VALUE = "all";
-function encodeTemplateFilter(filter: BookingsTemplateFilter): string {
-  if (filter === null) return TEMPLATE_FILTER_ALL_VALUE;
-  return `${filter.kind}::${filter.name}`;
-}
-function decodeTemplateFilter(value: string): BookingsTemplateFilter {
-  if (value === TEMPLATE_FILTER_ALL_VALUE) return null;
-  const sepIdx = value.indexOf("::");
-  if (sepIdx <= 0) return null;
-  const kind = value.slice(0, sepIdx);
-  const name = value.slice(sepIdx + 2);
-  if (kind !== "call" && kind !== "email") return null;
-  if (name.length === 0) return null;
-  return { kind, name };
 }
 
 export function BookingsView({
