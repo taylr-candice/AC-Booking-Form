@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { ArrowRight, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
-import { isCoordinationFlow } from "../../../state/bookingDerived";
+import {
+  isCoordinationFlow,
+  resolveOtherServiceRules,
+} from "../../../state/bookingDerived";
 import {
   acSummary,
   BILLING_EMAIL_HELPER,
@@ -45,6 +48,9 @@ export function PayDesktop() {
   const ack = session.cancellation_acknowledged;
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
+  const otherServices = resolveOtherServiceRules(
+    session.selected_other_service_ids,
+  );
 
   const payEnabled = isPayStepEnabled(session) && method !== null;
   const ctaLabel =
@@ -95,6 +101,18 @@ export function PayDesktop() {
                     </span>
                   )
                 } />
+                {otherServices.map((s) => (
+                  <SummaryRow
+                    key={s.id}
+                    label={s.name}
+                    value={
+                      <span className="tabular-nums">
+                        ${s.priceAud + s.addonPriceAud}
+                      </span>
+                    }
+                    testId={`row-pay-other-${s.id}`}
+                  />
+                ))}
               </div>
             </div>
 
@@ -344,9 +362,20 @@ export function PayDesktop() {
   );
 }
 
-function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+function SummaryRow({
+  label,
+  value,
+  testId,
+}: {
+  label: string;
+  value: React.ReactNode;
+  testId?: string;
+}) {
   return (
-    <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+    <div
+      className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
+      data-testid={testId}
+    >
       <div className="text-[12px] font-medium text-slate-500 mt-0.5">{label}</div>
       <div className="flex-1 text-right text-sm font-medium text-slate-900">{value}</div>
     </div>

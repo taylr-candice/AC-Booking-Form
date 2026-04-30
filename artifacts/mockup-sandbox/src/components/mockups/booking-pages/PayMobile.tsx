@@ -14,7 +14,10 @@ import {
   bookingActions,
   useBookingSelector,
 } from "../../../state/bookingSession";
-import { isCoordinationFlow } from "../../../state/bookingDerived";
+import {
+  isCoordinationFlow,
+  resolveOtherServiceRules,
+} from "../../../state/bookingDerived";
 import {
   acSummary,
   BILLING_EMAIL_HELPER,
@@ -53,6 +56,9 @@ export function PayMobile() {
   const ack = session.cancellation_acknowledged;
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
+  const otherServices = resolveOtherServiceRules(
+    session.selected_other_service_ids,
+  );
 
   // If role changes away from agent while invoice is selected, clear the selection.
   useEffect(() => {
@@ -163,6 +169,22 @@ export function PayMobile() {
                 </>
               )}
             </SummaryItem>
+            {otherServices.length > 0 && (
+              <div className="space-y-2 border-t border-slate-100 pt-3">
+                {otherServices.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-start justify-between gap-3 text-sm"
+                    data-testid={`row-pay-other-${s.id}`}
+                  >
+                    <span className="min-w-0 text-slate-700">{s.name}</span>
+                    <span className="tabular-nums font-medium text-slate-900 shrink-0">
+                      ${s.priceAud + s.addonPriceAud}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="bg-slate-900 px-4 py-3 text-white flex justify-between items-center">
             <span className="font-medium">Total (incl. GST)</span>
