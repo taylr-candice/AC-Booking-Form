@@ -22,8 +22,8 @@
  * and is intentionally NOT tied to a template).
  */
 
-import { Edit3, GripVertical, Phone, Pin, Plus, Star, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowDownWideNarrow, Edit3, GripVertical, Phone, Pin, Plus, Star, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   findDefaultCallTemplate,
@@ -208,18 +208,45 @@ export function CallTemplatesView({
     return () => clearTimeout(t);
   }, [pulseId]);
 
+  // Sort toggle (Task #170). `default` keeps the natural catalog
+  // order; `mostUsed` re-sorts the non-default rows by the same
+  // "Used in N bookings" badge that the LatestTouchBadge renders so
+  // an admin spotting an over-used template can push the busiest
+  // rows to the top in one click. The default row stays pinned at
+  // the top regardless — the per-row Pin icon and copy already
+  // promise that, and re-sorting it down would conflict with the
+  // existing default-pinning contract.
+  const [sortMode, setSortMode] = useState<"default" | "mostUsed">("default");
+
   const defaultTemplate = findDefaultCallTemplate(templates);
 
   // Pin the default row to the top of the list so ops never has to
   // scroll to find it once the catalog grows past a handful of
   // entries. The remaining rows keep their existing seed / catalog
-  // order so non-default rows stay where ops expects them.
-  const orderedTemplates = defaultTemplate
-    ? [
-        defaultTemplate,
-        ...templates.filter((t) => t.id !== defaultTemplate.id),
-      ]
-    : templates;
+  // order so non-default rows stay where ops expects them — unless
+  // the admin has flipped the sort toggle to "Most used first", in
+  // which case non-default rows are stable-sorted by their latest-
+  // touch usage count (descending). Ties are broken by the rows'
+  // current order so the list stays stable across re-renders. The
+  // sort happens at render time only — the underlying catalog state
+  // is not mutated, so flipping the toggle back restores the seed
+  // order verbatim.
+  const orderedTemplates = useMemo(() => {
+    const nonDefault = defaultTemplate
+      ? templates.filter((t) => t.id !== defaultTemplate.id)
+      : templates;
+    const sortedNonDefault =
+      sortMode === "mostUsed"
+        ? [...nonDefault].sort(
+            (a, b) =>
+              (latestTouchCounts?.[b.id] ?? 0) -
+              (latestTouchCounts?.[a.id] ?? 0),
+          )
+        : nonDefault;
+    return defaultTemplate
+      ? [defaultTemplate, ...sortedNonDefault]
+      : sortedNonDefault;
+  }, [templates, defaultTemplate, sortMode, latestTouchCounts]);
 
   const focusDefaultRow = () => {
     if (!defaultTemplate) return;
@@ -255,7 +282,7 @@ export function CallTemplatesView({
     currentId: string,
     direction: "up" | "down" | "first" | "last",
   ) => {
-    if (!onReorder) return;
+    if (!onReorder || sortMode !== "default") return;
     const idx = movableTemplates.findIndex((t) => t.id === currentId);
     if (idx === -1) return;
     let targetIdx: number;
@@ -358,6 +385,47 @@ export function CallTemplatesView({
         {liveMessage}
       </div>
 
+      {templates.length > 0 ? (
+        <div className="flex items-center justify-end gap-2 text-[12px] text-slate-600">
+          <span className="text-slate-500">Sort:</span>
+          <div
+            className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5"
+            data-testid="sort-toggle-call-templates"
+            data-sort-mode={sortMode}
+          >
+            <button
+              type="button"
+              onClick={() => setSortMode("default")}
+              data-testid="button-sort-call-templates-default"
+              aria-pressed={sortMode === "default"}
+              title="Show templates in their natural catalog order. The default row stays pinned at the top."
+              className={
+                sortMode === "default"
+                  ? "rounded-md bg-slate-900 px-2.5 py-1 text-[12px] font-semibold text-white"
+                  : "rounded-md px-2.5 py-1 text-[12px] font-semibold text-slate-600 hover:bg-slate-100"
+              }
+            >
+              Default order
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortMode("mostUsed")}
+              data-testid="button-sort-call-templates-most-used"
+              aria-pressed={sortMode === "mostUsed"}
+              title="Sort non-default rows by the 'Used in N bookings' badge — busiest templates jump to the top. Ties keep their current order."
+              className={
+                sortMode === "mostUsed"
+                  ? "inline-flex items-center gap-1 rounded-md bg-slate-900 px-2.5 py-1 text-[12px] font-semibold text-white"
+                  : "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-semibold text-slate-600 hover:bg-slate-100"
+              }
+            >
+              <ArrowDownWideNarrow className="h-3 w-3" />
+              Most used first
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         {templates.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-slate-500">
@@ -410,9 +478,9 @@ export function CallTemplatesView({
                     data-pulsing={isPulsing ? "true" : undefined}
                     data-dragging={isDragging ? "true" : undefined}
                     data-drop-target={isDropTarget ? "true" : undefined}
-                    draggable={!t.isDefault}
+                    draggable={!t.isDefault && sortMode === "default"}
                     onDragStart={(e) => {
-                      if (t.isDefault) return;
+                      if (t.isDefault || sortMode !== "default") return;
                       // Some browsers refuse to start a drag without
                       // any payload on the dataTransfer — empty string
                       // is enough to satisfy them, the actual id is
@@ -432,7 +500,12 @@ export function CallTemplatesView({
                       setDragOverId(null);
                     }}
                     onDragOver={(e) => {
-                      if (!draggingId || t.isDefault || draggingId === t.id) {
+                      if (
+                        !draggingId ||
+                        t.isDefault ||
+                        draggingId === t.id ||
+                        sortMode !== "default"
+                      ) {
                         return;
                       }
                       e.preventDefault();
@@ -451,7 +524,14 @@ export function CallTemplatesView({
                       const from = draggingId;
                       setDraggingId(null);
                       setDragOverId(null);
-                      if (!from || t.isDefault || from === t.id) return;
+                      if (
+                        !from ||
+                        t.isDefault ||
+                        from === t.id ||
+                        sortMode !== "default"
+                      ) {
+                        return;
+                      }
                       onReorder?.(from, t.id);
                     }}
                     className={
@@ -493,17 +573,28 @@ export function CallTemplatesView({
                             movableIdx >= 0
                               ? ` Currently at position ${movableIdx + 1} of ${movableTotal}.`
                               : "";
+                          const isDefaultOrder = sortMode === "default";
                           return (
                             <button
                               type="button"
+                              disabled={!isDefaultOrder}
                               ref={(el) => {
                                 dragHandleRefs.current.set(t.id, el);
                               }}
                               data-testid={`drag-handle-call-template-${t.id}`}
-                              aria-label={`Reorder "${t.name}".${positionLabel} Press Up or Down arrow to move, Home or End to jump to top or bottom.`}
-                              aria-keyshortcuts="ArrowUp ArrowDown Home End"
-                              title="Drag, or press Up/Down arrow keys to reorder"
+                              aria-label={
+                                isDefaultOrder
+                                  ? `Reorder "${t.name}".${positionLabel} Press Up or Down arrow to move, Home or End to jump to top or bottom.`
+                                  : `Reorder is disabled while sorted by usage`
+                              }
+                              aria-keyshortcuts={isDefaultOrder ? "ArrowUp ArrowDown Home End" : undefined}
+                              title={
+                                isDefaultOrder
+                                  ? "Drag, or press Up/Down arrow keys to reorder"
+                                  : "Reorder is disabled while sorted by usage"
+                              }
                               onKeyDown={(e) => {
+                                if (!isDefaultOrder) return;
                                 if (e.key === "ArrowUp") {
                                   e.preventDefault();
                                   handleKeyboardMove(t.id, "up");
@@ -518,7 +609,11 @@ export function CallTemplatesView({
                                   handleKeyboardMove(t.id, "last");
                                 }
                               }}
-                              className="inline-flex h-7 w-5 cursor-grab items-center justify-center rounded text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 active:cursor-grabbing"
+                              className={
+                                isDefaultOrder
+                                  ? "inline-flex h-7 w-5 cursor-grab items-center justify-center rounded text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 active:cursor-grabbing"
+                                  : "inline-flex h-7 w-5 cursor-not-allowed items-center justify-center text-slate-300"
+                              }
                             >
                               <GripVertical className="h-4 w-4" />
                             </button>

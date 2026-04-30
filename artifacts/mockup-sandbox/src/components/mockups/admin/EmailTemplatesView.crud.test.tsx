@@ -367,6 +367,243 @@ describe("EmailTemplatesView · CRUD", () => {
 });
 
 /**
+ * Sort-toggle regression (Task #170).
+ *
+ * Mirror of the Call templates sort tests for the email channel. The
+ * Email templates panel ships the same "Sort: Default order / Most
+ * used first" segmented control above the table. Default mode keeps
+ * the natural catalog order (default row pinned at the top by the
+ * existing default-pinning contract). Most-used mode re-sorts the
+ * non-default rows by `latestTouchCounts` descending, ties broken by
+ * the rows' current order so the list stays stable across re-renders.
+ *
+ * The sort happens at render time only — the underlying catalog
+ * state is not mutated, so flipping the toggle back restores the
+ * seed order verbatim.
+ */
+describe("EmailTemplatesView · Sort by Most used first", () => {
+  it("default is the active mode on first render — non-default rows render in catalog order", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "" },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        latestTouchCounts={{ "tpl-a": 1, "tpl-b": 9, "tpl-c": 4 }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    const toggle = screen.getByTestId("sort-toggle-email-templates");
+    expect(toggle.getAttribute("data-sort-mode")).toBe("default");
+    expect(
+      screen
+        .getByTestId("button-sort-email-templates-default")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByTestId("button-sort-email-templates-most-used")
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+
+    const rowIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(rowIds).toEqual([
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-c",
+    ]);
+  });
+
+  it("clicking 'Most used first' re-sorts non-default rows by latestTouchCounts desc; clicking 'Default order' restores the original sequence", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "" },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+      { id: "tpl-d", name: "Delta", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        latestTouchCounts={{
+          "tpl-a": 1,
+          "tpl-b": 9,
+          "tpl-c": 4,
+          "tpl-d": 0,
+        }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-most-used"),
+    );
+
+    expect(
+      screen
+        .getByTestId("sort-toggle-email-templates")
+        .getAttribute("data-sort-mode"),
+    ).toBe("mostUsed");
+    expect(
+      screen
+        .getByTestId("button-sort-email-templates-most-used")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(sortedIds).toEqual([
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-c",
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-d",
+    ]);
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-default"),
+    );
+    const restoredIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(restoredIds).toEqual([
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-c",
+      "email-template-row-tpl-d",
+    ]);
+  });
+
+  it("ties on usage count break by current row order so the list is stable", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "" },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+      { id: "tpl-d", name: "Delta", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        latestTouchCounts={{
+          "tpl-a": 5,
+          "tpl-b": 2,
+          "tpl-c": 5,
+          "tpl-d": 2,
+        }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-most-used"),
+    );
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(sortedIds).toEqual([
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-c",
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-d",
+    ]);
+  });
+
+  it("default row stays pinned at the top in both modes, even when its usage is lowest", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "", isDefault: true },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        latestTouchCounts={{ "tpl-a": 0, "tpl-b": 9, "tpl-c": 4 }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    let rowIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(rowIds[0]).toBe("email-template-row-tpl-a");
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-most-used"),
+    );
+    rowIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(rowIds).toEqual([
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-c",
+    ]);
+  });
+
+  it("missing latestTouchCounts entries are treated as 0 — rows without a count fall to the bottom in Most used mode", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "" },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        latestTouchCounts={{ "tpl-b": 7 }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-most-used"),
+    );
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(sortedIds).toEqual([
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-c",
+    ]);
+  });
+});
+
+/**
  * Companion test — mirrors the harness style of the existing
  * `AwaitingCoordinationView.bulkLogEmail.test.tsx`. We mount the full
  * `<AdminApp />`, add a template through the panel, then jump to the

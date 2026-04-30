@@ -358,6 +358,257 @@ describe("CallTemplatesView · CRUD", () => {
 });
 
 /**
+ * Sort-toggle regression (Task #170).
+ *
+ * The Call templates panel ships a "Sort: Default order / Most used
+ * first" segmented control above the table. Default mode keeps the
+ * natural catalog order (with the default row pinned at the top by
+ * the existing default-pinning contract). Most-used mode re-sorts
+ * the non-default rows by their `latestTouchCounts` value descending,
+ * ties broken by the rows' current order so the list stays stable
+ * across re-renders.
+ *
+ * The sort happens at render time only — the underlying catalog
+ * state is not mutated, so flipping the toggle back restores the
+ * seed order verbatim. Pinning the toggle and the resulting row
+ * order here catches a future refactor that accidentally mutates
+ * the catalog (or sorts the default row down) without breaking the
+ * broader CRUD suite.
+ */
+describe("CallTemplatesView · Sort by Most used first", () => {
+  it("default is the active mode on first render — non-default rows render in catalog order", () => {
+    const templates: CallTemplate[] = [
+      { id: "tpl-a", name: "Alpha", note: "" },
+      { id: "tpl-b", name: "Bravo", note: "" },
+      { id: "tpl-c", name: "Charlie", note: "" },
+    ];
+    render(
+      <CallTemplatesView
+        templates={templates}
+        latestTouchCounts={{ "tpl-a": 1, "tpl-b": 9, "tpl-c": 4 }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    const toggle = screen.getByTestId("sort-toggle-call-templates");
+    expect(toggle.getAttribute("data-sort-mode")).toBe("default");
+    expect(
+      screen
+        .getByTestId("button-sort-call-templates-default")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByTestId("button-sort-call-templates-most-used")
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+
+    const rowIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(rowIds).toEqual([
+      "call-template-row-tpl-a",
+      "call-template-row-tpl-b",
+      "call-template-row-tpl-c",
+    ]);
+  });
+
+  it("clicking 'Most used first' re-sorts non-default rows by latestTouchCounts desc; clicking 'Default order' restores the original sequence", () => {
+    const templates: CallTemplate[] = [
+      { id: "tpl-a", name: "Alpha", note: "" },
+      { id: "tpl-b", name: "Bravo", note: "" },
+      { id: "tpl-c", name: "Charlie", note: "" },
+      { id: "tpl-d", name: "Delta", note: "" },
+    ];
+    render(
+      <CallTemplatesView
+        templates={templates}
+        latestTouchCounts={{
+          "tpl-a": 1,
+          "tpl-b": 9,
+          "tpl-c": 4,
+          "tpl-d": 0,
+        }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-call-templates-most-used"),
+    );
+
+    expect(
+      screen
+        .getByTestId("sort-toggle-call-templates")
+        .getAttribute("data-sort-mode"),
+    ).toBe("mostUsed");
+    expect(
+      screen
+        .getByTestId("button-sort-call-templates-most-used")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    // 9 → 4 → 1 → 0, no ties, no default pinned.
+    expect(sortedIds).toEqual([
+      "call-template-row-tpl-b",
+      "call-template-row-tpl-c",
+      "call-template-row-tpl-a",
+      "call-template-row-tpl-d",
+    ]);
+
+    // Toggle back — original catalog order is restored verbatim, so
+    // the sort never mutated the underlying templates prop.
+    fireEvent.click(
+      screen.getByTestId("button-sort-call-templates-default"),
+    );
+    const restoredIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(restoredIds).toEqual([
+      "call-template-row-tpl-a",
+      "call-template-row-tpl-b",
+      "call-template-row-tpl-c",
+      "call-template-row-tpl-d",
+    ]);
+  });
+
+  it("ties on usage count break by current row order so the list is stable", () => {
+    const templates: CallTemplate[] = [
+      { id: "tpl-a", name: "Alpha", note: "" },
+      { id: "tpl-b", name: "Bravo", note: "" },
+      { id: "tpl-c", name: "Charlie", note: "" },
+      { id: "tpl-d", name: "Delta", note: "" },
+    ];
+    render(
+      <CallTemplatesView
+        templates={templates}
+        // Two ties: a/c at 5, b/d at 2. Stable sort means a comes
+        // before c (a was first in the catalog) and b comes before
+        // d (same reason).
+        latestTouchCounts={{
+          "tpl-a": 5,
+          "tpl-b": 2,
+          "tpl-c": 5,
+          "tpl-d": 2,
+        }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-call-templates-most-used"),
+    );
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(sortedIds).toEqual([
+      "call-template-row-tpl-a",
+      "call-template-row-tpl-c",
+      "call-template-row-tpl-b",
+      "call-template-row-tpl-d",
+    ]);
+  });
+
+  it("default row stays pinned at the top in both modes, even when its usage is lowest", () => {
+    const templates: CallTemplate[] = [
+      { id: "tpl-a", name: "Alpha", note: "", isDefault: true },
+      { id: "tpl-b", name: "Bravo", note: "" },
+      { id: "tpl-c", name: "Charlie", note: "" },
+    ];
+    render(
+      <CallTemplatesView
+        templates={templates}
+        latestTouchCounts={{ "tpl-a": 0, "tpl-b": 9, "tpl-c": 4 }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    // Default mode — default row at the top, others in catalog order.
+    let rowIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(rowIds[0]).toBe("call-template-row-tpl-a");
+
+    // Flip to Most used — default row STILL at the top despite having
+    // the lowest usage; the rest are sorted by usage desc.
+    fireEvent.click(
+      screen.getByTestId("button-sort-call-templates-most-used"),
+    );
+    rowIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(rowIds).toEqual([
+      "call-template-row-tpl-a",
+      "call-template-row-tpl-b",
+      "call-template-row-tpl-c",
+    ]);
+  });
+
+  it("missing latestTouchCounts entries are treated as 0 — rows without a count fall to the bottom in Most used mode", () => {
+    const templates: CallTemplate[] = [
+      { id: "tpl-a", name: "Alpha", note: "" },
+      { id: "tpl-b", name: "Bravo", note: "" },
+      { id: "tpl-c", name: "Charlie", note: "" },
+    ];
+    render(
+      <CallTemplatesView
+        templates={templates}
+        // tpl-b has a count, the other two are absent → both treated
+        // as 0 and ordered by their catalog position (a then c).
+        latestTouchCounts={{ "tpl-b": 7 }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-call-templates-most-used"),
+    );
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(sortedIds).toEqual([
+      "call-template-row-tpl-b",
+      "call-template-row-tpl-a",
+      "call-template-row-tpl-c",
+    ]);
+  });
+});
+
+/**
  * Companion tests — mirror the harness style of the existing
  * `EmailTemplatesView.crud.test.tsx` cross-view block. We mount the
  * full `<AdminApp />`, add / edit a template through the panel, then
