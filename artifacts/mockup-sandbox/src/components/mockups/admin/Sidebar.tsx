@@ -15,6 +15,7 @@ import {
   Phone,
   Snowflake,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string; icon: LucideIcon }> 
   { id: "rollouts", label: "Rollouts", icon: CalendarRange },
   { id: "buildings", label: "Buildings", icon: Building2 },
   { id: "units", label: "Units", icon: Home },
+  { id: "services", label: "Services", icon: Wrench },
   { id: "agents", label: "Agents", icon: Users },
   { id: "email_templates", label: "Email templates", icon: Mail },
   { id: "call_templates", label: "Call templates", icon: Phone },

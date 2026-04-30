@@ -15,17 +15,20 @@ import { ArrowRight, CalendarRange, ChevronLeft, ChevronRight } from "lucide-rea
 
 import {
   bookerAgencyName,
+  DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   formatRolloutDateRange,
   getBuildingBookings,
   getBuildingUnits,
   getRolloutsForBuilding,
   getServiceById,
   latestBookingByUnit,
+  notifyLiveBuildingsChanged,
   summarizeBuildingRollout,
   type AdminBooking,
   type AdminBuilding,
   type AdminRollout,
   type AdminUnit,
+  type OutdoorPlacement,
 } from "@/state/adminMockData";
 
 import { Card } from "./atoms";
@@ -35,6 +38,7 @@ import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 export function BuildingDetail({
   buildingId,
   buildings,
+  setBuildings,
   units,
   bookings,
   onBack,
@@ -45,6 +49,7 @@ export function BuildingDetail({
 }: {
   buildingId: string;
   buildings: AdminBuilding[];
+  setBuildings: (next: AdminBuilding[]) => void;
   units: AdminUnit[];
   bookings: AdminBooking[];
   onBack: () => void;
@@ -79,6 +84,35 @@ export function BuildingDetail({
   const coordinationBookings = buildingBookings.filter(
     (b) => b.serviceSlot === "to_be_coordinated",
   );
+
+  // Reading defaults via `??` so the helpers cope with older
+  // `AdminBuilding` literals that pre-date Task #182's placement
+  // fields (a few admin tests still build these by hand).
+  const placement: OutdoorPlacement =
+    building.outdoorPlacement ?? "in_property";
+  const overhead =
+    building.rooftopOverheadMinutes ?? DEFAULT_ROOFTOP_OVERHEAD_MINUTES;
+
+  function patchBuilding(patch: Partial<AdminBuilding>) {
+    setBuildings(
+      buildings.map((b) => (b.id === buildingId ? { ...b, ...patch } : b)),
+    );
+    notifyLiveBuildingsChanged();
+  }
+  function setPlacement(next: OutdoorPlacement) {
+    if (next === "rooftop") {
+      patchBuilding({
+        outdoorPlacement: "rooftop",
+        rooftopOverheadMinutes:
+          overhead > 0 ? overhead : DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+      });
+    } else {
+      patchBuilding({ outdoorPlacement: "in_property" });
+    }
+  }
+  function setRooftopOverhead(minutes: number) {
+    patchBuilding({ rooftopOverheadMinutes: Math.max(0, minutes) });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -161,6 +195,75 @@ export function BuildingDetail({
             coordination
           </div>
         )}
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[12px] font-semibold uppercase tracking-wider text-slate-700">
+                Outdoor unit placement
+              </div>
+              <div className="text-[12px] text-slate-500">
+                Drives the rooftop overhead added to every booking on this
+                building's units.
+              </div>
+            </div>
+            <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5 text-[12px]">
+              <button
+                type="button"
+                onClick={() => setPlacement("in_property")}
+                className={`rounded-md px-3 py-1 font-semibold transition ${
+                  placement === "in_property"
+                    ? "text-white"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                style={
+                  placement === "in_property"
+                    ? { backgroundColor: BRAND }
+                    : undefined
+                }
+              >
+                In property
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlacement("rooftop")}
+                className={`rounded-md px-3 py-1 font-semibold transition ${
+                  placement === "rooftop"
+                    ? "text-white"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                style={
+                  placement === "rooftop"
+                    ? { backgroundColor: BRAND }
+                    : undefined
+                }
+              >
+                Rooftop
+              </button>
+            </div>
+          </div>
+          {placement === "rooftop" && (
+            <div className="mt-3 flex items-end gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                  Rooftop overhead (min / system)
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={240}
+                  value={overhead}
+                  onChange={(e) =>
+                    setRooftopOverhead(Number(e.target.value) || 0)
+                  }
+                  className="w-32 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] focus:border-slate-400 focus:outline-none"
+                />
+              </label>
+              <div className="pb-1.5 text-[11px] italic text-slate-500">
+                Added per AC system on every booking on this building.
+              </div>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Two-column body: units list + schedule strip */}

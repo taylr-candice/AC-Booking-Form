@@ -33,6 +33,9 @@ import {
   findUsageBookingsForTemplate,
   formatBookingShortDate,
   getActiveBookingForUnit,
+  getEffectivePlacementForUnit,
+  getRecordedAcTypeForUnit,
+  getServiceRuleForAcType,
   isCustomCallTemplateLabel,
   liveBookingFromSession,
   nextCallTemplateId,
@@ -41,6 +44,7 @@ import {
   normalizeEmailTemplateDraft,
   notifyLiveBookingsChanged,
   notifyLiveBuildingsChanged,
+  notifyLiveServiceCatalogueChanged,
   notifyLiveUnitsChanged,
   priorServiceStatusFromTimeline,
   releaseBookingCapacity,
@@ -52,9 +56,11 @@ import {
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
   SEEDED_BUILDINGS,
+  SEEDED_SERVICES,
   SEEDED_UNITS,
   setLiveBookingsSource,
   setLiveBuildingsSource,
+  setLiveServiceCatalogueSource,
   setLiveUnitsSource,
   summarizeTemplateUsageBooking,
   updateRolloutSlot,
@@ -62,6 +68,7 @@ import {
   type AdminBooking,
   type AdminBuilding,
   type AdminCreatedScheduleChoice,
+  type AdminService,
   type AdminUnit,
   type CallTemplate,
   type EmailTemplate,
@@ -69,6 +76,10 @@ import {
   type ServiceStatus,
   type TimelineEntry,
 } from "@/state/adminMockData";
+import {
+  setServiceRuleResolver,
+  setUnitDurationContextResolver,
+} from "@/state/bookingDerived";
 import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
@@ -88,6 +99,7 @@ import { RolloutScheduleEditor } from "./RolloutScheduleEditor";
 import { RolloutsView } from "./RolloutsView";
 import { SchedulingModal, type SchedulingMode } from "./SchedulingModal";
 import { selectPendingInvoiceVoids } from "./InvoiceVoidAlerts";
+import { ServicesView } from "./ServicesView";
 import { Sidebar } from "./Sidebar";
 import { Toast, type ToastVariant } from "./Toast";
 import { TopBar } from "./TopBar";
@@ -136,10 +148,26 @@ export function AdminApp() {
     ? [liveBooking, ...seededBookings]
     : seededBookings;
 
-  // Buildings are not currently editable from the admin UI — but we hold
-  // them in state so future tasks (e.g. add a building, rename one) only
-  // need to flip a `setBuildings` setter through.
-  const [buildings] = useState<AdminBuilding[]>([...SEEDED_BUILDINGS]);
+  // Buildings are mutable so the per-building "Outdoor unit placement"
+  // controls (Task #182) can persist edits for the demo session — the
+  // duration helper reads through `setLiveBuildingsSource` so any
+  // change re-flows into the booking-detail duration breakdown and the
+  // slot picker's time-budget math the next render.
+  const [buildings, setBuildings] = useState<AdminBuilding[]>([
+    ...SEEDED_BUILDINGS,
+  ]);
+
+  // Mutable service catalogue (Task #182). Seeded from `SEEDED_SERVICES`
+  // so the catalogue isn't empty on first render; ops edits made on the
+  // Services view re-flow through `setLiveServiceCatalogueSource` into
+  // the duration helper and pricing card the next render.
+  const [services, setServices] = useState<AdminService[]>([
+    ...SEEDED_SERVICES,
+  ]);
+  function commitServices(next: AdminService[]) {
+    setServices(next);
+    notifyLiveServiceCatalogueChanged();
+  }
 
   // Mutable email-template catalog for the bulk Log-email dropdown
   // on the Awaiting-coordination queue. Seeded from `EMAIL_TEMPLATES`
@@ -1164,6 +1192,20 @@ export function AdminApp() {
     // the unit changes registered just above.
     setLiveBuildingsSource(() => buildings);
     notifyLiveBuildingsChanged();
+    // Task #182: register the live service catalogue + per-AC-type rule
+    // resolver + per-unit duration context resolver so the booking
+    // duration helper (`getBookingDurationMinutes`) reads ops-edited
+    // base / add-on minutes and per-building / per-unit outdoor
+    // placement instead of the legacy 45 / 15 / 0 constants. All three
+    // close over the latest `services` / `buildings` / `units` state,
+    // so any admin edit re-flows into the slot picker the next render.
+    setLiveServiceCatalogueSource(() => services);
+    notifyLiveServiceCatalogueChanged();
+    setServiceRuleResolver((acType) => getServiceRuleForAcType(acType));
+    setUnitDurationContextResolver((unitId) => ({
+      acType: getRecordedAcTypeForUnit(unitId),
+      placement: getEffectivePlacementForUnit(unitId),
+    }));
     setUniquenessGuard((sess, newBookingReference) => {
       if (!sess.unit_id) return "ok";
       const rollout = findRolloutForBooking("svc-ac", sess.unit_id);
@@ -1226,8 +1268,11 @@ export function AdminApp() {
       setLiveBookingsSource(null);
       setLiveUnitsSource(null);
       setLiveBuildingsSource(null);
+      setLiveServiceCatalogueSource(null);
+      setServiceRuleResolver(null);
+      setUnitDurationContextResolver(null);
     };
-  }, [seededBookings, units, buildings]);
+  }, [seededBookings, units, buildings, services]);
 
   function openNewBooking(buildingId: string | null) {
     setNewBookingBuildingId(buildingId);
@@ -1575,6 +1620,7 @@ export function AdminApp() {
               <BuildingDetail
                 buildingId={selectedBuildingId}
                 buildings={buildings}
+                setBuildings={setBuildings}
                 units={units}
                 bookings={allBookings}
                 onBack={() => setSelectedBuildingId(null)}
@@ -1612,6 +1658,10 @@ export function AdminApp() {
               agents={agents}
               buildings={buildings}
             />
+          )}
+
+          {view === "services" && (
+            <ServicesView services={services} setServices={commitServices} />
           )}
 
           {view === "agents" && (

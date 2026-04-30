@@ -39,6 +39,7 @@ export const modules: ModuleMap = {
   "./components/mockups/admin/RolloutScheduleEditor.tsx": () => import("../components/mockups/admin/RolloutScheduleEditor.tsx"),
   "./components/mockups/admin/RolloutsView.tsx": () => import("../components/mockups/admin/RolloutsView.tsx"),
   "./components/mockups/admin/SchedulingModal.tsx": () => import("../components/mockups/admin/SchedulingModal.tsx"),
+  "./components/mockups/admin/ServicesView.tsx": () => import("../components/mockups/admin/ServicesView.tsx"),
   "./components/mockups/admin/Sidebar.tsx": () => import("../components/mockups/admin/Sidebar.tsx"),
   "./components/mockups/admin/TemplateUsagePopover.tsx": () => import("../components/mockups/admin/TemplateUsagePopover.tsx"),
   "./components/mockups/admin/Toast.tsx": () => import("../components/mockups/admin/Toast.tsx"),

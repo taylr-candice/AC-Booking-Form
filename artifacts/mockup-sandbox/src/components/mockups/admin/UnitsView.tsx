@@ -11,6 +11,7 @@ import type {
   AdminAgent,
   AdminBuilding,
   AdminUnit,
+  OutdoorPlacement,
 } from "@/state/adminMockData";
 import { formatUnitsCsv, unitsCsvTemplate } from "@/state/unitsCsv";
 
@@ -272,6 +273,7 @@ function UnitEditor({
   const overrideType =
     draft.ac.type === "split" || draft.ac.type === "ducted";
   const overrideBrand = draft.ac.brand.trim().length > 0;
+  const overridePlacement = draft.outdoorPlacementOverride !== undefined;
   const countsKnown =
     draft.ac.systems !== null && draft.ac.additional !== null;
   const inheritedBuilding =
@@ -416,6 +418,60 @@ function UnitEditor({
                 placeholder="Daikin, Mitsubishi, Fujitsu, Panasonic…"
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
               />
+            </FormField>
+          )}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+            <div>
+              <div className="text-[12px] font-semibold text-slate-700">
+                Different outdoor placement for this unit
+              </div>
+              <div className="text-[11px] text-slate-500">
+                Inherits the building's setting (
+                {inheritedBuilding?.outdoorPlacement === "rooftop"
+                  ? "rooftop"
+                  : "in property"}
+                ). Override only when this unit's outdoor unit lives somewhere
+                different.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={overridePlacement}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  const fallback: OutdoorPlacement =
+                    inheritedBuilding?.outdoorPlacement === "rooftop"
+                      ? "in_property"
+                      : "rooftop";
+                  setDraft({
+                    ...draft,
+                    outdoorPlacementOverride: fallback,
+                  });
+                } else {
+                  const next = { ...draft };
+                  delete next.outdoorPlacementOverride;
+                  setDraft(next);
+                }
+              }}
+              className="h-4 w-4"
+            />
+          </div>
+          {overridePlacement && (
+            <FormField label="Outdoor placement override">
+              <select
+                value={draft.outdoorPlacementOverride ?? "in_property"}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    outdoorPlacementOverride: e.target
+                      .value as OutdoorPlacement,
+                  })
+                }
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+              >
+                <option value="in_property">In property</option>
+                <option value="rooftop">Rooftop</option>
+              </select>
             </FormField>
           )}
           <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">

@@ -173,31 +173,135 @@ export const MINUTES_PER_ADDITIONAL_INDOOR = 15;
 export const UNSURE_FALLBACK_MINUTES = MINUTES_PER_SYSTEM;
 
 /**
+ * Per-AC-type service rule used to compute booking duration.
+ *
+ * The shape mirrors the configurable Service catalogue (Task #182):
+ * each catalogue entry exposes a `baseMinutes` (per-system) value and
+ * an `addonMinutes` (per-extra-indoor / per-extra-grille) value. The
+ * defaults below preserve the legacy 45/15 numbers so callers that
+ * never register a resolver behave exactly as before.
+ */
+export type ServiceRule = {
+  baseMinutes: number;
+  addonMinutes: number;
+};
+
+/**
+ * Where the unit's outdoor unit lives, used to compute the
+ * "rooftop access" overhead surcharge per system. `in_property`
+ * contributes nothing; `rooftop` adds `overheadMinutes` per AC system
+ * captured on the booking (the tech climbs once per system in the
+ * mockup model — Task #182's worked example).
+ */
+export type OutdoorPlacementContext =
+  | { kind: "in_property" }
+  | { kind: "rooftop"; overheadMinutes: number };
+
+/**
+ * Per-unit context the duration helper needs to compute placement
+ * overhead and resolve a default AC type when the booking session
+ * hasn't committed one yet (e.g. fresh slot picker render).
+ */
+export type UnitDurationContext = {
+  acType: "split" | "ducted" | null;
+  placement: OutdoorPlacementContext;
+};
+
+const DEFAULT_SERVICE_RULE: ServiceRule = {
+  baseMinutes: MINUTES_PER_SYSTEM,
+  addonMinutes: MINUTES_PER_ADDITIONAL_INDOOR,
+};
+
+const DEFAULT_UNIT_CONTEXT: UnitDurationContext = {
+  acType: null,
+  placement: { kind: "in_property" },
+};
+
+let serviceRuleResolver: (acType: "split" | "ducted") => ServiceRule = () =>
+  DEFAULT_SERVICE_RULE;
+let unitDurationContextResolver: (
+  unitId: string | null,
+) => UnitDurationContext = () => DEFAULT_UNIT_CONTEXT;
+
+/**
+ * Register a resolver that returns the per-AC-type service rule.
+ * Pass `null` to restore the legacy 45/15 defaults — used by the
+ * canvas-isolated mode and by tests that don't need the catalogue.
+ */
+export function setServiceRuleResolver(
+  fn: ((acType: "split" | "ducted") => ServiceRule) | null,
+): void {
+  serviceRuleResolver = fn ?? (() => DEFAULT_SERVICE_RULE);
+}
+
+/**
+ * Register a resolver that returns the per-unit placement + recorded
+ * AC type. Pass `null` to restore the in-property / unknown-type
+ * defaults.
+ */
+export function setUnitDurationContextResolver(
+  fn: ((unitId: string | null) => UnitDurationContext) | null,
+): void {
+  unitDurationContextResolver = fn ?? (() => DEFAULT_UNIT_CONTEXT);
+}
+
+/**
  * How long the customer's current booking will take, in minutes.
  *
- * Formula: `45 × num_systems + 15 × num_additional_indoor`.
+ * Formula:
+ *   `baseMinutes × num_systems`
+ * + `addonMinutes × num_additional_indoor`
+ * + `rooftopOverheadMinutes × num_systems` (only when the unit's
+ *   building / unit-override places the outdoor unit on a rooftop)
+ *
+ * `baseMinutes` and `addonMinutes` come from the registered Service
+ * catalogue resolver, keyed by the AC type the customer / unit
+ * resolves to. With no resolver registered the helper falls back to
+ * the legacy 45 / 15 / 0 constants — preserving the pre-Task-#182
+ * behaviour for tests and isolated component renders.
  *
  * When the customer answered "I'm not sure" on the AC step
- * (`ac_discrepancy.customer.type === "unsure"`) we don't trust the seeded
- * stepper values, so we fall back to {@link UNSURE_FALLBACK_MINUTES}.
+ * (`ac_discrepancy.customer.type === "unsure"`) we don't trust the
+ * seeded stepper values, so we fall back to
+ * {@link UNSURE_FALLBACK_MINUTES} — the smallest job Taylr will
+ * dispatch — without applying any rooftop surcharge.
  *
  * Pure function — used by the slot picker (to size each slot's time
- * budget) and by the admin mockup later (to render the booked job's
+ * budget) and by the admin mockup (to render the booked job's
  * duration).
  */
 export function getBookingDurationMinutes(
   s: Pick<
     BookingState,
     "num_systems" | "num_additional_indoor" | "ac_discrepancy"
-  >,
+  > & { unit_id?: string | null },
 ): number {
   if (s.ac_discrepancy?.customer.type === "unsure") {
     return UNSURE_FALLBACK_MINUTES;
   }
-  return (
-    s.num_systems * MINUTES_PER_SYSTEM +
-    s.num_additional_indoor * MINUTES_PER_ADDITIONAL_INDOOR
-  );
+  const ctx = unitDurationContextResolver(s.unit_id ?? null);
+  // Pick the AC type the rule resolver should key off. Prefer the
+  // customer's confirmed selection, fall back to whatever was on file
+  // for the unit, then to the unit context's recorded type, and
+  // finally to "split" so a brand-new session still produces a
+  // meaningful number.
+  const customerType = s.ac_discrepancy?.customer.type;
+  const recordedType = s.ac_discrepancy?.recorded.type;
+  const acType: "split" | "ducted" =
+    customerType === "split" || customerType === "ducted"
+      ? customerType
+      : recordedType === "split" || recordedType === "ducted"
+        ? recordedType
+        : ctx.acType ?? "split";
+  const rule = serviceRuleResolver(acType);
+  const base =
+    s.num_systems * rule.baseMinutes +
+    s.num_additional_indoor * rule.addonMinutes;
+  const overhead =
+    ctx.placement.kind === "rooftop"
+      ? ctx.placement.overheadMinutes * s.num_systems
+      : 0;
+  return base + overhead;
 }
 
 // ─── Customer-side slot fit status ────────────────────────────────────────

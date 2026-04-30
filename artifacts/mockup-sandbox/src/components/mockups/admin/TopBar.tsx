@@ -76,6 +76,9 @@ export function TopBar({
   } else if (view === "units") {
     title = "Units";
     crumb = "AC config on file (the source of customer pre-fill)";
+  } else if (view === "services") {
+    title = "Service catalogue";
+    crumb = "Per-service base time, add-on rules, and pricing";
   } else if (view === "agents") {
     title = "Agents";
     crumb = "Leasing agents and the units they manage";

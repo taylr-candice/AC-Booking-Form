@@ -26,6 +26,7 @@ import {
   MINUTES_PER_ADDITIONAL_INDOOR,
   MINUTES_PER_SYSTEM,
   UNSURE_FALLBACK_MINUTES,
+  type OutdoorPlacementContext,
 } from "./bookingDerived";
 import type {
   AccessMethod,
@@ -72,6 +73,14 @@ export type AdminUnit = {
    * same lesson the agency↔unit refactor learned in Task #37.
    */
   buildingId: string;
+  /**
+   * Per-unit override of the building's outdoor-unit placement
+   * (Task #182). Optional — when absent the unit inherits its
+   * building's `outdoorPlacement`. Setting it to "rooftop" on a unit
+   * inside an "in_property" building (or vice-versa) flips just this
+   * unit's bookings to the other duration / overhead model.
+   */
+  outdoorPlacementOverride?: OutdoorPlacement;
 };
 
 /**
@@ -114,7 +123,43 @@ export type AdminBuilding = {
    * {@link AdminUnit.ac.brand}.
    */
   acBrand: string;
+  /**
+   * Where the outdoor units live for this building (Task #182).
+   * `in_property` (the default) means the tech can reach the outdoor
+   * unit from inside the apartment / on a balcony — no extra time
+   * needed. `rooftop` means the tech has to climb to the building's
+   * roof to access the outdoor unit; we add
+   * {@link rooftopOverheadMinutes} per AC system to every booking on
+   * a rooftop building.
+   *
+   * Optional on the type so older fixtures (test data, hand-rolled
+   * `AdminBuilding` literals) keep compiling — every read goes
+   * through {@link getEffectivePlacementForUnit}, which defaults to
+   * `in_property` when the field is absent.
+   */
+  outdoorPlacement?: OutdoorPlacement;
+  /**
+   * Minutes added to a booking *per AC system* when the building's
+   * (or unit's) effective placement is `rooftop`. Defaults to
+   * {@link DEFAULT_ROOFTOP_OVERHEAD_MINUTES} (10 min) — the rough
+   * "climb up + climb down" overhead per system in the mockup model.
+   * Ignored when the placement is `in_property`. Optional for the
+   * same fixture-compat reason as {@link outdoorPlacement}.
+   */
+  rooftopOverheadMinutes?: number;
 };
+
+/**
+ * Where a building's (or unit's) outdoor units live. Drives the
+ * "rooftop access" overhead surcharge applied per AC system on every
+ * booking touching that building / unit.
+ */
+export type OutdoorPlacement = "in_property" | "rooftop";
+
+/** Default rooftop overhead used by the seed data + when the admin
+ *  flips a building from in-property to rooftop without picking a
+ *  custom value. Mirrors the example in the Task #182 spec. */
+export const DEFAULT_ROOFTOP_OVERHEAD_MINUTES = 10;
 
 /**
  * A managing agency on file. Agents are tracked at the company level
@@ -321,6 +366,8 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     addressLine2: "Greenway ACT 2900",
     acType: "ducted",
     acBrand: "Daikin",
+    outdoorPlacement: "in_property",
+    rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   },
   {
     id: "bldg-marine",
@@ -329,6 +376,8 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     addressLine2: "Coogee NSW 2034",
     acType: "split",
     acBrand: "Mitsubishi",
+    outdoorPlacement: "in_property",
+    rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   },
   {
     id: "bldg-bourke",
@@ -337,6 +386,8 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     addressLine2: "Surry Hills NSW 2010",
     acType: "split",
     acBrand: "Fujitsu",
+    outdoorPlacement: "in_property",
+    rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   },
   {
     id: "bldg-anzac",
@@ -345,6 +396,8 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     addressLine2: "Kensington NSW 2033",
     acType: "ducted",
     acBrand: "Panasonic",
+    outdoorPlacement: "in_property",
+    rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   },
 ];
 
@@ -1860,10 +1913,86 @@ export function requiresTenantCoordination(b: AdminBooking): boolean {
 
 export function bookingDurationMinutes(b: AdminBooking): number {
   if (b.acType === "unsure") return UNSURE_FALLBACK_MINUTES;
-  return (
-    b.systems * MINUTES_PER_SYSTEM +
-    b.additional * MINUTES_PER_ADDITIONAL_INDOOR
-  );
+  // Pull the per-AC-type rule + per-unit placement from the live
+  // catalogue / live buildings + units. Both helpers default to the
+  // legacy 45 / 15 / no-overhead numbers when the catalogue / live
+  // sources haven't been registered (canvas-isolated mode, vitest),
+  // so the existing tests stay green.
+  const rule = getServiceRuleForAcType(b.acType);
+  const placement = getEffectivePlacementForUnit(b.unitId);
+  const base = b.systems * rule.baseMinutes + b.additional * rule.addonMinutes;
+  const overhead =
+    placement.kind === "rooftop" ? placement.overheadMinutes * b.systems : 0;
+  return base + overhead;
+}
+
+/**
+ * Resolve the per-AC-type service rule from the live catalogue.
+ *
+ * Returns the catalogue entry whose `acTypeKey` matches `acType`, or
+ * the legacy 45 / 15 defaults when no such entry exists (e.g. ops
+ * deleted the entry or a brand-new test environment hasn't seeded the
+ * catalogue). Pure read of the live source — safe everywhere.
+ */
+export function getServiceRuleForAcType(
+  acType: "split" | "ducted",
+): { baseMinutes: number; addonMinutes: number } {
+  const catalogue = getLiveServiceCatalogue();
+  const match = catalogue.find((s) => s.acTypeKey === acType);
+  return match
+    ? { baseMinutes: match.baseMinutes, addonMinutes: match.addonMinutes }
+    : {
+        baseMinutes: MINUTES_PER_SYSTEM,
+        addonMinutes: MINUTES_PER_ADDITIONAL_INDOOR,
+      };
+}
+
+/**
+ * Resolve the effective outdoor-unit placement for a unit, walking
+ * `unit.outdoorPlacementOverride → building.outdoorPlacement` and
+ * carrying the building's `rooftopOverheadMinutes` when the result is
+ * `rooftop`. Returns `in_property` (no overhead) for unknown units.
+ */
+export function getEffectivePlacementForUnit(
+  unitId: string | null,
+): OutdoorPlacementContext {
+  if (!unitId) return { kind: "in_property" };
+  const unit = getLiveUnits().find((u) => u.id === unitId);
+  if (!unit) return { kind: "in_property" };
+  const building = getLiveBuildings().find((b) => b.id === unit.buildingId);
+  if (!building) return { kind: "in_property" };
+  const placement =
+    unit.outdoorPlacementOverride ??
+    building.outdoorPlacement ??
+    "in_property";
+  if (placement === "rooftop") {
+    return {
+      kind: "rooftop",
+      overheadMinutes:
+        building.rooftopOverheadMinutes ?? DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+    };
+  }
+  return { kind: "in_property" };
+}
+
+/**
+ * Resolve the AC type Taylr has on file for a unit (building default,
+ * with the unit-level override applied). Used by the booking session
+ * duration helper to pick a sensible service rule when the customer
+ * hasn't yet committed to an AC type. Returns `null` for unknown
+ * units / units with no recorded type.
+ */
+export function getRecordedAcTypeForUnit(
+  unitId: string | null,
+): "split" | "ducted" | null {
+  if (!unitId) return null;
+  const unit = getLiveUnits().find((u) => u.id === unitId);
+  if (!unit) return null;
+  if (unit.ac.type === "split" || unit.ac.type === "ducted") {
+    return unit.ac.type;
+  }
+  const building = getLiveBuildings().find((b) => b.id === unit.buildingId);
+  return building?.acType ?? null;
 }
 
 // ─── Building joins / rollout summary ──────────────────────────────────────
@@ -2925,14 +3054,75 @@ export type ServiceCapacityModel =
 export type AdminService = {
   id: string;
   name: string;
-  /** Default per-system minutes, used by the live booking → live
-   *  rollout-slot math. Mirrors the customer-side AC defaults so the
-   *  "remaining minutes" display matches what the customer sees. */
+  /**
+   * The AC type this catalogue entry's rule applies to (Task #182).
+   * `split` and `ducted` entries drive the per-system / per-extra
+   * duration math for AC bookings. `null` is used for "other"
+   * services modelled in the catalogue (e.g. bathroom extraction add-ons)
+   * which aren't yet wired into the booking flow's step list — they
+   * live in the catalogue so ops can author the rule, but the
+   * customer flow hasn't picked them up yet.
+   */
+  acTypeKey: "split" | "ducted" | null;
+  /** Per-system base duration in minutes (default: 45). */
+  baseMinutes: number;
+  /**
+   * Human-readable label for the per-extra "add-on" stepper, shown to
+   * ops in the Service catalogue and on the booking detail when we
+   * surface a duration breakdown. e.g. "additional indoor head"
+   * (split) or "additional return-air grille" (ducted).
+   */
+  addonLabel: string;
+  /** Per-add-on duration in minutes (default: 15). */
+  addonMinutes: number;
+  /** Per-system base price in AUD (default: $179). */
+  priceAud: number;
+  /** Per-add-on price in AUD (default: $39). */
+  addonPriceAud: number;
+  /**
+   * Optional free-text "applies to" note, used for generic catalogue
+   * entries that aren't keyed off an AC type (e.g. "applies to:
+   * bathroom extraction"). Empty / undefined for the seeded AC entries.
+   */
+  appliesToNote?: string;
+  /**
+   * Legacy alias kept for back-compat with the few callers that read
+   * `defaultJobMinutes` directly (the rollouts code path that pre-dated
+   * Task #182). Mirrors `baseMinutes`.
+   */
   defaultJobMinutes: number;
 };
 
+/**
+ * Seeded service catalogue. Two entries cover the AC service today:
+ * "Split system service" (svc-ac, kept under its original id so the
+ * existing rollouts continue to resolve) and "Ducted system service"
+ * (svc-ac-ducted). Both default to 45 min base + 15 min per add-on
+ * and the matching $179 / $39 pricing — Task #182's worked example.
+ */
 export const SEEDED_SERVICES: AdminService[] = [
-  { id: "svc-ac", name: "Annual AC service", defaultJobMinutes: 45 },
+  {
+    id: "svc-ac",
+    name: "Split system service",
+    acTypeKey: "split",
+    baseMinutes: 45,
+    addonLabel: "additional indoor head",
+    addonMinutes: 15,
+    priceAud: 179,
+    addonPriceAud: 39,
+    defaultJobMinutes: 45,
+  },
+  {
+    id: "svc-ac-ducted",
+    name: "Ducted system service",
+    acTypeKey: "ducted",
+    baseMinutes: 45,
+    addonLabel: "additional return-air grille",
+    addonMinutes: 15,
+    priceAud: 179,
+    addonPriceAud: 39,
+    defaultJobMinutes: 45,
+  },
 ];
 
 /** One window within a {@link RolloutDay}. Carries the capacity counter
@@ -3184,12 +3374,53 @@ function cloneRollout(r: AdminRollout): AdminRollout {
 }
 
 export function getServices(): AdminService[] {
-  return SEEDED_SERVICES;
+  return [...getLiveServiceCatalogue()];
 }
 
 export function getServiceById(id: string | null): AdminService | null {
   if (!id) return null;
-  return SEEDED_SERVICES.find((s) => s.id === id) ?? null;
+  return getLiveServiceCatalogue().find((s) => s.id === id) ?? null;
+}
+
+/**
+ * Live service catalogue source — same registration pattern as
+ * {@link setLiveBuildingsSource} / {@link setLiveUnitsSource}.
+ *
+ * The admin shell holds the catalogue in React state so ops edits to
+ * baseMinutes / addonMinutes / addonLabel / pricing flow through to
+ * everywhere the catalogue is read (booking duration math, rollout
+ * picker, customer pricing display). Defaults to the seeded catalogue
+ * when no admin shell is mounted (canvas-isolated mode, vitest).
+ */
+export type LiveServiceCatalogueSource = () => readonly AdminService[];
+let liveServiceCatalogueSource: LiveServiceCatalogueSource = () =>
+  SEEDED_SERVICES;
+let liveServiceCatalogueVersion = 0;
+const liveServiceCatalogueListeners = new Set<() => void>();
+
+export function setLiveServiceCatalogueSource(
+  source: LiveServiceCatalogueSource | null,
+): void {
+  liveServiceCatalogueSource = source ?? (() => SEEDED_SERVICES);
+  notifyLiveServiceCatalogueChanged();
+}
+export function getLiveServiceCatalogue(): readonly AdminService[] {
+  return liveServiceCatalogueSource();
+}
+export function notifyLiveServiceCatalogueChanged(): void {
+  liveServiceCatalogueVersion += 1;
+  for (const fn of liveServiceCatalogueListeners) fn();
+}
+export function subscribeLiveServiceCatalogue(
+  listener: () => void,
+): () => void {
+  liveServiceCatalogueListeners.add(listener);
+  return () => {
+    liveServiceCatalogueListeners.delete(listener);
+  };
+}
+export function getLiveServiceCatalogueVersion(): number {
+  return liveServiceCatalogueVersion;
 }
 
 export function getRollouts(): AdminRollout[] {
