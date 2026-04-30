@@ -10,6 +10,8 @@ import type {
   AdminBooking,
   AdminBuilding,
   AdminUnit,
+  CallTemplate,
+  EmailTemplate,
   TimelineEntry,
 } from "@/state/adminMockData";
 
@@ -18,9 +20,16 @@ import { BookingsView, type BookingsTemplateFilter } from "./BookingsView";
 type HarnessProps = {
   bookings: AdminBooking[];
   onOpen?: (id: string) => void;
+  callTemplates?: ReadonlyArray<CallTemplate>;
+  emailTemplates?: ReadonlyArray<EmailTemplate>;
 };
 
-function Harness({ bookings, onOpen }: HarnessProps) {
+function Harness({
+  bookings,
+  onOpen,
+  callTemplates,
+  emailTemplates,
+}: HarnessProps) {
   const [templateFilter, setTemplateFilter] =
     useState<BookingsTemplateFilter>(null);
   return (
@@ -40,6 +49,8 @@ function Harness({ bookings, onOpen }: HarnessProps) {
       onAcknowledgeSupersede={() => {}}
       templateFilter={templateFilter}
       onTemplateFilter={setTemplateFilter}
+      callTemplates={callTemplates}
+      emailTemplates={emailTemplates}
     />
   );
 }
@@ -231,6 +242,118 @@ describe("BookingsView — template filter pivot", () => {
       screen.queryByTestId("bookings-row-last-attempt-template"),
     ).toBeNull();
     expect(screen.queryByTestId("bookings-template-filter-chip")).toBeNull();
+  });
+
+  it("shows a 'no longer in templates catalog' hint when the chip's template name doesn't match either current catalog (Task #173)", () => {
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-renamed",
+        serviceTimeline: [emailEntry("Old name template")],
+      }),
+    ];
+    const callTemplates: CallTemplate[] = [
+      { id: "c1", name: "Some other call template", note: "" },
+    ];
+    const emailTemplates: EmailTemplate[] = [
+      { id: "e1", name: "Some other email template", subject: "x", note: "" },
+    ];
+    render(
+      <Harness
+        bookings={bookings}
+        callTemplates={callTemplates}
+        emailTemplates={emailTemplates}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+    expect(screen.getByTestId("bookings-template-filter-chip")).toBeInTheDocument();
+    const hint = screen.getByTestId("bookings-template-filter-missing-hint");
+    expect(hint).toBeInTheDocument();
+    expect(hint.getAttribute("aria-label")).toContain("Old name template");
+    expect(hint.getAttribute("aria-label")).toContain("no longer in the templates catalog");
+    // The filter still works — `bk-renamed` is the only matching row.
+    expect(visibleBookingIds()).toEqual(["bk-renamed"]);
+  });
+
+  it("does NOT show the missing-template hint when the chip's name matches a current call or email template", () => {
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-a",
+        serviceTimeline: [emailEntry("Sent rebook link")],
+      }),
+    ];
+    const callTemplates: CallTemplate[] = [];
+    const emailTemplates: EmailTemplate[] = [
+      { id: "e1", name: "Sent rebook link", subject: "x", note: "" },
+    ];
+    render(
+      <Harness
+        bookings={bookings}
+        callTemplates={callTemplates}
+        emailTemplates={emailTemplates}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+    expect(screen.getByTestId("bookings-template-filter-chip")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("bookings-template-filter-missing-hint"),
+    ).toBeNull();
+  });
+
+  it("clearing the chip removes the missing-template hint", () => {
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-renamed",
+        serviceTimeline: [emailEntry("Old name template")],
+      }),
+    ];
+    render(
+      <Harness
+        bookings={bookings}
+        callTemplates={[]}
+        emailTemplates={[]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+    expect(
+      screen.getByTestId("bookings-template-filter-missing-hint"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByTestId("button-clear-bookings-template-filter"),
+    );
+    expect(screen.queryByTestId("bookings-template-filter-chip")).toBeNull();
+    expect(
+      screen.queryByTestId("bookings-template-filter-missing-hint"),
+    ).toBeNull();
+  });
+
+  it("stays quiet (no false-positive hint) when the catalogs aren't threaded in", () => {
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-a",
+        serviceTimeline: [emailEntry("Old name template")],
+      }),
+    ];
+    renderView(bookings);
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+    expect(screen.getByTestId("bookings-template-filter-chip")).toBeInTheDocument();
+    // No catalogs => we can't tell renamed/removed apart from "we just
+    // don't know", so we deliberately suppress the hint to avoid a
+    // false positive on older call-sites.
+    expect(
+      screen.queryByTestId("bookings-template-filter-missing-hint"),
+    ).toBeNull();
   });
 
   it("clicking the template suffix doesn't bubble up to open the booking", () => {

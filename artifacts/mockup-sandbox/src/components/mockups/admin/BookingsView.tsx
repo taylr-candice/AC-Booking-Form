@@ -5,7 +5,7 @@
  * `AdminApp` shell to mount `BookingDetail`.
  */
 
-import { Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
+import { Info, Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -617,32 +617,72 @@ export function BookingsView({
         </div>
       </div>
 
-      {activeTemplateFilter !== null && (
-        <div
-          className="flex items-center gap-2 text-[12px]"
-          data-testid="bookings-template-filter-chip"
-        >
-          <span className="text-slate-500">
-            Filtered by{" "}
-            {activeTemplateFilter.kind === "call" ? "call" : "email"} template:
-          </span>
-          <button
-            type="button"
-            onClick={() => setTemplateFilter(null)}
-            data-testid="button-clear-bookings-template-filter"
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
-            style={{
-              backgroundColor: BRAND_SOFT,
-              color: BRAND_DEEP,
-            }}
-            title="Clear template filter"
-            aria-label={`Clear template filter "${activeTemplateFilter.name}"`}
+      {activeTemplateFilter !== null && (() => {
+        // The chip's name is a snapshot — it was captured onto the
+        // timeline entry when the call/email was logged, and the
+        // table filter still matches by that snapshot string. If the
+        // template has since been renamed or removed in the
+        // templates panel, the filter still works for any other
+        // timelines that share that snapshot, but the chip's name
+        // won't show up in the templates list anymore. We surface a
+        // small icon + label in that case so admins know why,
+        // without breaking the snapshot-based match.
+        //
+        // We only flag the chip as "missing" when the catalog for
+        // the filter's channel was threaded in by the parent AND
+        // doesn't contain a template with this name. Without the
+        // catalog we can't tell renamed/removed apart from "we just
+        // don't know", so we stay quiet to avoid a false-positive
+        // hint on older call-sites / tests that don't pass the
+        // catalogs. Scoping by `kind` (call vs email) avoids a
+        // cross-channel false negative when a same-named template
+        // happens to exist in the other channel.
+        const channelCatalog =
+          activeTemplateFilter.kind === "call" ? callTemplates : emailTemplates;
+        const haveCatalog = channelCatalog !== undefined;
+        const stillExists = (channelCatalog ?? []).some(
+          (t) => t.name === activeTemplateFilter.name,
+        );
+        const isMissing = haveCatalog && !stillExists;
+        return (
+          <div
+            className="flex items-center gap-2 text-[12px]"
+            data-testid="bookings-template-filter-chip"
           >
-            <span>{activeTemplateFilter.name}</span>
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
+            <span className="text-slate-500">
+              Filtered by{" "}
+              {activeTemplateFilter.kind === "call" ? "call" : "email"} template:
+            </span>
+            <button
+              type="button"
+              onClick={() => setTemplateFilter(null)}
+              data-testid="button-clear-bookings-template-filter"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+              style={{
+                backgroundColor: BRAND_SOFT,
+                color: BRAND_DEEP,
+              }}
+              title="Clear template filter"
+              aria-label={`Clear template filter "${activeTemplateFilter.name}"`}
+            >
+              <span>{activeTemplateFilter.name}</span>
+              <X className="h-3 w-3" />
+            </button>
+            {isMissing && (
+              <span
+                role="img"
+                aria-label={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+                title={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+                data-testid="bookings-template-filter-missing-hint"
+                className="inline-flex items-center gap-1 text-slate-500"
+              >
+                <Info className="h-3.5 w-3.5" />
+                <span className="text-[11px]">No longer in templates catalog</span>
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
