@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Sunrise,
@@ -13,19 +13,14 @@ import {
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import { useBookingSession } from "../../../state/bookingSession";
 import { isBeThereMethod } from "../../../state/accessMethodCatalog";
-import { isPastDate, unitCity } from "../../../state/bookingHelpers";
-import {
-  getLiveBookingsVersion,
-  subscribeLiveBookings,
-} from "../../../state/adminMockData";
+import { unitCity } from "../../../state/bookingHelpers";
 import {
   accessRecapLabel,
-  alreadyScheduledByOther,
-  resolveCustomerSlotData,
   WINDOW_TIME_RANGE,
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { Lock } from "lucide-react";
 
 const BRAND = "#ED017F";
@@ -45,7 +40,6 @@ function dayHasAvailable(day: Day): boolean {
 
 export function SlotsDesktop() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [ack, setAck] = useState(false);
   const [weekIdx, setWeekIdx] = useState(0);
   const session = useBookingSession();
@@ -58,27 +52,17 @@ export function SlotsDesktop() {
   // so on. Falls back to "Sydney" when no unit is known.
   const cityLabel = unitCity(session.unit_id);
 
-  const slotData = useMemo(
-    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
-    [session.unit_id, jobMinutes],
-  );
-  const rollout = slotData.rollout;
-  const liveBookingsVersion = useSyncExternalStore(
-    subscribeLiveBookings,
-    getLiveBookingsVersion,
-    getLiveBookingsVersion,
-  );
-  const lockedByOther = useMemo(
-    () => {
-      void liveBookingsVersion;
-      return alreadyScheduledByOther(session.unit_id);
-    },
-    [session.unit_id, liveBookingsVersion],
-  );
-  const visibleDays = useMemo(
-    () => slotData.days.filter((d) => !isPastDate(d.date)),
-    [slotData.days],
-  );
+  // Shared customer slot-picker wiring (Task #214): rollout
+  // resolution, live-bookings subscription, past-date filtering, and
+  // the selected-slot invalidation effect all live in one place so
+  // every picker stays in sync.
+  const {
+    rollout,
+    visibleDays,
+    lockedByOther,
+    selected: selectedSlotId,
+    setSelected: setSelectedSlotId,
+  } = useCustomerSlotPicker(session.unit_id, jobMinutes);
 
   // Paginate by 6-day weeks so wide rollouts (the demo runs 12+ days)
   // don't overflow the 6-up grid. Mirrors the previous picker rhythm.
@@ -97,16 +81,12 @@ export function SlotsDesktop() {
     [visibleDays, selectedDate],
   );
 
+  // Clear the be-there ack the moment the shared hook drops the
+  // selected slot (rollout shifted, job grew, etc.) so Confirm can't
+  // re-enable on a stale ack.
   useEffect(() => {
-    if (!selectedSlotId) return;
-    const stillValid = visibleDays
-      .flatMap(dayWindows)
-      .some((s) => s.id === selectedSlotId && s.status === "available");
-    if (!stillValid) {
-      setSelectedSlotId(null);
-      setAck(false);
-    }
-  }, [selectedSlotId, visibleDays]);
+    if (!selectedSlotId) setAck(false);
+  }, [selectedSlotId]);
 
   useEffect(() => {
     if (selectedDate && !activeDay) {
@@ -114,7 +94,7 @@ export function SlotsDesktop() {
       setSelectedSlotId(null);
       setAck(false);
     }
-  }, [selectedDate, activeDay]);
+  }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const monthLabel = useMemo(() => {
     if (!week.length) return "";

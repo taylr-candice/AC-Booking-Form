@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,21 +11,15 @@ import {
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
-import { isPastDate } from "../../../state/bookingHelpers";
 import { useBookingSession } from "../../../state/bookingSession";
 import { isBeThereMethod } from "../../../state/accessMethodCatalog";
 import {
-  getLiveBookingsVersion,
-  subscribeLiveBookings,
-} from "../../../state/adminMockData";
-import {
   accessRecapLabel,
-  alreadyScheduledByOther,
-  resolveCustomerSlotData,
   type CustomerDay,
   type CustomerSlot,
   WINDOW_TIME_RANGE,
 } from "./customerSlotData";
+import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -44,7 +38,6 @@ function dayHasAvailable(day: Day): boolean {
 
 export function SlotsMobileLite() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [ack, setAck] = useState(false);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
@@ -52,43 +45,29 @@ export function SlotsMobileLite() {
   const beThere = isBeThereMethod(accessMethod);
   const recapLabel = accessRecapLabel(accessMethod);
 
-  const slotData = useMemo(
-    () => resolveCustomerSlotData(session.unit_id, jobMinutes),
-    [session.unit_id, jobMinutes],
-  );
-  const rollout = slotData.rollout;
-  const liveBookingsVersion = useSyncExternalStore(
-    subscribeLiveBookings,
-    getLiveBookingsVersion,
-    getLiveBookingsVersion,
-  );
-  const lockedByOther = useMemo(
-    () => {
-      void liveBookingsVersion;
-      return alreadyScheduledByOther(session.unit_id);
-    },
-    [session.unit_id, liveBookingsVersion],
-  );
-  const visibleDays = useMemo(
-    () => slotData.days.filter((d) => !isPastDate(d.date)),
-    [slotData.days],
-  );
+  // Shared customer slot-picker wiring (Task #214): rollout
+  // resolution, live-bookings subscription, past-date filtering, and
+  // the selected-slot invalidation effect all live in one place so
+  // every picker stays in sync.
+  const {
+    rollout,
+    visibleDays,
+    lockedByOther,
+    selected: selectedSlotId,
+    setSelected: setSelectedSlotId,
+  } = useCustomerSlotPicker(session.unit_id, jobMinutes);
 
   const activeDay = useMemo(
     () => visibleDays.find((d) => d.date === selectedDate) ?? null,
     [visibleDays, selectedDate],
   );
 
+  // Clear the be-there ack the moment the shared hook drops the
+  // selected slot (rollout shifted, job grew, etc.) so Confirm can't
+  // re-enable on a stale ack.
   useEffect(() => {
-    if (!selectedSlotId) return;
-    const stillValid = visibleDays
-      .flatMap(dayWindows)
-      .some((s) => s.id === selectedSlotId && s.status === "available");
-    if (!stillValid) {
-      setSelectedSlotId(null);
-      setAck(false);
-    }
-  }, [selectedSlotId, visibleDays]);
+    if (!selectedSlotId) setAck(false);
+  }, [selectedSlotId]);
 
   useEffect(() => {
     if (selectedDate && !activeDay) {
@@ -96,7 +75,7 @@ export function SlotsMobileLite() {
       setSelectedSlotId(null);
       setAck(false);
     }
-  }, [selectedDate, activeDay]);
+  }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const canConfirm =
     !!selectedSlotId && !lockedByOther && (!beThere || ack);
