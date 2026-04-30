@@ -1,8 +1,10 @@
 /**
  * Shared source-row highlight machinery for the admin list views
- * (BookingsView, AwaitingCoordinationView, RolloutsView, and any
- * future list view that wants the same "land on a clearly marked
- * source row after a pivot" behaviour).
+ * (BookingsView, AwaitingCoordinationView, RolloutsView, BuildingsView)
+ * AND the templates panels (CallTemplatesView, EmailTemplatesView)
+ * — every "land on a clearly marked source row after a pivot" surface
+ * in the admin shell resolves through this single hook so a future
+ * tweak (palette, animation, a11y) can't drift between consumers.
  *
  * Consolidates the byte-identical state machine that was previously
  * copy-pasted into each consumer view: a one-shot `initialFocusedRowId`
@@ -12,6 +14,22 @@
  * dismiss listener. Pulling it here means a future tweak — respecting
  * `prefers-reduced-motion` from JS, lengthening the pulse, swapping
  * the dismiss trigger, etc. — happens in one place instead of three+.
+ *
+ * Two dismissal strategies are supported via {@link UseFocusedRowHighlightOptions.dismissal}:
+ *
+ *   - `"interaction"` (default): the seed is one-shot — focus is
+ *     dismissed by the next global mousedown / keydown / scroll, and
+ *     the parent is notified via `onFocusedRowConsumed` so it can
+ *     clear its seed slot. Used by every list view.
+ *
+ *   - `"controlled"`: the focused-row id mirrors the prop directly,
+ *     no global dismiss listeners are installed, and
+ *     `onFocusedRowConsumed` is never fired — the parent owns the
+ *     full lifecycle (e.g. the templates panels keep the highlight
+ *     until the AdminApp shell clears `focusedTemplateId` on the
+ *     next sidebar nav). The pulse-clear timer + scroll-into-view
+ *     still fire on each fresh non-null id so the visual + a11y
+ *     contract stays identical across modes.
  *
  * The persistent BRAND_SOFT background tint and the
  * `template-row-focus-pulse` class are owned by the consumer view's
@@ -49,17 +67,33 @@ export type FocusedRowProps<T extends HTMLElement> = {
   style: CSSProperties | undefined;
 };
 
+/**
+ * Dismissal strategies — see the module doc comment for the full
+ * contract. New consumers should pick the one that matches their
+ * pivot lifecycle rather than re-introducing a bespoke state
+ * machine.
+ */
+export type FocusedRowDismissal = "interaction" | "controlled";
+
 export type UseFocusedRowHighlightResult<T extends HTMLElement> = {
   focusedRowProps: (id: string) => FocusedRowProps<T>;
+  /** Programmatically scroll the row registered under `id` into view
+   *  using the same options the focus-seed effect uses, so external
+   *  callers (e.g. the templates panel's "Default <kind> template"
+   *  header link) can reuse the hook's row-ref map rather than
+   *  threading a parallel ref map through the view. No-op when
+   *  `scrollIntoView` is unavailable (happy-dom / jsdom test
+   *  environments) or no row is registered under the id yet. */
+  scrollRowIntoView: (id: string) => void;
 };
 
 /**
- * One hook per list view. Pass the one-shot `initialFocusedRowId`
- * the parent hands down, and the matching `onFocusedRowConsumed`
- * callback so the parent can clear its seed slot the moment we've
- * absorbed it. Optional both — omitting them is equivalent to "no
- * row is ever pre-focused", which keeps consumers that don't yet
- * wire a pivot source compiling.
+ * One hook per list / templates view. Pass the
+ * `initialFocusedRowId` the parent hands down, the matching
+ * `onFocusedRowConsumed` callback (interaction mode only), and the
+ * dismissal strategy. All three are optional — omitting the seed is
+ * equivalent to "no row is ever pre-focused", which keeps consumers
+ * that don't yet wire a pivot source compiling.
  *
  * The generic `T` parameter pins the row element type so the ref
  * callback narrows correctly at the call site (e.g.
@@ -70,33 +104,54 @@ export function useFocusedRowHighlight<T extends HTMLElement = HTMLElement>(
   opts: {
     initialFocusedRowId?: string | null;
     onFocusedRowConsumed?: () => void;
+    dismissal?: FocusedRowDismissal;
   } = {},
 ): UseFocusedRowHighlightResult<T> {
-  const { initialFocusedRowId, onFocusedRowConsumed } = opts;
-  // Seeded from `initialFocusedRowId` so first paint already carries
-  // the highlight; re-seeded via the effect below if a fresh
-  // non-null value lands mid-life. Dismissed on first interaction
-  // (scroll / click / keydown) so it doesn't linger.
-  const [focusedRowId, setFocusedRowId] = useState<string | null>(
-    initialFocusedRowId ?? null,
-  );
+  const {
+    initialFocusedRowId,
+    onFocusedRowConsumed,
+    dismissal = "interaction",
+  } = opts;
+  const isControlled = dismissal === "controlled";
+  // Interaction mode: focus is seeded from `initialFocusedRowId` and
+  // then owned internally — global mousedown / scroll / keydown
+  // dismisses it. Controlled mode: focus mirrors the prop directly,
+  // the parent owns the lifecycle (e.g. the templates panel keeps
+  // the highlight until the AdminApp shell clears `focusedTemplateId`
+  // on sidebar nav). The internal `useState` is still allocated in
+  // controlled mode (cheap, and avoids hook-order branches), but
+  // `focusedRowId` below resolves to the prop value so writes to it
+  // would have no effect — we never call the setter outside the
+  // interaction-mode branches.
+  const [internalFocusedRowId, setInternalFocusedRowId] = useState<
+    string | null
+  >(initialFocusedRowId ?? null);
+  const focusedRowId = isControlled
+    ? initialFocusedRowId ?? null
+    : internalFocusedRowId;
   const [pulseRowId, setPulseRowId] = useState<string | null>(null);
   const rowRefs = useRef<Map<string, T | null>>(new Map());
 
   // Re-apply when the parent hands us a fresh non-null seed mid-life
   // (admin pivots, dismisses, navigates away, pivots again into the
-  // same component instance). Notify the parent so it can clear its
-  // slot — otherwise unrelated re-renders would re-apply the
-  // highlight after dismissal.
+  // same component instance). Interaction mode notifies the parent
+  // so it can clear its seed slot — otherwise unrelated re-renders
+  // would re-apply the highlight after dismissal. Controlled mode
+  // skips both the internal state write (the prop IS the source of
+  // truth) and the consume callback (the parent doesn't want to
+  // clear its slot — it owns the full lifecycle).
   useEffect(() => {
     if (initialFocusedRowId) {
-      setFocusedRowId(initialFocusedRowId);
+      if (!isControlled) {
+        setInternalFocusedRowId(initialFocusedRowId);
+        onFocusedRowConsumed?.();
+      }
       setPulseRowId(initialFocusedRowId);
-      onFocusedRowConsumed?.();
     }
-    // Depend on seed value only, not callback identity — re-running
-    // on consume-callback re-creation would defeat the one-shot
-    // handoff invariant.
+    // Depend on seed value only, not callback identity or mode —
+    // re-running on consume-callback re-creation would defeat the
+    // one-shot handoff invariant in interaction mode, and the mode
+    // flag is fixed for the lifetime of a hook instance anyway.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFocusedRowId]);
 
@@ -124,11 +179,14 @@ export function useFocusedRowHighlight<T extends HTMLElement = HTMLElement>(
   // mid-flight, and a subsequent pivot re-arms a fresh dismissal.
   // Filter changes flow through clicks / keystrokes / selects that
   // already fire these events, so the global listener catches them
-  // without us enumerating every filter knob.
+  // without us enumerating every filter knob. Skipped entirely in
+  // controlled mode — the parent owns dismissal there (e.g. the
+  // templates panel keeps focus until the next sidebar nav).
   useEffect(() => {
+    if (isControlled) return;
     if (!focusedRowId) return;
     function dismiss() {
-      setFocusedRowId(null);
+      setInternalFocusedRowId(null);
     }
     window.addEventListener("scroll", dismiss, {
       passive: true,
@@ -141,7 +199,7 @@ export function useFocusedRowHighlight<T extends HTMLElement = HTMLElement>(
       window.removeEventListener("mousedown", dismiss, true);
       window.removeEventListener("keydown", dismiss, true);
     };
-  }, [focusedRowId]);
+  }, [focusedRowId, isControlled]);
 
   function focusedRowProps(id: string): FocusedRowProps<T> {
     const isFocused = focusedRowId === id;
@@ -157,5 +215,12 @@ export function useFocusedRowHighlight<T extends HTMLElement = HTMLElement>(
     };
   }
 
-  return { focusedRowProps };
+  function scrollRowIntoView(id: string) {
+    const row = rowRefs.current.get(id);
+    if (row && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }
+
+  return { focusedRowProps, scrollRowIntoView };
 }

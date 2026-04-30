@@ -34,7 +34,8 @@ import { FormField } from "./atoms";
 import { LatestTouchBadge } from "./LatestTouchBadge";
 import { TemplateUsagePopover } from "./TemplateUsagePopover";
 import { TemplateUsageSparkline } from "./TemplateUsageSparkline";
-import { BRAND, BRAND_SOFT } from "./theme";
+import { BRAND } from "./theme";
+import { useFocusedRowHighlight } from "./useFocusedRowHighlight";
 
 /**
  * Sort modes for the Email templates panel toggle (Task #170 + #193 +
@@ -184,23 +185,25 @@ export function EmailTemplatesView({
   );
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const [liveMessage, setLiveMessage] = useState<string>("");
-  // Single shared ref-map covering both row-scroll callers:
-  //   - the "Default Email template" header link (transient amber
-  //     highlight that auto-clears),
-  //   - the AdminApp round-trip from a booking timeline chip
-  //     (Task #155, persistent BRAND_SOFT highlight cleared on
-  //     sidebar nav).
-  const rowRefs = useRef<Map<string, HTMLTableRowElement | null>>(new Map());
+  // Source-row highlight (Task #155 + #165 + #231). Routed through the
+  // shared `useFocusedRowHighlight` hook in `controlled` mode so this
+  // panel — and the mirror CallTemplatesView — share the exact same
+  // BRAND_SOFT tint, `template-row-focus-pulse` keyframe, and
+  // 1100ms pulse-clear timer the four list views (BookingsView,
+  // AwaitingCoordinationView, RolloutsView, BuildingsView) already
+  // resolve through. `controlled` mode preserves the templates-panel
+  // lifecycle: the highlight stays until the AdminApp shell clears
+  // `focusedTemplateId` on the next sidebar nav (no global mousedown
+  // / scroll / keydown dismissal). The hook also owns the row-ref
+  // map so the "Default Email template" header link can scroll the
+  // matching row into view via {@link scrollRowIntoView} below
+  // without a parallel ref map.
+  const { focusedRowProps, scrollRowIntoView } =
+    useFocusedRowHighlight<HTMLTableRowElement>({
+      initialFocusedRowId: focusedTemplateId,
+      dismissal: "controlled",
+    });
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  // One-shot pulse marker (Task #165). Set whenever the AdminApp
-  // shell hands us a fresh `focusedTemplateId` so the matching row
-  // briefly flashes a deeper-pink background on top of the persistent
-  // BRAND_SOFT tint — making the landing row unmistakable on long
-  // template lists. Tied to the focus-id change (not the scroll
-  // position), so scrolling away and back doesn't replay it. Reduced-
-  // motion users still get the static BRAND_SOFT highlight; the CSS
-  // `prefers-reduced-motion` rule simply suppresses the animation.
-  const [pulseId, setPulseId] = useState<string | null>(null);
 
   // Auto-clear the row highlight a moment after it's set, so the panel
   // stays visually quiet once ops has spotted the matching row.
@@ -209,32 +212,6 @@ export function EmailTemplatesView({
     const t = setTimeout(() => setHighlightedId(null), 1500);
     return () => clearTimeout(t);
   }, [highlightedId]);
-
-  // Whenever the AdminApp shell hands us a fresh focus id (round-trip
-  // from a booking timeline chip), scroll the matching row into view
-  // so the admin doesn't have to hunt for it on long template lists,
-  // and trigger the one-shot pulse marker so the landing is obvious.
-  // We intentionally don't drop the persistent focus highlight here —
-  // it stays until the user navigates away via the sidebar so a quick
-  // scroll back doesn't lose the marker.
-  useEffect(() => {
-    if (!focusedTemplateId) return;
-    const row = rowRefs.current.get(focusedTemplateId);
-    if (row && typeof row.scrollIntoView === "function") {
-      row.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
-    setPulseId(focusedTemplateId);
-  }, [focusedTemplateId]);
-
-  // Drop the one-shot pulse marker once the animation has had time to
-  // play. 1100ms gives the 1s keyframe a small buffer so the class is
-  // still on the row through the final frame. The marker re-arms the
-  // next time `focusedTemplateId` changes.
-  useEffect(() => {
-    if (!pulseId) return;
-    const t = setTimeout(() => setPulseId(null), 1100);
-    return () => clearTimeout(t);
-  }, [pulseId]);
 
   // Sort toggle (Task #170 + #193). `default` keeps the natural
   // catalog order; `mostUsed` re-sorts the non-default rows by the
@@ -306,10 +283,7 @@ export function EmailTemplatesView({
 
   const focusDefaultRow = () => {
     if (!defaultTemplate) return;
-    const row = rowRefs.current.get(defaultTemplate.id);
-    if (row && typeof row.scrollIntoView === "function") {
-      row.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
+    scrollRowIntoView(defaultTemplate.id);
     setHighlightedId(defaultTemplate.id);
   };
 
@@ -527,8 +501,8 @@ export function EmailTemplatesView({
                 const bookings = usageBookings?.[t.id] ?? [];
                 const latestTouch = latestTouchCounts?.[t.id] ?? 0;
                 const trend = usageTrends?.[t.id];
-                const isFocused = focusedTemplateId === t.id;
-                const isPulsing = pulseId === t.id;
+                const focusProps = focusedRowProps(t.id);
+                const isFocused = focusProps["data-focused"] === "true";
                 const isDragging = draggingId === t.id;
                 const isDropTarget =
                   dragOverId === t.id &&
@@ -538,15 +512,13 @@ export function EmailTemplatesView({
                 return (
                   <tr
                     key={t.id}
-                    ref={(el) => {
-                      rowRefs.current.set(t.id, el);
-                    }}
+                    ref={focusProps.ref}
                     data-testid={`email-template-row-${t.id}`}
                     data-highlighted={
                       highlightedId === t.id ? "true" : "false"
                     }
-                    data-focused={isFocused ? "true" : undefined}
-                    data-pulsing={isPulsing ? "true" : undefined}
+                    data-focused={focusProps["data-focused"]}
+                    data-pulsing={focusProps["data-pulsing"]}
                     data-dragging={isDragging ? "true" : undefined}
                     data-drop-target={isDropTarget ? "true" : undefined}
                     draggable={!t.isDefault && sortMode === "default"}
@@ -604,15 +576,20 @@ export function EmailTemplatesView({
                         ? "border-b border-slate-100 last:border-b-0 align-top bg-slate-50 outline outline-2 outline-offset-[-2px] transition-colors"
                         : highlightedId === t.id
                         ? "border-b border-slate-100 last:border-b-0 align-top bg-amber-50 transition-colors"
-                        : `border-b border-slate-100 last:border-b-0 align-top transition-colors${
-                            isPulsing ? " template-row-focus-pulse" : ""
-                          }${isDragging ? " opacity-50" : ""}${
+                        : `border-b border-slate-100 last:border-b-0 align-top transition-colors${focusProps.pulseClassName}${isDragging ? " opacity-50" : ""}${
                             isDropTarget ? " outline outline-2 outline-offset-[-2px]" : ""
                           }`
                     }
                     style={{
+                      // Pull the BRAND_SOFT focus tint straight from
+                      // the shared hook so a future palette tweak in
+                      // `useFocusedRowHighlight` lands here without an
+                      // extra edit. Suppressed while the amber default-
+                      // header-link highlight or the drag-drop outline
+                      // are active — those two override the focus
+                      // tint by design.
                       ...(isFocused && highlightedId !== t.id && !isDropTarget
-                        ? { backgroundColor: BRAND_SOFT }
+                        ? focusProps.style
                         : null),
                       ...(isDropTarget ? { outlineColor: BRAND } : null),
                       ...(isDragging ? { opacity: 0.5 } : null),

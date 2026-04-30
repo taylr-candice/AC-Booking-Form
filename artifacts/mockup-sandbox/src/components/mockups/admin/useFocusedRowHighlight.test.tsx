@@ -342,3 +342,296 @@ describe("useFocusedRowHighlight — lifecycle", () => {
     expect(row1.style.backgroundColor).toBe(probe.style.backgroundColor);
   });
 });
+
+/**
+ * Task #231: Controlled-mode contract for the Call/EmailTemplatesView
+ * panels. The templates panels reuse the same hook but the parent
+ * (AdminApp) keeps `focusedTemplateId` set until the next sidebar
+ * nav, so the hook must NOT install global dismiss listeners and
+ * must NOT fire `onFocusedRowConsumed` — the prop IS the source of
+ * truth, not a one-shot seed. The pulse-clear timer + scroll-into-
+ * view + BRAND_SOFT tint stay identical to interaction mode so the
+ * visual + a11y contract pinned by the lifecycle tests above flows
+ * through both consumer surfaces from the same module.
+ */
+function ControlledHarness({
+  focusedRowId,
+  onFocusedRowConsumed,
+  rowIds = ["row-1", "row-2"],
+}: {
+  focusedRowId: string | null;
+  onFocusedRowConsumed?: () => void;
+  rowIds?: ReadonlyArray<string>;
+}) {
+  const { focusedRowProps } = useFocusedRowHighlight<HTMLDivElement>({
+    initialFocusedRowId: focusedRowId,
+    onFocusedRowConsumed,
+    dismissal: "controlled",
+  });
+  return (
+    <div>
+      {rowIds.map((id) => {
+        const props = focusedRowProps(id);
+        return (
+          <div
+            key={id}
+            data-testid={`row-${id}`}
+            ref={props.ref}
+            data-focused={props["data-focused"]}
+            data-pulsing={props["data-pulsing"]}
+            className={`row-base${props.pulseClassName}`}
+            style={props.style}
+          >
+            {id}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+describe("useFocusedRowHighlight — controlled dismissal", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("seeds focus + pulse + BRAND_SOFT on the matching row when the prop is non-null", () => {
+    const { getByTestId } = render(
+      <ControlledHarness focusedRowId="row-1" />,
+    );
+    const row1 = getByTestId("row-row-1") as HTMLDivElement;
+    expect(row1.getAttribute("data-focused")).toBe("true");
+    expect(row1.getAttribute("data-pulsing")).toBe("true");
+    expect(row1.className).toContain("template-row-focus-pulse");
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = BRAND_SOFT;
+    expect(row1.style.backgroundColor).toBe(probe.style.backgroundColor);
+  });
+
+  it("does NOT call onFocusedRowConsumed when a non-null prop arrives (parent owns the lifecycle)", () => {
+    const consumed = vi.fn();
+    render(
+      <ControlledHarness focusedRowId="row-1" onFocusedRowConsumed={consumed} />,
+    );
+    expect(consumed).not.toHaveBeenCalled();
+  });
+
+  it("does NOT dismiss on a global mousedown (parent decides when to clear)", () => {
+    const { getByTestId } = render(
+      <ControlledHarness focusedRowId="row-1" />,
+    );
+    const row1 = getByTestId("row-row-1");
+    expect(row1.getAttribute("data-focused")).toBe("true");
+
+    act(() => {
+      document.body.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true }),
+      );
+    });
+
+    // Focus persists — only the parent flipping the prop to null
+    // can clear it in controlled mode.
+    expect(row1.getAttribute("data-focused")).toBe("true");
+  });
+
+  it("does NOT dismiss on a global keydown or scroll", () => {
+    const { getByTestId } = render(
+      <ControlledHarness focusedRowId="row-1" />,
+    );
+    const row1 = getByTestId("row-row-1");
+    expect(row1.getAttribute("data-focused")).toBe("true");
+
+    act(() => {
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowDown" }),
+      );
+    });
+    act(() => {
+      window.dispatchEvent(new Event("scroll"));
+    });
+
+    expect(row1.getAttribute("data-focused")).toBe("true");
+  });
+
+  it("clears focus + tint when the parent flips the prop back to null", () => {
+    function Driver() {
+      const [focused, setFocused] = useState<string | null>("row-1");
+      return (
+        <>
+          <button
+            type="button"
+            data-testid="clear"
+            onClick={() => setFocused(null)}
+          >
+            clear
+          </button>
+          <ControlledHarness focusedRowId={focused} />
+        </>
+      );
+    }
+    const { getByTestId } = render(<Driver />);
+    const row1 = getByTestId("row-row-1") as HTMLDivElement;
+    expect(row1.getAttribute("data-focused")).toBe("true");
+
+    act(() => {
+      getByTestId("clear").click();
+    });
+
+    expect(row1.getAttribute("data-focused")).toBeNull();
+    expect(row1.style.backgroundColor).toBe("");
+  });
+
+  it("re-arms the pulse on the new row when the parent swaps the focused id mid-life", () => {
+    function Driver() {
+      const [focused, setFocused] = useState<string | null>("row-1");
+      return (
+        <>
+          <button
+            type="button"
+            data-testid="swap"
+            onClick={() => setFocused("row-2")}
+          >
+            swap
+          </button>
+          <ControlledHarness focusedRowId={focused} />
+        </>
+      );
+    }
+    const { getByTestId } = render(<Driver />);
+    expect(getByTestId("row-row-1").getAttribute("data-focused")).toBe("true");
+    expect(getByTestId("row-row-1").getAttribute("data-pulsing")).toBe("true");
+
+    // Let the first pulse expire so the next swap demonstrably
+    // re-arms it on a fresh row rather than coasting on the
+    // outgoing timer.
+    act(() => {
+      vi.advanceTimersByTime(1200);
+    });
+    expect(getByTestId("row-row-1").getAttribute("data-pulsing")).toBeNull();
+
+    act(() => {
+      getByTestId("swap").click();
+    });
+
+    expect(getByTestId("row-row-1").getAttribute("data-focused")).toBeNull();
+    expect(getByTestId("row-row-2").getAttribute("data-focused")).toBe("true");
+    expect(getByTestId("row-row-2").getAttribute("data-pulsing")).toBe("true");
+    expect(getByTestId("row-row-2").className).toContain(
+      "template-row-focus-pulse",
+    );
+  });
+
+  it("clears the pulse marker after ~1100ms while keeping data-focused (matches interaction mode)", () => {
+    const { getByTestId } = render(
+      <ControlledHarness focusedRowId="row-1" />,
+    );
+    const row1 = getByTestId("row-row-1") as HTMLDivElement;
+    expect(row1.getAttribute("data-pulsing")).toBe("true");
+
+    act(() => {
+      vi.advanceTimersByTime(1100);
+    });
+
+    // Pulse drops, but the BRAND_SOFT tint + data-focused stay
+    // because the parent still has the prop set — exactly how the
+    // templates panels keep the highlight visible until sidebar nav.
+    expect(row1.getAttribute("data-pulsing")).toBeNull();
+    expect(row1.className).not.toContain("template-row-focus-pulse");
+    expect(row1.getAttribute("data-focused")).toBe("true");
+    expect(row1.style.backgroundColor).toBeTruthy();
+  });
+
+  it("calls scrollIntoView on the focused row when a fresh non-null prop lands", () => {
+    const scrollSpy = vi.fn();
+    const proto = Element.prototype as unknown as {
+      scrollIntoView?: (...args: unknown[]) => void;
+    };
+    const original = proto.scrollIntoView;
+    proto.scrollIntoView = scrollSpy;
+    try {
+      const { getByTestId } = render(
+        <ControlledHarness focusedRowId="row-1" />,
+      );
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect(scrollSpy.mock.contexts[0]).toBe(getByTestId("row-row-1"));
+      expect(scrollSpy).toHaveBeenCalledWith({
+        block: "center",
+        behavior: "smooth",
+      });
+    } finally {
+      if (original) {
+        proto.scrollIntoView = original;
+      } else {
+        delete proto.scrollIntoView;
+      }
+    }
+  });
+
+  it("exposes scrollRowIntoView so external callers (default-header link) can scroll a row by id", () => {
+    const scrollSpy = vi.fn();
+    const proto = Element.prototype as unknown as {
+      scrollIntoView?: (...args: unknown[]) => void;
+    };
+    const original = proto.scrollIntoView;
+    proto.scrollIntoView = scrollSpy;
+    try {
+      // Mount with no seed so the scroll-on-seed effect doesn't fire,
+      // then explicitly invoke `scrollRowIntoView` from a click
+      // handler — mirrors how Call/EmailTemplatesView's "Default
+      // <kind> template" header link calls it.
+      function ExternalCallerHarness() {
+        const { focusedRowProps, scrollRowIntoView } =
+          useFocusedRowHighlight<HTMLDivElement>({
+            dismissal: "controlled",
+          });
+        return (
+          <div>
+            <button
+              type="button"
+              data-testid="scroll-to-row-2"
+              onClick={() => scrollRowIntoView("row-2")}
+            >
+              scroll
+            </button>
+            {["row-1", "row-2"].map((id) => {
+              const props = focusedRowProps(id);
+              return (
+                <div
+                  key={id}
+                  data-testid={`row-${id}`}
+                  ref={props.ref}
+                >
+                  {id}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+      const { getByTestId } = render(<ExternalCallerHarness />);
+      // No seed, so no scroll yet.
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      act(() => {
+        getByTestId("scroll-to-row-2").click();
+      });
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect(scrollSpy.mock.contexts[0]).toBe(getByTestId("row-row-2"));
+      expect(scrollSpy).toHaveBeenCalledWith({
+        block: "center",
+        behavior: "smooth",
+      });
+    } finally {
+      if (original) {
+        proto.scrollIntoView = original;
+      } else {
+        delete proto.scrollIntoView;
+      }
+    }
+  });
+});
