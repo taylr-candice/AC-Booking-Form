@@ -244,22 +244,6 @@ export function SlotsMobileLite() {
                   )}
                 </div>
 
-                {beThere && selectedSlotId && (
-                  <label
-                    className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700"
-                    data-testid="ack-row-mobile-lite"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={ack}
-                      onChange={(e) => setAck(e.target.checked)}
-                      className="mt-0.5 h-3.5 w-3.5 cursor-pointer"
-                      style={{ accentColor: BRAND }}
-                      data-testid="ack-checkbox-mobile-lite"
-                    />
-                    <span>I'll be available for the entire window.</span>
-                  </label>
-                )}
               </div>
             )}
 
@@ -274,9 +258,25 @@ export function SlotsMobileLite() {
         )}
       </div>
 
-      {/* Docked CTA — see SlotsMobile for the rationale on placing
-          the cancellation ack directly above Confirm (Task #121). */}
+      {/* Docked CTA — both acks sit directly above Confirm as a single
+          "checks before you confirm" group (Task #121). */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
+        {beThere && selectedSlotId && (
+          <label
+            className="mb-2 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700"
+            data-testid="ack-row-mobile-lite"
+          >
+            <input
+              type="checkbox"
+              checked={ack}
+              onChange={(e) => setAck(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer"
+              style={{ accentColor: ack ? "#5FBB97" : BRAND }}
+              data-testid="ack-checkbox-mobile-lite"
+            />
+            <span>I'll be available for the entire window.</span>
+          </label>
+        )}
         <TermsAckRow
           checked={cancellationAck}
           onChange={(next) =>

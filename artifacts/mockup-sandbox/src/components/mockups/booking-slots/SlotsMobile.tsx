@@ -253,27 +253,6 @@ export function SlotsMobile() {
                   )}
                 </div>
 
-                {/* Optional access acknowledgement — only for be-there
-                    methods, since they're the only ones who'd actually
-                    be waiting around for the technician. */}
-                {beThere && selectedSlotId && (
-                  <label
-                    className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700"
-                    data-testid="ack-row-mobile"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={ack}
-                      onChange={(e) => setAck(e.target.checked)}
-                      className="mt-0.5 h-3.5 w-3.5 cursor-pointer"
-                      style={{ accentColor: BRAND }}
-                      data-testid="ack-checkbox-mobile"
-                    />
-                    <span>
-                      I'll be available for the entire window.
-                    </span>
-                  </label>
-                )}
               </div>
             )}
 
@@ -288,13 +267,29 @@ export function SlotsMobile() {
         )}
       </div>
 
-      {/* Docked CTA — cancellation ack always sits directly above
-          Confirm so the customer is reading the same line they're
-          gating on, regardless of whether a slot has been picked yet
-          (Task #121). When the be-there ack is also showing it sits
-          inside the body above this panel, giving a consistent
-          "checks before you confirm" stack. */}
+      {/* Docked CTA — both acks sit directly above Confirm as a single
+          "checks before you confirm" group (Task #121). The be-there
+          ack only shows for be-there access methods + once a slot is
+          picked; the cancellation ack is always present so the
+          customer sees what they're agreeing to before tapping a
+          slot. */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
+        {beThere && selectedSlotId && (
+          <label
+            className="mb-2 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700"
+            data-testid="ack-row-mobile"
+          >
+            <input
+              type="checkbox"
+              checked={ack}
+              onChange={(e) => setAck(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer"
+              style={{ accentColor: ack ? "#5FBB97" : BRAND }}
+              data-testid="ack-checkbox-mobile"
+            />
+            <span>I'll be available for the entire window.</span>
+          </label>
+        )}
         <TermsAckRow
           checked={cancellationAck}
           onChange={(next) =>

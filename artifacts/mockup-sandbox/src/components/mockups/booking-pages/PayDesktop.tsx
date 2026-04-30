@@ -44,9 +44,6 @@ export function PayDesktop() {
 
   const total = computeBookingTotal(session);
   const isCoordination = isCoordinationFlow(session);
-  // Task #121: cancellation ack now lives on the Schedule step, so by
-  // the time the customer reaches Pay it's already true. Pay no longer
-  // renders a tickbox or derives `ack`.
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
   const otherServices = resolveOtherServiceQuantities(
@@ -261,19 +258,16 @@ export function PayDesktop() {
               )}
             </div>
 
-            {/* Short support-email line — the full cancellation
-                policy now lives behind the Schedule-step ack
-                (Task #121). We keep this single contact line on Pay
-                so customers tweaking payment details still know where
-                to write if they need to reschedule. */}
+            {/* Single support-email line — the full cancellation
+                policy lives behind the Schedule-step ack. */}
             <p
               className="text-sm text-slate-500"
               data-testid="cancellation-contact-desktop"
             >
-              Need to change or cancel? Email{" "}
+              To request a change or cancellation, email{" "}
               <a
                 href={`mailto:${CANCELLATION_CONTACT_EMAIL}`}
-                className="font-medium underline underline-offset-2"
+                className="font-semibold underline underline-offset-2"
                 style={{ color: "#A30058" }}
               >
                 {CANCELLATION_CONTACT_EMAIL}

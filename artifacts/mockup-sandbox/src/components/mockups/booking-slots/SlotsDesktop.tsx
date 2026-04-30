@@ -294,33 +294,35 @@ export function SlotsDesktop() {
                       )}
                     </div>
 
-                    {beThere && selectedSlotId && (
-                      <label
-                        className="mt-4 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
-                        data-testid="ack-row-desktop"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={ack}
-                          onChange={(e) => setAck(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 cursor-pointer"
-                          style={{ accentColor: BRAND }}
-                          data-testid="ack-checkbox-desktop"
-                        />
-                        <span>I'll be available for the entire window.</span>
-                      </label>
-                    )}
                   </div>
                 )}
               </>
             )}
           </div>
 
-          {/* Cancellation ack — always visible, sits directly above
-              the Confirm row so it reads as the final check before
-              the customer commits (Task #121). Same panel pattern as
-              the mobile pickers, just sized for the desktop card. */}
-          <div className="mt-8">
+          {/* Acks group — both acks sit directly above the Confirm row
+              as a single "checks before you confirm" group (Task #121).
+              The be-there ack only appears for be-there access methods
+              and once a slot is picked; the cancellation ack is always
+              visible so the customer sees what they're agreeing to
+              before tapping a slot. */}
+          <div className="mt-8 space-y-2">
+            {beThere && selectedSlotId && (
+              <label
+                className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
+                data-testid="ack-row-desktop"
+              >
+                <input
+                  type="checkbox"
+                  checked={ack}
+                  onChange={(e) => setAck(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer"
+                  style={{ accentColor: ack ? "#5FBB97" : BRAND }}
+                  data-testid="ack-checkbox-desktop"
+                />
+                <span>I'll be available for the entire window.</span>
+              </label>
+            )}
             <TermsAckRow
               checked={cancellationAck}
               onChange={(next) =>
