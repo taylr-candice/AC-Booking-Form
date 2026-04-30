@@ -448,6 +448,138 @@ describe("Default-template marker in Log dropdown options", () => {
   });
 });
 
+describe("Templates panel header — default-template marker", () => {
+  it("Call templates header shows 'No default set' out of the box and updates when a default is starred / moved / unset", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+
+    // Out of the box no template is starred — header should call this out.
+    expect(
+      screen.getByTestId("text-call-templates-default-empty").textContent,
+    ).toMatch(/No default set/);
+    expect(screen.queryByTestId("link-call-templates-default")).toBeNull();
+
+    // Star the "Voicemail left" row — header should pick up its name.
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-voicemail_left"),
+    );
+    let link = screen.getByTestId("link-call-templates-default");
+    expect(link.textContent).toBe("No answer — left voicemail");
+    expect(
+      screen.queryByTestId("text-call-templates-default-empty"),
+    ).toBeNull();
+
+    // Move the default to a different row — header tracks the move.
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+    link = screen.getByTestId("link-call-templates-default");
+    expect(link.textContent).toBe("Spoke to them — confirmed window");
+
+    // Unset the default — header falls back to the empty-state message.
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+    expect(
+      screen.getByTestId("text-call-templates-default-empty").textContent,
+    ).toMatch(/No default set/);
+    expect(screen.queryByTestId("link-call-templates-default")).toBeNull();
+  });
+
+  it("Email templates header shows 'No default set' out of the box and updates when a default is starred / moved / unset", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+
+    expect(
+      screen.getByTestId("text-email-templates-default-empty").textContent,
+    ).toMatch(/No default set/);
+    expect(screen.queryByTestId("link-email-templates-default")).toBeNull();
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-rebook_link"),
+    );
+    let link = screen.getByTestId("link-email-templates-default");
+    expect(link.textContent).toBe("Sent rebook link");
+    expect(
+      screen.queryByTestId("text-email-templates-default-empty"),
+    ).toBeNull();
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-awaiting_confirm"),
+    );
+    link = screen.getByTestId("link-email-templates-default");
+    expect(link.textContent).toBe("Awaiting confirmation nudge");
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-awaiting_confirm"),
+    );
+    expect(
+      screen.getByTestId("text-email-templates-default-empty").textContent,
+    ).toMatch(/No default set/);
+    expect(screen.queryByTestId("link-email-templates-default")).toBeNull();
+  });
+
+  it("clicking the Call header link highlights the matching row", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-voicemail_left"),
+    );
+
+    // Before the click, no row is highlighted.
+    expect(
+      screen
+        .getByTestId("call-template-row-voicemail_left")
+        .getAttribute("data-highlighted"),
+    ).toBe("false");
+
+    fireEvent.click(screen.getByTestId("link-call-templates-default"));
+
+    expect(
+      screen
+        .getByTestId("call-template-row-voicemail_left")
+        .getAttribute("data-highlighted"),
+    ).toBe("true");
+    // No other row should be highlighted.
+    expect(
+      screen
+        .getByTestId("call-template-row-spoke_confirmed")
+        .getAttribute("data-highlighted"),
+    ).toBe("false");
+  });
+
+  it("clicking the Email header link highlights the matching row", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-rebook_link"),
+    );
+
+    expect(
+      screen
+        .getByTestId("email-template-row-rebook_link")
+        .getAttribute("data-highlighted"),
+    ).toBe("false");
+
+    fireEvent.click(screen.getByTestId("link-email-templates-default"));
+
+    expect(
+      screen
+        .getByTestId("email-template-row-rebook_link")
+        .getAttribute("data-highlighted"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByTestId("email-template-row-awaiting_confirm")
+        .getAttribute("data-highlighted"),
+    ).toBe("false");
+  });
+});
+
 describe("Default-template fallback to Custom…", () => {
   it("with no default set, every Log form opens on Custom…", () => {
     render(<AdminApp />);

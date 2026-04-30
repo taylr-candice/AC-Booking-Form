@@ -20,9 +20,10 @@
  */
 
 import { Edit3, Mail, Plus, Star, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
+  findDefaultEmailTemplate,
   normalizeEmailTemplateDraft,
   type EmailTemplate,
   type TemplateUsageBooking,
@@ -84,9 +85,62 @@ export function EmailTemplatesView({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const rowRefs = useRef<Map<string, HTMLTableRowElement | null>>(new Map());
+
+  // Auto-clear the row highlight a moment after it's set, so the panel
+  // stays visually quiet once ops has spotted the matching row.
+  useEffect(() => {
+    if (!highlightedId) return;
+    const t = setTimeout(() => setHighlightedId(null), 1500);
+    return () => clearTimeout(t);
+  }, [highlightedId]);
+
+  const defaultTemplate = findDefaultEmailTemplate(templates);
+
+  const focusDefaultRow = () => {
+    if (!defaultTemplate) return;
+    const row = rowRefs.current.get(defaultTemplate.id);
+    if (row && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+    setHighlightedId(defaultTemplate.id);
+  };
 
   return (
     <div className="flex flex-col gap-4">
+      <div
+        data-testid="email-templates-default-header"
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-600"
+      >
+        <Star
+          className={
+            defaultTemplate
+              ? "h-3.5 w-3.5 text-amber-500"
+              : "h-3.5 w-3.5 text-slate-300"
+          }
+          fill={defaultTemplate ? "currentColor" : "none"}
+        />
+        <span>Default Email template:</span>
+        {defaultTemplate ? (
+          <button
+            type="button"
+            onClick={focusDefaultRow}
+            data-testid="link-email-templates-default"
+            className="font-semibold text-slate-900 underline-offset-2 hover:underline"
+            title="Jump to this template in the list below"
+          >
+            {defaultTemplate.name}
+          </button>
+        ) : (
+          <span
+            data-testid="text-email-templates-default-empty"
+            className="italic text-slate-500"
+          >
+            No default set — Log-email dropdowns open on Custom…
+          </span>
+        )}
+      </div>
       <div className="flex items-start justify-between gap-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-[12px] text-slate-600">
           Email templates prefill the bulk Log email form on the Awaiting
@@ -138,8 +192,18 @@ export function EmailTemplatesView({
                 return (
                   <tr
                     key={t.id}
+                    ref={(el) => {
+                      rowRefs.current.set(t.id, el);
+                    }}
                     data-testid={`email-template-row-${t.id}`}
-                    className="border-b border-slate-100 last:border-b-0 align-top"
+                    data-highlighted={
+                      highlightedId === t.id ? "true" : "false"
+                    }
+                    className={
+                      highlightedId === t.id
+                        ? "border-b border-slate-100 last:border-b-0 align-top bg-amber-50 transition-colors"
+                        : "border-b border-slate-100 last:border-b-0 align-top transition-colors"
+                    }
                   >
                     <td className="px-4 py-3">
                       <button
