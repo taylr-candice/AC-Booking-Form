@@ -741,3 +741,27 @@ export function UnsureMergedCard({
     </div>
   );
 }
+
+/**
+ * One-line price reassurance shown under the price block when the
+ * customer is in type-level unsure mode (`override === "unsure"`).
+ * The price block in this state shows the default `1 × $179` line, so
+ * customers naturally wonder "what if I actually have 2 systems?".
+ * This sentence answers that question in plain language and references
+ * the same $179 / $39 figures as the price block, so the customer
+ * doesn't need to open the "see terms" modal to get the gist.
+ */
+export function UnsurePriceReassurance({ variant }: { variant: Variant }) {
+  const isMobile = variant === "mobile";
+  const textSize = isMobile ? "text-[11px]" : "text-xs";
+  return (
+    <p
+      data-testid="text-unsure-price-reassurance"
+      className={`mt-2 ${textSize} text-slate-500 leading-snug`}
+    >
+      If we find more systems or extra units on the day, we’ll only invoice
+      the difference — ${SYSTEM_PRICE} per extra system, ${ADDON_PRICE} per
+      extra unit.
+    </p>
+  );
+}

@@ -32,6 +32,7 @@ import {
   PriceBlock,
   SYSTEM_PRICE,
   UnsureMergedCard,
+  UnsurePriceReassurance,
   useAcOnFileSync,
   useAcStep,
 } from "./acStepShared";
@@ -476,6 +477,9 @@ function FullConfigView({
                   knownType={override === "unsure" ? null : knownType}
                   variant="desktop"
                 />
+                {override === "unsure" && (
+                  <UnsurePriceReassurance variant="desktop" />
+                )}
               </div>
             )}
 
