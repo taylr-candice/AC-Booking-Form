@@ -120,15 +120,27 @@ export type BookingState = {
   num_systems: number;
   num_additional_indoor: number;
   /** Catalogue ids of "other" services (Task #186) the customer has
-   *  toggled on in the AC step. Each id refers to an `AdminService`
-   *  with `acTypeKey === null` (e.g. "bathroom extraction"). The
-   *  catalogue's `baseMinutes` + `addonMinutes` for each selected id
-   *  contribute to the slot picker's duration math, and the `priceAud`
-   *  + `addonPriceAud` contribute to the customer pricing card and
-   *  the Pay step total. Order is preserved so the price card lists
-   *  services in the order the customer toggled them. Stale ids
-   *  (catalogue entry removed) are silently ignored by the resolver. */
-  selected_other_service_ids: string[];
+   *  picked in the AC step, mapped to the chosen quantity (Task #201).
+   *  Each id refers to an `AdminService` with `acTypeKey === null`
+   *  (e.g. "bathroom extraction") and the value is the number of units
+   *  the customer wants — e.g. `{ "svc-bath": 2 }` for two bathroom
+   *  extractions. A qty of 0 (or a missing key) means the service is
+   *  not selected.
+   *
+   *  Duration / price math follows the AC indoor-unit pattern:
+   *   - minutes per id = `baseMinutes × qty + addonMinutes × (qty − 1)`
+   *   - price per id   = `priceAud × qty   + addonPriceAud × (qty − 1)`
+   *  i.e. the first unit pays the base rate, every additional unit
+   *  pays both base + add-on (consistent with the AC stepper math
+   *  where `num_systems` is multiplied by `baseMinutes` and the
+   *  smaller `addonMinutes` covers each extra component beyond the
+   *  first system).
+   *
+   *  Iteration order is the JS object insertion order, which mirrors
+   *  the order the customer added services so the price card lists
+   *  them in tap order. Stale ids (catalogue entry removed) are
+   *  silently ignored by the resolver. */
+  other_service_quantities: Record<string, number>;
   /** Snapshot of how the customer's selection on Step 2 differs from
    *  Taylr's records. Null while it matches (or the unit has no AC
    *  record to compare against). Read by the admin mockup to surface
@@ -326,7 +338,7 @@ const INITIAL_STATE: BookingState = {
   contact_phone: "",
   num_systems: 1,
   num_additional_indoor: 0,
-  selected_other_service_ids: [],
+  other_service_quantities: {},
   ac_discrepancy: null,
   ac_override_active: false,
   primary_residence: null,
@@ -358,21 +370,32 @@ const isBrowser = typeof window !== "undefined";
 /**
  * Schema version stamped on every persisted blob this module writes.
  *
- * The legacy → current migration in {@link migratePersistedSession} is
- * lossy by design: it shifts any persisted `current_step > 2` down by
- * one (collapsing the old Booker step into the Unit page). That's
- * correct for legacy blobs but catastrophic to apply to a freshly-
- * written current-schema blob — `getBookingSession()` re-reads storage
- * on every call (for cross-iframe sync), so a customer who reaches
- * Step 4 would have their step silently rewritten to 3 the next time
- * any handler peeked at the session.
+ * The migration in {@link migratePersistedSession} is split into two
+ * independent rewrites, each gated on its own threshold so a single
+ * version bump can't accidentally re-trigger an unrelated rewrite:
  *
- * Bumping this constant is how we tell the migrator "this blob has
- * already been rewritten in current-schema shape — leave the step
- * alone." Legacy blobs (older `__schema`, or missing entirely) keep
- * getting the down-shift treatment exactly once.
+ *  - **Step down-shift** (gated on `< 3`). The legacy 7-step flow had
+ *    a standalone Booker step (old step 2) which has since been
+ *    collapsed into Step 1 (Unit). For blobs older than 3 we shift
+ *    `current_step > 2` down by one. This is lossy by design and must
+ *    NEVER be re-applied — `getBookingSession()` re-reads storage on
+ *    every call (for cross-iframe sync), so re-applying the shift
+ *    would silently rewrite a Step-4 customer back to Step 3.
+ *
+ *  - **`other_service_quantities` field rename** (gated on `< 4`).
+ *    Task #186 stored "other" service selections as
+ *    `selected_other_service_ids: string[]`; Task #201 promoted that
+ *    to a quantity map keyed by id. For blobs older than 4 we
+ *    convert each id in the legacy array into `{ [id]: 1 }` and drop
+ *    the old field. New shape is JSON-compatible (no class
+ *    instances), so a blob written under the new schema round-trips
+ *    untouched.
+ *
+ * Bumping this constant is how we tell each migrator "this blob has
+ * already been rewritten in the current shape for the rewrite you
+ * own — skip it."
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /**
  * Migrate a raw persisted session blob (as stored in sessionStorage under
@@ -401,22 +424,28 @@ export function migratePersistedSession(raw: string | null): BookingState {
     const parsed = JSON.parse(raw) as Partial<BookingState> & {
       __schema?: unknown;
       current_step?: unknown;
+      /** Legacy field replaced in schema 4 by `other_service_quantities`. */
+      selected_other_service_ids?: unknown;
     };
     const rawStep = parsed.current_step;
     const schema =
       typeof parsed.__schema === "number" ? parsed.__schema : 0;
     // Drop the wrapper field so it doesn't leak into BookingState.
-    const { __schema: _ignored, ...rest } = parsed;
-    void _ignored;
+    const {
+      __schema: _ignoredSchema,
+      selected_other_service_ids: legacyOtherIds,
+      ...rest
+    } = parsed;
+    void _ignoredSchema;
 
     let step: StepId = 1;
     if (typeof rawStep === "number" && Number.isInteger(rawStep)) {
-      // Current-schema blobs trust the persisted step verbatim (subject
-      // to the 1..5 range clamp). Legacy blobs get the down-shift:
-      // step 2 (Booker) collapses into step 1 (Unit), and any step > 2
-      // shifts down by one.
+      // Booker → Unit collapse (gated on `< 3`). Anything stamped at
+      // 3+ trusts the persisted step verbatim — re-applying the
+      // shift would silently rewrite a Step-4 customer back to
+      // Step 3 (see SCHEMA_VERSION).
       const candidate =
-        schema >= SCHEMA_VERSION
+        schema >= 3
           ? rawStep
           : rawStep === 2
             ? 1
@@ -425,10 +454,74 @@ export function migratePersistedSession(raw: string | null): BookingState {
               : rawStep;
       if (candidate >= 1 && candidate <= 5) step = candidate as StepId;
     }
-    return { ...INITIAL_STATE, ...rest, current_step: step };
+
+    // `other_service_quantities` rename (gated on `< 4`).
+    // Legacy blobs carried `selected_other_service_ids: string[]`;
+    // promote each id to qty 1 in the new map. Newer blobs already
+    // have a map and we leave it alone (subject to the runtime guard
+    // in {@link normaliseOtherServiceQuantities}).
+    let otherQuantities: Record<string, number>;
+    if (schema >= 4) {
+      otherQuantities = normaliseOtherServiceQuantities(
+        rest.other_service_quantities,
+      );
+    } else if (Array.isArray(legacyOtherIds)) {
+      otherQuantities = {};
+      for (const id of legacyOtherIds) {
+        if (typeof id === "string" && id.length > 0 && !(id in otherQuantities)) {
+          otherQuantities[id] = 1;
+        }
+      }
+    } else {
+      // Legacy blob without the field at all — start empty.
+      otherQuantities = {};
+    }
+
+    return {
+      ...INITIAL_STATE,
+      ...rest,
+      current_step: step,
+      other_service_quantities: otherQuantities,
+    };
   } catch {
     return INITIAL_STATE;
   }
+}
+
+/** Coerce a persisted `other_service_quantities` blob back into the
+ *  canonical shape. Drops keys whose value isn't a positive integer
+ *  (qty 0 means "not selected" and shouldn't sit in the map; floats /
+ *  strings / negatives are corruption-recovery fallback). Pure helper
+ *  used by both the persistence migration and the runtime setter. */
+function normaliseOtherServiceQuantities(
+  raw: unknown,
+): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof id !== "string" || id.length === 0) continue;
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    const qty = Math.floor(value);
+    if (qty >= 1) out[id] = qty;
+  }
+  return out;
+}
+
+/** Structural equality (key set + qty) for two quantity maps —
+ *  intentionally order-independent so `{a:1,b:2}` and `{b:2,a:1}`
+ *  are considered equal. Insertion order is preserved by callers
+ *  separately (it drives display order, not equality). */
+function otherServiceQuantitiesEqual(
+  a: Record<string, number>,
+  b: Record<string, number>,
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
 }
 
 function readFromStorage(): BookingState {
@@ -757,38 +850,90 @@ export const bookingActions = {
     );
   },
   /** Replace the customer's currently-selected "other" services
-   *  (Task #186). Dedupes input order while preserving first-seen
+   *  (Task #186, Task #201). Accepts either a list of ids (each
+   *  promoted to qty 1, dedupes input while preserving first-seen
    *  order — useful if a caller hands us [a, b, a] from a checkbox
-   *  state shuffle. No-op if the resulting array is structurally
-   *  equal to what's already in state. */
-  setOtherServices(ids: readonly string[]) {
+   *  state shuffle) or a quantity map. No-op if the resulting map is
+   *  structurally equal to what's already in state. */
+  setOtherServices(input: readonly string[] | Record<string, number>) {
     setState((s) => {
-      const seen = new Set<string>();
-      const next: string[] = [];
-      for (const id of ids) {
-        if (seen.has(id)) continue;
-        seen.add(id);
-        next.push(id);
+      let next: Record<string, number>;
+      if (Array.isArray(input)) {
+        next = {};
+        for (const id of input) {
+          if (typeof id !== "string" || id.length === 0) continue;
+          if (id in next) continue;
+          next[id] = 1;
+        }
+      } else {
+        next = normaliseOtherServiceQuantities(input);
       }
-      const cur = s.selected_other_service_ids;
-      if (cur.length === next.length && cur.every((v, i) => v === next[i])) {
+      if (otherServiceQuantitiesEqual(s.other_service_quantities, next)) {
         return s;
       }
-      return { ...s, selected_other_service_ids: next };
+      return { ...s, other_service_quantities: next };
+    });
+  },
+  /** Set a single service id to a specific quantity (Task #201).
+   *  `qty <= 0` removes the entry entirely so the slot picker /
+   *  price card see "not selected" rather than "selected with 0".
+   *  Quantities are clamped to a sensible 1..99 window — the cap is
+   *  matched to the AC `setAdditionalIndoor` ceiling so a runaway
+   *  stepper press can't blow up the slot picker's duration math. */
+  setOtherServiceQuantity(id: string, qty: number) {
+    if (!id) return;
+    setState((s) => {
+      const cur = s.other_service_quantities;
+      const clamped = Math.min(99, Math.max(0, Math.floor(qty)));
+      if (clamped === 0) {
+        if (!(id in cur)) return s;
+        // Re-build the object so insertion order of the remaining
+        // ids is preserved (delete-then-spread would leave a stale
+        // hole in the iteration order on some engines).
+        const next: Record<string, number> = {};
+        for (const [k, v] of Object.entries(cur)) {
+          if (k !== id) next[k] = v;
+        }
+        return { ...s, other_service_quantities: next };
+      }
+      if (cur[id] === clamped) return s;
+      // Preserve insertion order: existing keys keep their slot,
+      // a brand-new id is appended at the end so the price card
+      // lists services in the order the customer picked them.
+      if (id in cur) {
+        const next: Record<string, number> = {};
+        for (const [k, v] of Object.entries(cur)) {
+          next[k] = k === id ? clamped : v;
+        }
+        return { ...s, other_service_quantities: next };
+      }
+      return {
+        ...s,
+        other_service_quantities: { ...cur, [id]: clamped },
+      };
     });
   },
   /** Toggle a single "other" service id on/off. Appends new ids at
    *  the end so the price-card display reflects the order the
    *  customer ticked them. Idempotent for the no-op case (empty id
-   *  string). */
+   *  string). When toggling on, the qty defaults to 1 — the customer
+   *  can bump it up via the stepper. When toggling off, any
+   *  previously-set qty is wiped. */
   toggleOtherService(id: string) {
     if (!id) return;
     setState((s) => {
-      const cur = s.selected_other_service_ids;
-      const idx = cur.indexOf(id);
-      const next =
-        idx === -1 ? [...cur, id] : cur.filter((v) => v !== id);
-      return { ...s, selected_other_service_ids: next };
+      const cur = s.other_service_quantities;
+      if (id in cur) {
+        const next: Record<string, number> = {};
+        for (const [k, v] of Object.entries(cur)) {
+          if (k !== id) next[k] = v;
+        }
+        return { ...s, other_service_quantities: next };
+      }
+      return {
+        ...s,
+        other_service_quantities: { ...cur, [id]: 1 },
+      };
     });
   },
   /** Persist the latest discrepancy snapshot from the AC step. Null when the

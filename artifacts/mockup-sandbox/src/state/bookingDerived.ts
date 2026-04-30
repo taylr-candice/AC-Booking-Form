@@ -330,6 +330,57 @@ export function resolveOtherServiceRules(
 }
 
 /**
+ * Resolve a quantity map (Task #201) to its {@link OtherServiceRule}
+ * entries plus the chosen quantity, in the map's iteration order.
+ * Stale / unknown ids are dropped silently for the same reason
+ * {@link resolveOtherServiceRules} drops them — the customer must
+ * never be blocked from paying because ops just edited the catalogue.
+ */
+export function resolveOtherServiceQuantities(
+  quantities: Readonly<Record<string, number>>,
+): { rule: OtherServiceRule; qty: number }[] {
+  const out: { rule: OtherServiceRule; qty: number }[] = [];
+  for (const [id, qty] of Object.entries(quantities)) {
+    if (qty <= 0) continue;
+    const rule = otherServiceLookup(id);
+    if (rule) out.push({ rule, qty });
+  }
+  return out;
+}
+
+/**
+ * Per-service minutes contribution under the Task #201 quantity model.
+ *
+ *   minutes = baseMinutes × qty + addonMinutes × max(qty − 1, 0)
+ *
+ * Mirrors the AC indoor-unit math: the first unit pays the full
+ * `baseMinutes`, every additional unit pays the smaller `addonMinutes`
+ * on top of another `baseMinutes` block (so a service the catalogue
+ * priced at "30 min base + 10 min add-on" runs to 30 min for qty 1,
+ * 70 min for qty 2, 110 min for qty 3, …). Returns 0 for qty ≤ 0 so
+ * it's safe to call without a guard.
+ */
+export function otherServiceMinutes(
+  rule: Pick<OtherServiceRule, "baseMinutes" | "addonMinutes">,
+  qty: number,
+): number {
+  if (qty <= 0) return 0;
+  return rule.baseMinutes * qty + rule.addonMinutes * Math.max(qty - 1, 0);
+}
+
+/**
+ * Per-service price contribution under the Task #201 quantity model
+ * (mirrors {@link otherServiceMinutes}, swapping minutes for AUD).
+ */
+export function otherServicePrice(
+  rule: Pick<OtherServiceRule, "priceAud" | "addonPriceAud">,
+  qty: number,
+): number {
+  if (qty <= 0) return 0;
+  return rule.priceAud * qty + rule.addonPriceAud * Math.max(qty - 1, 0);
+}
+
+/**
  * How long the customer's current booking will take, in minutes.
  *
  * Formula:
@@ -364,21 +415,27 @@ export function getBookingDurationMinutes(
     "num_systems" | "num_additional_indoor" | "ac_discrepancy"
   > & {
     unit_id?: string | null;
-    selected_other_service_ids?: readonly string[];
+    other_service_quantities?: Readonly<Record<string, number>>;
   },
 ): number {
-  // Task #186: even when the AC selection is "unsure", any "other"
-  // service the customer ALSO toggled on still has a known
-  // base+addon duration (the catalogue gives us deterministic
-  // minutes). The slot picker must size the slot to fit them, and
-  // the Pay-step total must reflect them, so add their minutes to
-  // the unsure-fallback baseline rather than dropping them on the
-  // floor (which would let the customer book a slot too small for
-  // the very services they just selected).
-  const otherIds = s.selected_other_service_ids ?? [];
-  const others = resolveOtherServiceRules(otherIds);
+  // Task #201: each selected "other" service contributes
+  // `baseMinutes × qty + addonMinutes × (qty − 1)` minutes — the AC
+  // indoor-unit pattern, where the first unit pays the full base
+  // rate and every additional unit pays both base + add-on. Even
+  // when the AC selection is "unsure", any "other" service the
+  // customer ALSO chose still has a known per-qty duration (the
+  // catalogue gives us deterministic minutes). The slot picker must
+  // size the slot to fit them, and the Pay-step total must reflect
+  // them, so add their minutes to the unsure-fallback baseline
+  // rather than dropping them on the floor (which would let the
+  // customer book a slot too small for the very services they just
+  // selected).
+  const quantities = s.other_service_quantities ?? {};
+  const others = resolveOtherServiceQuantities(quantities);
   let othersMinutes = 0;
-  for (const r of others) othersMinutes += r.baseMinutes + r.addonMinutes;
+  for (const { rule, qty } of others) {
+    othersMinutes += otherServiceMinutes(rule, qty);
+  }
   if (s.ac_discrepancy?.customer.type === "unsure") {
     return UNSURE_FALLBACK_MINUTES + othersMinutes;
   }
@@ -404,11 +461,6 @@ export function getBookingDurationMinutes(
     ctx.placement.kind === "rooftop"
       ? ctx.placement.overheadMinutes * s.num_systems
       : 0;
-  // Task #186: each selected "other" service contributes its base +
-  // add-on minutes (qty 1 of each — the customer flow exposes one
-  // toggle per service rather than a separate stepper). Stale ids are
-  // dropped silently by the resolver. `othersMinutes` was computed
-  // up-front so the unsure-fallback branch above could share it.
   return base + overhead + othersMinutes;
 }
 

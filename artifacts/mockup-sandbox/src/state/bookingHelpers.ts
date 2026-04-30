@@ -16,7 +16,11 @@ import {
   type PrimaryResidence,
   type Role,
 } from "./bookingSession";
-import { isCoordinationFlow, resolveOtherServiceRules } from "./bookingDerived";
+import {
+  isCoordinationFlow,
+  otherServicePrice,
+  resolveOtherServiceQuantities,
+} from "./bookingDerived";
 import { getBuildingById, getLiveUnits } from "./adminMockData";
 
 // ─── Pricing ───────────────────────────────────────────────────────────────
@@ -32,8 +36,9 @@ export const ADDON_PRICE_AUD = 39;
  * Formula:
  *   `SYSTEM_PRICE_AUD × num_systems`
  * + `ADDON_PRICE_AUD × num_additional_indoor`
- * + Σ `(priceAud + addonPriceAud)` for each selected "other"
- *   service (Task #186), resolved against the live catalogue.
+ * + Σ `priceAud × qty + addonPriceAud × max(qty − 1, 0)` for each
+ *   selected "other" service (Task #186, Task #201), resolved
+ *   against the live catalogue.
  *
  * Stale "other" service ids (catalogue entry removed) are dropped
  * silently by the resolver so the customer is never blocked from
@@ -41,17 +46,19 @@ export const ADDON_PRICE_AUD = 39;
  */
 export function computeBookingTotal(
   s: Pick<BookingState, "num_systems" | "num_additional_indoor"> & {
-    selected_other_service_ids?: readonly string[];
+    other_service_quantities?: Readonly<Record<string, number>>;
   },
 ): number {
   const acTotal =
     s.num_systems * SYSTEM_PRICE_AUD +
     s.num_additional_indoor * ADDON_PRICE_AUD;
-  const others = resolveOtherServiceRules(
-    s.selected_other_service_ids ?? [],
+  const others = resolveOtherServiceQuantities(
+    s.other_service_quantities ?? {},
   );
   let othersTotal = 0;
-  for (const r of others) othersTotal += r.priceAud + r.addonPriceAud;
+  for (const { rule, qty } of others) {
+    othersTotal += otherServicePrice(rule, qty);
+  }
   return acTotal + othersTotal;
 }
 

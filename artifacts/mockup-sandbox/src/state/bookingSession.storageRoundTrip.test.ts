@@ -47,7 +47,7 @@ describe("booking session storage round-trip stability", () => {
       __schema?: number;
     };
     expect(parsed.current_step).toBe(5);
-    expect(parsed.__schema).toBe(3);
+    expect(parsed.__schema).toBe(4);
   });
 
   it("does not drift current_step across many bookingAction writes", () => {

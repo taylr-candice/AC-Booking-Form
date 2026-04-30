@@ -23,7 +23,10 @@ import {
   Check,
   Grid3x3,
   Info,
+  Minus,
+  Plus,
   RefreshCw,
+  X,
 } from "lucide-react";
 import {
   bookingActions,
@@ -39,7 +42,11 @@ import {
   readLiveOtherServicesFromStorage,
   subscribeLiveOtherServices,
 } from "../../../state/liveOtherServices";
-import { type OtherServiceRule } from "../../../state/bookingDerived";
+import {
+  otherServiceMinutes,
+  otherServicePrice,
+  type OtherServiceRule,
+} from "../../../state/bookingDerived";
 import { type ExampleVariant } from "./AcExampleModal";
 
 // ─── Visual constants ───────────────────────────────────────────────────────
@@ -461,18 +468,19 @@ export function PriceBlock({
   knownType: KnownType | null;
   variant: Variant;
   /**
-   * Selected "other" catalogue services (Task #186) to itemise in the
-   * price card. Each contributes one base + one add-on charge — so a
-   * single line per service shows `name + qualifier` and
-   * `priceAud + addonPriceAud`. Pass `[]` (or omit) for the
-   * AC-only path that pre-dates Task #186.
+   * Selected "other" catalogue services (Task #186, Task #201) to
+   * itemise in the price card. Each entry pairs a catalogue rule
+   * with a qty; the price card renders one line per service and
+   * shows `qty × name` (when qty > 1) plus the combined
+   * `priceAud × qty + addonPriceAud × max(qty − 1, 0)` charge. Pass
+   * `[]` (or omit) for the AC-only path that pre-dates Task #186.
    */
-  otherServices?: readonly OtherServiceRule[];
+  otherServices?: readonly SelectedOtherService[];
 }) {
   const base = systems * SYSTEM_PRICE;
   const extras = additional * ADDON_PRICE;
   const othersTotal = otherServices.reduce(
-    (sum, s) => sum + s.priceAud + s.addonPriceAud,
+    (sum, { rule, qty }) => sum + otherServicePrice(rule, qty),
     0,
   );
   const total = base + extras + othersTotal;
@@ -546,31 +554,34 @@ export function PriceBlock({
             </span>
           </div>
         )}
-        {/* Task #186: one row per selected "other" catalogue service.
-            Each card toggle contributes one base + one add-on charge,
-            so the line shows the combined amount and a qualifier
-            with the catalogue's add-on label. */}
-        {otherServices.map((s) => (
+        {/* Task #186 / Task #201: one row per selected "other"
+            catalogue service. Qty 1 reads the same as the original
+            single-toggle path; qty > 1 prefixes "n × " to the name
+            so the multi-bathroom case is unambiguous, and uses the
+            base × qty + add-on × (qty − 1) total. */}
+        {otherServices.map(({ rule, qty }) => (
           <div
-            key={s.id}
+            key={rule.id}
             className="flex items-start justify-between gap-3"
-            data-testid={`row-price-other-${s.id}`}
+            data-testid={`row-price-other-${rule.id}`}
           >
             <div className="min-w-0">
               <p>
-                {s.name}{" "}
+                {qty > 1 ? `${qty} × ${rule.name}` : rule.name}{" "}
                 <span className="text-slate-500">
-                  (base + {s.addonLabel})
+                  {qty > 1
+                    ? `(base + ${qty - 1} × ${rule.addonLabel})`
+                    : "(base)"}
                 </span>
               </p>
-              {s.appliesToNote ? (
+              {rule.appliesToNote ? (
                 <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">
-                  {s.appliesToNote}
+                  {rule.appliesToNote}
                 </p>
               ) : null}
             </div>
             <span className="tabular-nums text-slate-900 font-medium shrink-0">
-              ${s.priceAud + s.addonPriceAud}
+              ${otherServicePrice(rule, qty)}
             </span>
           </div>
         ))}
@@ -870,38 +881,59 @@ export function useLiveOtherServices(): readonly OtherServiceRule[] {
   );
 }
 
+/** A selected "other" service paired with the chosen quantity
+ *  (Task #201). The customer-flow projection of one entry in
+ *  `other_service_quantities` resolved against the live catalogue. */
+export type SelectedOtherService = {
+  rule: OtherServiceRule;
+  qty: number;
+};
+
 /**
- * Resolve the customer's currently-selected `selected_other_service_ids`
- * against the live catalogue, preserving session order and dropping
- * stale ids. Used by AC step price card so removed catalogue entries
- * silently disappear instead of crashing the booking flow.
+ * Resolve the customer's currently-selected `other_service_quantities`
+ * against the live catalogue, preserving session insertion order and
+ * dropping stale ids / non-positive qtys. Used by the AC step price
+ * card so removed catalogue entries silently disappear instead of
+ * crashing the booking flow.
  */
-export function useSelectedOtherServices(): OtherServiceRule[] {
+export function useSelectedOtherServices(): SelectedOtherService[] {
   const session = useBookingSession();
   const others = useLiveOtherServices();
   return useMemo(() => {
-    if (session.selected_other_service_ids.length === 0) return [];
+    const quantities = session.other_service_quantities;
+    const ids = Object.keys(quantities);
+    if (ids.length === 0) return [];
     const byId = new Map<string, OtherServiceRule>(
       others.map((s) => [s.id, s]),
     );
-    const out: OtherServiceRule[] = [];
-    for (const id of session.selected_other_service_ids) {
+    const out: SelectedOtherService[] = [];
+    for (const id of ids) {
+      const qty = quantities[id];
+      if (typeof qty !== "number" || qty <= 0) continue;
       const m = byId.get(id);
-      if (m) out.push(m);
+      if (m) out.push({ rule: m, qty });
     }
     return out;
-  }, [others, session.selected_other_service_ids]);
+  }, [others, session.other_service_quantities]);
 }
 
 /**
- * Toggleable cards for the catalogue's "other" services (Task #186)
- * — rendered between the AC config block and the price card on Step 2.
- * Each card shows the service name, the "applies to" note (if any),
- * the duration the rule contributes, and the combined base + add-on
- * price. Selecting a card writes the id into
- * `selected_other_service_ids` via `bookingActions.toggleOtherService`,
- * which the slot picker (`getBookingDurationMinutes`) and the Pay
- * step (`computeBookingTotal`) both consume.
+ * Per-service cards for the catalogue's "other" services
+ * (Task #186, Task #201) — rendered between the AC config block and
+ * the price card on Step 2. Each card shows the service name, the
+ * "applies to" note (if any), the per-unit duration / price, and:
+ *
+ *   - a `+ Add` affordance when the customer hasn't selected it
+ *     (`qty === 0`) — tapping it sets qty to 1 and reveals the
+ *     stepper, mirroring the AC indoor-units pattern.
+ *   - a `−  qty  +` stepper plus a remove (×) button when selected
+ *     (`qty ≥ 1`), so the customer can book multiple bathrooms /
+ *     filter cleans without phoning ops.
+ *
+ * Quantity edits write through to `other_service_quantities` via
+ * `bookingActions.setOtherServiceQuantity`, which the slot picker
+ * (`getBookingDurationMinutes`) and the Pay step
+ * (`computeBookingTotal`) both consume.
  *
  * Returns `null` when the catalogue has no "other" entries — the
  * customer flow stays visually identical to its pre-Task-#186 layout
@@ -911,11 +943,10 @@ export function OtherServicesSection({ variant }: { variant: Variant }) {
   const session = useBookingSession();
   const others = useLiveOtherServices();
   if (others.length === 0) return null;
-  const selected = new Set(session.selected_other_service_ids);
+  const quantities = session.other_service_quantities;
   const isMobile = variant === "mobile";
   const titleSize = isMobile ? "text-[15px]" : "text-base";
   const helperSize = isMobile ? "text-[12px]" : "text-[13px]";
-  const cardPadding = isMobile ? "p-3" : "p-4";
   return (
     <div data-testid="block-other-services" className="space-y-3">
       <div>
@@ -924,69 +955,257 @@ export function OtherServicesSection({ variant }: { variant: Variant }) {
         </h3>
         <p className={`mt-1 ${helperSize} text-slate-500 leading-snug`}>
           Bundle a one-off task with this visit. Each option adds its
-          own time to the slot and to your total.
+          own time to the slot and to your total — pick a quantity
+          to book multiple.
         </p>
       </div>
       <div className="space-y-2">
-        {others.map((s) => {
-          const isOn = selected.has(s.id);
-          const totalMin = s.baseMinutes + s.addonMinutes;
-          const totalAud = s.priceAud + s.addonPriceAud;
-          return (
-            <button
-              key={s.id}
-              type="button"
-              role="checkbox"
-              aria-checked={isOn}
-              data-testid={`toggle-other-service-${s.id}`}
-              onClick={() => bookingActions.toggleOtherService(s.id)}
-              className={`flex w-full items-start justify-between gap-3 rounded-xl border ${cardPadding} text-left transition`}
-              style={
-                isOn
-                  ? {
-                      borderColor: BRAND,
-                      backgroundColor: "rgba(237,1,127,0.04)",
-                    }
-                  : { borderColor: "#e2e8f0", backgroundColor: "#fff" }
-              }
-            >
-              <span className="flex items-start gap-3 min-w-0">
-                <span
-                  className="mt-0.5 grid h-5 w-5 place-items-center rounded-md border-2 shrink-0"
-                  style={
-                    isOn
-                      ? { backgroundColor: BRAND, borderColor: BRAND }
-                      : { borderColor: "#cbd5e1", backgroundColor: "#fff" }
-                  }
-                  aria-hidden="true"
-                >
-                  {isOn && (
-                    <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
-                  )}
-                </span>
-                <span className="min-w-0">
-                  <span
-                    className={`block ${helperSize} font-semibold text-slate-900`}
-                  >
-                    {s.name}
-                  </span>
-                  {s.appliesToNote && (
-                    <span className="mt-0.5 block text-[11px] text-slate-500 leading-snug">
-                      {s.appliesToNote}
-                    </span>
-                  )}
-                  <span className="mt-1 block text-[11px] text-slate-500">
-                    Adds ~{totalMin} min to the visit
-                  </span>
-                </span>
-              </span>
-              <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">
-                +${totalAud}
-              </span>
-            </button>
-          );
-        })}
+        {others.map((s) => (
+          <OtherServiceCard
+            key={s.id}
+            rule={s}
+            qty={quantities[s.id] ?? 0}
+            variant={variant}
+          />
+        ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One row of the {@link OtherServicesSection}. Split out as its own
+ * component so the "selected vs not selected" branch can read
+ * cleanly: when `qty === 0` we render a single full-width "+ Add"
+ * button so the row stays tappable in its entirety; once selected
+ * the row swaps to a header + StepperRow layout that mirrors the
+ * AC indoor-units stepper (same minus / plus buttons, same disabled
+ * state at qty = 1).
+ */
+function OtherServiceCard({
+  rule,
+  qty,
+  variant,
+}: {
+  rule: OtherServiceRule;
+  qty: number;
+  variant: Variant;
+}) {
+  const isMobile = variant === "mobile";
+  const helperSize = isMobile ? "text-[12px]" : "text-[13px]";
+  const cardPadding = isMobile ? "p-3" : "p-4";
+  const isOn = qty >= 1;
+
+  const perUnitMin = rule.baseMinutes;
+  const perUnitAud = rule.priceAud;
+  const totalMin = otherServiceMinutes(rule, qty);
+  const totalAud = otherServicePrice(rule, qty);
+
+  if (!isOn) {
+    return (
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={false}
+        data-testid={`toggle-other-service-${rule.id}`}
+        onClick={() => bookingActions.setOtherServiceQuantity(rule.id, 1)}
+        className={`flex w-full items-start justify-between gap-3 rounded-xl border ${cardPadding} text-left transition hover:border-slate-300`}
+        style={{ borderColor: "#e2e8f0", backgroundColor: "#fff" }}
+      >
+        <span className="flex items-start gap-3 min-w-0">
+          <span
+            className="mt-0.5 grid h-5 w-5 place-items-center rounded-full border-2 shrink-0"
+            style={{ borderColor: BRAND, backgroundColor: "#fff" }}
+            aria-hidden="true"
+          >
+            <Plus className="h-3 w-3" style={{ color: BRAND }} strokeWidth={3} />
+          </span>
+          <span className="min-w-0">
+            <span
+              className={`block ${helperSize} font-semibold text-slate-900`}
+            >
+              {rule.name}
+            </span>
+            {rule.appliesToNote && (
+              <span className="mt-0.5 block text-[11px] text-slate-500 leading-snug">
+                {rule.appliesToNote}
+              </span>
+            )}
+            <span className="mt-1 block text-[11px] text-slate-500">
+              Adds ~{perUnitMin} min · ${perUnitAud} per unit
+            </span>
+          </span>
+        </span>
+        <span
+          className={`shrink-0 ${helperSize} font-semibold underline underline-offset-2`}
+          style={{ color: BRAND }}
+        >
+          + Add
+        </span>
+      </button>
+    );
+  }
+
+  return (
+    <div
+      data-testid={`card-other-service-${rule.id}`}
+      className={`rounded-xl border ${cardPadding} transition`}
+      style={{ borderColor: BRAND, backgroundColor: "rgba(237,1,127,0.04)" }}
+      role="checkbox"
+      aria-checked={true}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <span
+            className="mt-0.5 grid h-5 w-5 place-items-center rounded-md border-2 shrink-0"
+            style={{ backgroundColor: BRAND, borderColor: BRAND }}
+            aria-hidden="true"
+          >
+            <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+          </span>
+          <div className="min-w-0">
+            <p
+              className={`${helperSize} font-semibold text-slate-900`}
+            >
+              {rule.name}
+            </p>
+            {rule.appliesToNote && (
+              <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">
+                {rule.appliesToNote}
+              </p>
+            )}
+            <p className="mt-1 text-[11px] text-slate-500">
+              {qty > 1 ? `${qty} × ~${perUnitMin} min` : `~${perUnitMin} min`}
+              {" · "}${perUnitAud} per unit
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => bookingActions.setOtherServiceQuantity(rule.id, 0)}
+          data-testid={`btn-remove-other-service-${rule.id}`}
+          aria-label={`Remove ${rule.name}`}
+          className="-m-1.5 grid h-7 w-7 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <StepperRow
+          qty={qty}
+          onDecrement={() =>
+            bookingActions.setOtherServiceQuantity(rule.id, qty - 1)
+          }
+          onIncrement={() =>
+            bookingActions.setOtherServiceQuantity(rule.id, qty + 1)
+          }
+          minQty={1}
+          decrementTestId={`btn-other-service-minus-${rule.id}`}
+          incrementTestId={`btn-other-service-plus-${rule.id}`}
+          decrementAriaLabel={`Decrease ${rule.name}`}
+          incrementAriaLabel={`Increase ${rule.name}`}
+          variant={variant}
+        />
+        <span
+          className="shrink-0 tabular-nums text-sm font-semibold text-slate-900"
+          data-testid={`text-other-service-total-${rule.id}`}
+        >
+          +${totalAud}
+          <span className="ml-1 text-[11px] font-normal text-slate-500">
+            · ~{totalMin} min
+          </span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Reusable −/+ stepper row, modelled on the AC indoor-units stepper
+ * pattern (same minus/plus icons, same disabled-at-min behaviour).
+ * Lifted out so any add-on count UI can share one stepper without
+ * each call site re-implementing the JSX.
+ *
+ * Visual variants intentionally mirror the AC stepper: mobile uses
+ * the rounded-lg slate-100 button chrome, desktop uses the
+ * rounded-full bordered chrome — so a customer who used the AC
+ * stepper finds the same affordance here without re-learning it.
+ */
+function StepperRow({
+  qty,
+  onDecrement,
+  onIncrement,
+  minQty = 0,
+  decrementTestId,
+  incrementTestId,
+  decrementAriaLabel,
+  incrementAriaLabel,
+  variant,
+}: {
+  qty: number;
+  onDecrement: () => void;
+  onIncrement: () => void;
+  minQty?: number;
+  decrementTestId?: string;
+  incrementTestId?: string;
+  decrementAriaLabel: string;
+  incrementAriaLabel: string;
+  variant: Variant;
+}) {
+  const isMobile = variant === "mobile";
+  const decrementDisabled = qty <= minQty;
+  if (isMobile) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onDecrement}
+          disabled={decrementDisabled}
+          data-testid={decrementTestId}
+          aria-label={decrementAriaLabel}
+          className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <div className="text-base font-bold text-slate-900 w-8 text-center tabular-nums">
+          {qty}
+        </div>
+        <button
+          type="button"
+          onClick={onIncrement}
+          data-testid={incrementTestId}
+          aria-label={incrementAriaLabel}
+          className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={onDecrement}
+        disabled={decrementDisabled}
+        data-testid={decrementTestId}
+        aria-label={decrementAriaLabel}
+        className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      <div className="w-7 text-center text-lg font-bold text-slate-900 tabular-nums">
+        {qty}
+      </div>
+      <button
+        type="button"
+        onClick={onIncrement}
+        data-testid={incrementTestId}
+        aria-label={incrementAriaLabel}
+        className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
     </div>
   );
 }
