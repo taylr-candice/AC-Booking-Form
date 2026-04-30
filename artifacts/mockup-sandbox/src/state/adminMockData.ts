@@ -2510,6 +2510,91 @@ export function countLatestTouchUsageForTemplate(
   return count;
 }
 
+/** A single bucket of {@link getTemplateUsageTrend}'s output: the
+ *  ISO YYYY-MM-DD day key + the number of timeline entries that
+ *  referenced the template on that calendar day. */
+export type TemplateUsageTrendPoint = {
+  date: string;
+  count: number;
+};
+
+/** Default window length for {@link getTemplateUsageTrend}. Matches the
+ *  "+N this week" copy the sparkline renders next to the count badge
+ *  on each templates-view row (Task #171). */
+export const DEFAULT_TEMPLATE_TREND_DAYS = 7;
+
+/**
+ * Per-day usage trend for a single template: walks every booking's
+ * service timeline, picks entries whose `kind` and snapshot-on-use
+ * `templateLabel` match `templateName`, and buckets them by the UTC
+ * calendar day their `loggedAt` ISO timestamp lives on. Returns a
+ * dense, fixed-length array of {@link TemplateUsageTrendPoint}s
+ * (oldest first → most recent last) so the sparkline renderer can
+ * draw a stable axis even when most days have zero usage.
+ *
+ * The window ends on the UTC calendar day of `now` and stretches
+ * `days` days back (default {@link DEFAULT_TEMPLATE_TREND_DAYS}). Any
+ * matching entry whose `loggedAt` is missing, unparseable, or falls
+ * outside the window is silently ignored — those bookings still
+ * count against the headline "Used in N bookings" badge, they just
+ * don't show up on the rolling trend.
+ *
+ * Snapshot-on-use semantics match {@link countTimelineUsageForTemplate}
+ * and {@link findUsageBookingsForTemplate}: the entry's literal
+ * `templateLabel` string is what's compared, so a rename never
+ * retroactively reattributes history.
+ *
+ * UTC-based day keys (rather than local-time) keep the buckets
+ * deterministic across the dev/test/CI timezones and let the
+ * companion test pin a fixed "now" without having to mock
+ * `Intl`/`Date.prototype.toLocaleDateString`.
+ */
+export function getTemplateUsageTrend(
+  bookings: ReadonlyArray<AdminBooking>,
+  kind: "call" | "email",
+  templateName: string,
+  options: { days?: number; now?: Date } = {},
+): TemplateUsageTrendPoint[] {
+  const days = Math.max(1, Math.floor(options.days ?? DEFAULT_TEMPLATE_TREND_DAYS));
+  const now = options.now ?? new Date();
+  // Anchor on the UTC midnight of `now`'s calendar day so subsequent
+  // arithmetic in milliseconds doesn't drift across DST seams.
+  const endUtc = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+  const buckets: TemplateUsageTrendPoint[] = [];
+  const bucketIndexByKey = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) {
+    const dayMs = endUtc - i * ONE_DAY_MS;
+    const key = new Date(dayMs).toISOString().slice(0, 10);
+    bucketIndexByKey.set(key, buckets.length);
+    buckets.push({ date: key, count: 0 });
+  }
+
+  const trimmed = templateName.trim();
+  if (trimmed.length === 0) return buckets;
+
+  for (const b of bookings) {
+    for (const entry of b.serviceTimeline) {
+      if (entry.kind !== kind) continue;
+      if (entry.templateLabel !== trimmed) continue;
+      const loggedAt = entry.loggedAt;
+      if (!loggedAt) continue;
+      const t = new Date(loggedAt).getTime();
+      if (!Number.isFinite(t)) continue;
+      const key = new Date(t).toISOString().slice(0, 10);
+      const idx = bucketIndexByKey.get(key);
+      if (idx === undefined) continue;
+      buckets[idx]!.count += 1;
+    }
+  }
+  return buckets;
+}
+
 /**
  * Find every booking whose service timeline references `templateName`
  * for the given `kind`. Sibling of {@link countTimelineUsageForTemplate}

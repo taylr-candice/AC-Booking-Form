@@ -27,11 +27,13 @@ import {
   normalizeEmailTemplateDraft,
   type EmailTemplate,
   type TemplateUsageBooking,
+  type TemplateUsageTrendPoint,
 } from "@/state/adminMockData";
 
 import { FormField } from "./atoms";
 import { LatestTouchBadge } from "./LatestTouchBadge";
 import { TemplateUsagePopover } from "./TemplateUsagePopover";
+import { TemplateUsageSparkline } from "./TemplateUsageSparkline";
 import { BRAND, BRAND_SOFT } from "./theme";
 
 /** Mirror of {@link buildCallTemplateRemoveConfirm} for the email
@@ -52,6 +54,7 @@ export function EmailTemplatesView({
   usageCounts,
   usageBookings,
   latestTouchCounts,
+  usageTrends,
   onOpenFilteredBookings,
   onOpenBooking,
   onCreate,
@@ -75,6 +78,13 @@ export function EmailTemplatesView({
    *  here equals the row count the admin will see after clicking
    *  through. Defaults to 0 per template. */
   latestTouchCounts?: Readonly<Record<string, number>>;
+  /** Per-template rolling 7-day usage trend keyed by template id
+   *  (Task #171). Each entry is an oldest-first → most-recent-last
+   *  array of `{ date, count }` buckets sourced from
+   *  {@link getTemplateUsageTrend}; the sparkline renders the
+   *  underlying numbers in its hover `title`. Omit to suppress the
+   *  sparkline entirely (the templates panel still works). */
+  usageTrends?: Readonly<Record<string, ReadonlyArray<TemplateUsageTrendPoint>>>;
   /** Click-through handler for the "Used in N bookings" badge.
    *  Receives the template's current name (the filter is
    *  snapshot-on-use so it matches the literal string the timeline
@@ -373,6 +383,7 @@ export function EmailTemplatesView({
                 const usage = usageCounts?.[t.id] ?? 0;
                 const bookings = usageBookings?.[t.id] ?? [];
                 const latestTouch = latestTouchCounts?.[t.id] ?? 0;
+                const trend = usageTrends?.[t.id];
                 const isFocused = focusedTemplateId === t.id;
                 const isPulsing = pulseId === t.id;
                 const isDragging = draggingId === t.id;
@@ -568,6 +579,13 @@ export function EmailTemplatesView({
                         count={latestTouch}
                         onOpenFilteredBookings={onOpenFilteredBookings}
                       />
+                      {trend ? (
+                        <TemplateUsageSparkline
+                          kind="email"
+                          templateId={t.id}
+                          trend={trend}
+                        />
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-[12px] text-slate-700">

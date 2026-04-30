@@ -36,6 +36,7 @@ import {
   getEffectivePlacementForUnit,
   getRecordedAcTypeForUnit,
   getServiceRuleForAcType,
+  getTemplateUsageTrend,
   isCustomCallTemplateLabel,
   liveBookingFromSession,
   nextCallTemplateId,
@@ -360,6 +361,26 @@ export function AdminApp() {
         "call",
         t.name,
       );
+    }
+    return out;
+  }, [allBookings, callTemplates]);
+
+  // Per-template rolling 7-day usage trend (Task #171). Drives the
+  // sparkline shown next to the "Used in N bookings" badge so admins
+  // can spot a template whose usage is climbing without leaving the
+  // panel. Snapshot-on-use semantics — a rename doesn't reattribute
+  // historical bars, same rule the headline count badge follows.
+  const emailTemplateUsageTrends = useMemo(() => {
+    const out: Record<string, ReturnType<typeof getTemplateUsageTrend>> = {};
+    for (const t of emailTemplates) {
+      out[t.id] = getTemplateUsageTrend(allBookings, "email", t.name);
+    }
+    return out;
+  }, [allBookings, emailTemplates]);
+  const callTemplateUsageTrends = useMemo(() => {
+    const out: Record<string, ReturnType<typeof getTemplateUsageTrend>> = {};
+    for (const t of callTemplates) {
+      out[t.id] = getTemplateUsageTrend(allBookings, "call", t.name);
     }
     return out;
   }, [allBookings, callTemplates]);
@@ -1774,6 +1795,7 @@ export function AdminApp() {
               usageCounts={emailTemplateUsageCounts}
               usageBookings={emailTemplateUsageBookings}
               latestTouchCounts={emailTemplateLatestTouchCounts}
+              usageTrends={emailTemplateUsageTrends}
               onOpenFilteredBookings={(templateName) =>
                 openBookingsForTemplate("email", templateName)
               }
@@ -1793,6 +1815,7 @@ export function AdminApp() {
               usageCounts={callTemplateUsageCounts}
               usageBookings={callTemplateUsageBookings}
               latestTouchCounts={callTemplateLatestTouchCounts}
+              usageTrends={callTemplateUsageTrends}
               onOpenFilteredBookings={(templateName) =>
                 openBookingsForTemplate("call", templateName)
               }
