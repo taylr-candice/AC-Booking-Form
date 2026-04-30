@@ -604,6 +604,186 @@ describe("EmailTemplatesView · Sort by Most used first", () => {
 });
 
 /**
+ * Sort-by-Most-referenced-overall (Task #193) — mirror of the
+ * "Most used first" describe above, but ordering off `usageCounts`
+ * (the history-wide "Referenced by N timeline entries" count from the
+ * usage popover) instead of `latestTouchCounts` (latest-touch only).
+ *
+ * The two axes can disagree: a template that ops fired heavily a
+ * month ago but hasn't touched recently can have a tall historical
+ * count and a tiny latest-touch count, so picking the right sort
+ * matters for hygiene work. These tests pin that the new toggle
+ * sorts by the history-wide axis specifically — i.e. using a fixture
+ * where the two counts deliberately rank rows differently and
+ * asserting the row order matches the history-wide ranking.
+ */
+describe("EmailTemplatesView · Sort by Most referenced overall", () => {
+  it("clicking 'Most referenced overall' re-sorts non-default rows by usageCounts desc — independently of latestTouchCounts", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "" },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+      { id: "tpl-d", name: "Delta", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        // Latest-touch and history-wide counts deliberately rank the
+        // rows differently. Latest-touch desc → b, c, a, d.
+        // History-wide desc → d, a, c, b. The new toggle must
+        // produce the history-wide order, proving it reads from
+        // usageCounts and not latestTouchCounts.
+        latestTouchCounts={{
+          "tpl-a": 1,
+          "tpl-b": 9,
+          "tpl-c": 4,
+          "tpl-d": 0,
+        }}
+        usageCounts={{
+          "tpl-a": 7,
+          "tpl-b": 1,
+          "tpl-c": 3,
+          "tpl-d": 12,
+        }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-most-referenced"),
+    );
+
+    expect(
+      screen
+        .getByTestId("sort-toggle-email-templates")
+        .getAttribute("data-sort-mode"),
+    ).toBe("mostReferenced");
+    expect(
+      screen
+        .getByTestId("button-sort-email-templates-most-referenced")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    // Default + Most-used buttons read as not pressed so the three
+    // options are mutually exclusive.
+    expect(
+      screen
+        .getByTestId("button-sort-email-templates-default")
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+    expect(
+      screen
+        .getByTestId("button-sort-email-templates-most-used")
+        .getAttribute("aria-pressed"),
+    ).toBe("false");
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    // 12 → 7 → 3 → 1 by usageCounts.
+    expect(sortedIds).toEqual([
+      "email-template-row-tpl-d",
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-c",
+      "email-template-row-tpl-b",
+    ]);
+
+    // Toggle back — original catalog order is restored verbatim, so
+    // the sort never mutated the underlying templates prop.
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-default"),
+    );
+    const restoredIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(restoredIds).toEqual([
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-c",
+      "email-template-row-tpl-d",
+    ]);
+  });
+
+  it("ties on usageCounts break by current row order so the list is stable", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "" },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+      { id: "tpl-d", name: "Delta", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        usageCounts={{
+          "tpl-a": 5,
+          "tpl-b": 2,
+          "tpl-c": 5,
+          "tpl-d": 2,
+        }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-most-referenced"),
+    );
+
+    const sortedIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(sortedIds).toEqual([
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-c",
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-d",
+    ]);
+  });
+
+  it("default row stays pinned at the top in Most-referenced mode, even when its usageCount is lowest", () => {
+    const templates: EmailTemplate[] = [
+      { id: "tpl-a", name: "Alpha", subject: "", note: "", isDefault: true },
+      { id: "tpl-b", name: "Bravo", subject: "", note: "" },
+      { id: "tpl-c", name: "Charlie", subject: "", note: "" },
+    ];
+    render(
+      <EmailTemplatesView
+        templates={templates}
+        usageCounts={{ "tpl-a": 0, "tpl-b": 9, "tpl-c": 4 }}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+        onSetDefault={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("button-sort-email-templates-most-referenced"),
+    );
+    const rowIds = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((r) => r.getAttribute("data-testid"));
+    expect(rowIds).toEqual([
+      "email-template-row-tpl-a",
+      "email-template-row-tpl-b",
+      "email-template-row-tpl-c",
+    ]);
+  });
+});
+
+/**
  * Companion test — mirrors the harness style of the existing
  * `AwaitingCoordinationView.bulkLogEmail.test.tsx`. We mount the full
  * `<AdminApp />`, add a template through the panel, then jump to the

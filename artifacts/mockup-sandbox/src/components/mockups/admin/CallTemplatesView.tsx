@@ -208,15 +208,25 @@ export function CallTemplatesView({
     return () => clearTimeout(t);
   }, [pulseId]);
 
-  // Sort toggle (Task #170). `default` keeps the natural catalog
-  // order; `mostUsed` re-sorts the non-default rows by the same
-  // "Used in N bookings" badge that the LatestTouchBadge renders so
-  // an admin spotting an over-used template can push the busiest
-  // rows to the top in one click. The default row stays pinned at
-  // the top regardless — the per-row Pin icon and copy already
-  // promise that, and re-sorting it down would conflict with the
-  // existing default-pinning contract.
-  const [sortMode, setSortMode] = useState<"default" | "mostUsed">("default");
+  // Sort toggle (Task #170 + #193). `default` keeps the natural
+  // catalog order; `mostUsed` re-sorts the non-default rows by the
+  // "Used in N bookings" badge that LatestTouchBadge renders (latest-
+  // touch-only — the same predicate the BookingsView template filter
+  // uses) so an admin spotting an over-used template can push the
+  // busiest rows to the top in one click; `mostReferenced` re-sorts
+  // by the history-wide reference count surfaced on the
+  // TemplateUsagePopover ("Referenced by N timeline entries"), which
+  // is dedup-per-booking but counts every booking the template was
+  // ever sent on rather than just bookings whose freshest touch is
+  // this template — useful for hygiene work like spotting the
+  // template the team has historically leaned on the most. The
+  // default row stays pinned at the top regardless of sort mode —
+  // the per-row Pin icon and copy already promise that, and re-
+  // sorting it down would conflict with the existing default-pinning
+  // contract.
+  const [sortMode, setSortMode] = useState<
+    "default" | "mostUsed" | "mostReferenced"
+  >("default");
 
   const defaultTemplate = findDefaultCallTemplate(templates);
 
@@ -235,18 +245,24 @@ export function CallTemplatesView({
     const nonDefault = defaultTemplate
       ? templates.filter((t) => t.id !== defaultTemplate.id)
       : templates;
-    const sortedNonDefault =
-      sortMode === "mostUsed"
-        ? [...nonDefault].sort(
-            (a, b) =>
-              (latestTouchCounts?.[b.id] ?? 0) -
-              (latestTouchCounts?.[a.id] ?? 0),
-          )
-        : nonDefault;
+    let sortedNonDefault: typeof nonDefault;
+    if (sortMode === "mostUsed") {
+      sortedNonDefault = [...nonDefault].sort(
+        (a, b) =>
+          (latestTouchCounts?.[b.id] ?? 0) -
+          (latestTouchCounts?.[a.id] ?? 0),
+      );
+    } else if (sortMode === "mostReferenced") {
+      sortedNonDefault = [...nonDefault].sort(
+        (a, b) => (usageCounts?.[b.id] ?? 0) - (usageCounts?.[a.id] ?? 0),
+      );
+    } else {
+      sortedNonDefault = nonDefault;
+    }
     return defaultTemplate
       ? [defaultTemplate, ...sortedNonDefault]
       : sortedNonDefault;
-  }, [templates, defaultTemplate, sortMode, latestTouchCounts]);
+  }, [templates, defaultTemplate, sortMode, latestTouchCounts, usageCounts]);
 
   const focusDefaultRow = () => {
     if (!defaultTemplate) return;
@@ -421,6 +437,21 @@ export function CallTemplatesView({
             >
               <ArrowDownWideNarrow className="h-3 w-3" />
               Most used first
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortMode("mostReferenced")}
+              data-testid="button-sort-call-templates-most-referenced"
+              aria-pressed={sortMode === "mostReferenced"}
+              title="Sort non-default rows by the 'Referenced by N timeline entries' history-wide count — templates the team has leaned on the most overall jump to the top. Ties keep their current order."
+              className={
+                sortMode === "mostReferenced"
+                  ? "inline-flex items-center gap-1 rounded-md bg-slate-900 px-2.5 py-1 text-[12px] font-semibold text-white"
+                  : "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-semibold text-slate-600 hover:bg-slate-100"
+              }
+            >
+              <ArrowDownWideNarrow className="h-3 w-3" />
+              Most referenced overall
             </button>
           </div>
         </div>
