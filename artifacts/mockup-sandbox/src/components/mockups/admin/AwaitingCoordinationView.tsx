@@ -297,6 +297,7 @@ export function AwaitingCoordinationView({
     outcome: CallOutcome,
     note: string,
     templateLabel: string,
+    isDefault: boolean,
   ) => void;
   /** Bulk-log an email against every supplied booking. Mirror of
    *  `onBulkLogCall` for the email channel — appends a typed
@@ -319,6 +320,7 @@ export function AwaitingCoordinationView({
     subject: string,
     note: string,
     templateLabel: string,
+    isDefault: boolean,
   ) => void;
   /** Live email-template catalog the bulk Log-email dropdown reads
    *  from. Defaults to the seeded {@link EMAIL_TEMPLATES} so the view
@@ -704,11 +706,15 @@ export function AwaitingCoordinationView({
     // template surfaces its current name in the toast.
     const tpl = callTemplates.find((t) => t.id === bulkCallTemplateId);
     const templateLabel = tpl ? tpl.name : CALL_TEMPLATE_CUSTOM_LABEL;
+    // Forward whether the pick is the channel default so the toast
+    // can echo a "(Default)" marker matching the dropdown pill.
+    const isDefault = tpl?.isDefault ?? false;
     onBulkLogCall(
       Array.from(selectedIds),
       bulkOutcome,
       bulkNote,
       templateLabel,
+      isDefault,
     );
     clearSelection();
   }
@@ -762,11 +768,15 @@ export function AwaitingCoordinationView({
     // unknown id, which the select handler should already prevent).
     const tpl = emailTemplates.find((t) => t.id === bulkEmailTemplateId);
     const templateLabel = tpl ? tpl.name : EMAIL_TEMPLATE_CUSTOM_LABEL;
+    // Forward whether the pick is the channel default so the toast
+    // can echo a "(Default)" marker matching the dropdown pill.
+    const isDefault = tpl?.isDefault ?? false;
     onBulkLogEmail(
       Array.from(selectedIds),
       bulkEmailSubject,
       bulkEmailNote,
       templateLabel,
+      isDefault,
     );
     clearSelection();
   }

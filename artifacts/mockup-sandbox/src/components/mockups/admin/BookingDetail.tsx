@@ -147,19 +147,33 @@ export function BookingDetail({
    *  consistently in ops' bottom-right toaster. The second arg is the
    *  human-readable outcome label (e.g. `"Spoke to them"`) so the
    *  toast can fall back to it on the `Custom` path — analogous to
-   *  how the email toast falls back to the free-text subject.
-   *  Optional so existing call-sites and tests that don't care about
-   *  the toast remain valid — the timeline write happens regardless. */
-  onLogCallToast?: (templateLabel: string, outcomeLabel: string) => void;
+   *  how the email toast falls back to the free-text subject. The
+   *  third arg flags whether the picked template is the channel
+   *  default so the AdminApp shell can echo the same "Default" marker
+   *  the per-row dropdown trigger shows (Task #163 / #169). Optional
+   *  so existing call-sites and tests that don't care about the toast
+   *  remain valid — the timeline write happens regardless. */
+  onLogCallToast?: (
+    templateLabel: string,
+    outcomeLabel: string,
+    isDefault: boolean,
+  ) => void;
   /** Mirror of the bulk-log-email toast on
    *  {@link AwaitingCoordinationView}: fired after a per-row email
    *  is logged so the AdminApp shell can surface a confirmation toast
    *  reflecting which template (or `Custom`) landed. Same shape as the
    *  bulk handler's toast so single- and batch-logged emails read
-   *  consistently in ops' bottom-right toaster. Optional so existing
+   *  consistently in ops' bottom-right toaster. The third arg flags
+   *  whether the picked template is the channel default so the
+   *  AdminApp shell can echo the same "Default" marker the per-row
+   *  dropdown trigger shows (Task #163 / #169). Optional so existing
    *  call-sites and tests that don't care about the toast remain
    *  valid — the timeline write happens regardless. */
-  onLogEmailToast?: (templateLabel: string, subject: string) => void;
+  onLogEmailToast?: (
+    templateLabel: string,
+    subject: string,
+    isDefault: boolean,
+  ) => void;
   /** Round-trip companion to the Call / Email templates panel's
    *  "Referenced by N entries" popover (Task #149): a timeline entry
    *  that was logged from a saved template renders a clickable
@@ -337,7 +351,12 @@ export function BookingDetail({
    * {@link onLogCallToast} callback so the AdminApp shell can fire
    * the same template-aware confirmation toast the bulk action does.
    */
-  function logCall(outcome: CallOutcome, note: string, templateLabel: string) {
+  function logCall(
+    outcome: CallOutcome,
+    note: string,
+    templateLabel: string,
+    isDefault: boolean,
+  ) {
     if (!booking) return;
     const nowIso = new Date().toISOString();
     const trimmedTemplate = templateLabel.trim();
@@ -358,7 +377,9 @@ export function BookingDetail({
       lastContactedAt: nowIso,
       serviceTimeline: [...booking.serviceTimeline, newEntry],
     });
-    onLogCallToast?.(templateLabel, CALL_OUTCOME_LABEL[outcome]);
+    // Forward the default flag so the toast echoes a "(Default)"
+    // marker matching the dropdown pill.
+    onLogCallToast?.(templateLabel, CALL_OUTCOME_LABEL[outcome], isDefault);
   }
 
   /**
@@ -377,7 +398,12 @@ export function BookingDetail({
    * {@link onLogEmailToast} callback so the AdminApp shell can fire
    * the same template-aware confirmation toast the bulk action does.
    */
-  function logEmail(subject: string, note: string, templateLabel: string) {
+  function logEmail(
+    subject: string,
+    note: string,
+    templateLabel: string,
+    isDefault: boolean,
+  ) {
     if (!booking) return;
     const nowIso = new Date().toISOString();
     const trimmedSubject = subject.trim();
@@ -407,7 +433,9 @@ export function BookingDetail({
       lastContactedAt: nowIso,
       serviceTimeline: [...booking.serviceTimeline, newEntry],
     });
-    onLogEmailToast?.(templateLabel, trimmedSubject);
+    // Forward the default flag so the toast echoes a "(Default)"
+    // marker matching the dropdown pill.
+    onLogEmailToast?.(templateLabel, trimmedSubject, isDefault);
   }
 
   return (
@@ -635,12 +663,12 @@ export function BookingDetail({
                 }}
                 onCloseLogCall={() => setShowLogCall(false)}
                 onCloseLogEmail={() => setShowLogEmail(false)}
-                onLogCall={(outcome, note, templateLabel) => {
-                  logCall(outcome, note, templateLabel);
+                onLogCall={(outcome, note, templateLabel, isDefault) => {
+                  logCall(outcome, note, templateLabel, isDefault);
                   setShowLogCall(false);
                 }}
-                onLogEmail={(subject, note, templateLabel) => {
-                  logEmail(subject, note, templateLabel);
+                onLogEmail={(subject, note, templateLabel, isDefault) => {
+                  logEmail(subject, note, templateLabel, isDefault);
                   setShowLogEmail(false);
                 }}
                 onScheduleCoordination={
@@ -1214,8 +1242,18 @@ function CoordinationCoordinatePanel({
   onOpenLogEmail: () => void;
   onCloseLogCall: () => void;
   onCloseLogEmail: () => void;
-  onLogCall: (outcome: CallOutcome, note: string, templateLabel: string) => void;
-  onLogEmail: (subject: string, note: string, templateLabel: string) => void;
+  onLogCall: (
+    outcome: CallOutcome,
+    note: string,
+    templateLabel: string,
+    isDefault: boolean,
+  ) => void;
+  onLogEmail: (
+    subject: string,
+    note: string,
+    templateLabel: string,
+    isDefault: boolean,
+  ) => void;
   onScheduleCoordination?: () => void;
   emailTemplates: ReadonlyArray<EmailTemplate>;
   callTemplates: ReadonlyArray<CallTemplate>;
@@ -1470,6 +1508,7 @@ function LogCallForm({
     outcome: CallOutcome,
     note: string,
     templateLabel: string,
+    isDefault: boolean,
   ) => void;
   /** Live call-template catalog the dropdown reads from. Same prop
    *  shape (and same snapshot-on-use semantics) as the bulk Log-call
@@ -1528,7 +1567,10 @@ function LogCallForm({
     // note still snapshots onto the timeline entry.
     const tpl = callTemplates.find((t) => t.id === templateId);
     const templateLabel = tpl ? tpl.name : CALL_TEMPLATE_CUSTOM_LABEL;
-    onSubmit(outcome, note, templateLabel);
+    // Forward whether the pick is the channel default so the toast
+    // can echo a "(Default)" marker matching the dropdown pill.
+    const isDefault = tpl?.isDefault ?? false;
+    onSubmit(outcome, note, templateLabel, isDefault);
   }
   // Drives the "Default" pill next to the collapsed dropdown trigger.
   const selectedCallIsDefault =
@@ -1648,7 +1690,12 @@ function LogEmailForm({
    *  note are what land on the timeline — snapshot-on-use — while the
    *  label is forwarded by the AdminApp shell to its toast so a
    *  per-row email reads the same as a bulk-logged one. */
-  onSubmit: (subject: string, note: string, templateLabel: string) => void;
+  onSubmit: (
+    subject: string,
+    note: string,
+    templateLabel: string,
+    isDefault: boolean,
+  ) => void;
   /** Live email-template catalog the dropdown reads from. Same prop
    *  shape (and same snapshot-on-use semantics) as the bulk
    *  Log-email form on `AwaitingCoordinationView`: picking a template
@@ -1726,7 +1773,10 @@ function LogEmailForm({
     // subject + note still snapshot onto the timeline entry.
     const tpl = emailTemplates.find((t) => t.id === templateId);
     const templateLabel = tpl ? tpl.name : EMAIL_TEMPLATE_CUSTOM_LABEL;
-    onSubmit(subject, note, templateLabel);
+    // Forward whether the pick is the channel default so the toast
+    // can echo a "(Default)" marker matching the dropdown pill.
+    const isDefault = tpl?.isDefault ?? false;
+    onSubmit(subject, note, templateLabel, isDefault);
   }
 
   // Drives the "Default" pill next to the collapsed dropdown trigger.

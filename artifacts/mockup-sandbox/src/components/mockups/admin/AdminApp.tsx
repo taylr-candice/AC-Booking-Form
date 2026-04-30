@@ -668,6 +668,7 @@ export function AdminApp() {
     outcome: CallOutcome,
     note: string,
     templateLabel: string,
+    isDefault: boolean = false,
   ) {
     if (ids.length === 0) return;
     const idSet = new Set(ids);
@@ -699,15 +700,14 @@ export function AdminApp() {
     );
     const count = ids.length;
     // Toast format reflects which template (or "Custom") landed so
-    // ops can confirm at a glance — keeps the Awaiting-coordination
-    // confirmation consistent across batches. On the Custom path we
-    // surface the outcome label as a fallback (analogous to the
-    // bulk-log-email toast surfacing the free-text subject), since
-    // the outcome dropdown always carries a value and gives ops a
-    // useful "what kind of attempt landed" hint.
+    // ops can confirm at a glance. On the Custom path we surface the
+    // outcome label as a fallback (analogous to bulk-log-email
+    // surfacing the free-text subject). Default templates also echo
+    // a "(Default)" marker matching the per-row dropdown pill.
+    const defaultSuffix = !isCustom && isDefault ? " · (Default)" : "";
     const tail = isCustom
       ? ` · Custom · ${CALL_OUTCOME_LABEL[outcome]}`
-      : ` · ${trimmedTemplate}`;
+      : ` · ${trimmedTemplate}${defaultSuffix}`;
     setToast({
       id: `bulk-log-call-${Date.now()}`,
       message: `Logged call on ${count} booking${count === 1 ? "" : "s"}${tail}`,
@@ -734,6 +734,7 @@ export function AdminApp() {
     subject: string,
     note: string,
     templateLabel: string,
+    isDefault: boolean = false,
   ) {
     if (ids.length === 0) return;
     const nowIso = new Date().toISOString();
@@ -750,22 +751,20 @@ export function AdminApp() {
     );
     const count = ids.length;
     // Toast format reflects which template (or "Custom") landed so
-    // ops can confirm at a glance — keeps the Awaiting-coordination
-    // "Last attempt" cell consistent across batches because the same
-    // template label that ops just acknowledged also ends up in the
-    // timeline subject. For Custom we additionally surface the
-    // free-text subject so the toast still tells ops which message
-    // they actually sent. Trimmed for parity with the audit trail.
+    // ops can confirm at a glance. For Custom we surface the
+    // free-text subject as a fallback. Default templates also echo
+    // a "(Default)" marker matching the per-row dropdown pill.
     const trimmedTemplate = templateLabel.trim();
     const trimmedSubject = subject.trim();
     const isCustom =
       trimmedTemplate.length === 0 ||
       trimmedTemplate.toLowerCase() === "custom";
+    const defaultSuffix = !isCustom && isDefault ? " · (Default)" : "";
     const tail = isCustom
       ? trimmedSubject.length > 0
         ? ` · Custom · ${trimmedSubject}`
         : ` · Custom`
-      : ` · ${trimmedTemplate}`;
+      : ` · ${trimmedTemplate}${defaultSuffix}`;
     setToast({
       id: `bulk-log-email-${Date.now()}`,
       message: `Logged email on ${count} booking${count === 1 ? "" : "s"}${tail}`,
@@ -783,17 +782,24 @@ export function AdminApp() {
    * Awaiting-coordination bulk action bar. The detail screen still
    * owns the timeline write — this handler is purely the toast.
    */
-  function logEmailToast(templateLabel: string, subject: string) {
+  function logEmailToast(
+    templateLabel: string,
+    subject: string,
+    isDefault: boolean = false,
+  ) {
     const trimmedTemplate = templateLabel.trim();
     const trimmedSubject = subject.trim();
     const isCustom =
       trimmedTemplate.length === 0 ||
       trimmedTemplate.toLowerCase() === "custom";
+    // Default templates echo a "(Default)" marker matching the
+    // per-row dropdown pill.
+    const defaultSuffix = !isCustom && isDefault ? " · (Default)" : "";
     const tail = isCustom
       ? trimmedSubject.length > 0
         ? ` · Custom · ${trimmedSubject}`
         : ` · Custom`
-      : ` · ${trimmedTemplate}`;
+      : ` · ${trimmedTemplate}${defaultSuffix}`;
     setToast({
       id: `log-email-${Date.now()}`,
       message: `Logged email on 1 booking${tail}`,
@@ -812,17 +818,24 @@ export function AdminApp() {
    * detail screen still owns the timeline write — this handler is
    * purely the toast.
    */
-  function logCallToast(templateLabel: string, outcomeLabel: string) {
+  function logCallToast(
+    templateLabel: string,
+    outcomeLabel: string,
+    isDefault: boolean = false,
+  ) {
     const trimmedTemplate = templateLabel.trim();
     const trimmedOutcome = outcomeLabel.trim();
     const isCustom =
       trimmedTemplate.length === 0 ||
       trimmedTemplate.toLowerCase() === "custom";
+    // Default templates echo a "(Default)" marker matching the
+    // per-row dropdown pill.
+    const defaultSuffix = !isCustom && isDefault ? " · (Default)" : "";
     const tail = isCustom
       ? trimmedOutcome.length > 0
         ? ` · Custom · ${trimmedOutcome}`
         : ` · Custom`
-      : ` · ${trimmedTemplate}`;
+      : ` · ${trimmedTemplate}${defaultSuffix}`;
     setToast({
       id: `log-call-${Date.now()}`,
       message: `Logged call on 1 booking${tail}`,
