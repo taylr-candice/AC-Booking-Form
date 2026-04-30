@@ -348,3 +348,108 @@ describe("Templates panel sparkline ↔ AdminApp wiring", () => {
     expect(after).toBe(before + 1);
   });
 });
+
+/**
+ * Task #235 — proves the panels still thread `bookingsByDay` and
+ * `onOpenBooking` through to the sparkline and that a booking-row
+ * click inside the day-scoped popover lands on the matching
+ * `BookingDetail`. Mirror of the bulk-picker coverage in
+ * `AwaitingCoordinationView.bulkTemplateDayDrilldown.test.tsx`.
+ */
+describe("Templates panel sparkline · per-day drill-down click path (Task #235)", () => {
+  function todayUtcKey(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  it("clicking a non-zero bar on the Call templates panel opens the day-scoped popover and clicking a booking row navigates to that BookingDetail", () => {
+    render(<AdminApp />);
+
+    const tpl = CALL_TEMPLATES[0]!;
+
+    // Plant a fresh entry so today's bucket on tpl.id is guaranteed
+    // non-zero regardless of seeded baseline drift.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1038"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    fireEvent.change(screen.getByTestId("select-bulk-call-template"), {
+      target: { value: tpl.id },
+    });
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-call"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    const today = todayUtcKey();
+    const bar = screen.getByTestId(
+      `call-template-usage-sparkline-bar-${tpl.id}-${today}`,
+    );
+    expect(bar.tagName).toBe("BUTTON");
+    expect(bar.getAttribute("data-interactive")).toBe("true");
+    expect(
+      screen.queryByTestId(`call-template-usage-sparkline-popover-${tpl.id}`),
+    ).toBeNull();
+
+    fireEvent.click(bar);
+
+    const popover = screen.getByTestId(
+      `call-template-usage-sparkline-popover-${tpl.id}`,
+    );
+    expect(popover.getAttribute("data-day")).toBe(today);
+
+    fireEvent.click(
+      screen.getByTestId(
+        `call-template-usage-sparkline-booking-${tpl.id}-${today}-bk-1038`,
+      ),
+    );
+
+    expect(screen.getByTestId("booking-detail-bk-1038")).toBeTruthy();
+    expect(
+      screen.queryByTestId(`call-template-usage-sparkline-popover-${tpl.id}`),
+    ).toBeNull();
+  });
+
+  it("clicking a non-zero bar on the Email templates panel opens the day-scoped popover and clicking a booking row navigates to that BookingDetail", () => {
+    render(<AdminApp />);
+
+    const tpl = EMAIL_TEMPLATES[0]!;
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1038"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+    fireEvent.change(screen.getByTestId("select-bulk-email-template"), {
+      target: { value: tpl.id },
+    });
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-email"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    const today = todayUtcKey();
+    const bar = screen.getByTestId(
+      `email-template-usage-sparkline-bar-${tpl.id}-${today}`,
+    );
+    expect(bar.tagName).toBe("BUTTON");
+    expect(bar.getAttribute("data-interactive")).toBe("true");
+    expect(
+      screen.queryByTestId(`email-template-usage-sparkline-popover-${tpl.id}`),
+    ).toBeNull();
+
+    fireEvent.click(bar);
+
+    const popover = screen.getByTestId(
+      `email-template-usage-sparkline-popover-${tpl.id}`,
+    );
+    expect(popover.getAttribute("data-day")).toBe(today);
+
+    fireEvent.click(
+      screen.getByTestId(
+        `email-template-usage-sparkline-booking-${tpl.id}-${today}-bk-1038`,
+      ),
+    );
+
+    expect(screen.getByTestId("booking-detail-bk-1038")).toBeTruthy();
+    expect(
+      screen.queryByTestId(`email-template-usage-sparkline-popover-${tpl.id}`),
+    ).toBeNull();
+  });
+});
