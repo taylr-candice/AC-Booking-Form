@@ -768,6 +768,17 @@ export function AwaitingCoordinationView({
   // the call and email affordances.
   const bulkActionsEnabled = Boolean(onBulkLogCall || onBulkLogEmail);
 
+  // Active defaults for the call/email channels — surfaced as a small
+  // hint line above the bulk-action pill so ops can confirm at a
+  // glance which template will be pre-selected when they open either
+  // bulk form, without having to click through or jump to the
+  // templates panel. Derived live from the `callTemplates` /
+  // `emailTemplates` props (the same source the bulk forms read from)
+  // so flipping the default in the templates panel updates the hint
+  // on the next render.
+  const defaultCallTemplateForHint = findDefaultCallTemplate(callTemplates);
+  const defaultEmailTemplateForHint = findDefaultEmailTemplate(emailTemplates);
+
   return (
     <div className="flex flex-col gap-4">
       {/* Summary */}
@@ -1374,6 +1385,43 @@ export function AwaitingCoordinationView({
                     Save email for {selectedCount}
                   </button>
                 </div>
+              </div>
+            )}
+            {/* Default-template hint — surfaces which template will be
+                pre-selected when ops opens the bulk Log call / Log
+                email forms, so they can confirm the active default
+                at a glance without opening the form or jumping to
+                the templates panel. Stays in sync because the
+                defaults are derived live from the `callTemplates` /
+                `emailTemplates` props (the same source the bulk
+                forms read from). The whole hint is omitted when
+                neither channel has a default set. */}
+            {(defaultCallTemplateForHint || defaultEmailTemplateForHint) && (
+              <div
+                className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-center text-[11px] text-slate-600 shadow-sm"
+                data-testid="bulk-action-bar-default-hint"
+              >
+                {defaultCallTemplateForHint && (
+                  <span data-testid="bulk-action-bar-default-call">
+                    Log call default:{" "}
+                    <span className="font-medium text-slate-800">
+                      {defaultCallTemplateForHint.name}
+                    </span>
+                  </span>
+                )}
+                {defaultCallTemplateForHint && defaultEmailTemplateForHint && (
+                  <span aria-hidden="true" className="text-slate-300">
+                    ·
+                  </span>
+                )}
+                {defaultEmailTemplateForHint && (
+                  <span data-testid="bulk-action-bar-default-email">
+                    Log email default:{" "}
+                    <span className="font-medium text-slate-800">
+                      {defaultEmailTemplateForHint.name}
+                    </span>
+                  </span>
+                )}
               </div>
             )}
             <div className="flex items-center justify-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2.5 shadow-lg">
