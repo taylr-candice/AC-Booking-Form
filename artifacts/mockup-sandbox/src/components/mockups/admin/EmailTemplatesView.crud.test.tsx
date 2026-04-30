@@ -37,6 +37,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   EMAIL_TEMPLATES,
+  setDefaultEmailTemplate,
   type EmailTemplate,
 } from "@/state/adminMockData";
 
@@ -91,6 +92,9 @@ function Harness({ initial }: { initial: EmailTemplate[] }) {
       }
       onRemove={(id) =>
         setTemplates((prev) => prev.filter((t) => t.id !== id))
+      }
+      onSetDefault={(id) =>
+        setTemplates((prev) => setDefaultEmailTemplate(prev, id))
       }
     />
   );
@@ -305,6 +309,7 @@ describe("EmailTemplatesView · CRUD", () => {
         onCreate={onCreate}
         onUpdate={onUpdate}
         onRemove={onRemove}
+        onSetDefault={vi.fn()}
       />,
     );
 

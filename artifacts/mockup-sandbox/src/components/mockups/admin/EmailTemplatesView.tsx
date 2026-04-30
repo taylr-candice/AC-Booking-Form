@@ -19,7 +19,7 @@
  * editor for create / edit, with a single tabular row per template.
  */
 
-import { Edit3, Mail, Plus, Trash2, X } from "lucide-react";
+import { Edit3, Mail, Plus, Star, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -49,6 +49,7 @@ export function EmailTemplatesView({
   onCreate,
   onUpdate,
   onRemove,
+  onSetDefault,
 }: {
   templates: EmailTemplate[];
   /** Per-template count of timeline entries referencing each template
@@ -70,6 +71,8 @@ export function EmailTemplatesView({
    *  removed template — historical timeline entries are never
    *  affected (snapshot-on-use). */
   onRemove: (id: string) => void;
+  /** Toggle the default flag on the given template. */
+  onSetDefault: (id: string) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -113,6 +116,7 @@ export function EmailTemplatesView({
           <table className="w-full text-left text-[13px]">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="px-4 py-3 font-semibold w-12">Default</th>
                 <th className="px-4 py-3 font-semibold">Template</th>
                 <th className="px-4 py-3 font-semibold">Subject</th>
                 <th className="px-4 py-3 font-semibold">Suggested note</th>
@@ -128,6 +132,35 @@ export function EmailTemplatesView({
                     data-testid={`email-template-row-${t.id}`}
                     className="border-b border-slate-100 last:border-b-0 align-top"
                   >
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => onSetDefault(t.id)}
+                        data-testid={`button-default-email-template-${t.id}`}
+                        data-default={t.isDefault ? "true" : "false"}
+                        aria-pressed={t.isDefault ? true : false}
+                        aria-label={
+                          t.isDefault
+                            ? `Unset "${t.name}" as the default Email template`
+                            : `Set "${t.name}" as the default Email template`
+                        }
+                        title={
+                          t.isDefault
+                            ? "Default — Log-email dropdowns open pre-selected on this template. Click to unset."
+                            : "Set as default — the per-row and bulk Log-email dropdowns will open pre-selected on this template."
+                        }
+                        className={
+                          t.isDefault
+                            ? "inline-flex h-7 w-7 items-center justify-center rounded-md text-amber-500 hover:bg-amber-50"
+                            : "inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+                        }
+                      >
+                        <Star
+                          className="h-4 w-4"
+                          fill={t.isDefault ? "currentColor" : "none"}
+                        />
+                      </button>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-900">{t.name}</div>
                       <div

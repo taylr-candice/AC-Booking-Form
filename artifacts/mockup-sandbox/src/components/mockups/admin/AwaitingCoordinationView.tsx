@@ -30,6 +30,8 @@ import {
   EMAIL_TEMPLATE_CUSTOM_ID,
   EMAIL_TEMPLATE_CUSTOM_LABEL,
   EMAIL_TEMPLATES,
+  findDefaultCallTemplate,
+  findDefaultEmailTemplate,
   formatAttemptRecency,
   formatCoordinationWaiting,
   formatLastContacted,
@@ -332,10 +334,12 @@ export function AwaitingCoordinationView({
   // place they were before this picker existed.
   const [showBulkLogCall, setShowBulkLogCall] = useState(false);
   const [bulkCallTemplateId, setBulkCallTemplateId] = useState<string>(
-    CALL_TEMPLATE_CUSTOM_ID,
+    () => findDefaultCallTemplate(callTemplates)?.id ?? CALL_TEMPLATE_CUSTOM_ID,
   );
   const [bulkOutcome, setBulkOutcome] = useState<CallOutcome>("no_answer");
-  const [bulkNote, setBulkNote] = useState("");
+  const [bulkNote, setBulkNote] = useState<string>(
+    () => findDefaultCallTemplate(callTemplates)?.note ?? "",
+  );
 
   // Bulk-log-email form state — same shape as the per-row
   // `LogEmailForm` on `BookingDetail` (subject + optional note) so
@@ -355,10 +359,15 @@ export function AwaitingCoordinationView({
   // same place they were before this picker existed.
   const [showBulkLogEmail, setShowBulkLogEmail] = useState(false);
   const [bulkEmailTemplateId, setBulkEmailTemplateId] = useState<string>(
-    EMAIL_TEMPLATE_CUSTOM_ID,
+    () =>
+      findDefaultEmailTemplate(emailTemplates)?.id ?? EMAIL_TEMPLATE_CUSTOM_ID,
   );
-  const [bulkEmailSubject, setBulkEmailSubject] = useState("");
-  const [bulkEmailNote, setBulkEmailNote] = useState("");
+  const [bulkEmailSubject, setBulkEmailSubject] = useState<string>(
+    () => findDefaultEmailTemplate(emailTemplates)?.subject ?? "",
+  );
+  const [bulkEmailNote, setBulkEmailNote] = useState<string>(
+    () => findDefaultEmailTemplate(emailTemplates)?.note ?? "",
+  );
 
   // Outcome chip filter — local because no other view needs to know
   // which outcome ops are pivoting on, and resetting it on view
@@ -601,14 +610,18 @@ export function AwaitingCoordinationView({
     // Closing the forms too keeps the bulk-action UI in a clean
     // "nothing in flight" state — otherwise re-selecting a different
     // set would resurface the previous outcome / subject / note.
+    // Re-resolve the default each call so a default flipped in the
+    // templates panel between batches takes effect immediately.
+    const defaultCall = findDefaultCallTemplate(callTemplates);
+    const defaultEmail = findDefaultEmailTemplate(emailTemplates);
     setShowBulkLogCall(false);
-    setBulkCallTemplateId(CALL_TEMPLATE_CUSTOM_ID);
+    setBulkCallTemplateId(defaultCall?.id ?? CALL_TEMPLATE_CUSTOM_ID);
     setBulkOutcome("no_answer");
-    setBulkNote("");
+    setBulkNote(defaultCall?.note ?? "");
     setShowBulkLogEmail(false);
-    setBulkEmailTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
-    setBulkEmailSubject("");
-    setBulkEmailNote("");
+    setBulkEmailTemplateId(defaultEmail?.id ?? EMAIL_TEMPLATE_CUSTOM_ID);
+    setBulkEmailSubject(defaultEmail?.subject ?? "");
+    setBulkEmailNote(defaultEmail?.note ?? "");
   }
 
   /**
@@ -1187,10 +1200,13 @@ export function AwaitingCoordinationView({
                   <button
                     type="button"
                     onClick={() => {
+                      const defaultCall = findDefaultCallTemplate(callTemplates);
                       setShowBulkLogCall(false);
-                      setBulkCallTemplateId(CALL_TEMPLATE_CUSTOM_ID);
+                      setBulkCallTemplateId(
+                        defaultCall?.id ?? CALL_TEMPLATE_CUSTOM_ID,
+                      );
                       setBulkOutcome("no_answer");
-                      setBulkNote("");
+                      setBulkNote(defaultCall?.note ?? "");
                     }}
                     data-testid="button-bulk-cancel-log-call"
                     className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
@@ -1282,10 +1298,15 @@ export function AwaitingCoordinationView({
                   <button
                     type="button"
                     onClick={() => {
+                      const defaultEmail = findDefaultEmailTemplate(
+                        emailTemplates,
+                      );
                       setShowBulkLogEmail(false);
-                      setBulkEmailTemplateId(EMAIL_TEMPLATE_CUSTOM_ID);
-                      setBulkEmailSubject("");
-                      setBulkEmailNote("");
+                      setBulkEmailTemplateId(
+                        defaultEmail?.id ?? EMAIL_TEMPLATE_CUSTOM_ID,
+                      );
+                      setBulkEmailSubject(defaultEmail?.subject ?? "");
+                      setBulkEmailNote(defaultEmail?.note ?? "");
                     }}
                     data-testid="button-bulk-cancel-log-email"
                     className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
@@ -1313,7 +1334,21 @@ export function AwaitingCoordinationView({
                 <button
                   type="button"
                   onClick={() => {
-                    setShowBulkLogCall((v) => !v);
+                    setShowBulkLogCall((v) => {
+                      if (!v) {
+                        // Opening (closed → open): re-resolve the
+                        // current default so each open is a fresh
+                        // defaulted form.
+                        const defaultCall =
+                          findDefaultCallTemplate(callTemplates);
+                        setBulkCallTemplateId(
+                          defaultCall?.id ?? CALL_TEMPLATE_CUSTOM_ID,
+                        );
+                        setBulkOutcome("no_answer");
+                        setBulkNote(defaultCall?.note ?? "");
+                      }
+                      return !v;
+                    });
                     // Mutually exclusive — opening Log call collapses
                     // the email form so only one panel ever floats
                     // above the pill at a time.
@@ -1333,7 +1368,18 @@ export function AwaitingCoordinationView({
                 <button
                   type="button"
                   onClick={() => {
-                    setShowBulkLogEmail((v) => !v);
+                    setShowBulkLogEmail((v) => {
+                      if (!v) {
+                        const defaultEmail =
+                          findDefaultEmailTemplate(emailTemplates);
+                        setBulkEmailTemplateId(
+                          defaultEmail?.id ?? EMAIL_TEMPLATE_CUSTOM_ID,
+                        );
+                        setBulkEmailSubject(defaultEmail?.subject ?? "");
+                        setBulkEmailNote(defaultEmail?.note ?? "");
+                      }
+                      return !v;
+                    });
                     setShowBulkLogCall(false);
                   }}
                   data-testid="button-bulk-log-email"

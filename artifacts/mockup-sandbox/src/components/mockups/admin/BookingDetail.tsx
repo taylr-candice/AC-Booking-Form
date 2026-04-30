@@ -32,6 +32,8 @@ import {
   coordinationContactForBooking,
   EMAIL_TEMPLATE_CUSTOM_ID,
   EMAIL_TEMPLATE_CUSTOM_LABEL,
+  findDefaultCallTemplate,
+  findDefaultEmailTemplate,
   isCustomCallTemplateLabel,
   isCustomEmailTemplateLabel,
   EMAIL_TEMPLATES,
@@ -1327,10 +1329,12 @@ function LogCallForm({
   // and we'd rather ops re-pick the outcome explicitly than silently
   // lose what they had.
   const [templateId, setTemplateId] = useState<string>(
-    CALL_TEMPLATE_CUSTOM_ID,
+    () => findDefaultCallTemplate(callTemplates)?.id ?? CALL_TEMPLATE_CUSTOM_ID,
   );
   const [outcome, setOutcome] = useState<CallOutcome>("no_answer");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState<string>(
+    () => findDefaultCallTemplate(callTemplates)?.note ?? "",
+  );
   function handleSelectTemplate(id: string) {
     setTemplateId(id);
     if (id === CALL_TEMPLATE_CUSTOM_ID) {
@@ -1488,10 +1492,15 @@ function LogEmailForm({
   // inputs, matching the bulk picker's mental model: "the dropdown is
   // the source of truth, edit it after if you need to tweak".
   const [templateId, setTemplateId] = useState<string>(
-    EMAIL_TEMPLATE_CUSTOM_ID,
+    () =>
+      findDefaultEmailTemplate(emailTemplates)?.id ?? EMAIL_TEMPLATE_CUSTOM_ID,
   );
-  const [subject, setSubject] = useState("");
-  const [note, setNote] = useState("");
+  const [subject, setSubject] = useState<string>(
+    () => findDefaultEmailTemplate(emailTemplates)?.subject ?? "",
+  );
+  const [note, setNote] = useState<string>(
+    () => findDefaultEmailTemplate(emailTemplates)?.note ?? "",
+  );
 
   /**
    * Pick (or unpick) a saved email template from the dropdown above

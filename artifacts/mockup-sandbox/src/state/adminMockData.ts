@@ -2063,6 +2063,9 @@ export type EmailTemplate = {
    *  service timeline (omitted when blank, matching the per-row
    *  `BookingDetail.logEmail` shape). */
   note: string;
+  /** At most one row per catalog. Pre-selects the template in the
+   *  per-row + bulk Log-email dropdowns (subject + note prefilled). */
+  isDefault?: boolean;
 };
 
 export const EMAIL_TEMPLATES: ReadonlyArray<EmailTemplate> = [
@@ -2147,6 +2150,10 @@ export type CallTemplate = {
    *  service timeline (omitted when blank, matching the per-row
    *  `BookingDetail.logCall` shape). */
   note: string;
+  /** At most one row per catalog. Pre-selects the template in the
+   *  per-row + bulk Log-call dropdowns (note prefilled). The call
+   *  outcome dropdown is unaffected. */
+  isDefault?: boolean;
 };
 
 /**
@@ -2306,6 +2313,61 @@ export function nextCallTemplateId(
     if (Number.isFinite(n) && n > max) max = n;
   }
   return `call-tpl-${max + 1}`;
+}
+
+export function findDefaultCallTemplate(
+  templates: readonly CallTemplate[],
+): CallTemplate | undefined {
+  return templates.find((t) => t.isDefault === true);
+}
+
+export function findDefaultEmailTemplate(
+  templates: readonly EmailTemplate[],
+): EmailTemplate | undefined {
+  return templates.find((t) => t.isDefault === true);
+}
+
+/**
+ * Toggle the default flag for `id`: clicking the active default
+ * unsets it, clicking any other row makes it the only default.
+ * Unknown ids are a no-op.
+ */
+export function setDefaultCallTemplate(
+  templates: readonly CallTemplate[],
+  id: string,
+): CallTemplate[] {
+  if (!templates.some((t) => t.id === id)) {
+    return templates.map((t) => ({ ...t }));
+  }
+  const wasDefault = templates.some((t) => t.id === id && t.isDefault === true);
+  return templates.map((t) => {
+    if (t.id === id) {
+      return { ...t, isDefault: !wasDefault };
+    }
+    if (t.isDefault) {
+      return { ...t, isDefault: false };
+    }
+    return t;
+  });
+}
+
+export function setDefaultEmailTemplate(
+  templates: readonly EmailTemplate[],
+  id: string,
+): EmailTemplate[] {
+  if (!templates.some((t) => t.id === id)) {
+    return templates.map((t) => ({ ...t }));
+  }
+  const wasDefault = templates.some((t) => t.id === id && t.isDefault === true);
+  return templates.map((t) => {
+    if (t.id === id) {
+      return { ...t, isDefault: !wasDefault };
+    }
+    if (t.isDefault) {
+      return { ...t, isDefault: false };
+    }
+    return t;
+  });
 }
 
 /**

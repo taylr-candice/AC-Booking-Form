@@ -41,6 +41,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   CALL_TEMPLATES,
+  setDefaultCallTemplate,
   type CallTemplate,
 } from "@/state/adminMockData";
 
@@ -93,6 +94,9 @@ function Harness({ initial }: { initial: CallTemplate[] }) {
       }
       onRemove={(id) =>
         setTemplates((prev) => prev.filter((t) => t.id !== id))
+      }
+      onSetDefault={(id) =>
+        setTemplates((prev) => setDefaultCallTemplate(prev, id))
       }
     />
   );
@@ -304,6 +308,7 @@ describe("CallTemplatesView · CRUD", () => {
         onCreate={onCreate}
         onUpdate={onUpdate}
         onRemove={onRemove}
+        onSetDefault={vi.fn()}
       />,
     );
 

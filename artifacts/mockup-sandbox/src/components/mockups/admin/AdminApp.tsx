@@ -42,6 +42,8 @@ import {
   priorServiceStatusFromTimeline,
   releaseBookingCapacity,
   revertScheduledToCoordinationPatch,
+  setDefaultCallTemplate as setDefaultCallTemplateInCatalog,
+  setDefaultEmailTemplate as setDefaultEmailTemplateInCatalog,
   SEEDED_AGENTS,
   SEEDED_BOOKINGS,
   SEEDED_BUILDINGS,
@@ -160,6 +162,9 @@ export function AdminApp() {
   function removeEmailTemplate(id: string) {
     setEmailTemplates((prev) => prev.filter((t) => t.id !== id));
   }
+  function setDefaultEmailTemplate(id: string) {
+    setEmailTemplates((prev) => setDefaultEmailTemplateInCatalog(prev, id));
+  }
 
   // Mutable call-template catalog for the per-row Log-call form on
   // `BookingDetail` and the bulk Log-call form on
@@ -198,6 +203,9 @@ export function AdminApp() {
   }
   function removeCallTemplate(id: string) {
     setCallTemplates((prev) => prev.filter((t) => t.id !== id));
+  }
+  function setDefaultCallTemplate(id: string) {
+    setCallTemplates((prev) => setDefaultCallTemplateInCatalog(prev, id));
   }
 
   // Per-template count of timeline entries that reference each
@@ -1299,6 +1307,7 @@ export function AdminApp() {
               onCreate={createEmailTemplate}
               onUpdate={updateEmailTemplate}
               onRemove={removeEmailTemplate}
+              onSetDefault={setDefaultEmailTemplate}
             />
           )}
 
@@ -1309,6 +1318,7 @@ export function AdminApp() {
               onCreate={createCallTemplate}
               onUpdate={updateCallTemplate}
               onRemove={removeCallTemplate}
+              onSetDefault={setDefaultCallTemplate}
             />
           )}
         </main>
