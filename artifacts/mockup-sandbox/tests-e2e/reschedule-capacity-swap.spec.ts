@@ -102,6 +102,9 @@ test.describe("Admin reschedule swaps rollout capacity", () => {
     const reviewBtn = modal.getByTestId("button-review-reschedule");
     await expect(reviewBtn).toBeDisabled();
 
+    // Task #241: focus the calendar day to reveal that day's window
+    // picker before tapping the window button.
+    await modal.getByTestId(`rollout-day-${TO_DATE}`).click();
     await modal
       .getByTestId(`rollout-pick-slot-${TO_DATE}__${TO_WINDOW}`)
       .click();
@@ -219,6 +222,9 @@ test.describe("Reschedule modal — same-slot guard", () => {
     // Pick a different slot — Review flips on, proving the guard is
     // the *only* thing keeping it disabled (and not e.g. a missing
     // pickedDate / pickedWindow).
+    // Task #241: each calendar day's window picker only renders for
+    // the focused day, so we focus the day before tapping its window.
+    await modal.getByTestId(`rollout-day-${OTHER_DATE}`).click();
     await modal
       .getByTestId(`rollout-pick-slot-${OTHER_DATE}__${OTHER_WINDOW}`)
       .click();
@@ -227,6 +233,7 @@ test.describe("Reschedule modal — same-slot guard", () => {
     // Re-pick the booking's CURRENT slot. `setPickedDate` /
     // `setPickedWindow` write the same values back, but `isSameAsCurrent`
     // re-evaluates true and the Review CTA must drop back to disabled.
+    await modal.getByTestId(`rollout-day-${CURRENT_DATE}`).click();
     await modal
       .getByTestId(`rollout-pick-slot-${CURRENT_DATE}__${CURRENT_WINDOW}`)
       .click();
@@ -283,6 +290,11 @@ test.describe("Reschedule modal — closed / full alternative cells", () => {
     // Admin-closed window — `openByAdmin: false` short-circuits to
     // "not_yet_open" so the slot button must be disabled and surface
     // the "Morning not yet open for booking" reason next to the cell.
+    // Task #241: focus the day on the calendar so its window picker
+    // panel becomes visible. The day cell itself stays clickable for
+    // open days even when no window is bookable, so the admin can
+    // still inspect the disabled-state copy.
+    await modal.getByTestId(`rollout-day-${CLOSED_DATE}`).click();
     const closedSlot = modal.getByTestId(
       `rollout-pick-slot-${CLOSED_DATE}__${CLOSED_WINDOW}`,
     );
@@ -295,6 +307,7 @@ test.describe("Reschedule modal — closed / full alternative cells", () => {
     // Fully-booked window (6/6) — slots-per-window mode prints the
     // exact "is full (booked/total)" copy so an admin can see the
     // capacity readout without hovering.
+    await modal.getByTestId(`rollout-day-${FULL_DATE}`).click();
     const fullSlot = modal.getByTestId(
       `rollout-pick-slot-${FULL_DATE}__${FULL_WINDOW}`,
     );

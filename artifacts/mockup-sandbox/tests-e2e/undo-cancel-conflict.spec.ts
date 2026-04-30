@@ -100,6 +100,8 @@ test.describe("Admin · Undo cancellation when slot was given away", () => {
     await page.getByRole("button", { name: /Continue/i }).click();
 
     // Step 3 — Schedule: pick the same morning slot bk-1042 just freed
+    // Task #241: focus the calendar day to reveal its window picker.
+    await page.getByTestId(`rollout-day-${SHARED_DATE}`).click();
     await page
       .getByTestId(`rollout-pick-slot-${SHARED_DATE}__morning`)
       .click();
@@ -141,6 +143,10 @@ test.describe("Admin · Undo cancellation when slot was given away", () => {
       rescheduleModal.getByTestId("undo-reschedule-explainer"),
     ).toBeVisible();
 
+    // Task #241: focus the calendar day for the restore slot first.
+    // The reschedule modal pre-selects the booking's original slot,
+    // so the panel needs to be re-focused on RESTORE_DATE.
+    await rescheduleModal.getByTestId(`rollout-day-${RESTORE_DATE}`).click();
     await rescheduleModal
       .getByTestId(`rollout-pick-slot-${RESTORE_DATE}__morning`)
       .click();

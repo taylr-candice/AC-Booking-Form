@@ -131,6 +131,10 @@ async function scheduleAndUndo(
   await expect(scheduleModal).toBeVisible();
 
   // ── 3. Pick the empty slot we just measured, then confirm.
+  // Task #241: the calendar's per-day window picker only renders for
+  // the focused day, so the day cell has to be clicked first to
+  // reveal the Morning / Afternoon / Evening buttons.
+  await scheduleModal.getByTestId(`rollout-day-${PICK_DATE}`).click();
   await scheduleModal
     .getByTestId(`rollout-pick-slot-${PICK_DATE}__${PICK_WINDOW}`)
     .click();

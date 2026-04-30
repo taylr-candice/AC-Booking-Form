@@ -22,7 +22,7 @@
  *                    bookedMinutes/bookedCount until the swap lands).
  *
  * Visuals match the Step 3 picker in the New Booking flow — same
- * RolloutDayCell grid + capacity-model accent — so admins see one
+ * RolloutMonthCalendar + capacity-model accent — so admins see one
  * picker no matter which entry point they came from.
  */
 
@@ -40,7 +40,10 @@ import {
 } from "@/state/adminMockData";
 import { formatDurationMinutes } from "@/state/bookingDerived";
 
-import { capacityModelColor, RolloutDayCell } from "./rolloutSlotPicker";
+import {
+  capacityModelColor,
+  RolloutMonthCalendar,
+} from "./rolloutSlotPicker";
 import { BRAND, BRAND_DEEP } from "./theme";
 
 /** Hard cap on the optional reschedule note so the timeline label
@@ -319,22 +322,17 @@ export function SchedulingModal({
                       {rollout.name} · {modeLabel}
                     </div>
                   </div>
-                  <div className="grid grid-cols-7 gap-2">
-                    {rollout.days.map((day) => (
-                      <RolloutDayCell
-                        key={day.isoDate}
-                        day={day}
-                        capacityModel={rollout.capacityModel}
-                        jobMinutes={jobMinutes}
-                        pickedDate={pickedDate}
-                        pickedWindow={pickedWindow}
-                        onPick={(date, window) => {
-                          setPickedDate(date);
-                          setPickedWindow(window);
-                        }}
-                      />
-                    ))}
-                  </div>
+                  <RolloutMonthCalendar
+                    days={rollout.days}
+                    capacityModel={rollout.capacityModel}
+                    jobMinutes={jobMinutes}
+                    pickedDate={pickedDate}
+                    pickedWindow={pickedWindow}
+                    onPick={(date, window) => {
+                      setPickedDate(date);
+                      setPickedWindow(window);
+                    }}
+                  />
                 </>
               ) : (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-[13px] text-slate-700">

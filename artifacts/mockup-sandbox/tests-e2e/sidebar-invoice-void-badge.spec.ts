@@ -99,7 +99,9 @@ async function createAdminInvoicePendingBooking(page: Page): Promise<string> {
   // Step 2 — AC config (defaults match u-aspen-02: ducted / 1 system / 0 extra)
   await page.getByRole("button", { name: /Continue/i }).click();
 
-  // Step 3 — Schedule
+  // Step 3 — Schedule. Task #241: click the calendar day cell first
+  // to reveal that day's window-picker panel.
+  await page.getByTestId(`rollout-day-${ADMIN_BOOKING_DATE}`).click();
   await page
     .getByTestId(`rollout-pick-slot-${ADMIN_BOOKING_DATE}__morning`)
     .click();

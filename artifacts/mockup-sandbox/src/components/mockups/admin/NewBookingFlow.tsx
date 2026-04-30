@@ -61,7 +61,10 @@ import {
 } from "@/state/liveAcServices";
 
 import { FormField } from "./atoms";
-import { capacityModelColor, RolloutDayCell } from "./rolloutSlotPicker";
+import {
+  capacityModelColor,
+  RolloutMonthCalendar,
+} from "./rolloutSlotPicker";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
 // ─── Local form state ──────────────────────────────────────────────────────
@@ -1023,25 +1026,20 @@ function Step3Schedule({
               {rollout.name} · {modeLabel}
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-2">
-            {rollout.days.map((day) => (
-              <RolloutDayCell
-                key={day.isoDate}
-                day={day}
-                capacityModel={rollout.capacityModel}
-                jobMinutes={jobMinutes}
-                pickedDate={form.pickedDate}
-                pickedWindow={form.pickedWindow}
-                onPick={(date, window) =>
-                  setForm((s) => ({
-                    ...s,
-                    pickedDate: date,
-                    pickedWindow: window,
-                  }))
-                }
-              />
-            ))}
-          </div>
+          <RolloutMonthCalendar
+            days={rollout.days}
+            capacityModel={rollout.capacityModel}
+            jobMinutes={jobMinutes}
+            pickedDate={form.pickedDate}
+            pickedWindow={form.pickedWindow}
+            onPick={(date, window) =>
+              setForm((s) => ({
+                ...s,
+                pickedDate: date,
+                pickedWindow: window,
+              }))
+            }
+          />
         </>
       ) : (
         <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-[13px] text-slate-700">

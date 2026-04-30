@@ -55,6 +55,10 @@ async function advanceToConfirmStep(page: Page) {
   await expect(modal).toBeVisible();
   await expect(modal).toContainText(/Currently 30 Apr · Afternoon/);
 
+  // Task #241: the calendar's window picker only renders for the
+  // currently-focused day, so the new TO_DATE day cell has to be
+  // clicked first to swap the panel away from FROM_DATE.
+  await modal.getByTestId(`rollout-day-${TO_DATE}`).click();
   await modal
     .getByTestId(`rollout-pick-slot-${TO_DATE}__${TO_WINDOW}`)
     .click();
