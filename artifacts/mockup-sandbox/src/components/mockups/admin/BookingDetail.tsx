@@ -100,6 +100,7 @@ export function BookingDetail({
   onLogCallToast,
   onLogEmailToast,
   onOpenTemplate,
+  onPivotToBookingsFilteredByTemplate,
   emailTemplates = EMAIL_TEMPLATES,
   callTemplates = CALL_TEMPLATES,
 }: {
@@ -168,6 +169,21 @@ export function BookingDetail({
    *  prop — the chip then degrades to a non-interactive label so the
    *  audit trail still shows which template wrote the entry. */
   onOpenTemplate?: (kind: "call" | "email", templateName: string) => void;
+  /** Round-trip companion to the BookingsView / Awaiting-coordination
+   *  "Last attempt: …" template-name pivot (Task #153): a timeline
+   *  entry that was logged from a saved template renders an extra
+   *  "View other bookings using this template" link beside the
+   *  `From template: <name>` chip. Clicking it asks the AdminApp
+   *  shell to leave the detail screen and land in BookingsView with
+   *  the matching template filter active and the clear chip showing,
+   *  closing the loop for the common "I'm reading a single booking
+   *  and want to see who else got this template" workflow.
+   *
+   *  Optional so screens that don't expose the bookings list (or
+   *  tests that don't care about the pivot) can omit it — the link
+   *  is then suppressed and the chip alone (when {@link onOpenTemplate}
+   *  is wired) still gives admins their templates-panel jump. */
+  onPivotToBookingsFilteredByTemplate?: (templateLabel: string) => void;
   /** Live email-template catalog the per-row Log-email form's
    *  template dropdown reads from. Defaults to the seeded
    *  {@link EMAIL_TEMPLATES} so the screen stays usable in isolation
@@ -653,6 +669,9 @@ export function BookingDetail({
               entries={booking.paymentTimeline}
               accent={booking.paymentStatus === "paid" ? "#16A34A" : BRAND}
               onOpenTemplate={onOpenTemplate}
+              onPivotToBookingsFilteredByTemplate={
+                onPivotToBookingsFilteredByTemplate
+              }
             />
             <div className="mt-3">
               <PaymentChip status={booking.paymentStatus} />
@@ -663,6 +682,9 @@ export function BookingDetail({
               entries={booking.serviceTimeline}
               accent={BRAND}
               onOpenTemplate={onOpenTemplate}
+              onPivotToBookingsFilteredByTemplate={
+                onPivotToBookingsFilteredByTemplate
+              }
             />
             <div className="mt-3">
               <ServiceChip status={booking.serviceStatus} />
@@ -934,6 +956,7 @@ function Timeline({
   entries,
   accent,
   onOpenTemplate,
+  onPivotToBookingsFilteredByTemplate,
 }: {
   entries: ReadonlyArray<TimelineEntry>;
   accent: string;
@@ -945,6 +968,15 @@ function Timeline({
    *  plain non-interactive label so the audit trail still shows
    *  which template wrote the entry. */
   onOpenTemplate?: (kind: "call" | "email", templateName: string) => void;
+  /** When provided, an extra inline link renders beside the per-entry
+   *  "From template: …" chip — clicking it asks the AdminApp shell
+   *  to leave the detail and land in BookingsView with the matching
+   *  template filter already active (Task #159 mirror of the
+   *  BookingsView "Last attempt: …" template-name suffix introduced
+   *  in Task #153). When omitted the link is suppressed; the chip
+   *  alone (when {@link onOpenTemplate} is wired) still gives admins
+   *  their templates-panel jump. */
+  onPivotToBookingsFilteredByTemplate?: (templateLabel: string) => void;
 }) {
   if (entries.length === 0) {
     return <div className="text-[12px] text-slate-500">No events yet.</div>;
@@ -970,43 +1002,75 @@ function Timeline({
                 {e.label}
               </div>
               {templateChipKind && e.templateLabel && (
-                // Small grey chip naming the Call/Email template the
-                // admin picked when logging this entry. Email entries
-                // got the chip first (Task #138); call entries reuse
-                // the same affordance so an admin can retrace which
-                // preset wrote each row without opening the Log call /
-                // Log email panel and counting references (Task #149).
-                // When `onOpenTemplate` is wired (Task #155) the chip
-                // becomes a button that round-trips back to the
-                // matching row in the Call/Email templates panel —
-                // the inverse of that panel's "Referenced by N entries"
-                // popover. Custom / legacy entries leave
-                // `templateLabel` undefined and skip the chip entirely.
-                onOpenTemplate ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onOpenTemplate(templateChipKind, e.templateLabel!)
-                    }
-                    data-testid={`timeline-entry-${i}-template`}
-                    aria-label={`Open ${
-                      templateChipKind === "call" ? "Call" : "Email"
-                    } template "${e.templateLabel}" in the templates panel`}
-                    title={`Open this ${
-                      templateChipKind === "call" ? "Call" : "Email"
-                    } template in the templates panel`}
-                    className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 underline decoration-dotted underline-offset-2 transition hover:bg-slate-200 hover:text-slate-900"
-                  >
-                    From template: {e.templateLabel}
-                  </button>
-                ) : (
-                  <div
-                    className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700"
-                    data-testid={`timeline-entry-${i}-template`}
-                  >
-                    From template: {e.templateLabel}
-                  </div>
-                )
+                // Row of template-related affordances for the entry.
+                // The first child — the grey "From template: …" chip —
+                // names the Call/Email template the admin picked when
+                // logging this entry. Email entries got the chip first
+                // (Task #138); call entries reuse the same affordance
+                // so an admin can retrace which preset wrote each row
+                // without opening the Log call / Log email panel and
+                // counting references (Task #149). When `onOpenTemplate`
+                // is wired (Task #155) the chip becomes a button that
+                // round-trips back to the matching row in the Call /
+                // Email templates panel — the inverse of that panel's
+                // "Referenced by N entries" popover. Custom / legacy
+                // entries leave `templateLabel` undefined and skip the
+                // whole row entirely.
+                //
+                // The second child — the inline "View other bookings
+                // using this template" link — only appears when the
+                // shell wires `onPivotToBookingsFilteredByTemplate`
+                // (Task #159). Clicking it leaves the detail screen
+                // and lands the admin in BookingsView with the
+                // matching template filter active and the clear chip
+                // showing — the same affordance the BookingsView /
+                // Awaiting-coordination "Last attempt: …" suffix
+                // already exposes from the list views (Task #153).
+                <div
+                  className="mt-1 flex flex-wrap items-center gap-1.5"
+                  data-testid={`timeline-entry-${i}-template-row`}
+                >
+                  {onOpenTemplate ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onOpenTemplate(templateChipKind, e.templateLabel!)
+                      }
+                      data-testid={`timeline-entry-${i}-template`}
+                      aria-label={`Open ${
+                        templateChipKind === "call" ? "Call" : "Email"
+                      } template "${e.templateLabel}" in the templates panel`}
+                      title={`Open this ${
+                        templateChipKind === "call" ? "Call" : "Email"
+                      } template in the templates panel`}
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 underline decoration-dotted underline-offset-2 transition hover:bg-slate-200 hover:text-slate-900"
+                    >
+                      From template: {e.templateLabel}
+                    </button>
+                  ) : (
+                    <div
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+                      data-testid={`timeline-entry-${i}-template`}
+                    >
+                      From template: {e.templateLabel}
+                    </div>
+                  )}
+                  {onPivotToBookingsFilteredByTemplate && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onPivotToBookingsFilteredByTemplate(e.templateLabel!)
+                      }
+                      data-testid={`timeline-entry-${i}-pivot-bookings`}
+                      data-template-label={e.templateLabel}
+                      aria-label={`View other bookings whose latest touch used "${e.templateLabel}"`}
+                      title={`Filter the bookings list to entries whose latest touch used "${e.templateLabel}"`}
+                      className="inline-flex items-center gap-1 rounded text-[10px] font-medium text-slate-500 underline decoration-dotted decoration-slate-400 underline-offset-2 transition hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                    >
+                      View other bookings using this template
+                    </button>
+                  )}
+                </div>
               )}
               {e.note && (
                 <div className="mt-0.5 text-[11px] text-slate-600">

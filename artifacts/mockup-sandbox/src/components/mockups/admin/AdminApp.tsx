@@ -313,6 +313,15 @@ export function AdminApp() {
   // When jumping to Payments, default the bookings list to the payments filter.
   const [bookingsStatusFilter, setBookingsStatusFilter] =
     useState<"all" | ServiceStatus | PaymentStatus>("all");
+  // One-shot seed handed to BookingsView's local templateFilter when
+  // the admin pivots in from a BookingDetail timeline entry's
+  // "View other bookings using this template" link (Task #159).
+  // BookingsView consumes the seed on its first render after the
+  // pivot and immediately calls back so we clear this slot —
+  // subsequent re-renders (sidebar nav, search edit, etc.) must not
+  // re-seed and clobber an admin's manual chip-clear.
+  const [bookingsTemplateFilterSeed, setBookingsTemplateFilterSeed] =
+    useState<string | null>(null);
   const [search, setSearch] = useState("");
   // Active building filter on the Bookings list ("all" = no filter).
   const [bookingsBuildingFilter, setBookingsBuildingFilter] =
@@ -335,6 +344,12 @@ export function AdminApp() {
     }
     setSearch("");
     setBookingsBuildingFilter("all");
+    // Sidebar nav is an explicit "fresh start" gesture, so clear any
+    // pending pivot seed from a BookingDetail "View other bookings
+    // using this template" link (Task #159). Without this, navigating
+    // to the bookings list via the sidebar after a half-completed
+    // pivot would mysteriously land on a filtered table.
+    setBookingsTemplateFilterSeed(null);
     // Sidebar nav is an explicit "fresh start" gesture, so clear any
     // template focus left behind by a chip click — the templates
     // panel should open in its default unfocused state when the user
@@ -407,6 +422,45 @@ export function AdminApp() {
       setFocusedEmailTemplateId(match ? match.id : null);
       setFocusedCallTemplateId(null);
     }
+  }
+
+  /**
+   * Companion to the `BookingDetail` timeline's "View other bookings
+   * using this template" link (Task #159): leave the detail screen
+   * and land in BookingsView with the matching template filter
+   * already active. Mirrors the in-list "Last attempt: …" template-
+   * name suffix introduced in Task #153, which lets ops pivot to a
+   * filtered table from the rows themselves — this closes the loop
+   * for the "I'm reading a single booking and want to see who else
+   * got this template" workflow without having to back out, scan the
+   * row, and click the suffix.
+   *
+   * Implementation: clears the building / status / search filters and
+   * the selected booking so the template lens is the sole filter
+   * applied (matches `openBookingsForBuilding`'s "single lens"
+   * convention), then stashes the template label as a one-shot seed
+   * the freshly-mounted BookingsView reads on first render. The view
+   * calls back via `onTemplateFilterConsumed` once it's applied, so
+   * subsequent re-renders never re-seed and clobber an admin's
+   * manual chip-clear.
+   *
+   * Always switches to "bookings" view (not "payments") regardless of
+   * where the admin came from — the destination is the bookings list,
+   * matching the BookingsView pivot-chip wording the link mirrors.
+   */
+  function pivotToBookingsFilteredByTemplate(templateLabel: string) {
+    setView("bookings");
+    setSelectedBookingId(null);
+    setSelectedBuildingId(null);
+    setSelectedRolloutId(null);
+    setBookingsStatusFilter("all");
+    setSearch("");
+    setBookingsBuildingFilter("all");
+    setBookingsTemplateFilterSeed(templateLabel);
+    // Drop any template focus on the way out — the next visit to a
+    // templates panel should open in its default unfocused state.
+    setFocusedCallTemplateId(null);
+    setFocusedEmailTemplateId(null);
   }
 
   // Service-status advance / payment status / notes edits flow back into
@@ -1272,6 +1326,9 @@ export function AdminApp() {
                 onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
                 onOpenTemplate={openTemplateFromBooking}
+                onPivotToBookingsFilteredByTemplate={
+                  pivotToBookingsFilteredByTemplate
+                }
                 emailTemplates={emailTemplates}
                 callTemplates={callTemplates}
               />
@@ -1292,6 +1349,10 @@ export function AdminApp() {
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
+                initialTemplateFilter={bookingsTemplateFilterSeed}
+                onTemplateFilterConsumed={() =>
+                  setBookingsTemplateFilterSeed(null)
+                }
               />
             )
           ) : null}
@@ -1314,6 +1375,9 @@ export function AdminApp() {
                 onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
                 onOpenTemplate={openTemplateFromBooking}
+                onPivotToBookingsFilteredByTemplate={
+                  pivotToBookingsFilteredByTemplate
+                }
                 emailTemplates={emailTemplates}
                 callTemplates={callTemplates}
               />

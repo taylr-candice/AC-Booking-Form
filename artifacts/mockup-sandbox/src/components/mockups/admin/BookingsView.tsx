@@ -6,7 +6,7 @@
  */
 
 import { Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   bookerAgencyName,
@@ -98,6 +98,8 @@ export function BookingsView({
   onAcknowledgeSupersede,
   onUndoCancelBooking,
   onUndoCancelBookingAndReschedule,
+  initialTemplateFilter,
+  onTemplateFilterConsumed,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -123,6 +125,30 @@ export function BookingsView({
    *  The AdminApp shell performs the atomic restore + reschedule on
    *  confirm. */
   onUndoCancelBookingAndReschedule?: (id: string) => void;
+  /** Optional one-shot seed for the local template filter — used when
+   *  the admin pivots into BookingsView from a BookingDetail timeline
+   *  entry's "View other bookings using this template" link
+   *  (Task #159). The view applies the seed via {@link useState}'s
+   *  initial value so the very first render already filters the
+   *  table, and additionally re-applies it via {@link useEffect}
+   *  whenever the prop transitions to a non-null value (handles the
+   *  edge case where the same component instance receives a fresh
+   *  pivot — e.g. the admin opens another booking from the filtered
+   *  list, clicks a different template chip, and lands back here).
+   *  Once consumed, the view fires {@link onTemplateFilterConsumed}
+   *  so the parent can clear the seed and avoid re-applying it on
+   *  unrelated re-renders (e.g. the admin clears the chip themselves
+   *  and we don't want a sidebar nav to re-seed). Optional so older
+   *  call-sites and tests that don't care about the pivot remain
+   *  valid — the local "click suffix → filter" path inside the view
+   *  is unchanged. */
+  initialTemplateFilter?: string | null;
+  /** Fires once after BookingsView has applied {@link initialTemplateFilter}
+   *  to its local state, so the parent (AdminApp) can clear its
+   *  pending seed slot. See {@link initialTemplateFilter} for the
+   *  full pivot-handoff rationale. Optional / inert when the seed
+   *  prop isn't wired. */
+  onTemplateFilterConsumed?: () => void;
 }) {
   // "Show cancelled" is OFF by default — cancelled rows are an audit-trail
   // artefact, not the day-to-day work, so we hide them unless the admin
@@ -149,8 +175,34 @@ export function BookingsView({
     "default" | "stalest_first" | "freshest_first"
   >("default");
   // "Latest call/email touch used this template" pivot. Local to this
-  // view so it doesn't bleed across surfaces.
-  const [templateFilter, setTemplateFilter] = useState<string | null>(null);
+  // view so it doesn't bleed across surfaces. Seeded from the
+  // `initialTemplateFilter` prop on first render so a pivot from a
+  // BookingDetail timeline entry's "View other bookings using this
+  // template" link (Task #159) lands the admin straight on a filtered
+  // table instead of having to re-click anything.
+  const [templateFilter, setTemplateFilter] = useState<string | null>(
+    initialTemplateFilter ?? null,
+  );
+  // Re-apply the seed if the parent hands us a fresh non-null value
+  // mid-life (e.g. the admin clears the chip themselves, opens another
+  // booking from the filtered list, clicks a different template chip,
+  // and lands back here on the same component instance). After
+  // applying we notify the parent so it can clear its pending slot —
+  // otherwise an unrelated re-render later (sidebar nav, search edit,
+  // etc.) would re-seed and undo the admin's manual clear. The
+  // `null`/`undefined` paths are no-ops so the view's own
+  // suffix-click handler remains the source of truth in normal use.
+  useEffect(() => {
+    if (initialTemplateFilter) {
+      setTemplateFilter(initialTemplateFilter);
+      onTemplateFilterConsumed?.();
+    }
+    // We deliberately depend only on the seed value, not on the
+    // callback identity — re-running this effect when a parent
+    // re-renders the consume callback would defeat the
+    // one-shot-handoff invariant above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTemplateFilter]);
   // Inline-undo pivot state. When the row-level "Undo" affordance hits
   // a "slot_taken" verdict we surface the same conflict dialog the
   // detail page uses; clicking "Open Reschedule" then asks the
