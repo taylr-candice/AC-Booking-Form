@@ -648,6 +648,215 @@ describe("Templates panel header — default-template marker", () => {
   });
 });
 
+describe("Templates panel — default row pinned to the top", () => {
+  const callRowIdsInOrder = (): string[] =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[data-testid^="call-template-row-"]',
+      ),
+    ).map((row) =>
+      (row.getAttribute("data-testid") ?? "").replace(
+        "call-template-row-",
+        "",
+      ),
+    );
+
+  const emailRowIdsInOrder = (): string[] =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[data-testid^="email-template-row-"]',
+      ),
+    ).map((row) =>
+      (row.getAttribute("data-testid") ?? "").replace(
+        "email-template-row-",
+        "",
+      ),
+    );
+
+  // Seed order pinned here so ordering tests stay aligned with
+  // `CALL_TEMPLATES` / `EMAIL_TEMPLATES` in `adminMockData.ts`.
+  const CALL_SEED_ORDER = [
+    "voicemail_left",
+    "no_answer",
+    "spoke_confirmed",
+    "spoke_will_call_back",
+    "wrong_number",
+  ];
+  const EMAIL_SEED_ORDER = [
+    "rebook_link",
+    "parcel_locker",
+    "agent_intro",
+    "awaiting_confirm",
+  ];
+
+  it("Call templates list keeps its seed order while no default is set", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+
+    expect(callRowIdsInOrder()).toEqual(CALL_SEED_ORDER);
+    for (const id of CALL_SEED_ORDER) {
+      expect(
+        screen.queryByTestId(`pill-default-call-template-${id}`),
+      ).toBeNull();
+    }
+  });
+
+  it("starring a non-first Call template moves it to the top and shows the Default pill", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+
+    // "spoke_confirmed" is the third seed row — starring it should
+    // hoist it to the top while every other row keeps its relative
+    // seed order.
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+
+    expect(callRowIdsInOrder()).toEqual([
+      "spoke_confirmed",
+      ...CALL_SEED_ORDER.filter((id) => id !== "spoke_confirmed"),
+    ]);
+    expect(
+      screen.getByTestId("pill-default-call-template-spoke_confirmed")
+        .textContent,
+    ).toMatch(/Default/i);
+    for (const id of CALL_SEED_ORDER.filter((x) => x !== "spoke_confirmed")) {
+      expect(
+        screen.queryByTestId(`pill-default-call-template-${id}`),
+      ).toBeNull();
+    }
+  });
+
+  it("moving the Call default to a different row re-pins the new default to the top", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+    expect(callRowIdsInOrder()[0]).toBe("spoke_confirmed");
+
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-wrong_number"),
+    );
+    expect(callRowIdsInOrder()).toEqual([
+      "wrong_number",
+      ...CALL_SEED_ORDER.filter((id) => id !== "wrong_number"),
+    ]);
+    expect(
+      screen.getByTestId("pill-default-call-template-wrong_number")
+        .textContent,
+    ).toMatch(/Default/i);
+    expect(
+      screen.queryByTestId("pill-default-call-template-spoke_confirmed"),
+    ).toBeNull();
+  });
+
+  it("unsetting the Call default restores the original seed order and removes the pill", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+    expect(callRowIdsInOrder()[0]).toBe("spoke_confirmed");
+
+    // Click the same star again to unset the default — order should
+    // fall back to the seed order and no row should carry the pill.
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+    expect(callRowIdsInOrder()).toEqual(CALL_SEED_ORDER);
+    for (const id of CALL_SEED_ORDER) {
+      expect(
+        screen.queryByTestId(`pill-default-call-template-${id}`),
+      ).toBeNull();
+    }
+  });
+
+  it("Email templates list keeps its seed order while no default is set", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+
+    expect(emailRowIdsInOrder()).toEqual(EMAIL_SEED_ORDER);
+    for (const id of EMAIL_SEED_ORDER) {
+      expect(
+        screen.queryByTestId(`pill-default-email-template-${id}`),
+      ).toBeNull();
+    }
+  });
+
+  it("starring a non-first Email template moves it to the top and shows the Default pill", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-awaiting_confirm"),
+    );
+
+    expect(emailRowIdsInOrder()).toEqual([
+      "awaiting_confirm",
+      ...EMAIL_SEED_ORDER.filter((id) => id !== "awaiting_confirm"),
+    ]);
+    expect(
+      screen.getByTestId("pill-default-email-template-awaiting_confirm")
+        .textContent,
+    ).toMatch(/Default/i);
+    for (const id of EMAIL_SEED_ORDER.filter(
+      (x) => x !== "awaiting_confirm",
+    )) {
+      expect(
+        screen.queryByTestId(`pill-default-email-template-${id}`),
+      ).toBeNull();
+    }
+  });
+
+  it("moving the Email default to a different row re-pins the new default to the top", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-awaiting_confirm"),
+    );
+    expect(emailRowIdsInOrder()[0]).toBe("awaiting_confirm");
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-parcel_locker"),
+    );
+    expect(emailRowIdsInOrder()).toEqual([
+      "parcel_locker",
+      ...EMAIL_SEED_ORDER.filter((id) => id !== "parcel_locker"),
+    ]);
+    expect(
+      screen.getByTestId("pill-default-email-template-parcel_locker")
+        .textContent,
+    ).toMatch(/Default/i);
+    expect(
+      screen.queryByTestId("pill-default-email-template-awaiting_confirm"),
+    ).toBeNull();
+  });
+
+  it("unsetting the Email default restores the seed order and removes the pill", () => {
+    render(<AdminApp />);
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-awaiting_confirm"),
+    );
+    expect(emailRowIdsInOrder()[0]).toBe("awaiting_confirm");
+
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-awaiting_confirm"),
+    );
+    expect(emailRowIdsInOrder()).toEqual(EMAIL_SEED_ORDER);
+    for (const id of EMAIL_SEED_ORDER) {
+      expect(
+        screen.queryByTestId(`pill-default-email-template-${id}`),
+      ).toBeNull();
+    }
+  });
+});
+
 describe("Default-template fallback to Custom…", () => {
   it("after clearing the seeded defaults, every Log form opens on Custom…", () => {
     render(<AdminApp />);

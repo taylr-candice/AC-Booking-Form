@@ -102,6 +102,17 @@ export function CallTemplatesView({
 
   const defaultTemplate = findDefaultCallTemplate(templates);
 
+  // Pin the default row to the top of the list so ops never has to
+  // scroll to find it once the catalog grows past a handful of
+  // entries. The remaining rows keep their existing seed / catalog
+  // order so non-default rows stay where ops expects them.
+  const orderedTemplates = defaultTemplate
+    ? [
+        defaultTemplate,
+        ...templates.filter((t) => t.id !== defaultTemplate.id),
+      ]
+    : templates;
+
   const focusDefaultRow = () => {
     if (!defaultTemplate) return;
     const row = rowRefs.current.get(defaultTemplate.id);
@@ -196,7 +207,7 @@ export function CallTemplatesView({
               </tr>
             </thead>
             <tbody>
-              {templates.map((t) => {
+              {orderedTemplates.map((t) => {
                 const usage = usageCounts?.[t.id] ?? 0;
                 const bookings = usageBookings?.[t.id] ?? [];
                 return (
@@ -245,7 +256,24 @@ export function CallTemplatesView({
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-900">{t.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900">
+                          {t.name}
+                        </span>
+                        {t.isDefault ? (
+                          <span
+                            data-testid={`pill-default-call-template-${t.id}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                            title="Default — Log-call dropdowns open pre-selected on this template."
+                          >
+                            <Star
+                              className="h-2.5 w-2.5"
+                              fill="currentColor"
+                            />
+                            Default
+                          </span>
+                        ) : null}
+                      </div>
                       <TemplateUsagePopover
                         kind="call"
                         testIdSuffix={t.id}
