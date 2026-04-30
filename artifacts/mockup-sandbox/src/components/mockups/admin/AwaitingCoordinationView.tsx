@@ -22,6 +22,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownNarrowWide,
   Clock,
+  Info,
   Mail,
   Phone,
   Search,
@@ -974,29 +975,66 @@ export function AwaitingCoordinationView({
         })}
       </div>
 
-      {templateFilter !== null && (
-        <div
-          className="flex items-center gap-2 text-[12px]"
-          data-testid="coordination-template-filter-chip"
-        >
-          <span className="text-slate-500">Filtered by template:</span>
-          <button
-            type="button"
-            onClick={() => setTemplateFilter(null)}
-            data-testid="button-clear-coordination-template-filter"
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
-            style={{
-              backgroundColor: BRAND_SOFT,
-              color: BRAND_DEEP,
-            }}
-            title="Clear template filter"
-            aria-label={`Clear template filter "${templateFilter}"`}
+      {templateFilter !== null && (() => {
+        // Mirror of the BookingsView chip's "no longer in catalog"
+        // hint (Task #173). The chip's name is a snapshot — it was
+        // captured onto the timeline entry when the call/email was
+        // logged, and the queue filter still matches by that snapshot
+        // string. If the template has since been renamed or removed
+        // in the templates panel, the filter still works for any
+        // other timeline entries that share that snapshot, but the
+        // chip's name won't show up in either templates catalog
+        // anymore. We surface a small icon + label in that case so
+        // admins on the coordination queue get the same context as
+        // those on the bookings list, without breaking the
+        // snapshot-based match.
+        //
+        // Unlike BookingsView's chip, this view's templateFilter is a
+        // bare string with no `kind`, so we check both the call and
+        // the email catalog: only flag as missing when neither
+        // catalog has a template with this name. Both catalogs are
+        // always defined here (default to the seeded constants), so
+        // we don't need BookingsView's "haveCatalog" guard.
+        const stillExists =
+          callTemplates.some((t) => t.name === templateFilter) ||
+          emailTemplates.some((t) => t.name === templateFilter);
+        const isMissing = !stillExists;
+        return (
+          <div
+            className="flex items-center gap-2 text-[12px]"
+            data-testid="coordination-template-filter-chip"
           >
-            <span>{templateFilter}</span>
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
+            <span className="text-slate-500">Filtered by template:</span>
+            <button
+              type="button"
+              onClick={() => setTemplateFilter(null)}
+              data-testid="button-clear-coordination-template-filter"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+              style={{
+                backgroundColor: BRAND_SOFT,
+                color: BRAND_DEEP,
+              }}
+              title="Clear template filter"
+              aria-label={`Clear template filter "${templateFilter}"`}
+            >
+              <span>{templateFilter}</span>
+              <X className="h-3 w-3" />
+            </button>
+            {isMissing && (
+              <span
+                role="img"
+                aria-label={`"${templateFilter}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+                title={`"${templateFilter}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+                data-testid="coordination-template-filter-missing-hint"
+                className="inline-flex items-center gap-1 text-slate-500"
+              >
+                <Info className="h-3.5 w-3.5" />
+                <span className="text-[11px]">No longer in templates catalog</span>
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Ordering hint — explains the composite priority sort so ops
           aren't surprised that the row order doesn't match the

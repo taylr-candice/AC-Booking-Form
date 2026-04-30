@@ -10,6 +10,8 @@ import type {
   AdminBooking,
   AdminBuilding,
   AdminUnit,
+  CallTemplate,
+  EmailTemplate,
   TimelineEntry,
 } from "@/state/adminMockData";
 
@@ -127,7 +129,15 @@ function callEntry(templateLabel: string | null): TimelineEntry {
   };
 }
 
-function Harness({ initial }: { initial: AdminBooking[] }) {
+function Harness({
+  initial,
+  callTemplates,
+  emailTemplates,
+}: {
+  initial: AdminBooking[];
+  callTemplates?: ReadonlyArray<CallTemplate>;
+  emailTemplates?: ReadonlyArray<EmailTemplate>;
+}) {
   const [filter, setFilter] = useState<
     "all" | "awaiting_tenant" | "awaiting_agent"
   >("all");
@@ -145,6 +155,8 @@ function Harness({ initial }: { initial: AdminBooking[] }) {
       search={search}
       onSearch={setSearch}
       onOpen={() => {}}
+      callTemplates={callTemplates}
+      emailTemplates={emailTemplates}
     />
   );
 }
@@ -318,5 +330,141 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
     expect(
       screen.getByTestId("coordination-template-filter-chip"),
     ).toBeInTheDocument();
+  });
+
+  it("shows a 'no longer in templates catalog' hint when the chip's name doesn't match either current catalog (Task #177)", () => {
+    const callTemplates: CallTemplate[] = [
+      { id: "c1", name: "Some other call template", note: "" },
+    ];
+    const emailTemplates: EmailTemplate[] = [
+      { id: "e1", name: "Some other email template", subject: "x", note: "" },
+    ];
+    render(
+      <Harness
+        initial={[
+          makeBooking({
+            id: "bk-renamed",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Old name template")],
+          }),
+        ]}
+        callTemplates={callTemplates}
+        emailTemplates={emailTemplates}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+    expect(
+      screen.getByTestId("coordination-template-filter-chip"),
+    ).toBeInTheDocument();
+    const hint = screen.getByTestId(
+      "coordination-template-filter-missing-hint",
+    );
+    expect(hint).toBeInTheDocument();
+    expect(hint.getAttribute("aria-label")).toContain("Old name template");
+    expect(hint.getAttribute("aria-label")).toContain(
+      "no longer in the templates catalog",
+    );
+    // Filter still works — the snapshot match is unchanged.
+    expect(renderedBookingIds()).toEqual(["bk-renamed"]);
+  });
+
+  it("does NOT show the missing-template hint when the chip's name matches a current call or email template", () => {
+    // The chip's name lives in the email catalog → no hint.
+    const callTemplates: CallTemplate[] = [];
+    const emailTemplates: EmailTemplate[] = [
+      { id: "e1", name: "Sent rebook link", subject: "x", note: "" },
+    ];
+    render(
+      <Harness
+        initial={[
+          makeBooking({
+            id: "bk-a",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Sent rebook link")],
+          }),
+        ]}
+        callTemplates={callTemplates}
+        emailTemplates={emailTemplates}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+    expect(
+      screen.getByTestId("coordination-template-filter-chip"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("coordination-template-filter-missing-hint"),
+    ).toBeNull();
+  });
+
+  it("does NOT show the hint when the chip's name matches a template in the OTHER channel's catalog", () => {
+    // The snapshot was logged from an email entry, but the same name
+    // happens to exist in the call catalog. Since the queue's chip
+    // doesn't carry a `kind`, we treat a hit in either catalog as
+    // "still in catalog" so the hint stays quiet.
+    const callTemplates: CallTemplate[] = [
+      { id: "c1", name: "Cross channel name", note: "" },
+    ];
+    const emailTemplates: EmailTemplate[] = [];
+    render(
+      <Harness
+        initial={[
+          makeBooking({
+            id: "bk-a",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Cross channel name")],
+          }),
+        ]}
+        callTemplates={callTemplates}
+        emailTemplates={emailTemplates}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+    expect(
+      screen.getByTestId("coordination-template-filter-chip"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("coordination-template-filter-missing-hint"),
+    ).toBeNull();
+  });
+
+  it("clearing the chip removes the missing-template hint", () => {
+    render(
+      <Harness
+        initial={[
+          makeBooking({
+            id: "bk-renamed",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Old name template")],
+          }),
+        ]}
+        callTemplates={[]}
+        emailTemplates={[]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+    expect(
+      screen.getByTestId("coordination-template-filter-missing-hint"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByTestId("button-clear-coordination-template-filter"),
+    );
+    expect(
+      screen.queryByTestId("coordination-template-filter-chip"),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("coordination-template-filter-missing-hint"),
+    ).toBeNull();
   });
 });
