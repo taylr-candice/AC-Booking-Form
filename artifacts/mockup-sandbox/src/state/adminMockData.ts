@@ -2627,6 +2627,55 @@ export function findUsageBookingsForTemplate(
 }
 
 /**
+ * Find every booking whose service timeline references `templateName`
+ * for the given `kind` *and* whose matching entry was logged on the
+ * given UTC calendar day (`dayKey`, formatted as `YYYY-MM-DD`).
+ *
+ * Day-scoped sibling of {@link findUsageBookingsForTemplate}: drives
+ * the click-to-filter drill-down on the per-template usage sparkline
+ * (Task #197), so an admin who notices a spike on a single bar can
+ * immediately see which bookings drove it without leaving the panel.
+ *
+ * Same snapshot-on-use semantics as the day-bucketing helper
+ * {@link getTemplateUsageTrend}: the entry's literal `templateLabel`
+ * is compared, and the day key is derived from the entry's
+ * `loggedAt` timestamp by slicing its UTC ISO string. Entries with
+ * a missing or unparseable `loggedAt` are silently skipped — they
+ * don't show up on the sparkline either, so the two surfaces stay
+ * in lockstep. A booking is included at most once even if its
+ * timeline has multiple matching entries on the same day. Input
+ * order is preserved.
+ */
+export function findUsageBookingsForTemplateOnDay(
+  bookings: ReadonlyArray<AdminBooking>,
+  kind: "call" | "email",
+  templateName: string,
+  dayKey: string,
+): AdminBooking[] {
+  const trimmed = templateName.trim();
+  if (trimmed.length === 0) return [];
+  if (!dayKey) return [];
+  const out: AdminBooking[] = [];
+  for (const b of bookings) {
+    let matched = false;
+    for (const entry of b.serviceTimeline) {
+      if (entry.kind !== kind) continue;
+      if (entry.templateLabel !== trimmed) continue;
+      const loggedAt = entry.loggedAt;
+      if (!loggedAt) continue;
+      const t = new Date(loggedAt).getTime();
+      if (!Number.isFinite(t)) continue;
+      const key = new Date(t).toISOString().slice(0, 10);
+      if (key !== dayKey) continue;
+      matched = true;
+      break;
+    }
+    if (matched) out.push(b);
+  }
+  return out;
+}
+
+/**
  * Compact, view-friendly summary of a booking surfaced in the
  * "Bookings using this template" drill-down popover. Lets the
  * templates view stay agnostic of the units list.

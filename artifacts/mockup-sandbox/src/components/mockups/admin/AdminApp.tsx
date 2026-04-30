@@ -31,6 +31,7 @@ import {
   EMAIL_TEMPLATES,
   findRolloutForBooking,
   findUsageBookingsForTemplate,
+  findUsageBookingsForTemplateOnDay,
   formatBookingShortDate,
   getActiveBookingForUnit,
   getEffectivePlacementForUnit,
@@ -407,6 +408,66 @@ export function AdminApp() {
     }
     return out;
   }, [allBookings, callTemplates, units]);
+
+  // Per-template, per-day list of bookings whose timeline touched
+  // each template on each UTC day inside the sparkline window
+  // (Task #197). The sparkline component reads this map by template
+  // id and turns each non-zero bar into a clickable affordance that
+  // opens a day-scoped drill-down popover. Same snapshot-on-use
+  // semantics as the day-bucketed counts that drive the sparkline
+  // itself, so the bar's count and the popover's booking list can
+  // never disagree about which entries lit the bar up. Ties the
+  // shape directly to the days that are actually rendered in the
+  // companion `*UsageTrends` map so a future tweak to the trend
+  // window (e.g. 14 days) only needs to change one place.
+  const emailTemplateUsageBookingsByDay = useMemo(() => {
+    const out: Record<
+      string,
+      Record<string, ReturnType<typeof summarizeTemplateUsageBooking>[]>
+    > = {};
+    for (const t of emailTemplates) {
+      const days = emailTemplateUsageTrends[t.id] ?? [];
+      const perDay: Record<
+        string,
+        ReturnType<typeof summarizeTemplateUsageBooking>[]
+      > = {};
+      for (const point of days) {
+        if (point.count === 0) continue;
+        perDay[point.date] = findUsageBookingsForTemplateOnDay(
+          allBookings,
+          "email",
+          t.name,
+          point.date,
+        ).map((b) => summarizeTemplateUsageBooking(b, units));
+      }
+      out[t.id] = perDay;
+    }
+    return out;
+  }, [allBookings, emailTemplates, units, emailTemplateUsageTrends]);
+  const callTemplateUsageBookingsByDay = useMemo(() => {
+    const out: Record<
+      string,
+      Record<string, ReturnType<typeof summarizeTemplateUsageBooking>[]>
+    > = {};
+    for (const t of callTemplates) {
+      const days = callTemplateUsageTrends[t.id] ?? [];
+      const perDay: Record<
+        string,
+        ReturnType<typeof summarizeTemplateUsageBooking>[]
+      > = {};
+      for (const point of days) {
+        if (point.count === 0) continue;
+        perDay[point.date] = findUsageBookingsForTemplateOnDay(
+          allBookings,
+          "call",
+          t.name,
+          point.date,
+        ).map((b) => summarizeTemplateUsageBooking(b, units));
+      }
+      out[t.id] = perDay;
+    }
+    return out;
+  }, [allBookings, callTemplates, units, callTemplateUsageTrends]);
 
   const [view, setView] = useState<ViewId>("bookings");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
@@ -1825,6 +1886,7 @@ export function AdminApp() {
               usageBookings={emailTemplateUsageBookings}
               latestTouchCounts={emailTemplateLatestTouchCounts}
               usageTrends={emailTemplateUsageTrends}
+              usageBookingsByDay={emailTemplateUsageBookingsByDay}
               onOpenFilteredBookings={(templateName) =>
                 openBookingsForTemplate("email", templateName)
               }
@@ -1845,6 +1907,7 @@ export function AdminApp() {
               usageBookings={callTemplateUsageBookings}
               latestTouchCounts={callTemplateLatestTouchCounts}
               usageTrends={callTemplateUsageTrends}
+              usageBookingsByDay={callTemplateUsageBookingsByDay}
               onOpenFilteredBookings={(templateName) =>
                 openBookingsForTemplate("call", templateName)
               }

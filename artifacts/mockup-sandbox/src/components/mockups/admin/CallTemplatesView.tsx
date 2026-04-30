@@ -62,6 +62,7 @@ export function CallTemplatesView({
   usageBookings,
   latestTouchCounts,
   usageTrends,
+  usageBookingsByDay,
   onOpenFilteredBookings,
   onOpenBooking,
   onCreate,
@@ -92,6 +93,16 @@ export function CallTemplatesView({
    *  underlying numbers in its hover `title`. Omit to suppress the
    *  sparkline entirely (the templates panel still works). */
   usageTrends?: Readonly<Record<string, ReadonlyArray<TemplateUsageTrendPoint>>>;
+  /** Per-template, per-day list of bookings whose timeline touched
+   *  each template on each UTC day in the sparkline window
+   *  (Task #197). Outer key is the template id, inner key is the
+   *  same `YYYY-MM-DD` date key the matching `usageTrends` entry
+   *  carries. Drives the click-to-filter drill-down popover that
+   *  opens when an admin clicks a non-zero sparkline bar. Omit to
+   *  leave bars non-interactive (the trend itself still renders). */
+  usageBookingsByDay?: Readonly<
+    Record<string, Readonly<Record<string, ReadonlyArray<TemplateUsageBooking>>>>
+  >;
   /** Click-through handler for the "Used in N bookings" badge.
    *  Receives the template's current name (the filter is
    *  snapshot-on-use so it matches the literal string the timeline
@@ -720,6 +731,9 @@ export function CallTemplatesView({
                           kind="call"
                           templateId={t.id}
                           trend={trend}
+                          templateName={t.name}
+                          bookingsByDay={usageBookingsByDay?.[t.id]}
+                          onOpenBooking={onOpenBooking}
                         />
                       ) : null}
                     </td>
