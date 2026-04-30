@@ -880,6 +880,16 @@ export function AdminApp() {
   // queued up at once (the sidebar nav clears both).
   const [rolloutsFocusedRowSeed, setRolloutsFocusedRowSeed] =
     useState<string | null>(null);
+  // One-shot seed: id of the building the admin pivoted FROM, so
+  // BuildingsView can highlight the source row on first paint after
+  // a BuildingDetail → BuildingsView "Back to buildings" pivot.
+  // Mirror of `bookingsFocusedRowSeed` / `rolloutsFocusedRowSeed`
+  // for the buildings mount (Task #216); independent slot because
+  // the buildings list, rollouts list, and bookings list can each
+  // have a pending source-row highlight queued up at once (the
+  // sidebar nav clears all three).
+  const [buildingsFocusedRowSeed, setBuildingsFocusedRowSeed] =
+    useState<string | null>(null);
   const [search, setSearch] = useState<string>(() => readSearchFromURL());
   useEffect(() => {
     writeSearchToURL(search);
@@ -946,6 +956,11 @@ export function AdminApp() {
     // back-pivot so an unrelated sidebar visit doesn't light up the
     // wrong rollout row.
     setRolloutsFocusedRowSeed(null);
+    // Same fresh-start convention for the buildings mount: clear any
+    // pending source-row seed from a BuildingDetail → list
+    // back-pivot so an unrelated sidebar visit doesn't light up the
+    // wrong building row (Task #216).
+    setBuildingsFocusedRowSeed(null);
     // Sidebar nav is an explicit "fresh start" gesture, so clear any
     // template focus left behind by a chip click — the templates
     // panel should open in its default unfocused state when the user
@@ -1167,6 +1182,28 @@ export function AdminApp() {
   function returnToRolloutsListWithSource(sourceRolloutId: string) {
     setRolloutsFocusedRowSeed(sourceRolloutId);
     setSelectedRolloutId(null);
+  }
+
+  /**
+   * Companion pivot for the buildings mount of {@link BuildingDetail}'s
+   * "Back to buildings" button (Task #216). Going back to the
+   * buildings list from a building's detail screen seeds the source
+   * building id so {@link BuildingsView} highlights the row the admin
+   * came from on first paint — mirroring the source-row highlight
+   * Task #172 introduced for the bookings list, Task #180 mirrored
+   * to the awaiting-coordination list, and Task #190 mirrored to
+   * the rollouts list. Without it, an admin who opened a building
+   * from a long list, scrolled the detail, and went back would lose
+   * their starting point on the buildings list.
+   *
+   * Independent slot from `bookingsFocusedRowSeed` /
+   * `rolloutsFocusedRowSeed` because all three lists can have a
+   * pending seed at once (sidebar nav clears all three via
+   * {@link handleNav}).
+   */
+  function returnToBuildingsListWithSource(sourceBuildingId: string) {
+    setBuildingsFocusedRowSeed(sourceBuildingId);
+    setSelectedBuildingId(null);
   }
 
   // Service-status advance / payment status / notes edits flow back into
@@ -2232,7 +2269,9 @@ export function AdminApp() {
                 setBuildings={setBuildings}
                 units={units}
                 bookings={allBookings}
-                onBack={() => setSelectedBuildingId(null)}
+                onBack={() =>
+                  returnToBuildingsListWithSource(selectedBuildingId)
+                }
                 onOpenBooking={(bookingId) => {
                   setSelectedBuildingId(null);
                   setView("bookings");
@@ -2256,6 +2295,10 @@ export function AdminApp() {
                 units={units}
                 bookings={allBookings}
                 onOpen={setSelectedBuildingId}
+                initialFocusedRowId={buildingsFocusedRowSeed}
+                onFocusedRowConsumed={() =>
+                  setBuildingsFocusedRowSeed(null)
+                }
               />
             )
           ) : null}
