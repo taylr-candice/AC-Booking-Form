@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownNarrowWide, Clock, Mail, Phone, Search } from "lucide-react";
+import { ArrowDownNarrowWide, Clock, Mail, Phone, Search, X } from "lucide-react";
 
 import {
   bookerAgencyName,
@@ -53,7 +53,7 @@ import {
 } from "./BookingDetail";
 import { CustomerCell } from "./BookingsView";
 import { PaymentChip } from "./chips";
-import { BRAND } from "./theme";
+import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
 type Filter = "all" | CoordinationKind;
 
@@ -104,11 +104,15 @@ function CoordinatingWithCell({
   unit,
   units,
   kind,
+  onTemplateClick,
 }: {
   booking: AdminBooking;
   unit: AdminUnit | undefined;
   units: AdminUnit[];
   kind: CoordinationKind | null;
+  /** When set, the template-name suffix renders as a button that
+   *  pivots the queue to that template. */
+  onTemplateClick?: (templateLabel: string) => void;
 }) {
   const waiting = formatCoordinationWaiting(booking.createdAt);
   const lastContacted = formatLastContacted(booking.lastContactedAt);
@@ -196,20 +200,35 @@ function CoordinatingWithCell({
               {recency ? ` · ${recency.label}` : ""}
             </span>
             {latestAttempt.templateLabel && (
-              // Small grey suffix naming the Call/Email template the
-              // admin picked when logging the entry (Task #141 for
-              // emails, Task #149 for calls), so a team lead can
-              // triage the queue at a glance — "spoke · 2h ago ·
-              // No answer — left voicemail" reads naturally inline
-              // without an extra row. Custom / legacy entries leave
-              // `templateLabel` as `null` and skip this entirely.
-              <span
-                className="text-slate-500"
-                data-testid="coordinating-with-last-attempt-template"
-              >
+              // stopPropagation so the suffix click doesn't bubble to
+              // the row's open handler.
+              <>
                 {" · "}
-                {latestAttempt.templateLabel}
-              </span>
+                {onTemplateClick ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTemplateClick(latestAttempt.templateLabel!);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    data-testid="coordinating-with-last-attempt-template"
+                    data-template-label={latestAttempt.templateLabel}
+                    className="cursor-pointer rounded text-slate-500 underline decoration-dotted decoration-slate-400 underline-offset-2 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                    title={`Filter the queue to bookings whose latest touch used "${latestAttempt.templateLabel}"`}
+                    aria-label={`Filter by template "${latestAttempt.templateLabel}"`}
+                  >
+                    {latestAttempt.templateLabel}
+                  </button>
+                ) : (
+                  <span
+                    className="text-slate-500"
+                    data-testid="coordinating-with-last-attempt-template"
+                  >
+                    {latestAttempt.templateLabel}
+                  </span>
+                )}
+              </>
             )}
           </div>
         );
@@ -374,6 +393,9 @@ export function AwaitingCoordinationView({
   // which outcome ops are pivoting on, and resetting it on view
   // remount matches how the bulk-action selection behaves.
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
+  // "Latest call/email touch used this template" pivot. Local to this
+  // view; the bookings list owns its own equivalent.
+  const [templateFilter, setTemplateFilter] = useState<string | null>(null);
   // Pre-compute the kind for each coordination booking so we don't
   // recompute it on every filter / search keystroke. We include every
   // booking whose serviceSlot is `to_be_coordinated`; rows whose
@@ -419,15 +441,18 @@ export function AwaitingCoordinationView({
   const unassignedCount = coordinating.filter((x) => x.kind === null).length;
   const totalCount = coordinating.length;
 
-  // Predicate for the "global" filters that aren't tied to either
-  // chip row — building filter + search. Used as the shared base for
-  // both per-chip count rollups, so each chip's count answers
-  // "how many rows would survive if I clicked me?" without
-  // double-counting against its own selection.
+  // Building + search + template-filter predicate, folded into the
+  // chip count rollups so they reflect the visible rows.
   function matchesBuildingAndSearch(b: AdminBooking) {
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
+    }
+    if (templateFilter !== null) {
+      const latest = latestCoordinationAttempt(b.serviceTimeline);
+      if (latest === null || latest.templateLabel !== templateFilter) {
+        return false;
+      }
     }
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
@@ -913,6 +938,30 @@ export function AwaitingCoordinationView({
         })}
       </div>
 
+      {templateFilter !== null && (
+        <div
+          className="flex items-center gap-2 text-[12px]"
+          data-testid="coordination-template-filter-chip"
+        >
+          <span className="text-slate-500">Filtered by template:</span>
+          <button
+            type="button"
+            onClick={() => setTemplateFilter(null)}
+            data-testid="button-clear-coordination-template-filter"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+            style={{
+              backgroundColor: BRAND_SOFT,
+              color: BRAND_DEEP,
+            }}
+            title="Clear template filter"
+            aria-label={`Clear template filter "${templateFilter}"`}
+          >
+            <span>{templateFilter}</span>
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
       {/* Ordering hint — explains the composite priority sort so ops
           aren't surprised that the row order doesn't match the
           BookingsView "newest first" they're used to. */}
@@ -1062,6 +1111,7 @@ export function AwaitingCoordinationView({
                         unit={unit}
                         units={units}
                         kind={kind}
+                        onTemplateClick={setTemplateFilter}
                       />
                     </td>
                     <td className="px-4 py-3">

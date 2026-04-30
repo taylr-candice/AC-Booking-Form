@@ -5,7 +5,7 @@
  * `AdminApp` shell to mount `BookingDetail`.
  */
 
-import { Plus, RotateCcw, Search, TriangleAlert } from "lucide-react";
+import { Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -148,6 +148,9 @@ export function BookingsView({
   const [attemptSort, setAttemptSort] = useState<
     "default" | "stalest_first" | "freshest_first"
   >("default");
+  // "Latest call/email touch used this template" pivot. Local to this
+  // view so it doesn't bleed across surfaces.
+  const [templateFilter, setTemplateFilter] = useState<string | null>(null);
   // Inline-undo pivot state. When the row-level "Undo" affordance hits
   // a "slot_taken" verdict we surface the same conflict dialog the
   // detail page uses; clicking "Open Reschedule" then asks the
@@ -186,15 +189,18 @@ export function BookingsView({
         { key: "cancelled", label: "Cancelled" },
       ];
 
-  // Predicate for the "global" filters that aren't tied to the
-  // status chip row — building filter + search. Mirrors the helper
-  // on AwaitingCoordinationView so each chip's count answers
-  // "how many rows would survive if I clicked me?" without
-  // double-counting against its own selection.
+  // Building + search + template-filter predicate, folded into the
+  // chip counts so they reflect the visible rows.
   function matchesBuildingAndSearch(b: AdminBooking) {
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
+    }
+    if (templateFilter !== null) {
+      const latest = latestCoordinationAttempt(b.serviceTimeline);
+      if (latest === null || latest.templateLabel !== templateFilter) {
+        return false;
+      }
     }
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
@@ -278,6 +284,12 @@ export function BookingsView({
     if (buildingFilter !== "all") {
       const unit = units.find((u) => u.id === b.unitId);
       if (!unit || unit.buildingId !== buildingFilter) return false;
+    }
+    if (templateFilter !== null) {
+      const latest = latestCoordinationAttempt(b.serviceTimeline);
+      if (latest === null || latest.templateLabel !== templateFilter) {
+        return false;
+      }
     }
     if (search.trim().length > 0) {
       const q = search.trim().toLowerCase();
@@ -469,6 +481,30 @@ export function BookingsView({
           })}
         </div>
       </div>
+
+      {templateFilter !== null && (
+        <div
+          className="flex items-center gap-2 text-[12px]"
+          data-testid="bookings-template-filter-chip"
+        >
+          <span className="text-slate-500">Filtered by template:</span>
+          <button
+            type="button"
+            onClick={() => setTemplateFilter(null)}
+            data-testid="button-clear-bookings-template-filter"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+            style={{
+              backgroundColor: BRAND_SOFT,
+              color: BRAND_DEEP,
+            }}
+            title="Clear template filter"
+            aria-label={`Clear template filter "${templateFilter}"`}
+          >
+            <span>{templateFilter}</span>
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -678,24 +714,31 @@ export function BookingsView({
                               {recency ? ` · ${recency.label}` : ""}
                             </span>
                             {latestAttempt.templateLabel && (
-                              // Small grey suffix naming the picked
-                              // Call/Email template (Task #141 for
-                              // emails, Task #149 for calls),
-                              // mirroring the same suffix on the
-                              // Awaiting-coordination queue's row so
-                              // ops can triage by template at a glance
-                              // without opening each booking.
-                              // Custom / legacy entries leave
-                              // `templateLabel` as `null` and skip
-                              // this entirely.
-                              <span
-                                className="text-slate-500"
-                                data-testid="bookings-row-last-attempt-template"
-                                data-booking-id={b.id}
-                              >
+                              // stopPropagation so the suffix activation
+                              // doesn't bubble to the row's open handler.
+                              <>
                                 {" · "}
-                                {latestAttempt.templateLabel}
-                              </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTemplateFilter(
+                                      latestAttempt.templateLabel,
+                                    );
+                                  }}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                  className="cursor-pointer rounded text-slate-500 underline decoration-dotted decoration-slate-400 underline-offset-2 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                                  data-testid="bookings-row-last-attempt-template"
+                                  data-booking-id={b.id}
+                                  data-template-label={
+                                    latestAttempt.templateLabel
+                                  }
+                                  title={`Filter the table to bookings whose latest touch used "${latestAttempt.templateLabel}"`}
+                                  aria-label={`Filter by template "${latestAttempt.templateLabel}"`}
+                                >
+                                  {latestAttempt.templateLabel}
+                                </button>
+                              </>
                             )}
                           </div>
                         );
