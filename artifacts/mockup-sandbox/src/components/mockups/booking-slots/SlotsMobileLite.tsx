@@ -24,7 +24,6 @@ import {
   dayWindows,
   type CustomerDay,
   type CustomerSlot,
-  WINDOW_TIME_RANGE,
 } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
@@ -211,7 +210,7 @@ export function SlotsMobileLite() {
                     slot={activeDay.morning}
                     icon={<Sunrise className="h-4 w-4" />}
                     label="Morning"
-                    hint={WINDOW_TIME_RANGE.morning}
+                    hint={activeDay.morning.timeLabel}
                     selected={selectedSlotId === activeDay.morning.id}
                     onClick={() => {
                       setSelectedSlotId(activeDay.morning.id);
@@ -222,7 +221,7 @@ export function SlotsMobileLite() {
                     slot={activeDay.afternoon}
                     icon={<Sun className="h-4 w-4" />}
                     label="Afternoon"
-                    hint={WINDOW_TIME_RANGE.afternoon}
+                    hint={activeDay.afternoon.timeLabel}
                     selected={selectedSlotId === activeDay.afternoon.id}
                     onClick={() => {
                       setSelectedSlotId(activeDay.afternoon.id);
@@ -234,7 +233,7 @@ export function SlotsMobileLite() {
                       slot={activeDay.evening}
                       icon={<Moon className="h-4 w-4" />}
                       label="Evening"
-                      hint={WINDOW_TIME_RANGE.evening}
+                      hint={activeDay.evening.timeLabel}
                       selected={selectedSlotId === activeDay.evening.id}
                       onClick={() => {
                         setSelectedSlotId(activeDay.evening!.id);

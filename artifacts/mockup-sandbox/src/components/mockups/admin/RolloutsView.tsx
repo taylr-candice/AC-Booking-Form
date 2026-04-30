@@ -10,13 +10,14 @@
  * open windows, # of bookings) — destructive edits live in the editor.
  */
 
-import { CalendarRange, Plus } from "lucide-react";
+import { AlertTriangle, CalendarRange, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
   formatRolloutDateRange,
   getRollouts,
   getServices,
+  shouldNudgeManualRelease,
   type AdminBooking,
   type AdminBuilding,
   type AdminRollout,
@@ -209,6 +210,16 @@ function RolloutListRow({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        {shouldNudgeManualRelease(rollout) && (
+          <span
+            data-testid={`rollouts-row-${rollout.id}-nudge-badge`}
+            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800"
+            title="Released windows are at 80%+. Release the next batch when ready."
+          >
+            <AlertTriangle className="h-3 w-3" />
+            Release nudge
+          </span>
+        )}
         <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
           {openWindows}/{totalWindows} windows open
         </span>

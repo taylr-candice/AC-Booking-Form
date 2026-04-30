@@ -26,23 +26,37 @@
 
 import {
   findRolloutForBooking,
+  formatWindowTimeRange,
   getActiveBookingForUnit,
   getLiveBookings,
+  resolveSlotTimes,
   rolloutSlotStatus,
   type AdminBooking,
   type AdminRollout,
+  type RolloutDay,
+  type RolloutSlot,
   type RolloutSlotStatus,
 } from "../../../state/adminMockData";
 
 /** View-model used by the customer-side pickers. Keeps the same
  *  field names the legacy hard-coded seed used so the JSX rendering
- *  in each picker barely changes. */
+ *  in each picker barely changes.
+ *
+ *  `startTime` / `endTime` are the resolved 24h `HH:MM` ranges (per-
+ *  slot override winning over rollout defaults), and `timeLabel` is
+ *  the customer-facing string ("8am – 12:30pm") so the picker tiles
+ *  render the same source-of-truth value the admin schedule editor
+ *  reads.
+ */
 export type CustomerSlot = {
   id: string;
   window: "morning" | "afternoon" | "evening";
   windowMinutes: number;
   bookedMinutes: number;
   status: RolloutSlotStatus;
+  startTime: string;
+  endTime: string;
+  timeLabel: string;
 };
 
 export type CustomerDay = {
@@ -80,45 +94,35 @@ export function resolveCustomerSlotData(
     return { rollout: null, days: [] };
   }
 
+  const toCustomerSlot = (
+    r: AdminRollout,
+    d: RolloutDay,
+    slot: RolloutSlot,
+  ): CustomerSlot => {
+    const range = resolveSlotTimes(r, slot);
+    return {
+      id: slot.id,
+      window: slot.window,
+      windowMinutes: slot.windowMinutes,
+      bookedMinutes: slot.bookedMinutes,
+      status: rolloutSlotStatus(d, slot, r.capacityModel, jobMinutes),
+      startTime: range.start,
+      endTime: range.end,
+      timeLabel: formatWindowTimeRange(range),
+    };
+  };
+
   const days: CustomerDay[] = rollout.days.map((d) => {
     const day: CustomerDay = {
       date: d.isoDate,
       weekday: d.weekdayLabel,
       day: parseInt(d.dayLabel, 10),
       month: d.monthLabel,
-      morning: {
-        id: d.morning.id,
-        window: d.morning.window,
-        windowMinutes: d.morning.windowMinutes,
-        bookedMinutes: d.morning.bookedMinutes,
-        status: rolloutSlotStatus(d, d.morning, rollout.capacityModel, jobMinutes),
-      },
-      afternoon: {
-        id: d.afternoon.id,
-        window: d.afternoon.window,
-        windowMinutes: d.afternoon.windowMinutes,
-        bookedMinutes: d.afternoon.bookedMinutes,
-        status: rolloutSlotStatus(
-          d,
-          d.afternoon,
-          rollout.capacityModel,
-          jobMinutes,
-        ),
-      },
+      morning: toCustomerSlot(rollout, d, d.morning),
+      afternoon: toCustomerSlot(rollout, d, d.afternoon),
     };
     if (d.evening) {
-      day.evening = {
-        id: d.evening.id,
-        window: d.evening.window,
-        windowMinutes: d.evening.windowMinutes,
-        bookedMinutes: d.evening.bookedMinutes,
-        status: rolloutSlotStatus(
-          d,
-          d.evening,
-          rollout.capacityModel,
-          jobMinutes,
-        ),
-      };
+      day.evening = toCustomerSlot(rollout, d, d.evening);
     }
     return day;
   });
@@ -198,21 +202,6 @@ export function dayWindows(day: CustomerDay): CustomerSlot[] {
 export function dayHasAvailable(day: CustomerDay): boolean {
   return dayWindows(day).some((s) => s.status === "available");
 }
-
-/**
- * Customer-facing time range for each booking window. Hoisted so
- * the slot tiles and the "Selected window" summary panel can
- * render the same string (single source of truth — change here
- * and every picker variant updates).
- */
-export const WINDOW_TIME_RANGE: Record<
-  "morning" | "afternoon" | "evening",
-  string
-> = {
-  morning: "8am – 12pm",
-  afternoon: "12pm – 5pm",
-  evening: "5pm – 8pm",
-};
 
 /** Short, human-friendly label for an access method, used by the
  *  slot picker's "Access: <label> · Change" recap line. Returns a

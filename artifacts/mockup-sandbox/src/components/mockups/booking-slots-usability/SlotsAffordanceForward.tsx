@@ -24,7 +24,6 @@ import {
   dayWindows,
   type CustomerDay,
   type CustomerSlot,
-  WINDOW_TIME_RANGE,
 } from "../booking-slots/customerSlotData";
 import { useCustomerSlotPicker } from "../booking-slots/useCustomerSlotPicker";
 
@@ -364,7 +363,7 @@ function DayBlock({
           slot={day.morning}
           icon={<Sunrise className="h-4 w-4" />}
           label="Morning"
-          hint={WINDOW_TIME_RANGE.morning}
+          hint={day.morning.timeLabel}
           selected={selected === day.morning.id}
           onClick={() => onSelect(day.morning.id)}
           isNextAvailable={day.morning.id === nextAvailableSlotId}
@@ -374,7 +373,7 @@ function DayBlock({
           slot={day.afternoon}
           icon={<Sun className="h-4 w-4" />}
           label="Afternoon"
-          hint={WINDOW_TIME_RANGE.afternoon}
+          hint={day.afternoon.timeLabel}
           selected={selected === day.afternoon.id}
           onClick={() => onSelect(day.afternoon.id)}
           isNextAvailable={day.afternoon.id === nextAvailableSlotId}
@@ -385,7 +384,7 @@ function DayBlock({
             slot={day.evening}
             icon={<Moon className="h-4 w-4" />}
             label="Evening"
-            hint={WINDOW_TIME_RANGE.evening}
+            hint={day.evening.timeLabel}
             selected={selected === day.evening.id}
             onClick={() => onSelect(day.evening!.id)}
             isNextAvailable={day.evening.id === nextAvailableSlotId}

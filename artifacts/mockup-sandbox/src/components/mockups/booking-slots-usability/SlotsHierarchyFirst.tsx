@@ -21,7 +21,6 @@ import {
   dayWindows,
   type CustomerDay,
   type CustomerSlot,
-  WINDOW_TIME_RANGE,
 } from "../booking-slots/customerSlotData";
 import { useCustomerSlotPicker } from "../booking-slots/useCustomerSlotPicker";
 
@@ -37,11 +36,17 @@ const WINDOW_LONG_LABEL: Record<Slot["window"], string> = {
   evening: "Evening window",
 };
 
-const WINDOW_COMPACT_LABEL: Record<Slot["window"], string> = {
-  morning: `Morning (${WINDOW_TIME_RANGE.morning})`,
-  afternoon: `Afternoon (${WINDOW_TIME_RANGE.afternoon})`,
-  evening: `Evening (${WINDOW_TIME_RANGE.evening})`,
+/** "Morning (8am – 12:30pm)" — built per-slot now that times come
+ *  from the rollout. Each slot has a `timeLabel` already resolved by
+ *  {@link resolveCustomerSlotData}. */
+const WINDOW_SHORT_NAME: Record<Slot["window"], string> = {
+  morning: "Morning",
+  afternoon: "Afternoon",
+  evening: "Evening",
 };
+function compactWindowLabel(slot: Slot): string {
+  return `${WINDOW_SHORT_NAME[slot.window]} (${slot.timeLabel})`;
+}
 
 function windowIcon(window: Slot["window"], className: string) {
   if (window === "morning") return <Sunrise className={className} />;
@@ -327,7 +332,7 @@ export function SlotsHierarchyFirst() {
                           <CompactSlotCard
                             slot={morning}
                             icon={windowIcon("morning", "h-4 w-4")}
-                            label={WINDOW_COMPACT_LABEL.morning}
+                            label={compactWindowLabel(morning)}
                             selected={selected === morning.id}
                             onClick={() => setSelected(morning.id)}
                           />
@@ -336,7 +341,7 @@ export function SlotsHierarchyFirst() {
                           <CompactSlotCard
                             slot={afternoon}
                             icon={windowIcon("afternoon", "h-4 w-4")}
-                            label={WINDOW_COMPACT_LABEL.afternoon}
+                            label={compactWindowLabel(afternoon)}
                             selected={selected === afternoon.id}
                             onClick={() => setSelected(afternoon.id)}
                           />
@@ -345,7 +350,7 @@ export function SlotsHierarchyFirst() {
                           <CompactSlotCard
                             slot={evening}
                             icon={windowIcon("evening", "h-4 w-4")}
-                            label={WINDOW_COMPACT_LABEL.evening}
+                            label={compactWindowLabel(evening)}
                             selected={selected === evening.id}
                             onClick={() => setSelected(evening.id)}
                           />
@@ -392,7 +397,7 @@ function HeroSlotCard({
   onClick: () => void;
 }) {
   const label = WINDOW_LONG_LABEL[slot.window];
-  const hint = WINDOW_TIME_RANGE[slot.window];
+  const hint = slot.timeLabel;
 
   const fits = slot.status === "available";
   const disabled = !fits;

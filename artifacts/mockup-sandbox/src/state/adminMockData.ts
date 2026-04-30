@@ -3299,7 +3299,14 @@ export const SEEDED_SERVICES: AdminService[] = [
  *  `slotCount` for fixed-count rollouts. The "off" mode just leaves the
  *  unused fields at 0; the schedule editor enforces which fields you can
  *  edit. `openByAdmin=false` means the window is staged but not yet
- *  released to customers. */
+ *  released to customers.
+ *
+ *  `startTime` / `endTime` are optional per-slot overrides of the
+ *  rollout's window-time defaults — when present they detach this slot
+ *  from the rollout's defaults so changing the default leaves this slot
+ *  untouched. Both stored as `HH:MM` 24-hour strings (e.g. `"08:30"`,
+ *  `"16:00"`) for easy round-tripping with `<input type="time">`.
+ */
 export type RolloutSlot = {
   id: string;
   window: "morning" | "afternoon" | "evening";
@@ -3309,6 +3316,11 @@ export type RolloutSlot = {
   slotCount?: number;
   bookedCount?: number;
   openByAdmin: boolean;
+  /** Per-slot time-range override (24h `HH:MM`). When unset, the
+   *  rollout's `windowDefaults[window]` is used. Both must be set
+   *  together — the schedule editor enforces this. */
+  startTime?: string;
+  endTime?: string;
 };
 
 export type RolloutDay = {
@@ -3324,9 +3336,65 @@ export type RolloutDay = {
   open: boolean;
   morning: RolloutSlot;
   afternoon: RolloutSlot;
-  /** Optional 5pm – 8pm window. Most days don't have one — admins
+  /** Optional evening window. Most days don't have one — admins
    *  opt-in per day for evening capacity. */
   evening?: RolloutSlot;
+};
+
+/** Time range for one of a rollout's three default windows. Strings
+ *  are 24-hour `HH:MM` so `<input type="time">` round-trips cleanly. */
+export type WindowTimeRange = { start: string; end: string };
+
+export type RolloutWindowDefaults = {
+  morning: WindowTimeRange;
+  afternoon: WindowTimeRange;
+  evening: WindowTimeRange;
+};
+
+/** How a rollout flips the next batch of staged days from
+ *  `openByAdmin: false` to `true`. */
+export type ReleaseStrategyMode =
+  | "auto_when_full"
+  | "auto_at_threshold"
+  | "manual_nudge";
+
+/** Whether "next batch" means the next N **days** or the next N
+ *  **windows** (chronological order). Same staged set, different
+ *  granularity. */
+export type ReleaseUnit = "days" | "windows";
+
+export type ReleaseAuditEvent = {
+  id: string;
+  /** Free-text "Just now" / ISO timestamp — same convention the
+   *  service timeline uses. */
+  at: string;
+  /** Who/what triggered the release. `admin` for the manual button;
+   *  `system` for any auto path. */
+  by: "admin" | "system";
+  /** Why the release fired. */
+  trigger: "manual" | "auto_full" | "auto_threshold";
+  /** Concrete windows that flipped to released. For
+   *  `unit: "days"` releases each day appears once with its open
+   *  windows; for `unit: "windows"` each released window appears as
+   *  its own entry. */
+  released: Array<{
+    isoDate: string;
+    window?: "morning" | "afternoon" | "evening";
+  }>;
+};
+
+export type ReleaseStrategy = {
+  mode: ReleaseStrategyMode;
+  /** 1–100. Only meaningful for `auto_at_threshold`. Default 80. */
+  thresholdPct: number;
+  unit: ReleaseUnit;
+  /** Small integer, default 1. */
+  batchSize: number;
+  audit: ReleaseAuditEvent[];
+  /** Set to true when an auto release fires; the schedule editor
+   *  reads this once on mount, surfaces a non-blocking toast, then
+   *  clears it via {@link clearReleaseAutoToast}. */
+  hasUnseenAuto?: boolean;
 };
 
 export type AdminRollout = {
@@ -3347,11 +3415,45 @@ export type AdminRollout = {
    *  (admins can't add days outside the range; they can only toggle
    *  the existing rows on/off). */
   days: RolloutDay[];
+  /** Default start/end times for every slot in the rollout. Each
+   *  slot picks them up unless it carries its own `startTime` /
+   *  `endTime` override. Seeded from the legacy global table for new
+   *  rollouts; per-rollout for the seeded ones so the customer-side
+   *  picker visibly differs between buildings. */
+  windowDefaults: RolloutWindowDefaults;
+  /** Strategy for staging vs. releasing the rollout's day rows. Newly
+   *  created rollouts default to "manual nudge only" (the safest for
+   *  ops while they're still staging) with batchSize 1. */
+  releaseStrategy: ReleaseStrategy;
 };
 
 const MORNING_WINDOW_MIN = 240; // 8am – 12pm
 const AFTERNOON_WINDOW_MIN = 300; // 12pm – 5pm
-const EVENING_WINDOW_MIN = 180; // 5pm – 8pm
+const EVENING_WINDOW_MIN = 240; // 5pm – 9pm
+
+/** Seed defaults for a rollout's window times. New rollouts created
+ *  via {@link createRollout} pick these up unchanged so anything that
+ *  doesn't customise the time still gets the legacy customer-facing
+ *  ranges. The seeded rollouts further down the file override these
+ *  per-building so the per-rollout-times feature is visible from the
+ *  first preview. */
+export const SEED_WINDOW_DEFAULTS: RolloutWindowDefaults = {
+  morning: { start: "08:00", end: "12:00" },
+  afternoon: { start: "12:00", end: "17:00" },
+  evening: { start: "17:00", end: "21:00" },
+};
+
+/** Default release strategy for new rollouts: ops typically wants to
+ *  stage everything and release in their own time, so we start in
+ *  manual-nudge mode with a batch of one day at a time. They can
+ *  flip to one of the auto modes once the rollout is shaped. */
+export const DEFAULT_RELEASE_STRATEGY: ReleaseStrategy = {
+  mode: "manual_nudge",
+  thresholdPct: 80,
+  unit: "days",
+  batchSize: 1,
+  audit: [],
+};
 
 function makeTimeBudgetDay(
   isoDate: string,
@@ -3490,6 +3592,47 @@ const RL_BOURKE_DAYS: RolloutDay[] = [
   makeTimeBudgetDay("2026-05-08", 0, 0),
 ];
 
+// Aspen: standard 8am start, but the afternoon block is sized to the
+// tech's actual 12:30–4:30 shift, and the evening (when opted in)
+// runs 5–8:30. The last two days are staged so the release ladder
+// has something concrete to act on out of the box.
+const ASPEN_WINDOW_DEFAULTS: RolloutWindowDefaults = {
+  morning: { start: "08:00", end: "12:30" },
+  afternoon: { start: "12:30", end: "16:30" },
+  evening: { start: "17:00", end: "20:30" },
+};
+{
+  // Stage the last two Aspen days so the release ladder isn't a no-op
+  // on first preview. Mutating the array directly keeps the seed
+  // factories above untouched.
+  const stage = (slot: RolloutSlot) => ({ ...slot, openByAdmin: false });
+  for (const iso of ["2026-05-08", "2026-05-09"]) {
+    const day = RL_ASPEN_DAYS.find((d) => d.isoDate === iso);
+    if (!day) continue;
+    day.morning = stage(day.morning);
+    day.afternoon = stage(day.afternoon);
+    if (day.evening) day.evening = stage(day.evening);
+  }
+}
+
+// Marine: starts an hour earlier (early-bird tech) and runs into the
+// evening on opt-in days. Designed to look visibly different from
+// Aspen at a glance.
+const MARINE_WINDOW_DEFAULTS: RolloutWindowDefaults = {
+  morning: { start: "07:30", end: "12:00" },
+  afternoon: { start: "12:30", end: "16:30" },
+  evening: { start: "17:30", end: "21:00" },
+};
+
+// Bourke: small-building Mon/Wed/Fri pilot — late start, no evening
+// activity expected. The default still carries an evening range
+// (admins can opt a day in), but it's never seeded.
+const BOURKE_WINDOW_DEFAULTS: RolloutWindowDefaults = {
+  morning: { start: "09:00", end: "12:00" },
+  afternoon: { start: "12:30", end: "17:00" },
+  evening: { start: "17:00", end: "20:00" },
+};
+
 const SEEDED_ROLLOUTS: AdminRollout[] = [
   {
     id: "rl-ac-aspen",
@@ -3500,6 +3643,14 @@ const SEEDED_ROLLOUTS: AdminRollout[] = [
     endDate: "2026-05-09",
     capacityModel: "time_budget_per_window",
     days: RL_ASPEN_DAYS,
+    windowDefaults: ASPEN_WINDOW_DEFAULTS,
+    releaseStrategy: {
+      mode: "auto_at_threshold",
+      thresholdPct: 80,
+      unit: "days",
+      batchSize: 2,
+      audit: [],
+    },
   },
   {
     id: "rl-ac-marine",
@@ -3510,6 +3661,14 @@ const SEEDED_ROLLOUTS: AdminRollout[] = [
     endDate: "2026-05-08",
     capacityModel: "slots_per_window",
     days: RL_MARINE_DAYS,
+    windowDefaults: MARINE_WINDOW_DEFAULTS,
+    releaseStrategy: {
+      mode: "auto_when_full",
+      thresholdPct: 80,
+      unit: "windows",
+      batchSize: 3,
+      audit: [],
+    },
   },
   {
     id: "rl-ac-bourke",
@@ -3520,6 +3679,14 @@ const SEEDED_ROLLOUTS: AdminRollout[] = [
     endDate: "2026-05-08",
     capacityModel: "time_budget_per_window",
     days: RL_BOURKE_DAYS,
+    windowDefaults: BOURKE_WINDOW_DEFAULTS,
+    releaseStrategy: {
+      mode: "manual_nudge",
+      thresholdPct: 80,
+      unit: "days",
+      batchSize: 1,
+      audit: [],
+    },
   },
 ];
 
@@ -3538,6 +3705,18 @@ function cloneRollout(r: AdminRollout): AdminRollout {
       afternoon: { ...d.afternoon },
       ...(d.evening ? { evening: { ...d.evening } } : {}),
     })),
+    windowDefaults: {
+      morning: { ...r.windowDefaults.morning },
+      afternoon: { ...r.windowDefaults.afternoon },
+      evening: { ...r.windowDefaults.evening },
+    },
+    releaseStrategy: {
+      ...r.releaseStrategy,
+      audit: r.releaseStrategy.audit.map((e) => ({
+        ...e,
+        released: e.released.map((x) => ({ ...x })),
+      })),
+    },
   };
 }
 
@@ -3961,6 +4140,11 @@ export function consumeBookingCapacity(
       bookedMinutes: slot.bookedMinutes + jobMin,
     });
   }
+  // Re-check the rollout's release strategy after every successful
+  // capacity bump. Manual-nudge mode is a no-op inside the
+  // evaluator; the auto modes will flip the next batch + write a
+  // system audit row when the trigger condition lands.
+  evaluateAutoRelease(rollout.id);
   return true;
 }
 
@@ -3993,6 +4177,18 @@ export function createRollout(input: {
     endDate: input.endDate,
     capacityModel: input.capacityModel,
     days,
+    windowDefaults: {
+      morning: { ...SEED_WINDOW_DEFAULTS.morning },
+      afternoon: { ...SEED_WINDOW_DEFAULTS.afternoon },
+      evening: { ...SEED_WINDOW_DEFAULTS.evening },
+    },
+    releaseStrategy: {
+      mode: DEFAULT_RELEASE_STRATEGY.mode,
+      thresholdPct: DEFAULT_RELEASE_STRATEGY.thresholdPct,
+      unit: DEFAULT_RELEASE_STRATEGY.unit,
+      batchSize: DEFAULT_RELEASE_STRATEGY.batchSize,
+      audit: [],
+    },
   };
   rollouts = [...rollouts, rollout];
   return rollout;
@@ -4131,10 +4327,428 @@ export function resetRolloutSlotUtilization(
   return prev;
 }
 
+// ── Window-time resolution + formatting ────────────────────────────────────
+
+/**
+ * Resolve the effective `{start, end}` for a slot. Looks at the per-slot
+ * override first, falling back to the rollout's `windowDefaults` for the
+ * matching window. Pure / data-only — every customer-side and admin-side
+ * display reads through this helper so the rule lives in one place.
+ */
+export function resolveSlotTimes(
+  rollout: AdminRollout,
+  slot: { window: "morning" | "afternoon" | "evening"; startTime?: string; endTime?: string },
+): WindowTimeRange {
+  if (slot.startTime && slot.endTime) {
+    return { start: slot.startTime, end: slot.endTime };
+  }
+  return { ...rollout.windowDefaults[slot.window] };
+}
+
+/** True iff the slot has both `startTime` and `endTime` set — i.e. it
+ *  has detached itself from the rollout's defaults. */
+export function isSlotTimeOverridden(slot: {
+  startTime?: string;
+  endTime?: string;
+}): boolean {
+  return Boolean(slot.startTime && slot.endTime);
+}
+
+/** Convert a 24h `HH:MM` to a "8am" / "12:30pm" / "4pm" customer-facing
+ *  string. Trims the `:00` minute when the time lands on the hour so
+ *  the rendered range stays compact ("8am – 12:30pm" not
+ *  "8:00am – 12:30pm"). */
+export function formatTimeOfDay(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(":");
+  const hRaw = parseInt(hStr ?? "", 10);
+  const m = parseInt(mStr ?? "", 10);
+  if (!Number.isFinite(hRaw) || !Number.isFinite(m)) return hhmm;
+  const meridiem = hRaw >= 12 ? "pm" : "am";
+  const h12 = ((hRaw + 11) % 12) + 1;
+  const minutePart = m === 0 ? "" : `:${String(m).padStart(2, "0")}`;
+  return `${h12}${minutePart}${meridiem}`;
+}
+
+/** "8am – 12:30pm" style range for a resolved {@link WindowTimeRange}. */
+export function formatWindowTimeRange(range: WindowTimeRange): string {
+  return `${formatTimeOfDay(range.start)} – ${formatTimeOfDay(range.end)}`;
+}
+
+/** Convenience wrapper combining {@link resolveSlotTimes} +
+ *  {@link formatWindowTimeRange}. */
+export function formatSlotTimeRange(
+  rollout: AdminRollout,
+  slot: { window: "morning" | "afternoon" | "evening"; startTime?: string; endTime?: string },
+): string {
+  return formatWindowTimeRange(resolveSlotTimes(rollout, slot));
+}
+
+/** Minute-of-day for a `HH:MM` string. Used to sort released windows
+ *  in chronological order when ops chooses `unit: "windows"`. */
+export function startMinutes(hhmm: string): number {
+  const [hStr, mStr] = hhmm.split(":");
+  const h = parseInt(hStr ?? "", 10);
+  const m = parseInt(mStr ?? "", 10);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
+  return h * 60 + m;
+}
+
+/** ISO date + start-minute key used to sort staged windows
+ *  chronologically (date asc, then start-time asc). */
+export function slotChronoKey(
+  rollout: AdminRollout,
+  day: RolloutDay,
+  window: "morning" | "afternoon" | "evening",
+): string {
+  const slot = day[window]!;
+  const { start } = resolveSlotTimes(rollout, slot);
+  const mins = startMinutes(start);
+  return `${day.isoDate}|${String(mins).padStart(4, "0")}`;
+}
+
+// ── Window-time + release-strategy mutators ────────────────────────────────
+
+/** Set the rollout-level default time range for a single window. Every
+ *  slot in that window that is *not* overridden picks the new range up
+ *  on the next render via {@link resolveSlotTimes}. */
+export function setRolloutWindowDefault(
+  rolloutId: string,
+  window: "morning" | "afternoon" | "evening",
+  range: WindowTimeRange,
+): void {
+  rollouts = rollouts.map((r) =>
+    r.id !== rolloutId
+      ? r
+      : {
+          ...r,
+          windowDefaults: { ...r.windowDefaults, [window]: { ...range } },
+        },
+  );
+}
+
+/** Set or clear a per-slot time override. Pass `null` to clear the
+ *  override (snap the slot back to the rollout's defaults). */
+export function setRolloutSlotTimeOverride(
+  rolloutId: string,
+  isoDate: string,
+  window: "morning" | "afternoon" | "evening",
+  range: WindowTimeRange | null,
+): void {
+  rollouts = rollouts.map((r) => {
+    if (r.id !== rolloutId) return r;
+    return {
+      ...r,
+      days: r.days.map((d) => {
+        if (d.isoDate !== isoDate) return d;
+        const existing = d[window];
+        if (!existing) return d;
+        const next: RolloutSlot = range
+          ? { ...existing, startTime: range.start, endTime: range.end }
+          : (() => {
+              const { startTime: _s, endTime: _e, ...rest } = existing;
+              return rest as RolloutSlot;
+            })();
+        return { ...d, [window]: next };
+      }),
+    };
+  });
+}
+
+/** Patch the rollout's release strategy. Caller passes only the fields
+ *  that change; audit list and `hasUnseenAuto` flag are preserved. */
+export function setRolloutReleaseStrategy(
+  rolloutId: string,
+  patch: Partial<Omit<ReleaseStrategy, "audit" | "hasUnseenAuto">>,
+): void {
+  rollouts = rollouts.map((r) =>
+    r.id !== rolloutId
+      ? r
+      : {
+          ...r,
+          releaseStrategy: { ...r.releaseStrategy, ...patch },
+        },
+  );
+}
+
+/** Returns the released windows for a rollout in chronological order.
+ *  Used by both the threshold/full evaluator (to compute fill) and by
+ *  the nudge surfaces (to know what's currently visible to customers). */
+export function releasedSlots(
+  rollout: AdminRollout,
+): Array<{ day: RolloutDay; window: "morning" | "afternoon" | "evening"; slot: RolloutSlot }> {
+  const out: Array<{ day: RolloutDay; window: "morning" | "afternoon" | "evening"; slot: RolloutSlot }> = [];
+  for (const day of rollout.days) {
+    if (!day.open) continue;
+    const ws: Array<"morning" | "afternoon" | "evening"> = ["morning", "afternoon", "evening"];
+    for (const w of ws) {
+      const slot = day[w];
+      if (!slot || !slot.openByAdmin) continue;
+      out.push({ day, window: w, slot });
+    }
+  }
+  return out;
+}
+
+/** Returns the staged (un-released) windows for a rollout in
+ *  chronological order. The release ladder always picks from the head
+ *  of this list. */
+export function stagedSlotsChrono(
+  rollout: AdminRollout,
+): Array<{ day: RolloutDay; window: "morning" | "afternoon" | "evening"; slot: RolloutSlot }> {
+  const out: Array<{ day: RolloutDay; window: "morning" | "afternoon" | "evening"; slot: RolloutSlot }> = [];
+  for (const day of rollout.days) {
+    if (!day.open) continue;
+    const ws: Array<"morning" | "afternoon" | "evening"> = ["morning", "afternoon", "evening"];
+    for (const w of ws) {
+      const slot = day[w];
+      if (!slot || slot.openByAdmin) continue;
+      out.push({ day, window: w, slot });
+    }
+  }
+  out.sort((a, b) =>
+    slotChronoKey(rollout, a.day, a.window).localeCompare(
+      slotChronoKey(rollout, b.day, b.window),
+    ),
+  );
+  return out;
+}
+
+/** Per-slot fill ratio (0..1). Mode-aware. Used by the threshold and
+ *  "auto when full" evaluators. */
+export function slotFillRatio(
+  slot: RolloutSlot,
+  capacityModel: ServiceCapacityModel,
+): number {
+  if (capacityModel === "slots_per_window") {
+    const total = slot.slotCount ?? 0;
+    if (total <= 0) return 0;
+    return Math.min(1, (slot.bookedCount ?? 0) / total);
+  }
+  if (slot.windowMinutes <= 0) return 0;
+  return Math.min(1, slot.bookedMinutes / slot.windowMinutes);
+}
+
+/** Aggregate fill across every released slot in the rollout. Empty
+ *  released set returns 0 — the evaluator treats "no released slots"
+ *  as "nothing to evaluate" and short-circuits before this is read. */
+export function releasedFillRatio(rollout: AdminRollout): number {
+  const released = releasedSlots(rollout);
+  if (released.length === 0) return 0;
+  let sum = 0;
+  for (const r of released) sum += slotFillRatio(r.slot, rollout.capacityModel);
+  return sum / released.length;
+}
+
+/** True when every released slot in the rollout is at 100% capacity.
+ *  Empty released set is treated as "not full" to avoid auto-flipping
+ *  before any windows are visible to customers. */
+export function releasedAllFull(rollout: AdminRollout): boolean {
+  const released = releasedSlots(rollout);
+  if (released.length === 0) return false;
+  for (const r of released) {
+    if (slotFillRatio(r.slot, rollout.capacityModel) < 1) return false;
+  }
+  return true;
+}
+
+let releaseEventCounter = 0;
+function nextReleaseEventId(): string {
+  releaseEventCounter += 1;
+  return `re-${releaseEventCounter}`;
+}
+
+/** Drop the most-recent release audit event from a rollout (the one
+ *  at index 0 — the audit list is newest-first). Used by the manual-
+ *  release "Undo" handler to keep the visible audit list in sync with
+ *  the re-staged windows. No-op when the audit list is already empty.
+ *
+ *  Re-clones via `rollouts.map(...)` so the immutability invariant
+ *  the editor relies on (`stagedSlotsChrono` reads always see fresh
+ *  rollout objects) is preserved. */
+export function popLatestReleaseAuditEvent(rolloutId: string): void {
+  rollouts = rollouts.map((r) => {
+    if (r.id !== rolloutId) return r;
+    if (r.releaseStrategy.audit.length === 0) return r;
+    return {
+      ...r,
+      releaseStrategy: {
+        ...r.releaseStrategy,
+        audit: r.releaseStrategy.audit.slice(1),
+      },
+    };
+  });
+}
+
+/** Append an audit event to the rollout's release strategy. Used by
+ *  both the manual button and the auto evaluator. */
+function appendReleaseAudit(
+  rolloutId: string,
+  patch: { by: "admin" | "system"; trigger: ReleaseAuditEvent["trigger"]; released: ReleaseAuditEvent["released"]; at?: string; setUnseenAuto?: boolean },
+): void {
+  const event: ReleaseAuditEvent = {
+    id: nextReleaseEventId(),
+    at: patch.at ?? "Just now",
+    by: patch.by,
+    trigger: patch.trigger,
+    released: patch.released,
+  };
+  rollouts = rollouts.map((r) =>
+    r.id !== rolloutId
+      ? r
+      : {
+          ...r,
+          releaseStrategy: {
+            ...r.releaseStrategy,
+            audit: [event, ...r.releaseStrategy.audit],
+            ...(patch.setUnseenAuto ? { hasUnseenAuto: true } : {}),
+          },
+        },
+  );
+}
+
+/** Flip the next batch of staged windows to released, in chronological
+ *  order. Honours the rollout's `unit` (days vs windows) and
+ *  `batchSize`. Returns the list of slots that actually flipped (empty
+ *  when there's nothing left to release). The audit is *not* written
+ *  here — callers ({@link releaseNextBatchManual}, the auto
+ *  evaluator) write it with the right `by` / `trigger` pair. */
+function flipNextBatch(
+  rollout: AdminRollout,
+): Array<{ isoDate: string; window: "morning" | "afternoon" | "evening" }> {
+  const staged = stagedSlotsChrono(rollout);
+  if (staged.length === 0) return [];
+  const flips: Array<{ isoDate: string; window: "morning" | "afternoon" | "evening" }> = [];
+  if (rollout.releaseStrategy.unit === "days") {
+    // Take the first N distinct days from the staged list, then flip
+    // every staged window on each.
+    const seenDates = new Set<string>();
+    const dates: string[] = [];
+    for (const s of staged) {
+      if (seenDates.has(s.day.isoDate)) continue;
+      seenDates.add(s.day.isoDate);
+      dates.push(s.day.isoDate);
+      if (dates.length >= rollout.releaseStrategy.batchSize) break;
+    }
+    for (const s of staged) {
+      if (!dates.includes(s.day.isoDate)) continue;
+      flips.push({ isoDate: s.day.isoDate, window: s.window });
+    }
+  } else {
+    // Windows mode: take the first N staged windows directly.
+    for (let i = 0; i < Math.min(rollout.releaseStrategy.batchSize, staged.length); i++) {
+      flips.push({ isoDate: staged[i]!.day.isoDate, window: staged[i]!.window });
+    }
+  }
+  for (const f of flips) {
+    updateRolloutSlot(rollout.id, f.isoDate, f.window, { openByAdmin: true });
+  }
+  return flips;
+}
+
+/** Manually release the next batch (or every staged window when the
+ *  rollout has fewer staged than the batch size). Always succeeds —
+ *  ops can hit this regardless of mode. Returns the flipped windows
+ *  for caller-side toasting. */
+export function releaseNextBatchManual(rolloutId: string): ReleaseAuditEvent["released"] {
+  const r = getRolloutById(rolloutId);
+  if (!r) return [];
+  const flipped = flipNextBatch(r);
+  if (flipped.length > 0) {
+    appendReleaseAudit(rolloutId, {
+      by: "admin",
+      trigger: "manual",
+      released: flipped,
+    });
+  }
+  return flipped;
+}
+
+/**
+ * Auto-release evaluator. Re-checks the strategy and, if the trigger
+ * condition is met, flips the next batch and writes a system audit
+ * event. Called from the booking-confirm pipeline (admin + customer)
+ * so any capacity bump re-evaluates. Returns the flipped windows
+ * (empty when nothing happened).
+ */
+export function evaluateAutoRelease(
+  rolloutId: string,
+): ReleaseAuditEvent["released"] {
+  const r = getRolloutById(rolloutId);
+  if (!r) return [];
+  const strat = r.releaseStrategy;
+  if (strat.mode === "manual_nudge") return [];
+  let triggered = false;
+  let trigger: ReleaseAuditEvent["trigger"] = "auto_full";
+  if (strat.mode === "auto_when_full") {
+    triggered = releasedAllFull(r);
+    trigger = "auto_full";
+  } else if (strat.mode === "auto_at_threshold") {
+    const pct = strat.thresholdPct / 100;
+    const released = releasedSlots(r);
+    if (released.length > 0) {
+      // Every released slot must be at-or-above the threshold for the
+      // batch to trip — same "all full" semantics, just with a softer
+      // bar. Using "every" instead of average prevents one full
+      // window from masking an empty one.
+      let allAtThreshold = true;
+      for (const rs of released) {
+        if (slotFillRatio(rs.slot, r.capacityModel) < pct) {
+          allAtThreshold = false;
+          break;
+        }
+      }
+      triggered = allAtThreshold;
+    }
+    trigger = "auto_threshold";
+  }
+  if (!triggered) return [];
+  const flipped = flipNextBatch(r);
+  if (flipped.length > 0) {
+    appendReleaseAudit(rolloutId, {
+      by: "system",
+      trigger,
+      released: flipped,
+      setUnseenAuto: true,
+    });
+  }
+  return flipped;
+}
+
+/** Clear the unseen-auto flag once the editor has surfaced the
+ *  toast. */
+export function clearReleaseAutoToast(rolloutId: string): void {
+  rollouts = rollouts.map((r) =>
+    r.id !== rolloutId
+      ? r
+      : {
+          ...r,
+          releaseStrategy: {
+            ...r.releaseStrategy,
+            hasUnseenAuto: false,
+          },
+        },
+  );
+}
+
+/** True iff the rollout is in `manual_nudge` mode AND every released
+ *  slot is at-or-above 80% capacity AND there's still something
+ *  staged to release. Drives the amber banner and the rollout-list
+ *  badge. */
+export function shouldNudgeManualRelease(rollout: AdminRollout): boolean {
+  if (rollout.releaseStrategy.mode !== "manual_nudge") return false;
+  const released = releasedSlots(rollout);
+  if (released.length === 0) return false;
+  for (const rs of released) {
+    if (slotFillRatio(rs.slot, rollout.capacityModel) < 0.8) return false;
+  }
+  return stagedSlotsChrono(rollout).length > 0;
+}
+
 /** TEST-ONLY helper — restores the seeded rollout list so unit tests are
  *  isolated from each other. Production code never calls this. */
 export function __resetRolloutsForTests(): void {
   rollouts = SEEDED_ROLLOUTS.map(cloneRollout);
+  releaseEventCounter = 0;
 }
 
 function enumerateDates(startIso: string, endIso: string): string[] {
