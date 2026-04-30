@@ -257,7 +257,15 @@ export function SlotsHierarchyFirst() {
         {/* Hero: Next Available */}
         {heroSlotObj && (
           <div className="mb-8">
-            <h2 className="mb-4 text-lg font-bold text-slate-900">Next available</h2>
+            <div className="mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-900">Next available</h2>
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
+                style={{ backgroundColor: BRAND }}
+              >
+                Earliest
+              </span>
+            </div>
             <HeroSlotCard
               day={heroSlotObj.day}
               slot={heroSlotObj.slot}
@@ -359,24 +367,34 @@ function HeroSlotCard({
     year: "numeric"
   });
 
+  // When the hero slot is bookable but not yet selected, give it a soft
+  // brand accent so it reads as the recommended/highlighted slot rather
+  // than a generic card.
+  const showHeroAccent = !disabled && !isSelected;
+
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
       data-testid={`mobile-slot-${slot.id}`}
+      data-next-available={showHeroAccent ? "true" : undefined}
       aria-pressed={isSelected}
       className={`relative flex w-full flex-col items-start rounded-2xl border-2 p-5 text-left transition ${
         disabled
           ? "cursor-not-allowed border-slate-100 bg-slate-50 opacity-60"
           : isSelected
             ? "bg-white shadow-sm"
-            : "border-slate-200 bg-white hover:border-slate-300"
+            : showHeroAccent
+              ? "shadow-sm hover:shadow-md"
+              : "border-slate-200 bg-white hover:border-slate-300"
       }`}
       style={
         isSelected
           ? { borderColor: SELECTED_GREEN }
-          : undefined
+          : showHeroAccent
+            ? { borderColor: "#F9A8D4", backgroundColor: "#FFF1F8" }
+            : undefined
       }
     >
       {isSelected && (
@@ -384,16 +402,48 @@ function HeroSlotCard({
           <CheckCircle2 className="h-6 w-6" style={{ color: SELECTED_GREEN }} />
         </div>
       )}
-      <div className={`mb-1 text-sm font-semibold uppercase tracking-wide ${isSelected ? "text-slate-900" : "text-slate-500"}`}>
+      <div
+        className={`mb-1 text-sm font-semibold uppercase tracking-wide ${
+          isSelected
+            ? "text-slate-900"
+            : showHeroAccent
+              ? "text-pink-700"
+              : "text-slate-500"
+        }`}
+      >
         {fullDateStr}
       </div>
       <div className="flex items-center gap-2 mb-2">
-        <Icon className={`h-5 w-5 ${isSelected ? "text-slate-900" : "text-slate-600"}`} />
-        <span className={`text-xl font-bold ${isSelected ? "text-slate-900" : "text-slate-800"}`}>
+        <Icon
+          className={`h-5 w-5 ${
+            isSelected
+              ? "text-slate-900"
+              : showHeroAccent
+                ? "text-pink-700"
+                : "text-slate-600"
+          }`}
+        />
+        <span
+          className={`text-xl font-bold ${
+            isSelected
+              ? "text-slate-900"
+              : showHeroAccent
+                ? "text-pink-900"
+                : "text-slate-800"
+          }`}
+        >
           {label}
         </span>
       </div>
-      <div className={`text-sm ${isSelected ? "text-slate-700 font-medium" : "text-slate-500"}`}>
+      <div
+        className={`text-sm ${
+          isSelected
+            ? "text-slate-700 font-medium"
+            : showHeroAccent
+              ? "text-pink-700/80"
+              : "text-slate-500"
+        }`}
+      >
         {hint}
       </div>
       {disabled && (

@@ -131,7 +131,20 @@ export function SlotsAccessibleReadable() {
     }
     return false;
   }, [selected, jobMinutes, visibleDays]);
-  
+
+  // Earliest bookable slot in view (morning before afternoon). Visual
+  // hint only — does not pre-select or change Continue logic.
+  const nextAvailableSlotId = useMemo<string | null>(() => {
+    for (const d of visibleDays) {
+      for (const slot of [d.morning, d.afternoon]) {
+        if (slotFitStatus(slot, jobMinutes) === "available") {
+          return slot.id;
+        }
+      }
+    }
+    return null;
+  }, [visibleDays, jobMinutes]);
+
   useEffect(() => {
     if (selected && !selectedSlotFits) setSelected(null);
   }, [selected, selectedSlotFits]);
@@ -272,6 +285,7 @@ export function SlotsAccessibleReadable() {
               jobMinutes={jobMinutes}
               selected={selected}
               onSelect={(id) => setSelected(id)}
+              nextAvailableSlotId={nextAvailableSlotId}
             />
           ))}
         </div>
@@ -302,11 +316,17 @@ export function SlotsAccessibleReadable() {
 }
 
 function DayBlock({
-  day, jobMinutes, selected, onSelect,
-}: { day: Day; jobMinutes: number; selected: string | null; onSelect: (id: string) => void }) {
-  
+  day, jobMinutes, selected, onSelect, nextAvailableSlotId,
+}: {
+  day: Day;
+  jobMinutes: number;
+  selected: string | null;
+  onSelect: (id: string) => void;
+  nextAvailableSlotId: string | null;
+}) {
+
   const fullDateString = `${FULL_DAYS[day.weekday] || day.weekday}, ${day.day} ${FULL_MONTHS[day.month] || day.month}`;
-  
+
   return (
     <div className="flex flex-col gap-4">
       {/* Fully spelled out date */}
@@ -324,6 +344,7 @@ function DayBlock({
           hint="8am – 12pm"
           selected={selected === day.morning.id}
           onClick={() => onSelect(day.morning.id)}
+          isNextAvailable={day.morning.id === nextAvailableSlotId}
         />
         <SlotCard
           slot={day.afternoon}
@@ -333,6 +354,7 @@ function DayBlock({
           hint="12pm – 5pm"
           selected={selected === day.afternoon.id}
           onClick={() => onSelect(day.afternoon.id)}
+          isNextAvailable={day.afternoon.id === nextAvailableSlotId}
         />
       </div>
     </div>
@@ -340,7 +362,7 @@ function DayBlock({
 }
 
 function SlotCard({
-  slot, jobMinutes, icon, label, hint, selected, onClick,
+  slot, jobMinutes, icon, label, hint, selected, onClick, isNextAvailable,
 }: {
   slot: Slot;
   jobMinutes: number;
@@ -349,11 +371,16 @@ function SlotCard({
   hint: string;
   selected: boolean;
   onClick: () => void;
+  isNextAvailable: boolean;
 }) {
   const status = slotFitStatus(slot, jobMinutes);
   const fits = status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
+  // Visual hint only — once the customer picks any slot the
+  // selected-green state should win, so we hide the next-available
+  // accent while this tile is the chosen one.
+  const showNextAvailable = isNextAvailable && !disabled && !isSelected;
 
   const reason =
     status === "full" ? "Full" : "Not enough time left for this service";
@@ -369,23 +396,47 @@ function SlotCard({
       onClick={onClick}
       data-testid={`mobile-slot-${slot.id}`}
       aria-pressed={isSelected}
+      data-next-available={showNextAvailable ? "true" : undefined}
       className={`relative flex w-full flex-row items-center gap-4 rounded-xl border-[3px] p-5 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-900 ${
         disabled
           ? "cursor-not-allowed border-slate-300 bg-slate-100 text-slate-600"
           : isSelected
             ? "border-[#5FBB97] bg-[#E6F5EE] text-slate-900 shadow-md"
-            : "border-slate-300 bg-white text-slate-900 hover:border-slate-500 hover:bg-slate-50"
+            : showNextAvailable
+              ? "bg-white text-slate-900 shadow-md hover:bg-pink-50"
+              : "border-slate-300 bg-white text-slate-900 hover:border-slate-500 hover:bg-slate-50"
       }`}
+      style={showNextAvailable ? { borderColor: BRAND_DARK } : undefined}
     >
-      <div className={`flex items-center justify-center rounded-lg p-2 ${disabled ? "bg-slate-200 text-slate-500" : isSelected ? "bg-[#5FBB97] text-white" : "bg-slate-100 text-slate-700"}`}>
+      {showNextAvailable && (
+        <span
+          className="absolute -top-3 left-4 inline-flex items-center rounded-md px-2 py-1 text-[13px] font-bold uppercase tracking-wide text-white shadow-sm"
+          style={{ backgroundColor: BRAND_DARK }}
+          data-testid={`next-available-badge-${slot.id}`}
+        >
+          Next available
+        </span>
+      )}
+      <div className={`flex items-center justify-center rounded-lg p-2 ${
+        disabled
+          ? "bg-slate-200 text-slate-500"
+          : isSelected
+            ? "bg-[#5FBB97] text-white"
+            : showNextAvailable
+              ? "bg-pink-100 text-pink-900"
+              : "bg-slate-100 text-slate-700"
+      }`}>
         {icon}
       </div>
-      
+
       <div className="flex-1 flex flex-col">
         <div className="flex items-center gap-2">
           <span className="text-[18px] font-bold">{label}</span>
           {isSelected && (
             <span className="sr-only">Selected</span>
+          )}
+          {showNextAvailable && (
+            <span className="sr-only">Next available</span>
           )}
         </div>
         <div className={`text-[16px] mt-1 ${disabled ? "text-slate-600" : "text-slate-700"}`}>
