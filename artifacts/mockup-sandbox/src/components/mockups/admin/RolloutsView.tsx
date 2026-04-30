@@ -127,10 +127,14 @@ function RolloutListRow({
     (acc, d) =>
       acc +
       (d.open && d.morning.openByAdmin ? 1 : 0) +
-      (d.open && d.afternoon.openByAdmin ? 1 : 0),
+      (d.open && d.afternoon.openByAdmin ? 1 : 0) +
+      (d.open && d.evening?.openByAdmin ? 1 : 0),
     0,
   );
-  const totalWindows = rollout.days.length * 2;
+  const totalWindows = rollout.days.reduce(
+    (acc, d) => acc + 2 + (d.evening ? 1 : 0),
+    0,
+  );
   const bookingsHere = bookings.filter((b) => b.rolloutId === rollout.id).length;
   const modeLabel =
     rollout.capacityModel === "slots_per_window"

@@ -748,7 +748,9 @@ export function AdminApp() {
     if (
       booking.rolloutId &&
       booking.serviceDate &&
-      (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon")
+      (booking.serviceSlot === "morning" ||
+        booking.serviceSlot === "afternoon" ||
+        booking.serviceSlot === "evening")
     ) {
       consumeBookingCapacity(
         booking,
@@ -799,7 +801,7 @@ export function AdminApp() {
   function undoCancelBookingAndReschedule(
     id: string,
     date: string,
-    window: "morning" | "afternoon",
+    window: "morning" | "afternoon" | "evening",
   ) {
     if (id === "bk-live") return;
     const booking = seededBookings.find((b) => b.id === id);
@@ -808,7 +810,12 @@ export function AdminApp() {
     consumeBookingCapacity(booking, booking.rolloutId, date, window);
     const restoredStatus = priorServiceStatusFromTimeline(booking);
     const note = booking.cancellationNote ?? "";
-    const winLabel = window === "morning" ? "morning" : "afternoon";
+    const winLabel =
+      window === "morning"
+        ? "morning"
+        : window === "afternoon"
+          ? "afternoon"
+          : "evening";
     const undoLabel = note
       ? `Undo · ${note} — restored to ${date} · ${winLabel}`
       : `Undo · cancellation reversed — restored to ${date} · ${winLabel}`;
@@ -859,7 +866,7 @@ export function AdminApp() {
   function rescheduleAppointment(
     id: string,
     date: string,
-    window: "morning" | "afternoon",
+    window: "morning" | "afternoon" | "evening",
     note?: string,
   ) {
     if (id === "bk-live") return;
@@ -868,7 +875,8 @@ export function AdminApp() {
     if (booking.serviceStatus === "cancelled") return;
     if (
       booking.serviceSlot !== "morning" &&
-      booking.serviceSlot !== "afternoon"
+      booking.serviceSlot !== "afternoon" &&
+      booking.serviceSlot !== "evening"
     ) {
       return;
     }
@@ -1066,7 +1074,9 @@ export function AdminApp() {
         const slot = day
           ? schedule.window === "morning"
             ? day.morning
-            : day.afternoon
+            : schedule.window === "afternoon"
+              ? day.afternoon
+              : day.evening
           : null;
         if (slot) {
           if (rollout.capacityModel === "slots_per_window") {
@@ -1108,7 +1118,7 @@ export function AdminApp() {
   function scheduleCoordinationBooking(
     bookingId: string,
     date: string,
-    window: "morning" | "afternoon",
+    window: "morning" | "afternoon" | "evening",
   ): (() => void) | undefined {
     const booking = allBookings.find((b) => b.id === bookingId);
     if (!booking || booking.isLive) return undefined;
@@ -1173,7 +1183,7 @@ export function AdminApp() {
   function handleSchedulingConfirm(
     bookingId: string,
     date: string,
-    window: "morning" | "afternoon",
+    window: "morning" | "afternoon" | "evening",
     note?: string,
   ) {
     if (!schedulingTarget) return;
@@ -1198,7 +1208,12 @@ export function AdminApp() {
     // The Undo affordance disappears with the toast (4-second
     // auto-dismiss) — matches the existing inline undo pattern in
     // RolloutScheduleEditor.
-    const windowLabel = window === "morning" ? "Morning" : "Afternoon";
+    const windowLabel =
+      window === "morning"
+        ? "Morning"
+        : window === "afternoon"
+          ? "Afternoon"
+          : "Evening";
     const action =
       mode === "reschedule"
         ? "rescheduled to"

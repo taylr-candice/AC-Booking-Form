@@ -256,7 +256,9 @@ export function BookingDetail({
     !booking.isLive &&
     !isCancelled &&
     !!booking.rolloutId &&
-    (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon");
+    (booking.serviceSlot === "morning" ||
+      booking.serviceSlot === "afternoon" ||
+      booking.serviceSlot === "evening");
   // Undo cancellation is only relevant for cancelled rows. The live
   // demo row's lifecycle is owned by the customer flow, so we never
   // expose admin-side undo for it.

@@ -80,7 +80,7 @@ type FormState = {
   // Step 3
   scheduleMode: "pick_slot" | "to_be_coordinated";
   pickedDate: string | null;
-  pickedWindow: "morning" | "afternoon" | null;
+  pickedWindow: "morning" | "afternoon" | "evening" | null;
 };
 
 function initialForm(presetBuildingId: string | null): FormState {
@@ -199,7 +199,13 @@ export function NewBookingFlow({
     if (form.pickedDate === null || form.pickedWindow === null) return false;
     const day = selectedRollout.days.find((d) => d.isoDate === form.pickedDate);
     if (!day) return false;
-    const slot = form.pickedWindow === "morning" ? day.morning : day.afternoon;
+    const slot =
+      form.pickedWindow === "morning"
+        ? day.morning
+        : form.pickedWindow === "afternoon"
+          ? day.afternoon
+          : day.evening;
+    if (!slot) return false;
     return (
       rolloutSlotStatus(
         day,

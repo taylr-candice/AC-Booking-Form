@@ -66,11 +66,11 @@ export function RolloutScheduleEditor({
   );
   const [editing, setEditing] = useState<{
     isoDate: string;
-    window: "morning" | "afternoon";
+    window: "morning" | "afternoon" | "evening";
   } | null>(null);
   const [confirmReset, setConfirmReset] = useState<{
     isoDate: string;
-    window: "morning" | "afternoon";
+    window: "morning" | "afternoon" | "evening";
   } | null>(null);
   const [undoToast, setUndoToast] = useState<{
     label: string;
@@ -117,8 +117,12 @@ export function RolloutScheduleEditor({
     );
   }
 
-  function toggleWindow(day: RolloutDay, window: "morning" | "afternoon") {
+  function toggleWindow(
+    day: RolloutDay,
+    window: "morning" | "afternoon" | "evening",
+  ) {
     const current = day[window];
+    if (!current) return;
     applyAndRefresh(() =>
       updateRolloutSlot(rollout!.id, day.isoDate, window, {
         openByAdmin: !current.openByAdmin,
@@ -128,7 +132,7 @@ export function RolloutScheduleEditor({
 
   function saveCapacity(
     isoDate: string,
-    window: "morning" | "afternoon",
+    window: "morning" | "afternoon" | "evening",
     patch: Partial<RolloutSlot>,
     prev: Partial<RolloutSlot>,
   ) {
@@ -147,10 +151,14 @@ export function RolloutScheduleEditor({
     setEditing(null);
   }
 
-  function performReset(isoDate: string, window: "morning" | "afternoon") {
+  function performReset(
+    isoDate: string,
+    window: "morning" | "afternoon" | "evening",
+  ) {
     const day = rollout!.days.find((d) => d.isoDate === isoDate);
     if (!day) return;
     const slot = day[window];
+    if (!slot) return;
     const prevPatch: Partial<RolloutSlot> = {
       bookedMinutes: slot.bookedMinutes,
       bookedCount: slot.bookedCount,
@@ -314,9 +322,18 @@ function ScheduleGrid({
 }: {
   rollout: AdminRollout;
   onToggleDay: (day: RolloutDay) => void;
-  onToggleWindow: (day: RolloutDay, window: "morning" | "afternoon") => void;
-  onEdit: (isoDate: string, window: "morning" | "afternoon") => void;
-  onReset: (isoDate: string, window: "morning" | "afternoon") => void;
+  onToggleWindow: (
+    day: RolloutDay,
+    window: "morning" | "afternoon" | "evening",
+  ) => void;
+  onEdit: (
+    isoDate: string,
+    window: "morning" | "afternoon" | "evening",
+  ) => void;
+  onReset: (
+    isoDate: string,
+    window: "morning" | "afternoon" | "evening",
+  ) => void;
 }) {
   return (
     <div className="grid grid-cols-7 gap-2">
@@ -346,9 +363,9 @@ function DayCell({
   day: RolloutDay;
   mode: "time_budget_per_window" | "slots_per_window";
   onToggleDay: () => void;
-  onToggleWindow: (w: "morning" | "afternoon") => void;
-  onEdit: (w: "morning" | "afternoon") => void;
-  onReset: (w: "morning" | "afternoon") => void;
+  onToggleWindow: (w: "morning" | "afternoon" | "evening") => void;
+  onEdit: (w: "morning" | "afternoon" | "evening") => void;
+  onReset: (w: "morning" | "afternoon" | "evening") => void;
 }) {
   return (
     <div
@@ -394,6 +411,18 @@ function DayCell({
             onEdit={() => onEdit("afternoon")}
             onReset={() => onReset("afternoon")}
           />
+          {day.evening ? (
+            <SlotCell
+              isoDate={day.isoDate}
+              window="evening"
+              label="EV"
+              slot={day.evening}
+              mode={mode}
+              onToggle={() => onToggleWindow("evening")}
+              onEdit={() => onEdit("evening")}
+              onReset={() => onReset("evening")}
+            />
+          ) : null}
         </>
       ) : (
         <div className="rounded bg-slate-100 px-1.5 py-1 text-center text-[10px] font-medium text-slate-500">
@@ -415,7 +444,7 @@ function SlotCell({
   onReset,
 }: {
   isoDate: string;
-  window: "morning" | "afternoon";
+  window: "morning" | "afternoon" | "evening";
   label: string;
   slot: RolloutSlot;
   mode: "time_budget_per_window" | "slots_per_window";
@@ -497,12 +526,12 @@ function CapacityEditModal({
 }: {
   rollout: AdminRollout;
   isoDate: string;
-  window: "morning" | "afternoon";
+  window: "morning" | "afternoon" | "evening";
   onCancel: () => void;
   onSave: (patch: Partial<RolloutSlot>, prev: Partial<RolloutSlot>) => void;
 }) {
   const day = rollout.days.find((d) => d.isoDate === isoDate)!;
-  const slot = day[window];
+  const slot = day[window]!;
   const isSlotMode = rollout.capacityModel === SLOTS;
   const [windowMinutes, setWindowMinutes] = useState(slot.windowMinutes);
   const [slotCount, setSlotCount] = useState(slot.slotCount ?? 6);
@@ -527,8 +556,12 @@ function CapacityEditModal({
         <div className="mb-3 flex items-center justify-between">
           <div className="text-[14px] font-semibold text-slate-900">
             Edit capacity ·{" "}
-            {window === "morning" ? "Morning" : "Afternoon"} ·{" "}
-            {day.weekdayLabel} {day.dayLabel} {day.monthLabel}
+            {window === "morning"
+              ? "Morning"
+              : window === "afternoon"
+                ? "Afternoon"
+                : "Evening"}{" "}
+            · {day.weekdayLabel} {day.dayLabel} {day.monthLabel}
           </div>
           <button
             type="button"
@@ -611,12 +644,12 @@ function ResetUtilizationConfirm({
 }: {
   rollout: AdminRollout;
   isoDate: string;
-  window: "morning" | "afternoon";
+  window: "morning" | "afternoon" | "evening";
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const day = rollout.days.find((d) => d.isoDate === isoDate)!;
-  const slot = day[window];
+  const slot = day[window]!;
   const isSlotMode = rollout.capacityModel === SLOTS;
   const usageLabel = isSlotMode
     ? `${slot.bookedCount ?? 0} of ${slot.slotCount ?? 0} slots`
@@ -637,8 +670,12 @@ function ResetUtilizationConfirm({
               Reset this window's utilization?
             </div>
             <div className="mt-1 text-[12px] text-slate-600">
-              {window === "morning" ? "Morning" : "Afternoon"} ·{" "}
-              {day.weekdayLabel} {day.dayLabel} {day.monthLabel}. This
+              {window === "morning"
+                ? "Morning"
+                : window === "afternoon"
+                  ? "Afternoon"
+                  : "Evening"}{" "}
+              · {day.weekdayLabel} {day.dayLabel} {day.monthLabel}. This
               window is currently using {usageLabel}
               {status === "full" ? " (full)" : "."} Resetting will mark
               the window as empty — useful when you've closed the

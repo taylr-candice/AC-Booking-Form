@@ -52,7 +52,9 @@ export function UndoConflictDialog({
   // don't have a real date / window — fall back to a softer phrase
   // so the admin still gets the actionable info.
   const slotLabel =
-    takenBy.slot === "morning" || takenBy.slot === "afternoon"
+    takenBy.slot === "morning" ||
+    takenBy.slot === "afternoon" ||
+    takenBy.slot === "evening"
       ? `${takenBy.date} · ${takenBy.slot}`
       : "an awaiting-coordination booking";
   const roleLabel = takenBy.role === "agent" ? "agent" : "owner";

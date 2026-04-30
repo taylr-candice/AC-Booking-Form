@@ -63,7 +63,7 @@ export function SchedulingModal({
   onConfirm: (
     bookingId: string,
     date: string,
-    window: "morning" | "afternoon",
+    window: "morning" | "afternoon" | "evening",
     note?: string,
   ) => void;
 }) {
@@ -82,7 +82,11 @@ export function SchedulingModal({
     if (mode !== "reschedule") return baseRollout;
     if (!booking.serviceDate) return baseRollout;
     const currentWindow = booking.serviceSlot;
-    if (currentWindow !== "morning" && currentWindow !== "afternoon") {
+    if (
+      currentWindow !== "morning" &&
+      currentWindow !== "afternoon" &&
+      currentWindow !== "evening"
+    ) {
       return baseRollout;
     }
     return {
@@ -90,6 +94,7 @@ export function SchedulingModal({
       days: baseRollout.days.map((d) => {
         if (d.isoDate !== booking.serviceDate) return d;
         const slot = d[currentWindow];
+        if (!slot) return d;
         const adjusted =
           baseRollout.capacityModel === "slots_per_window"
             ? {
@@ -109,12 +114,14 @@ export function SchedulingModal({
   const initialDate = isReschedule ? booking.serviceDate ?? null : null;
   const initialWindow =
     isReschedule &&
-    (booking.serviceSlot === "morning" || booking.serviceSlot === "afternoon")
+    (booking.serviceSlot === "morning" ||
+      booking.serviceSlot === "afternoon" ||
+      booking.serviceSlot === "evening")
       ? booking.serviceSlot
       : null;
   const [pickedDate, setPickedDate] = useState<string | null>(initialDate);
   const [pickedWindow, setPickedWindow] = useState<
-    "morning" | "afternoon" | null
+    "morning" | "afternoon" | "evening" | null
   >(initialWindow);
 
   // Reschedule has a two-step flow: pick → confirm. Step state lives
@@ -416,8 +423,14 @@ export function SchedulingModal({
   );
 }
 
-function windowDisplayLabel(window: "morning" | "afternoon"): string {
-  return window === "morning" ? "Morning" : "Afternoon";
+function windowDisplayLabel(
+  window: "morning" | "afternoon" | "evening",
+): string {
+  return window === "morning"
+    ? "Morning"
+    : window === "afternoon"
+      ? "Afternoon"
+      : "Evening";
 }
 
 function ConfirmRescheduleStep({

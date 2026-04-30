@@ -43,8 +43,11 @@ export function RolloutDayCell({
   capacityModel: ServiceCapacityModel;
   jobMinutes: number;
   pickedDate: string | null;
-  pickedWindow: "morning" | "afternoon" | null;
-  onPick: (date: string, window: "morning" | "afternoon") => void;
+  pickedWindow: "morning" | "afternoon" | "evening" | null;
+  onPick: (
+    date: string,
+    window: "morning" | "afternoon" | "evening",
+  ) => void;
 }) {
   return (
     <div
@@ -82,6 +85,19 @@ export function RolloutDayCell({
             picked={pickedDate === day.isoDate && pickedWindow === "afternoon"}
             onPick={() => onPick(day.isoDate, "afternoon")}
           />
+          {day.evening ? (
+            <RolloutSlotChoice
+              label="Evening"
+              day={day}
+              slot={day.evening}
+              capacityModel={capacityModel}
+              jobMinutes={jobMinutes}
+              picked={
+                pickedDate === day.isoDate && pickedWindow === "evening"
+              }
+              onPick={() => onPick(day.isoDate, "evening")}
+            />
+          ) : null}
         </>
       ) : (
         <div className="rounded bg-slate-100 px-1.5 py-1 text-center text-[10px] font-medium text-slate-500">

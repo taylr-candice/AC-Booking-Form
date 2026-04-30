@@ -32,6 +32,25 @@ describe("buildRescheduledTimelineEntry", () => {
     expect(entry.label).toBe("Rescheduled · 4 May · Afternoon");
   });
 
+  it("uses the Evening label when the window is evening", () => {
+    const entry = buildRescheduledTimelineEntry({
+      date: "2026-05-04",
+      window: "evening",
+    });
+    expect(entry.label).toBe("Rescheduled · 4 May · Evening");
+  });
+
+  it("appends a trimmed note to the Evening label too", () => {
+    const entry = buildRescheduledTimelineEntry({
+      date: "2026-05-04",
+      window: "evening",
+      note: "  customer prefers after-work  ",
+    });
+    expect(entry.label).toBe(
+      "Rescheduled · 4 May · Evening · customer prefers after-work",
+    );
+  });
+
   it("respects an explicit actor + timestamp override", () => {
     const entry = buildRescheduledTimelineEntry(
       { date: "2026-05-06", window: "morning" },

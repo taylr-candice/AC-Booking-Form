@@ -3536,12 +3536,20 @@ export function convertCoordinationToScheduledPatch(
  * anywhere, no DOM access.
  */
 export function buildRescheduledTimelineEntry(
-  schedule: { date: string; window: "morning" | "afternoon"; note?: string },
+  schedule: {
+    date: string;
+    window: "morning" | "afternoon" | "evening";
+    note?: string;
+  },
   by: string = ADMIN_USER_LABEL,
   at: string = "Just now",
 ): TimelineEntry {
   const windowLabel =
-    schedule.window === "morning" ? "Morning" : "Afternoon";
+    schedule.window === "morning"
+      ? "Morning"
+      : schedule.window === "afternoon"
+        ? "Afternoon"
+        : "Evening";
   const trimmedNote = schedule.note?.trim() ?? "";
   const noteSuffix = trimmedNote.length > 0 ? ` · ${trimmedNote}` : "";
   return {
