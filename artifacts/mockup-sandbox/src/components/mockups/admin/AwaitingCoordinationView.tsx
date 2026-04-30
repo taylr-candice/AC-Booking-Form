@@ -725,6 +725,21 @@ export function AwaitingCoordinationView({
     templateFilter !== undefined ? templateFilter : localTemplateFilter;
   const setTemplateFilter: (next: BookingsTemplateFilter) => void =
     onTemplateFilter ?? setLocalTemplateFilter;
+  // Resolve once per render: is the active filter's snapshot name still
+  // present in the catalog for its channel?  Drives BOTH the synthetic
+  // dropdown option (so the controlled `<select>` keeps displaying the
+  // active filter legibly even after a rename / remove — Task #204)
+  // and the missing-template chip hint below the toolbar (Task #194).
+  // Hoisted so the two surfaces can never disagree about which filters
+  // count as stale. The shared `templateFilterIsMissingFromCatalogs`
+  // helper also keeps this view aligned with the Bookings list — both
+  // narrow the lookup to the matching channel and both suppress the
+  // hint when the catalogs aren't threaded in (older harnesses), since
+  // we can't tell renamed/removed apart from "we just don't know".
+  const activeFilterIsMissing = templateFilterIsMissingFromCatalogs(
+    activeTemplateFilter,
+    { callTemplates, emailTemplates },
+  );
   // Pre-compute the kind for each coordination booking so we don't
   // recompute it on every filter / search keystroke. We include every
   // booking whose serviceSlot is `to_be_coordinated`; rows whose
@@ -1265,7 +1280,9 @@ export function AwaitingCoordinationView({
               waiting-on chip, building filter, search, and outcome
               chip. The sentinel "All templates" value is the
               toolbar's reset / clearable affordance. */}
-          {(emailTemplates.length > 0 || callTemplates.length > 0) && (
+          {(emailTemplates.length > 0 ||
+            callTemplates.length > 0 ||
+            activeFilterIsMissing) && (
             <select
               value={encodeTemplateFilter(activeTemplateFilter)}
               onChange={(e) =>
@@ -1276,6 +1293,34 @@ export function AwaitingCoordinationView({
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
             >
               <option value={TEMPLATE_FILTER_ALL_VALUE}>All templates</option>
+              {/* Synthetic option for an active filter whose snapshot
+                  name no longer maps to any catalog row in its
+                  channel. Mirrors the BookingsView dropdown
+                  (Task #162) — without this, the controlled
+                  `<select>` silently displays the wrong row
+                  (browsers render the first option when the bound
+                  value matches no option), so the dropdown would
+                  lie about what's filtering the queue. The
+                  "(no longer in catalog)" suffix lets an ops lead
+                  notice the lens has gone stale at a glance. The
+                  chip below (`coordination-template-filter-chip`)
+                  carries the same signal in long-form. The render
+                  gate above also includes `activeFilterIsMissing`
+                  so the dropdown stays mounted even when both
+                  catalogs are empty — otherwise the only "switch
+                  templates" affordance would disappear from the
+                  toolbar exactly when the lens is most confusing. */}
+              {activeFilterIsMissing && (
+                <optgroup label="No longer in catalog">
+                  <option
+                    key="missing-active-filter"
+                    value={encodeTemplateFilter(activeTemplateFilter)}
+                    data-testid="coordination-filter-template-missing-option"
+                  >
+                    {activeTemplateFilter!.name} (no longer in catalog)
+                  </option>
+                </optgroup>
+              )}
               {callTemplates.length > 0 && (
                 <optgroup label="Call templates">
                   {callTemplates.map((t) => (
@@ -1409,7 +1454,7 @@ export function AwaitingCoordinationView({
         })}
       </div>
 
-      {activeTemplateFilter !== null && (() => {
+      {activeTemplateFilter !== null && (
         // Mirror of the BookingsView chip's "no longer in catalog"
         // hint (Tasks #173 / #194). The chip's name is a snapshot —
         // captured onto the timeline entry when the call/email was
@@ -1421,59 +1466,47 @@ export function AwaitingCoordinationView({
         // anymore. We surface a small icon + label in that case so
         // ops on the coordination queue get the same context as
         // those on the bookings list, without breaking the
-        // snapshot-based match.
-        //
-        // The check goes through the shared
-        // `templateFilterIsMissingFromCatalogs` helper so this
-        // surface and the bookings list can never disagree about
-        // which filters count as stale — both narrow the lookup to
-        // the matching channel (so a renamed email template stays
-        // flagged even when a call template happens to share the
-        // name) and both suppress the hint when the catalog isn't
-        // threaded in.
-        const isMissing = templateFilterIsMissingFromCatalogs(
-          activeTemplateFilter,
-          { callTemplates, emailTemplates },
-        );
-        return (
-          <div
-            className="flex items-center gap-2 text-[12px]"
-            data-testid="coordination-template-filter-chip"
+        // snapshot-based match. The `activeFilterIsMissing` flag is
+        // hoisted at the top of the component so the chip and the
+        // dropdown's synthetic option (Task #204) can never disagree
+        // about which filters count as stale.
+        <div
+          className="flex items-center gap-2 text-[12px]"
+          data-testid="coordination-template-filter-chip"
+        >
+          <span className="text-slate-500">
+            Filtered by{" "}
+            {activeTemplateFilter.kind === "call" ? "call" : "email"} template:
+          </span>
+          <button
+            type="button"
+            onClick={() => setTemplateFilter(null)}
+            data-testid="button-clear-coordination-template-filter"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+            style={{
+              backgroundColor: BRAND_SOFT,
+              color: BRAND_DEEP,
+            }}
+            title="Clear template filter"
+            aria-label={`Clear template filter "${activeTemplateFilter.name}"`}
           >
-            <span className="text-slate-500">
-              Filtered by{" "}
-              {activeTemplateFilter.kind === "call" ? "call" : "email"} template:
-            </span>
-            <button
-              type="button"
-              onClick={() => setTemplateFilter(null)}
-              data-testid="button-clear-coordination-template-filter"
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold transition hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
-              style={{
-                backgroundColor: BRAND_SOFT,
-                color: BRAND_DEEP,
-              }}
-              title="Clear template filter"
-              aria-label={`Clear template filter "${activeTemplateFilter.name}"`}
+            <span>{activeTemplateFilter.name}</span>
+            <X className="h-3 w-3" />
+          </button>
+          {activeFilterIsMissing && (
+            <span
+              role="img"
+              aria-label={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+              title={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
+              data-testid="coordination-template-filter-missing-hint"
+              className="inline-flex items-center gap-1 text-slate-500"
             >
-              <span>{activeTemplateFilter.name}</span>
-              <X className="h-3 w-3" />
-            </button>
-            {isMissing && (
-              <span
-                role="img"
-                aria-label={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
-                title={`"${activeTemplateFilter.name}" is no longer in the templates catalog (renamed or removed). The filter still matches historical timeline entries.`}
-                data-testid="coordination-template-filter-missing-hint"
-                className="inline-flex items-center gap-1 text-slate-500"
-              >
-                <Info className="h-3.5 w-3.5" />
-                <span className="text-[11px]">No longer in templates catalog</span>
-              </span>
-            )}
-          </div>
-        );
-      })()}
+              <Info className="h-3.5 w-3.5" />
+              <span className="text-[11px]">No longer in templates catalog</span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Ordering hint — explains the composite priority sort so ops
           aren't surprised that the row order doesn't match the

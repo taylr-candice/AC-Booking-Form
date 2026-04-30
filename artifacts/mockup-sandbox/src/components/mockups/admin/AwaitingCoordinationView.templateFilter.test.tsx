@@ -686,6 +686,110 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
     ).toBeNull();
   });
 
+  it("renders a synthetic '(no longer in catalog)' option in the dropdown when the active filter no longer matches any catalog row (Task #204)", () => {
+    // Mirrors `BookingsView.templateFilter.test.tsx`'s synthetic-option
+    // test. Without this, the controlled `<select>` would silently
+    // display the wrong row (browsers render the first option when the
+    // bound value matches no option), so the queue's dropdown would
+    // lie about what's filtering it after a rename / remove — exactly
+    // the case where an ops lead pivoting from a saved/shared link
+    // most needs the lens to be honest.
+    const callTemplates: CallTemplate[] = [];
+    const emailTemplates: EmailTemplate[] = [
+      { id: "e1", name: "Some other email template", subject: "x", note: "" },
+    ];
+    render(
+      <Harness
+        initial={[
+          makeBooking({
+            id: "bk-renamed",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Old name template")],
+          }),
+        ]}
+        callTemplates={callTemplates}
+        emailTemplates={emailTemplates}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+
+    const select = screen.getByTestId(
+      "coordination-filter-template",
+    ) as HTMLSelectElement;
+    const missingOption = screen.getByTestId(
+      "coordination-filter-template-missing-option",
+    ) as HTMLOptionElement;
+    expect(missingOption.textContent).toContain("Old name template");
+    expect(missingOption.textContent).toContain("(no longer in catalog)");
+    // The select's bound value points at the synthetic option, not at
+    // "All templates" — so the dropdown displays the active filter
+    // legibly rather than appearing reset.
+    expect(select.value).toBe(missingOption.value);
+  });
+
+  it("renders the synthetic dropdown option even when both catalogs are empty (Task #204)", () => {
+    // Edge case: the admin removed the last template that was being
+    // filtered on. Without the synthetic option (and the matching
+    // render-gate carve-out for `activeFilterIsMissing`) the dropdown
+    // would hide entirely — its render gate is `length > 0` for both
+    // catalogs — which would strip the only "switch templates"
+    // affordance away from the queue's toolbar exactly when the lens
+    // is most confusing.
+    render(
+      <Harness
+        initial={[
+          makeBooking({
+            id: "bk-renamed",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Old name template")],
+          }),
+        ]}
+        callTemplates={[]}
+        emailTemplates={[]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+
+    expect(
+      screen.getByTestId("coordination-filter-template"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("coordination-filter-template-missing-option"),
+    ).toBeInTheDocument();
+  });
+
+  it("does NOT render the synthetic dropdown option when the active filter still matches a catalog row", () => {
+    render(
+      <Harness
+        initial={[
+          makeBooking({
+            id: "bk-a",
+            unitId: "u-a1",
+            serviceTimeline: [emailEntry("Sent rebook link")],
+          }),
+        ]}
+        callTemplates={[]}
+        emailTemplates={[
+          { id: "e1", name: "Sent rebook link", subject: "x", note: "" },
+        ]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+
+    expect(
+      screen.queryByTestId("coordination-filter-template-missing-option"),
+    ).toBeNull();
+  });
+
   it("hint disappears the moment the matching template is restored to the catalog (Task #194)", () => {
     // Reactive guarantee: the hint reads from the current catalog
     // props, not a frozen-on-pivot snapshot, so the moment an admin
