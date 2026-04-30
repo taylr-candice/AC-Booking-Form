@@ -20,6 +20,7 @@ import {
   Eye,
   EyeOff,
   Pencil,
+  Plus,
   RotateCcw,
   Undo2,
   X,
@@ -27,8 +28,10 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  addRolloutEveningWindow,
   formatRolloutDateRange,
   getRolloutById,
+  removeRolloutEveningWindow,
   resetRolloutSlotUtilization,
   rolloutSlotStatus,
   updateRolloutDay,
@@ -151,6 +154,20 @@ export function RolloutScheduleEditor({
     setEditing(null);
   }
 
+  function addEvening(isoDate: string) {
+    const added = addRolloutEveningWindow(rollout!.id, isoDate);
+    if (!added) return;
+    bumpRefreshKey();
+    setUndoToast({
+      label: "Evening window added.",
+      undo: () => {
+        removeRolloutEveningWindow(rollout!.id, isoDate);
+        bumpRefreshKey();
+        setUndoToast(null);
+      },
+    });
+  }
+
   function performReset(
     isoDate: string,
     window: "morning" | "afternoon" | "evening",
@@ -227,6 +244,7 @@ export function RolloutScheduleEditor({
           onReset={(isoDate, window) =>
             setConfirmReset({ isoDate, window })
           }
+          onAddEvening={addEvening}
         />
       </Card>
 
@@ -319,6 +337,7 @@ function ScheduleGrid({
   onToggleWindow,
   onEdit,
   onReset,
+  onAddEvening,
 }: {
   rollout: AdminRollout;
   onToggleDay: (day: RolloutDay) => void;
@@ -334,6 +353,7 @@ function ScheduleGrid({
     isoDate: string,
     window: "morning" | "afternoon" | "evening",
   ) => void;
+  onAddEvening: (isoDate: string) => void;
 }) {
   return (
     <div className="grid grid-cols-7 gap-2">
@@ -346,6 +366,7 @@ function ScheduleGrid({
           onToggleWindow={(w) => onToggleWindow(day, w)}
           onEdit={(w) => onEdit(day.isoDate, w)}
           onReset={(w) => onReset(day.isoDate, w)}
+          onAddEvening={() => onAddEvening(day.isoDate)}
         />
       ))}
     </div>
@@ -359,6 +380,7 @@ function DayCell({
   onToggleWindow,
   onEdit,
   onReset,
+  onAddEvening,
 }: {
   day: RolloutDay;
   mode: "time_budget_per_window" | "slots_per_window";
@@ -366,6 +388,7 @@ function DayCell({
   onToggleWindow: (w: "morning" | "afternoon" | "evening") => void;
   onEdit: (w: "morning" | "afternoon" | "evening") => void;
   onReset: (w: "morning" | "afternoon" | "evening") => void;
+  onAddEvening: () => void;
 }) {
   return (
     <div
@@ -422,7 +445,18 @@ function DayCell({
               onEdit={() => onEdit("evening")}
               onReset={() => onReset("evening")}
             />
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              onClick={onAddEvening}
+              data-testid={`rollout-add-evening-${day.isoDate}`}
+              className="inline-flex items-center justify-center gap-1 rounded border border-dashed border-slate-200 px-1.5 py-1 text-[10px] font-medium text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+              title="Add an Evening window (5pm – 8pm) to this day"
+            >
+              <Plus className="h-2.5 w-2.5" />
+              Add EV
+            </button>
+          )}
         </>
       ) : (
         <div className="rounded bg-slate-100 px-1.5 py-1 text-center text-[10px] font-medium text-slate-500">

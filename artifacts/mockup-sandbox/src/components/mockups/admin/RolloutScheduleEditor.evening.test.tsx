@@ -1,23 +1,21 @@
 // @vitest-environment happy-dom
 
 /**
- * Evening rendering for the per-rollout schedule editor.
- *
- * Days that opt into an Evening window (`day.evening` is set on the
- * seeded {@link RolloutDay}) should surface a third SlotCell in the
- * grid alongside Morning/Afternoon. Days without an Evening window
- * keep the original two-cell layout.
- *
- * Smoke-covers Task #107 — widening the window-type union to include
- * "evening" across the admin scheduling code paths.
+ * Evening rendering and add/remove behavior for the per-rollout
+ * schedule editor. Days that opt into an Evening window (`day.evening`
+ * is set) surface a third SlotCell alongside Morning/Afternoon. Days
+ * without an Evening window show an "Add EV" button that creates the
+ * slot via {@link addRolloutEveningWindow} and offers undo.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
   SEEDED_BUILDINGS,
   __resetRolloutsForTests,
+  getRolloutById,
 } from "@/state/adminMockData";
 
 import { RolloutScheduleEditor } from "./RolloutScheduleEditor";
@@ -27,36 +25,74 @@ afterEach(() => {
   __resetRolloutsForTests();
 });
 
-function renderEditor() {
-  // rl-ac-aspen / RL_ASPEN_DAYS seeds Evening windows on a handful of
-  // dates — see adminMockData.ts. We pick one with Evening set
-  // (2026-04-29) and one without (2026-04-27) to assert both shapes.
-  return render(
+function Harness() {
+  const [refreshKey, setRefreshKey] = useState(0);
+  return (
     <RolloutScheduleEditor
       rolloutId="rl-ac-aspen"
       buildings={SEEDED_BUILDINGS.slice()}
-      refreshKey={0}
-      bumpRefreshKey={() => {}}
+      refreshKey={refreshKey}
+      bumpRefreshKey={() => setRefreshKey((n) => n + 1)}
       onBack={() => {}}
-    />,
+    />
   );
 }
 
-describe("RolloutScheduleEditor — Evening window rendering", () => {
+describe("RolloutScheduleEditor — Evening windows", () => {
   it("renders an Evening SlotCell for days where day.evening is set", () => {
-    renderEditor();
+    render(<Harness />);
     const dayWithEvening = screen.getByTestId("rollout-day-2026-04-29");
-    // Reuse the within() helper so we only look inside the day's cell.
     expect(within(dayWithEvening).getByText("AM")).toBeTruthy();
     expect(within(dayWithEvening).getByText("PM")).toBeTruthy();
     expect(within(dayWithEvening).getByText("EV")).toBeTruthy();
   });
 
-  it("omits the Evening SlotCell for days without an evening window", () => {
-    renderEditor();
+  it("offers an Add EV affordance for days without an evening window", () => {
+    render(<Harness />);
     const dayWithoutEvening = screen.getByTestId("rollout-day-2026-04-27");
     expect(within(dayWithoutEvening).getByText("AM")).toBeTruthy();
     expect(within(dayWithoutEvening).getByText("PM")).toBeTruthy();
     expect(within(dayWithoutEvening).queryByText("EV")).toBeNull();
+    expect(
+      screen.getByTestId("rollout-add-evening-2026-04-27"),
+    ).toBeTruthy();
+  });
+
+  it("clicking Add EV creates the evening slot and shows an undo toast", () => {
+    render(<Harness />);
+    const addBtn = screen.getByTestId("rollout-add-evening-2026-04-27");
+    act(() => {
+      fireEvent.click(addBtn);
+    });
+    // EV cell now appears in that day, the Add button is gone.
+    const day = screen.getByTestId("rollout-day-2026-04-27");
+    expect(within(day).getByText("EV")).toBeTruthy();
+    expect(
+      screen.queryByTestId("rollout-add-evening-2026-04-27"),
+    ).toBeNull();
+    // Mutator updated the underlying rollout store with a staged slot.
+    const stored = getRolloutById("rl-ac-aspen")!;
+    const dayRow = stored.days.find((d) => d.isoDate === "2026-04-27")!;
+    expect(dayRow.evening).toBeDefined();
+    expect(dayRow.evening!.openByAdmin).toBe(false);
+    expect(dayRow.evening!.windowMinutes).toBe(180);
+    // Undo toast is offered.
+    expect(screen.getByText("Evening window added.")).toBeTruthy();
+  });
+
+  it("undoing the add removes the evening slot again", () => {
+    render(<Harness />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("rollout-add-evening-2026-04-27"));
+    });
+    act(() => {
+      fireEvent.click(screen.getByText("Undo"));
+    });
+    const stored = getRolloutById("rl-ac-aspen")!;
+    const dayRow = stored.days.find((d) => d.isoDate === "2026-04-27")!;
+    expect(dayRow.evening).toBeUndefined();
+    expect(
+      screen.getByTestId("rollout-add-evening-2026-04-27"),
+    ).toBeTruthy();
   });
 });

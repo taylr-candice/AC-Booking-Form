@@ -3423,6 +3423,75 @@ export function updateRolloutSlot(
   );
 }
 
+/** Adds an Evening window (5pm – 8pm) to a {@link RolloutDay} that
+ *  doesn't already have one. No-op if the day or rollout doesn't exist
+ *  or if the day already has an Evening slot — callers can rely on the
+ *  result to decide whether to surface a toast. The seeded windowMinutes
+ *  matches the EVENING_WINDOW_MIN used by the seed factories so the
+ *  newly-added slot looks identical to a seeded one; for slot-count
+ *  rollouts we mirror the day's morning slotCount so capacity stays
+ *  consistent. The slot starts staged (`openByAdmin: false`) so admins
+ *  can configure capacity before releasing it to customers. */
+export function addRolloutEveningWindow(
+  rolloutId: string,
+  isoDate: string,
+): RolloutSlot | null {
+  const r = getRolloutById(rolloutId);
+  if (!r) return null;
+  const day = r.days.find((d) => d.isoDate === isoDate);
+  if (!day || day.evening) return null;
+  const isSlotMode = r.capacityModel === "slots_per_window";
+  const slot: RolloutSlot = {
+    id: `${isoDate.replace(/-/g, "")}-ev`,
+    window: "evening",
+    windowMinutes: EVENING_WINDOW_MIN,
+    bookedMinutes: 0,
+    openByAdmin: false,
+    ...(isSlotMode
+      ? { slotCount: day.morning.slotCount ?? 6, bookedCount: 0 }
+      : {}),
+  };
+  rollouts = rollouts.map((rr) =>
+    rr.id !== rolloutId
+      ? rr
+      : {
+          ...rr,
+          days: rr.days.map((d) =>
+            d.isoDate !== isoDate ? d : { ...d, evening: slot },
+          ),
+        },
+  );
+  return slot;
+}
+
+/** Removes the Evening window from a {@link RolloutDay}. Mirror of
+ *  {@link addRolloutEveningWindow} so admins can undo an accidental
+ *  add. Returns the removed slot for the toast undo, or null if the
+ *  day didn't have one. */
+export function removeRolloutEveningWindow(
+  rolloutId: string,
+  isoDate: string,
+): RolloutSlot | null {
+  const r = getRolloutById(rolloutId);
+  if (!r) return null;
+  const day = r.days.find((d) => d.isoDate === isoDate);
+  if (!day || !day.evening) return null;
+  const removed = day.evening;
+  rollouts = rollouts.map((rr) =>
+    rr.id !== rolloutId
+      ? rr
+      : {
+          ...rr,
+          days: rr.days.map((d) => {
+            if (d.isoDate !== isoDate) return d;
+            const { evening: _evening, ...rest } = d;
+            return rest as RolloutDay;
+          }),
+        },
+  );
+  return removed;
+}
+
 /** Used by the "reset utilization" admin action — wipes bookedMinutes /
  *  bookedCount for a single window so the schedule editor can recover
  *  from a "I closed off the wrong day" mistake. The original undoable
