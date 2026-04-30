@@ -333,6 +333,28 @@ describe("CallTemplatesView · drag-and-drop reorder", () => {
   });
 });
 
+describe("Templates panels · sandbox-only reorder note (Task #176)", () => {
+  it("CallTemplatesView surfaces the inline note that reorder resets on refresh", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+    const note = screen.getByTestId(
+      "text-call-templates-reorder-sandbox-note",
+    );
+    expect(note).toBeTruthy();
+    expect(note.textContent ?? "").toMatch(/sandbox/i);
+    expect(note.textContent ?? "").toMatch(/refresh/i);
+  });
+
+  it("EmailTemplatesView surfaces the inline note that reorder resets on refresh", () => {
+    render(<EmailHarness initial={makeEmailCatalog()} />);
+    const note = screen.getByTestId(
+      "text-email-templates-reorder-sandbox-note",
+    );
+    expect(note).toBeTruthy();
+    expect(note.textContent ?? "").toMatch(/sandbox/i);
+    expect(note.textContent ?? "").toMatch(/refresh/i);
+  });
+});
+
 describe("EmailTemplatesView · drag-and-drop reorder", () => {
   it("dragging a non-default row onto another updates the visible order", () => {
     render(<EmailHarness initial={makeEmailCatalog()} />);

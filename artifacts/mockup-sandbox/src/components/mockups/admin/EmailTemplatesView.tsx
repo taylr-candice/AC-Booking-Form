@@ -251,6 +251,14 @@ export function EmailTemplatesView({
             Log-email dropdown. Click the active star again to clear the
             default and have the dropdowns open on Custom… instead.
           </div>
+          <div
+            data-testid="text-email-templates-reorder-sandbox-note"
+            className="mt-2 italic text-slate-500"
+          >
+            Drag the grip handle to reorder rows. Heads-up: this is a
+            sandbox preview, so the manual order resets to the seed on
+            a full page refresh.
+          </div>
         </div>
         <button
           type="button"
