@@ -151,20 +151,33 @@ function applyScenario(role: Role, s: Scenario) {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 /**
- * Each variant exposes its own testid for the be-there ack-checkbox so
- * the gate can be exercised in tests. The two mobile pickers share the
- * "button-continue-mobile" CTA testid; the desktop picker has its own.
- *
- * Task #121 added a second ack — the cancellation-terms ack — which
- * sits above Confirm on every variant and must also be ticked before
- * the booking can be confirmed. We thread its testids through the
- * same per-variant lookup so the existing tests can clear it whenever
- * they need Confirm to enable.
+ * The "be available for the entire window" reminder used to live as a
+ * checkbox above Confirm; the customer had to tick it before the
+ * booking could be confirmed. After the post-Task-#123 redesign that
+ * reminder moved up into the SlotsAccessBanner at the top of the page
+ * — the same words now read as a notification ("This is a window, not
+ * a set time…") with an inline "Change access method" prompt instead
+ * of being a tickbox. So the test ids for the old be-there ack are
+ * gone; what remains is a per-variant lookup for the banner + its
+ * change-access link, the cancellation-terms ack (Task #121, still a
+ * checkbox), and the Confirm button.
  */
-const ACK_TESTID_BY_VARIANT: Record<(typeof VARIANTS)[number]["name"], string> = {
-  SlotsMobile: "ack-checkbox-mobile",
-  SlotsMobileLite: "ack-checkbox-mobile-lite",
-  SlotsDesktop: "ack-checkbox-desktop",
+const BANNER_TESTID_BY_VARIANT: Record<
+  (typeof VARIANTS)[number]["name"],
+  string
+> = {
+  SlotsMobile: "banner-window-notice-mobile",
+  SlotsMobileLite: "banner-window-notice-mobile-lite",
+  SlotsDesktop: "banner-window-notice-desktop",
+};
+
+const CHANGE_ACCESS_TESTID_BY_VARIANT: Record<
+  (typeof VARIANTS)[number]["name"],
+  string
+> = {
+  SlotsMobile: "button-change-access-mobile",
+  SlotsMobileLite: "button-change-access-mobile-lite",
+  SlotsDesktop: "button-change-access-desktop",
 };
 
 const CANCELLATION_ACK_TESTID_BY_VARIANT: Record<
@@ -266,11 +279,15 @@ describe.each(VARIANTS)("$name slot picker", ({
 
   });
 
-  describe("be-there ack checkbox gates Confirm (Task #72)", () => {
-    it("for be-there access methods: Confirm stays disabled until both the be-there ack and the cancellation ack are ticked", () => {
-      // owner_live_at_unit is a be-there method: the ack checkbox
-      // appears and both it and the cancellation ack must be ticked
-      // before Confirm enables.
+  describe("top-of-page window-notice banner (post-Task-#123)", () => {
+    it("for be-there access methods: shows the be-there heads-up copy with a Change-access link, and the be-there ack checkbox is gone — only the cancellation ack gates Confirm", () => {
+      // owner_live_at_unit is a be-there method. After the redesign
+      // there's no checkbox above Confirm to tick — instead the
+      // banner at the top reads "This is a window, not a set time"
+      // and asks the customer to be available for the entire window,
+      // with an inline "Change access method" prompt for those who
+      // want to switch to a key-holder / lockbox method after
+      // reading it.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -279,17 +296,43 @@ describe.each(VARIANTS)("$name slot picker", ({
       });
       bookingActions.setAccessMethod("owner_live_at_unit");
 
-      const { container, getByTestId } = render(<Component />);
+      const { container, getByTestId, queryByTestId } = render(
+        <Component />,
+      );
 
+      // Banner is present, marked as the be-there variant, and
+      // includes the entire-window reminder + a Change-access link.
+      const banner = getByTestId(BANNER_TESTID_BY_VARIANT[name]);
+      expect(banner.getAttribute("data-access-mode")).toBe("be-there");
+      expect(banner.textContent ?? "").toContain(
+        "This is a window, not a set time",
+      );
+      expect(banner.textContent ?? "").toContain(
+        "available for the entire window",
+      );
+      expect(getByTestId(CHANGE_ACCESS_TESTID_BY_VARIANT[name])).toBeTruthy();
+
+      // The legacy be-there ack checkbox must NOT be in the DOM —
+      // any picker variant. The reminder is now a notification, not
+      // a tickbox.
+      expect(
+        queryByTestId(`ack-checkbox-${
+          name === "SlotsMobile"
+            ? "mobile"
+            : name === "SlotsMobileLite"
+              ? "mobile-lite"
+              : "desktop"
+        }`),
+      ).toBeNull();
+
+      // Pick a day, then a window. Confirm stays disabled until the
+      // cancellation ack is ticked — but it does NOT need a separate
+      // be-there checkbox.
       const continueBtn = getByTestId(
         CONTINUE_TESTID_BY_VARIANT[name],
       ) as HTMLButtonElement;
-
-      // Without a slot selected, Confirm is disabled — baseline.
       expect(continueBtn.disabled).toBe(true);
 
-      // Pick a day, then a window. Confirm must STILL be disabled
-      // because neither ack has been ticked yet.
       const firstDay = container.querySelector<HTMLButtonElement>(
         'button[data-testid^="day-card-"]:not([disabled])',
       );
@@ -302,19 +345,10 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(firstSlot).not.toBeNull();
       fireEvent.click(firstSlot!);
 
+      // Slot picked but cancellation ack still untouched — Confirm
+      // is the gated step.
       expect(continueBtn.disabled).toBe(true);
 
-      // Tick the be-there ack only — Confirm must STAY disabled,
-      // because the cancellation ack is still untouched.
-      const beThereAck = getByTestId(
-        ACK_TESTID_BY_VARIANT[name],
-      ) as HTMLInputElement;
-      expect(beThereAck.checked).toBe(false);
-      fireEvent.click(beThereAck);
-      expect(beThereAck.checked).toBe(true);
-      expect(continueBtn.disabled).toBe(true);
-
-      // Tick the cancellation ack — both gates clear, Confirm enables.
       const cancellationAck = getByTestId(
         CANCELLATION_ACK_TESTID_BY_VARIANT[name],
       ) as HTMLInputElement;
@@ -325,10 +359,11 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(continueBtn.disabled).toBe(false);
     });
 
-    it("for non-be-there access methods: no be-there ack is rendered, but the cancellation ack still gates Confirm", () => {
+    it("for non-be-there access methods: shows the unattended-mode copy in the banner, and the cancellation ack alone gates Confirm", () => {
       // owner_leased_leave_key is a non-be-there (key-holder) method.
-      // The be-there ack must NOT be in the DOM, but the cancellation
-      // ack still gates Confirm.
+      // The banner switches copy: no "be available for the entire
+      // window" reminder — instead it explains the service will
+      // happen sometime within the window.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -337,7 +372,16 @@ describe.each(VARIANTS)("$name slot picker", ({
       });
       bookingActions.setAccessMethod("owner_leased_leave_key");
 
-      const { container, getByTestId, queryByTestId } = render(<Component />);
+      const { container, getByTestId } = render(<Component />);
+
+      const banner = getByTestId(BANNER_TESTID_BY_VARIANT[name]);
+      expect(banner.getAttribute("data-access-mode")).toBe("unattended");
+      expect(banner.textContent ?? "").toContain(
+        "This is a window, not a set time",
+      );
+      expect(banner.textContent ?? "").not.toContain(
+        "available for the entire window",
+      );
 
       const continueBtn = getByTestId(
         CONTINUE_TESTID_BY_VARIANT[name],
@@ -356,8 +400,6 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(firstSlot).not.toBeNull();
       fireEvent.click(firstSlot!);
 
-      // Be-there ack checkbox must not exist for non-be-there methods.
-      expect(queryByTestId(ACK_TESTID_BY_VARIANT[name])).toBeNull();
       // Cancellation ack alone still gates Confirm.
       expect(continueBtn.disabled).toBe(true);
 

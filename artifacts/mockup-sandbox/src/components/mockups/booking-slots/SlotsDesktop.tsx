@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Clock,
+  Lock,
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
@@ -15,22 +16,19 @@ import {
   bookingActions,
   useBookingSession,
 } from "../../../state/bookingSession";
-import { isBeThereMethod } from "../../../state/accessMethodCatalog";
 import {
   CANCELLATION_ACK_LABEL,
   unitCity,
 } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
-  accessRecapLabel,
   dayHasAvailable,
-  dayWindows,
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
-import { Lock } from "lucide-react";
+import { SlotsAccessBanner } from "./SlotsAccessBanner";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -40,15 +38,12 @@ type Day = CustomerDay;
 
 export function SlotsDesktop() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [ack, setAck] = useState(false);
   const [weekIdx, setWeekIdx] = useState(0);
   const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSession();
   const cancellationAck = session.cancellation_acknowledged;
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
-  const beThere = isBeThereMethod(accessMethod);
-  const recapLabel = accessRecapLabel(accessMethod);
   // Timezone pill mirrors the city the building is in — a Canberra unit
   // shows "Canberra time", a Melbourne unit shows "Melbourne time", and
   // so on. Falls back to "Sydney" when no unit is known.
@@ -83,18 +78,10 @@ export function SlotsDesktop() {
     [visibleDays, selectedDate],
   );
 
-  // Clear the be-there ack the moment the shared hook drops the
-  // selected slot (rollout shifted, job grew, etc.) so Confirm can't
-  // re-enable on a stale ack.
-  useEffect(() => {
-    if (!selectedSlotId) setAck(false);
-  }, [selectedSlotId]);
-
   useEffect(() => {
     if (selectedDate && !activeDay) {
       setSelectedDate(null);
       setSelectedSlotId(null);
-      setAck(false);
     }
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
@@ -106,10 +93,7 @@ export function SlotsDesktop() {
   }, [week]);
 
   const canConfirm =
-    !!selectedSlotId &&
-    !lockedByOther &&
-    (!beThere || ack) &&
-    cancellationAck;
+    !!selectedSlotId && !lockedByOther && cancellationAck;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
@@ -131,21 +115,17 @@ export function SlotsDesktop() {
             </div>
           </div>
 
-          {/* Compact access recap — single line, no banner. */}
-          <div className="mb-6 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-            <div>
-              <span className="text-slate-500">Access:</span>{" "}
-              <span className="font-medium text-slate-900">{recapLabel}</span>
-            </div>
-            <button
-              type="button"
-              data-testid="button-change-access"
-              className="text-xs font-semibold underline underline-offset-2 hover:opacity-80"
-              style={{ color: BRAND }}
-            >
-              Change
-            </button>
-          </div>
+          {/* Top-of-page notification: explains the slot is a window
+              (not a fixed time), with an inline Change-access prompt
+              for be-there methods. Replaces the earlier be-there ack
+              checkbox so the same information becomes a piece of
+              guidance the customer reads up front, rather than a
+              term-to-agree-to checkbox above Confirm. */}
+          <SlotsAccessBanner
+            accessMethod={accessMethod}
+            size="regular"
+            testIdSuffix="desktop"
+          />
 
           <div className="flex-1">
             {!rollout && (
@@ -243,7 +223,6 @@ export function SlotsDesktop() {
                       onClick={() => {
                         setSelectedDate(d.date);
                         setSelectedSlotId(null);
-                        setAck(false);
                       }}
                     />
                   ))}
@@ -262,10 +241,9 @@ export function SlotsDesktop() {
                         label="Morning"
                         hint={activeDay.morning.timeLabel}
                         selected={selectedSlotId === activeDay.morning.id}
-                        onClick={() => {
-                          setSelectedSlotId(activeDay.morning.id);
-                          setAck(false);
-                        }}
+                        onClick={() =>
+                          setSelectedSlotId(activeDay.morning.id)
+                        }
                       />
                       <DesktopSlotCard
                         slot={activeDay.afternoon}
@@ -273,10 +251,9 @@ export function SlotsDesktop() {
                         label="Afternoon"
                         hint={activeDay.afternoon.timeLabel}
                         selected={selectedSlotId === activeDay.afternoon.id}
-                        onClick={() => {
-                          setSelectedSlotId(activeDay.afternoon.id);
-                          setAck(false);
-                        }}
+                        onClick={() =>
+                          setSelectedSlotId(activeDay.afternoon.id)
+                        }
                       />
                       {activeDay.evening && (
                         <DesktopSlotCard
@@ -285,10 +262,9 @@ export function SlotsDesktop() {
                           label="Evening"
                           hint={activeDay.evening.timeLabel}
                           selected={selectedSlotId === activeDay.evening.id}
-                          onClick={() => {
-                            setSelectedSlotId(activeDay.evening!.id);
-                            setAck(false);
-                          }}
+                          onClick={() =>
+                            setSelectedSlotId(activeDay.evening!.id)
+                          }
                         />
                       )}
                     </div>
@@ -299,29 +275,12 @@ export function SlotsDesktop() {
             )}
           </div>
 
-          {/* Acks group — both acks sit directly above the Confirm row
-              as a single "checks before you confirm" group (Task #121).
-              The be-there ack only appears for be-there access methods
-              and once a slot is picked; the cancellation ack is always
-              visible so the customer sees what they're agreeing to
-              before tapping a slot. */}
+          {/* Cancellation-terms ack sits above Confirm. The
+              "available for the entire window" reminder moved up
+              into the SlotsAccessBanner so it's an informational
+              notification, not a checkbox the customer has to
+              remember to tick. */}
           <div className="mt-8 space-y-2">
-            {beThere && selectedSlotId && (
-              <label
-                className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"
-                data-testid="ack-row-desktop"
-              >
-                <input
-                  type="checkbox"
-                  checked={ack}
-                  onChange={(e) => setAck(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer"
-                  style={{ accentColor: ack ? "#5FBB97" : BRAND }}
-                  data-testid="ack-checkbox-desktop"
-                />
-                <span>I'll be available for the entire window.</span>
-              </label>
-            )}
             <TermsAckRow
               checked={cancellationAck}
               onChange={(next) =>

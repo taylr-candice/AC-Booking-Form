@@ -15,18 +15,16 @@ import {
   bookingActions,
   useBookingSession,
 } from "../../../state/bookingSession";
-import { isBeThereMethod } from "../../../state/accessMethodCatalog";
 import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
-  accessRecapLabel,
   dayHasAvailable,
-  dayWindows,
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
+import { SlotsAccessBanner } from "./SlotsAccessBanner";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -36,13 +34,10 @@ type Day = CustomerDay;
 
 export function SlotsMobile() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [ack, setAck] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
-  const beThere = isBeThereMethod(accessMethod);
-  const recapLabel = accessRecapLabel(accessMethod);
   // Cancellation ack moved here from Pay (Task #121). Reads/writes the
   // existing `cancellation_acknowledged` boolean on the session store —
   // single source of truth, unchanged across the rest of the flow.
@@ -65,27 +60,16 @@ export function SlotsMobile() {
     [visibleDays, selectedDate],
   );
 
-  // Clear the be-there ack the moment the shared hook drops the
-  // selected slot (rollout shifted, job grew, etc.) so Confirm can't
-  // re-enable on a stale ack.
-  useEffect(() => {
-    if (!selectedSlotId) setAck(false);
-  }, [selectedSlotId]);
-
   // If the active day is no longer in view (rolled past, etc.), clear it.
   useEffect(() => {
     if (selectedDate && !activeDay) {
       setSelectedDate(null);
       setSelectedSlotId(null);
-      setAck(false);
     }
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const canConfirm =
-    !!selectedSlotId &&
-    !lockedByOther &&
-    (!beThere || ack) &&
-    cancellationAck;
+    !!selectedSlotId && !lockedByOther && cancellationAck;
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -120,21 +104,15 @@ export function SlotsMobile() {
           </button>
         </div>
 
-        {/* Compact access recap — single line, no pink banner. */}
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700">
-          <div>
-            <span className="text-slate-500">Access:</span>{" "}
-            <span className="font-medium text-slate-900">{recapLabel}</span>
-          </div>
-          <button
-            type="button"
-            data-testid="button-change-access"
-            className="font-semibold underline underline-offset-2 hover:opacity-80"
-            style={{ color: BRAND }}
-          >
-            Change
-          </button>
-        </div>
+        {/* Top-of-page notification: explains the slot is a window
+            (not a fixed time), with an inline Change-access prompt
+            for be-there methods. Replaces the earlier be-there ack
+            checkbox. */}
+        <SlotsAccessBanner
+          accessMethod={accessMethod}
+          size="compact"
+          testIdSuffix="mobile"
+        />
 
         {!rollout ? (
           <div
@@ -201,7 +179,6 @@ export function SlotsMobile() {
                   onClick={() => {
                     setSelectedDate(d.date);
                     setSelectedSlotId(null);
-                    setAck(false);
                   }}
                 />
               ))}
@@ -221,10 +198,7 @@ export function SlotsMobile() {
                     label="Morning"
                     hint={activeDay.morning.timeLabel}
                     selected={selectedSlotId === activeDay.morning.id}
-                    onClick={() => {
-                      setSelectedSlotId(activeDay.morning.id);
-                      setAck(false);
-                    }}
+                    onClick={() => setSelectedSlotId(activeDay.morning.id)}
                   />
                   <SlotCard
                     slot={activeDay.afternoon}
@@ -232,10 +206,7 @@ export function SlotsMobile() {
                     label="Afternoon"
                     hint={activeDay.afternoon.timeLabel}
                     selected={selectedSlotId === activeDay.afternoon.id}
-                    onClick={() => {
-                      setSelectedSlotId(activeDay.afternoon.id);
-                      setAck(false);
-                    }}
+                    onClick={() => setSelectedSlotId(activeDay.afternoon.id)}
                   />
                   {activeDay.evening && (
                     <SlotCard
@@ -244,10 +215,9 @@ export function SlotsMobile() {
                       label="Evening"
                       hint={activeDay.evening.timeLabel}
                       selected={selectedSlotId === activeDay.evening.id}
-                      onClick={() => {
-                        setSelectedSlotId(activeDay.evening!.id);
-                        setAck(false);
-                      }}
+                      onClick={() =>
+                        setSelectedSlotId(activeDay.evening!.id)
+                      }
                     />
                   )}
                 </div>
@@ -266,29 +236,13 @@ export function SlotsMobile() {
         )}
       </div>
 
-      {/* Docked CTA — both acks sit directly above Confirm as a single
-          "checks before you confirm" group (Task #121). The be-there
-          ack only shows for be-there access methods + once a slot is
-          picked; the cancellation ack is always present so the
+      {/* Docked CTA — the cancellation ack is always present so the
           customer sees what they're agreeing to before tapping a
-          slot. */}
+          slot. The "available for the entire window" message moved
+          to the top-of-page banner (SlotsAccessBanner) so it's an
+          informational notification, not a checkbox to remember to
+          tick. */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
-        {beThere && selectedSlotId && (
-          <label
-            className="mb-2 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700"
-            data-testid="ack-row-mobile"
-          >
-            <input
-              type="checkbox"
-              checked={ack}
-              onChange={(e) => setAck(e.target.checked)}
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer"
-              style={{ accentColor: ack ? "#5FBB97" : BRAND }}
-              data-testid="ack-checkbox-mobile"
-            />
-            <span>I'll be available for the entire window.</span>
-          </label>
-        )}
         <TermsAckRow
           checked={cancellationAck}
           onChange={(next) =>
