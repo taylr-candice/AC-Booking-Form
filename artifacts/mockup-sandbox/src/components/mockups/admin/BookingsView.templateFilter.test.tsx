@@ -356,6 +356,124 @@ describe("BookingsView — template filter pivot", () => {
     ).toBeNull();
   });
 
+  it("renders a synthetic '(no longer in catalog)' option in the dropdown when the active filter no longer matches any catalog row (Task #162)", () => {
+    // The controlled `<select>` would otherwise display the wrong row
+    // (browsers render the first option when the bound value matches no
+    // option), so without a synthetic option the dropdown silently
+    // lies about what's filtering the table.
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-renamed",
+        serviceTimeline: [emailEntry("Old name template")],
+      }),
+    ];
+    render(
+      <Harness
+        bookings={bookings}
+        callTemplates={[]}
+        emailTemplates={[
+          { id: "e1", name: "Some other email template", subject: "x", note: "" },
+        ]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+
+    const select = screen.getByTestId(
+      "bookings-filter-template",
+    ) as HTMLSelectElement;
+    const missingOption = screen.getByTestId(
+      "bookings-filter-template-missing-option",
+    ) as HTMLOptionElement;
+    expect(missingOption.textContent).toContain("Old name template");
+    expect(missingOption.textContent).toContain("(no longer in catalog)");
+    // The select's bound value points at the synthetic option, not at
+    // "All templates" — so the dropdown displays the active filter
+    // legibly rather than appearing reset.
+    expect(select.value).toBe(missingOption.value);
+  });
+
+  it("renders the synthetic dropdown option even when both catalogs are empty (Task #162)", () => {
+    // Edge case: the admin removed the last template that was being
+    // filtered on. Without the synthetic option the dropdown would
+    // hide entirely (its render gate is `options.length > 0`), which
+    // would strip the only "switch templates" affordance away from
+    // the toolbar.
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-renamed",
+        serviceTimeline: [emailEntry("Old name template")],
+      }),
+    ];
+    render(
+      <Harness
+        bookings={bookings}
+        callTemplates={[]}
+        emailTemplates={[]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+
+    expect(screen.getByTestId("bookings-filter-template")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("bookings-filter-template-missing-option"),
+    ).toBeInTheDocument();
+  });
+
+  it("does NOT render the synthetic dropdown option when the active filter still matches a catalog row", () => {
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-a",
+        serviceTimeline: [emailEntry("Sent rebook link")],
+      }),
+    ];
+    render(
+      <Harness
+        bookings={bookings}
+        callTemplates={[]}
+        emailTemplates={[
+          { id: "e1", name: "Sent rebook link", subject: "x", note: "" },
+        ]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+
+    expect(
+      screen.queryByTestId("bookings-filter-template-missing-option"),
+    ).toBeNull();
+  });
+
+  it("does NOT render the synthetic dropdown option when the catalogs aren't threaded in (no false positive)", () => {
+    // Without the catalogs we can't tell renamed/removed apart from
+    // "we just don't know", so the synthetic option must stay quiet
+    // for older call-sites that don't pass the catalogs.
+    const bookings: AdminBooking[] = [
+      makeBooking({
+        id: "bk-a",
+        serviceTimeline: [emailEntry("Old name template")],
+      }),
+    ];
+    renderView(bookings);
+
+    fireEvent.click(
+      screen.getByTestId("bookings-row-last-attempt-template"),
+    );
+
+    // The `<select>` itself isn't rendered without catalogs; just be
+    // sure the synthetic option never sneaks in.
+    expect(
+      screen.queryByTestId("bookings-filter-template-missing-option"),
+    ).toBeNull();
+  });
+
   it("clicking the template suffix doesn't bubble up to open the booking", () => {
     const bookings: AdminBooking[] = [
       makeBooking({

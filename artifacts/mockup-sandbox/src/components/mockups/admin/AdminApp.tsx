@@ -203,12 +203,45 @@ export function AdminApp() {
   ) {
     const normalized = normalizeEmailTemplateDraft(draft);
     if (normalized.name.length === 0 || normalized.subject.length === 0) return;
+    const previousName = emailTemplates.find((t) => t.id === id)?.name;
     setEmailTemplates((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...normalized } : t)),
     );
+    // Auto-clear the BookingsView "Template used" filter if it was
+    // bound to this template's old name (Task #162). The filter
+    // matches by snapshot string, so a rename leaves it dangling —
+    // the dropdown options reflect the new name, the chip is stuck
+    // on the old, and the table silently empties out. Clearing the
+    // filter is the honest behaviour: the lens the admin set up
+    // referred to a label that no longer exists. (We don't quietly
+    // re-bind to the new name because a rename can change meaning,
+    // not just spelling — better to surface the change than to
+    // silently follow it.)
+    if (
+      previousName !== undefined &&
+      previousName !== normalized.name &&
+      bookingsTemplateFilter !== null &&
+      bookingsTemplateFilter.kind === "email" &&
+      bookingsTemplateFilter.name === previousName
+    ) {
+      setBookingsTemplateFilter(null);
+    }
   }
   function removeEmailTemplate(id: string) {
+    const removed = emailTemplates.find((t) => t.id === id);
     setEmailTemplates((prev) => prev.filter((t) => t.id !== id));
+    // Companion to the rename auto-clear above (Task #162): if the
+    // BookingsView "Template used" filter was pointed at the
+    // template that just disappeared, clear it so the toolbar
+    // doesn't dangle on a label that's no longer in the catalog.
+    if (
+      removed !== undefined &&
+      bookingsTemplateFilter !== null &&
+      bookingsTemplateFilter.kind === "email" &&
+      bookingsTemplateFilter.name === removed.name
+    ) {
+      setBookingsTemplateFilter(null);
+    }
   }
   function setDefaultEmailTemplate(id: string) {
     setEmailTemplates((prev) => setDefaultEmailTemplateInCatalog(prev, id));
@@ -248,12 +281,34 @@ export function AdminApp() {
   ) {
     const normalized = normalizeCallTemplateDraft(draft);
     if (normalized.name.length === 0) return;
+    const previousName = callTemplates.find((t) => t.id === id)?.name;
     setCallTemplates((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...normalized } : t)),
     );
+    // Mirror of the email-template auto-clear (Task #162) — see the
+    // comment on `updateEmailTemplate` for the rationale.
+    if (
+      previousName !== undefined &&
+      previousName !== normalized.name &&
+      bookingsTemplateFilter !== null &&
+      bookingsTemplateFilter.kind === "call" &&
+      bookingsTemplateFilter.name === previousName
+    ) {
+      setBookingsTemplateFilter(null);
+    }
   }
   function removeCallTemplate(id: string) {
+    const removed = callTemplates.find((t) => t.id === id);
     setCallTemplates((prev) => prev.filter((t) => t.id !== id));
+    // Mirror of the email-template auto-clear (Task #162).
+    if (
+      removed !== undefined &&
+      bookingsTemplateFilter !== null &&
+      bookingsTemplateFilter.kind === "call" &&
+      bookingsTemplateFilter.name === removed.name
+    ) {
+      setBookingsTemplateFilter(null);
+    }
   }
   function setDefaultCallTemplate(id: string) {
     setCallTemplates((prev) => setDefaultCallTemplateInCatalog(prev, id));
