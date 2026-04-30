@@ -1000,6 +1000,11 @@ function OtherServiceCard({
   const perUnitAud = rule.priceAud;
   const totalMin = otherServiceMinutes(rule, qty);
   const totalAud = otherServicePrice(rule, qty);
+  // Per-service quantity ceiling; falls back to the global 99 for
+  // legacy catalogue blobs that don't carry a `maxQty`.
+  const maxQty =
+    rule.maxQty != null && rule.maxQty > 0 ? Math.floor(rule.maxQty) : 99;
+  const atCap = qty >= maxQty;
 
   if (!isOn) {
     return (
@@ -1100,6 +1105,10 @@ function OtherServiceCard({
             bookingActions.setOtherServiceQuantity(rule.id, qty + 1)
           }
           minQty={1}
+          maxQty={maxQty}
+          incrementTitle={
+            atCap ? `Max ${maxQty} — call us for more` : undefined
+          }
           decrementTestId={`btn-other-service-minus-${rule.id}`}
           incrementTestId={`btn-other-service-plus-${rule.id}`}
           decrementAriaLabel={`Decrease ${rule.name}`}
@@ -1116,6 +1125,14 @@ function OtherServiceCard({
           </span>
         </span>
       </div>
+      {atCap && (
+        <p
+          className="mt-2 text-[11px] text-slate-500"
+          data-testid={`text-other-service-cap-hint-${rule.id}`}
+        >
+          Max {maxQty} — call us for more.
+        </p>
+      )}
     </div>
   );
 }
@@ -1136,6 +1153,8 @@ function StepperRow({
   onDecrement,
   onIncrement,
   minQty = 0,
+  maxQty,
+  incrementTitle,
   decrementTestId,
   incrementTestId,
   decrementAriaLabel,
@@ -1146,6 +1165,13 @@ function StepperRow({
   onDecrement: () => void;
   onIncrement: () => void;
   minQty?: number;
+  /** Optional upper bound. When `qty >= maxQty` the "+" button
+   *  greys out and stops firing — caller is responsible for
+   *  surfacing a hint near the row explaining the cap. */
+  maxQty?: number;
+  /** Native `title` for the "+" button — used to expose the cap
+   *  reason on hover for sighted users. */
+  incrementTitle?: string;
   decrementTestId?: string;
   incrementTestId?: string;
   decrementAriaLabel: string;
@@ -1154,6 +1180,7 @@ function StepperRow({
 }) {
   const isMobile = variant === "mobile";
   const decrementDisabled = qty <= minQty;
+  const incrementDisabled = maxQty != null && qty >= maxQty;
   if (isMobile) {
     return (
       <div className="flex items-center gap-2">
@@ -1173,9 +1200,11 @@ function StepperRow({
         <button
           type="button"
           onClick={onIncrement}
+          disabled={incrementDisabled}
+          title={incrementTitle}
           data-testid={incrementTestId}
           aria-label={incrementAriaLabel}
-          className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
+          className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50 disabled:hover:bg-slate-100"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -1200,9 +1229,11 @@ function StepperRow({
       <button
         type="button"
         onClick={onIncrement}
+        disabled={incrementDisabled}
+        title={incrementTitle}
         data-testid={incrementTestId}
         aria-label={incrementAriaLabel}
-        className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+        className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
       >
         <Plus className="h-4 w-4" />
       </button>

@@ -3215,6 +3215,12 @@ export type AdminService = {
   /** Per-add-on price in AUD (default: $39). */
   addonPriceAud: number;
   /**
+   * Maximum quantity a customer can pick on the Step 2 stepper for
+   * an "other" service (only meaningful for `acTypeKey === null`).
+   * Stored as an integer; defaults to 5.
+   */
+  maxQty: number;
+  /**
    * Optional free-text "applies to" note, used for generic catalogue
    * entries that aren't keyed off an AC type (e.g. "applies to:
    * bathroom extraction"). Empty / undefined for the seeded AC entries.
@@ -3245,6 +3251,7 @@ export const SEEDED_SERVICES: AdminService[] = [
     addonMinutes: 15,
     priceAud: 179,
     addonPriceAud: 39,
+    maxQty: 5,
     defaultJobMinutes: 45,
   },
   {
@@ -3256,6 +3263,7 @@ export const SEEDED_SERVICES: AdminService[] = [
     addonMinutes: 15,
     priceAud: 179,
     addonPriceAud: 39,
+    maxQty: 5,
     defaultJobMinutes: 45,
   },
 ];

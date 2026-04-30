@@ -14,11 +14,17 @@
 
 import { useSyncExternalStore } from "react";
 
+import { findLiveOtherServiceRuleById } from "./liveOtherServices";
+
 // Mirror of `OTHER_AGENCY_ID` in `./accessMethodCatalog`. Kept as a local
 // constant so this module remains dependency-free per the file header
 // contract — the catalog is allowed to import from here, not the other
 // way round. If the canonical id ever changes, update both files.
 const OTHER_AGENCY_ID_INTERNAL = "agency-005";
+
+// Fallback ceiling for "other" service quantities when the rule has no
+// per-service cap (legacy / stale ids).
+const OTHER_SERVICE_GLOBAL_MAX_QTY = 99;
 
 // ─── Domain types ───────────────────────────────────────────────────────────
 
@@ -874,17 +880,24 @@ export const bookingActions = {
       return { ...s, other_service_quantities: next };
     });
   },
-  /** Set a single service id to a specific quantity (Task #201).
-   *  `qty <= 0` removes the entry entirely so the slot picker /
-   *  price card see "not selected" rather than "selected with 0".
-   *  Quantities are clamped to a sensible 1..99 window — the cap is
-   *  matched to the AC `setAdditionalIndoor` ceiling so a runaway
-   *  stepper press can't blow up the slot picker's duration math. */
+  /** Set a single service id to a specific quantity. `qty <= 0`
+   *  removes the entry. Quantities are clamped to the catalogue's
+   *  per-service `maxQty`, falling back to the global ceiling for
+   *  stale ids and rules with no cap. */
   setOtherServiceQuantity(id: string, qty: number) {
     if (!id) return;
     setState((s) => {
       const cur = s.other_service_quantities;
-      const clamped = Math.min(99, Math.max(0, Math.floor(qty)));
+      const rule = findLiveOtherServiceRuleById(id);
+      const ruleCap =
+        rule?.maxQty != null && Number.isFinite(rule.maxQty) && rule.maxQty > 0
+          ? Math.floor(rule.maxQty)
+          : null;
+      const ceiling =
+        ruleCap != null
+          ? Math.min(ruleCap, OTHER_SERVICE_GLOBAL_MAX_QTY)
+          : OTHER_SERVICE_GLOBAL_MAX_QTY;
+      const clamped = Math.min(ceiling, Math.max(0, Math.floor(qty)));
       if (clamped === 0) {
         if (!(id in cur)) return s;
         // Re-build the object so insertion order of the remaining

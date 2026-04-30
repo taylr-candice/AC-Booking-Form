@@ -1485,6 +1485,7 @@ export function AdminApp() {
           addonPriceAud: s.addonPriceAud,
           appliesToNote: s.appliesToNote,
           addonLabel: s.addonLabel,
+          maxQty: s.maxQty,
         })),
     );
     setUniquenessGuard((sess, newBookingReference) => {

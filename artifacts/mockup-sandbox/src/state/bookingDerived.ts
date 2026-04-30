@@ -240,6 +240,9 @@ export type OtherServiceRule = {
    *  the label is surfaced in the price card so the customer sees what
    *  the add-on charge covers. */
   addonLabel: string;
+  /** Optional per-service quantity ceiling. Callers must fall back
+   *  to the global 99 ceiling when missing (legacy blobs). */
+  maxQty?: number;
 };
 
 let serviceRuleResolver: (acType: "split" | "ducted") => ServiceRule = () =>

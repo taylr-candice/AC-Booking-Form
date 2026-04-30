@@ -100,7 +100,9 @@ export function readLiveOtherServicesFromStorage(): readonly OtherServiceRule[] 
         typeof (e as OtherServiceRule).addonMinutes === "number" &&
         typeof (e as OtherServiceRule).priceAud === "number" &&
         typeof (e as OtherServiceRule).addonPriceAud === "number" &&
-        typeof (e as OtherServiceRule).addonLabel === "string",
+        typeof (e as OtherServiceRule).addonLabel === "string" &&
+        ((e as OtherServiceRule).maxQty === undefined ||
+          typeof (e as OtherServiceRule).maxQty === "number"),
     );
     cachedValue = filtered.length === 0 ? EMPTY : Object.freeze(filtered);
     return cachedValue;
@@ -108,6 +110,21 @@ export function readLiveOtherServicesFromStorage(): readonly OtherServiceRule[] 
     cachedValue = EMPTY;
     return cachedValue;
   }
+}
+
+/**
+ * Look up a single projected "other" service rule by id. Returns
+ * `null` when storage is empty or the id is unknown — callers
+ * (notably `bookingActions.setOtherServiceQuantity`) treat that as
+ * "use the global fallback ceiling" so a stale session id never
+ * blocks the customer.
+ */
+export function findLiveOtherServiceRuleById(
+  id: string,
+): OtherServiceRule | null {
+  if (!id) return null;
+  const all = readLiveOtherServicesFromStorage();
+  return all.find((r) => r.id === id) ?? null;
 }
 
 /**

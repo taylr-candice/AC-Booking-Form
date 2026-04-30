@@ -146,6 +146,7 @@ export function ServicesView({
                   addonMinutes: 15,
                   priceAud: 179,
                   addonPriceAud: 39,
+                  maxQty: 5,
                   appliesToNote: "",
                   defaultJobMinutes: 45,
                 }
@@ -212,6 +213,15 @@ function ServiceCard({
               value={`$${service.addonPriceAud} / ${service.addonLabel}`}
             />
           </div>
+          {service.acTypeKey === null && (
+            <div className="mt-2 text-[11px] text-slate-500">
+              Customer stepper caps at{" "}
+              <span className="font-semibold text-slate-700">
+                {service.maxQty}
+              </span>
+              .
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -314,15 +324,38 @@ function ServiceEditor({
             </select>
           </Field>
           {draft.acTypeKey === null && (
-            <Field label='Applies to (free text)'>
-              <input
-                type="text"
-                value={draft.appliesToNote ?? ""}
-                onChange={(e) => patch({ appliesToNote: e.target.value })}
-                placeholder="e.g. bathroom extraction"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
-              />
-            </Field>
+            <>
+              <Field label='Applies to (free text)'>
+                <input
+                  type="text"
+                  value={draft.appliesToNote ?? ""}
+                  onChange={(e) => patch({ appliesToNote: e.target.value })}
+                  placeholder="e.g. bathroom extraction"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+                />
+              </Field>
+              <Field label="Max quantity (customer stepper)">
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  step={1}
+                  value={draft.maxQty}
+                  onChange={(e) =>
+                    patch({
+                      maxQty: Math.min(
+                        99,
+                        Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                      ),
+                    })
+                  }
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+                />
+                <span className="mt-1 text-[11px] text-slate-500">
+                  Caps the Step 2 stepper. Bigger jobs need to call in.
+                </span>
+              </Field>
+            </>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Base time (min / system)">

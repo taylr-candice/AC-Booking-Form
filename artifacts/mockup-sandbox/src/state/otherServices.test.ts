@@ -145,6 +145,55 @@ describe("bookingActions — other_service_quantities", () => {
     });
   });
 
+  describe("setOtherServiceQuantity per-service maxQty", () => {
+    it("clamps to the rule's maxQty when set", () => {
+      writeLiveOtherServices([{ ...BATHROOM, maxQty: 4 }]);
+      bookingActions.setOtherServiceQuantity(BATHROOM.id, 20);
+      expect(getBookingSession().other_service_quantities).toEqual({
+        [BATHROOM.id]: 4,
+      });
+      bookingActions.setOtherServiceQuantity(BATHROOM.id, 3);
+      expect(getBookingSession().other_service_quantities).toEqual({
+        [BATHROOM.id]: 3,
+      });
+      bookingActions.setOtherServiceQuantity(BATHROOM.id, 99);
+      expect(getBookingSession().other_service_quantities).toEqual({
+        [BATHROOM.id]: 4,
+      });
+    });
+
+    it("falls back to the global 99 ceiling when the rule has no maxQty", () => {
+      writeLiveOtherServices([BATHROOM]);
+      bookingActions.setOtherServiceQuantity(BATHROOM.id, 250);
+      expect(getBookingSession().other_service_quantities).toEqual({
+        [BATHROOM.id]: 99,
+      });
+    });
+
+    it("falls back to the global 99 ceiling for stale / unknown ids", () => {
+      bookingActions.setOtherServiceQuantity("svc-mystery", 250);
+      expect(
+        getBookingSession().other_service_quantities["svc-mystery"],
+      ).toBe(99);
+    });
+
+    it("treats a non-positive maxQty as missing and uses the global ceiling", () => {
+      writeLiveOtherServices([{ ...BATHROOM, maxQty: 0 }]);
+      bookingActions.setOtherServiceQuantity(BATHROOM.id, 50);
+      expect(getBookingSession().other_service_quantities).toEqual({
+        [BATHROOM.id]: 50,
+      });
+    });
+
+    it("floors a non-integer maxQty before clamping", () => {
+      writeLiveOtherServices([{ ...BATHROOM, maxQty: 4.7 }]);
+      bookingActions.setOtherServiceQuantity(BATHROOM.id, 10);
+      expect(getBookingSession().other_service_quantities).toEqual({
+        [BATHROOM.id]: 4,
+      });
+    });
+  });
+
   it("setOtherServices accepts a string array (each id promoted to qty 1, dedup'd)", () => {
     bookingActions.setOtherServices([
       KITCHEN.id,
