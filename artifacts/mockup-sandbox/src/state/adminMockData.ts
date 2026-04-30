@@ -258,6 +258,19 @@ export type TimelineEntry = {
    *  Task #138 don't carry it either, which is fine — the renderer
    *  just falls back to the plain label / note pair. */
   templateLabel?: string;
+  /** Snapshot of whether the {@link templateLabel} above was the
+   *  channel's default template at the moment ops logged this entry.
+   *  Drives the small `Default` pill next to the template chip on the
+   *  Service timeline (Task #181) — same affordance the Log call /
+   *  Log email dropdown trigger pill (Task #163) and the per-row /
+   *  bulk success toast (Task #169) already echo. Snapshot-on-use
+   *  like {@link templateLabel} so a later change to which template
+   *  is marked default in the catalog never rewrites the historical
+   *  marker on a past entry. Only populated when `templateLabel` is
+   *  also set (i.e. a real template was picked, not Custom…) and the
+   *  template was the catalog's default at log time. Omitted /
+   *  treated as `false` everywhere else. */
+  templateIsDefault?: boolean;
 };
 
 export type AdminBooking = {
@@ -4264,6 +4277,7 @@ export function buildBulkLogEmailEntry({
   at = "Just now",
   loggedAt,
   templateLabel,
+  templateIsDefault,
 }: {
   subject: string;
   note: string;
@@ -4288,6 +4302,14 @@ export function buildBulkLogEmailEntry({
    *  existing call-sites (and tests asserting only on the label /
    *  kind shape) don't have to spell out the picker. */
   templateLabel?: string;
+  /** Whether the picked template was the catalog's default at log
+   *  time. When `true` and a real template was picked (i.e. not
+   *  Custom…), persisted on the resulting
+   *  {@link TimelineEntry.templateIsDefault} so the Service timeline
+   *  can show the same amber `Default` pill the per-row Log call /
+   *  Log email path persists (Task #181). Snapshot-on-use — a later
+   *  catalog change never rewrites the historical entry. */
+  templateIsDefault?: boolean;
 }): TimelineEntry {
   const trimmedSubject = subject.trim();
   const trimmedNote = note.trim();
@@ -4306,6 +4328,9 @@ export function buildBulkLogEmailEntry({
     ...(loggedAt !== undefined ? { loggedAt } : {}),
     ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
     ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
+    ...(persistTemplate && templateIsDefault
+      ? { templateIsDefault: true }
+      : {}),
   };
 }
 
@@ -4332,6 +4357,12 @@ export function applyBulkLogEmail(
    *  so older callers / tests asserting only on the label shape don't
    *  have to spell out the picker. */
   templateLabel?: string,
+  /** Whether the picked template was the catalog's default at log
+   *  time. Forwarded to {@link buildBulkLogEmailEntry} so the
+   *  resulting timeline entry can echo the same `Default` pill the
+   *  per-row Log email path persists (Task #181). Optional + defaults
+   *  to `false` so older callers stay source-compatible. */
+  templateIsDefault: boolean = false,
 ): AdminBooking[] {
   if (ids.length === 0) return [...bookings];
   const idSet = new Set(ids);
@@ -4341,6 +4372,7 @@ export function applyBulkLogEmail(
     by,
     loggedAt: nowIso,
     templateLabel,
+    templateIsDefault,
   });
   return bookings.map((b) => {
     if (b.id === "bk-live") return b;

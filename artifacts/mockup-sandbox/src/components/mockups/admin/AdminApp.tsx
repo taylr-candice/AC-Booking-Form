@@ -969,6 +969,10 @@ export function AdminApp() {
           loggedAt: nowIso,
           ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
           ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
+          // Mirror the per-row writer (Task #181) so a bulk-logged
+          // default-template call also surfaces the amber `Default`
+          // pill in the booking's Service timeline.
+          ...(persistTemplate && isDefault ? { templateIsDefault: true } : {}),
         };
         return {
           ...b,
@@ -1026,6 +1030,10 @@ export function AdminApp() {
         nowIso,
         undefined, // `by` — fall through to ADMIN_USER_LABEL default
         templateLabel,
+        // Mirror the per-row writer (Task #181) so a bulk-logged
+        // default-template email also surfaces the amber `Default`
+        // pill in each booking's Service timeline.
+        isDefault,
       ),
     );
     const count = ids.length;

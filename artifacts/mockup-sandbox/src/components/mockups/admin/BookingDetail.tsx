@@ -372,6 +372,10 @@ export function BookingDetail({
       loggedAt: nowIso,
       ...(note.trim().length > 0 ? { note: note.trim() } : {}),
       ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
+      // Snapshot-on-use marker so the Service timeline can echo the
+      // same Default pill the dropdown trigger (Task #163) and the
+      // success toast (Task #169) show (Task #181).
+      ...(persistTemplate && isDefault ? { templateIsDefault: true } : {}),
     };
     onUpdate(booking.id, {
       lastContactedAt: nowIso,
@@ -428,6 +432,10 @@ export function BookingDetail({
       loggedAt: nowIso,
       ...(note.trim().length > 0 ? { note: note.trim() } : {}),
       ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
+      // Snapshot-on-use marker so the Service timeline can echo the
+      // same Default pill the dropdown trigger (Task #163) and the
+      // success toast (Task #169) show (Task #181).
+      ...(persistTemplate && isDefault ? { templateIsDefault: true } : {}),
     };
     onUpdate(booking.id, {
       lastContactedAt: nowIso,
@@ -1113,6 +1121,22 @@ function Timeline({
                       From template: {e.templateLabel}
                     </div>
                   )}
+                  {e.templateIsDefault ? (
+                    // Mirror of the dropdown trigger pill (Task #163)
+                    // and the "(Default)" toast suffix (Task #169) —
+                    // surfaces the same marker on past timeline
+                    // entries (Task #181).
+                    <span
+                      data-testid={`timeline-entry-${i}-template-default`}
+                      className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                      title={`Logged using the default ${
+                        templateChipKind === "call" ? "Call" : "Email"
+                      } template at the time`}
+                    >
+                      <Star className="h-2.5 w-2.5" fill="currentColor" />
+                      Default
+                    </span>
+                  ) : null}
                   {onPivotToBookingsFilteredByTemplate && (
                     <button
                       type="button"
