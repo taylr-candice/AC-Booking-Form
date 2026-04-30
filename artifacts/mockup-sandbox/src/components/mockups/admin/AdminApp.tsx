@@ -25,11 +25,13 @@ import {
   CALL_TEMPLATES,
   consumeBookingCapacity,
   convertCoordinationToScheduledPatch,
+  countTimelineUsageForTemplate,
   createRollout,
   EMAIL_TEMPLATES,
   findRolloutForBooking,
   formatBookingShortDate,
   getActiveBookingForUnit,
+  isCustomCallTemplateLabel,
   liveBookingFromSession,
   nextCallTemplateId,
   nextEmailTemplateId,
@@ -198,6 +200,25 @@ export function AdminApp() {
     setCallTemplates((prev) => prev.filter((t) => t.id !== id));
   }
 
+  // Per-template count of timeline entries that reference each
+  // template, surfaced by the `*TemplatesView` panels for the Remove
+  // confirm warning. Memoised so unrelated renders don't re-walk
+  // every booking's timeline.
+  const emailTemplateUsageCounts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const t of emailTemplates) {
+      out[t.id] = countTimelineUsageForTemplate(allBookings, "email", t.name);
+    }
+    return out;
+  }, [allBookings, emailTemplates]);
+  const callTemplateUsageCounts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const t of callTemplates) {
+      out[t.id] = countTimelineUsageForTemplate(allBookings, "call", t.name);
+    }
+    return out;
+  }, [allBookings, callTemplates]);
+
   const [view, setView] = useState<ViewId>("bookings");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(
@@ -334,6 +355,9 @@ export function AdminApp() {
     const idSet = new Set(ids);
     const nowIso = new Date().toISOString();
     const trimmedNote = note.trim();
+    const trimmedTemplate = templateLabel.trim();
+    const isCustom = isCustomCallTemplateLabel(trimmedTemplate);
+    const persistTemplate = trimmedTemplate.length > 0 && !isCustom;
     setSeededBookings((prev) =>
       prev.map((b) => {
         if (b.id === "bk-live") return b;
@@ -346,6 +370,7 @@ export function AdminApp() {
           by: "Mia (admin)",
           loggedAt: nowIso,
           ...(trimmedNote.length > 0 ? { note: trimmedNote } : {}),
+          ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
         };
         return {
           ...b,
@@ -362,10 +387,6 @@ export function AdminApp() {
     // bulk-log-email toast surfacing the free-text subject), since
     // the outcome dropdown always carries a value and gives ops a
     // useful "what kind of attempt landed" hint.
-    const trimmedTemplate = templateLabel.trim();
-    const isCustom =
-      trimmedTemplate.length === 0 ||
-      trimmedTemplate.toLowerCase() === "custom";
     const tail = isCustom
       ? ` · Custom · ${CALL_OUTCOME_LABEL[outcome]}`
       : ` · ${trimmedTemplate}`;
@@ -1274,6 +1295,7 @@ export function AdminApp() {
           {view === "email_templates" && (
             <EmailTemplatesView
               templates={emailTemplates}
+              usageCounts={emailTemplateUsageCounts}
               onCreate={createEmailTemplate}
               onUpdate={updateEmailTemplate}
               onRemove={removeEmailTemplate}
@@ -1283,6 +1305,7 @@ export function AdminApp() {
           {view === "call_templates" && (
             <CallTemplatesView
               templates={callTemplates}
+              usageCounts={callTemplateUsageCounts}
               onCreate={createCallTemplate}
               onUpdate={updateCallTemplate}
               onRemove={removeCallTemplate}

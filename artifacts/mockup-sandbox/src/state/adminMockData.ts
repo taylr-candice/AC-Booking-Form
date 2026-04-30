@@ -2197,6 +2197,37 @@ export const CALL_TEMPLATE_CUSTOM_ID = "custom";
  *  handler can render a consistent toast across both channels. */
 export const CALL_TEMPLATE_CUSTOM_LABEL = "Custom";
 
+/** Mirror of {@link isCustomEmailTemplateLabel} for the call channel. */
+export function isCustomCallTemplateLabel(label: string): boolean {
+  const trimmed = label.trim();
+  if (trimmed.length === 0) return true;
+  return trimmed.toLowerCase() === CALL_TEMPLATE_CUSTOM_LABEL.toLowerCase();
+}
+
+/**
+ * Count timeline entries that reference `templateName` for the given
+ * `kind`. Matches by the snapshot-on-use `templateLabel` field, so
+ * entries logged before a template rename keep the old name and
+ * won't be counted under the new one.
+ */
+export function countTimelineUsageForTemplate(
+  bookings: ReadonlyArray<AdminBooking>,
+  kind: "call" | "email",
+  templateName: string,
+): number {
+  const trimmed = templateName.trim();
+  if (trimmed.length === 0) return 0;
+  let count = 0;
+  for (const b of bookings) {
+    for (const entry of b.serviceTimeline) {
+      if (entry.kind === kind && entry.templateLabel === trimmed) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
 /**
  * Trim a draft email template's three free-text fields. Used by both
  * the create + edit code paths in the admin "Email templates" panel

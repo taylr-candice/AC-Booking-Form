@@ -30,13 +30,32 @@ import {
 import { FormField } from "./atoms";
 import { BRAND } from "./theme";
 
+/** Mirror of {@link buildCallTemplateRemoveConfirm} for the email
+ *  channel. Exported so tests can pin the exact string. */
+export function buildEmailTemplateRemoveConfirm(
+  name: string,
+  usage: number,
+): string {
+  if (usage === 0) {
+    return `Remove "${name}" from the Email templates catalog? No timeline entries reference this template — nothing else changes.`;
+  }
+  const entryWord = usage === 1 ? "entry" : "entries";
+  return `Remove "${name}" from the Email templates catalog? This template is referenced by ${usage} timeline ${entryWord} — historical entries are preserved (snapshot-on-use), but the shortcut will no longer be available in the bulk Log email dropdown.`;
+}
+
 export function EmailTemplatesView({
   templates,
+  usageCounts,
   onCreate,
   onUpdate,
   onRemove,
 }: {
   templates: EmailTemplate[];
+  /** Per-template count of timeline entries referencing each template
+   *  (keyed by {@link EmailTemplate.id}). Optional; defaults to 0
+   *  per template so harnesses can mount the view without computing
+   *  counts. */
+  usageCounts?: Readonly<Record<string, number>>;
   /** Append a new template to the catalog. The handler is responsible
    *  for stamping a fresh id (via {@link nextEmailTemplateId}) so the
    *  view doesn't have to know how the rest of the catalog is keyed. */
@@ -101,61 +120,72 @@ export function EmailTemplatesView({
               </tr>
             </thead>
             <tbody>
-              {templates.map((t) => (
-                <tr
-                  key={t.id}
-                  data-testid={`email-template-row-${t.id}`}
-                  className="border-b border-slate-100 last:border-b-0 align-top"
-                >
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{t.name}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-[12px] text-slate-700">
-                      {t.subject || (
-                        <span className="italic text-slate-400">—</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-[12px] text-slate-600 whitespace-pre-wrap">
-                      {t.note || (
-                        <span className="italic text-slate-400">—</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(t.id)}
-                        data-testid={`button-edit-email-template-${t.id}`}
-                        className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-600 hover:text-slate-900"
+              {templates.map((t) => {
+                const usage = usageCounts?.[t.id] ?? 0;
+                return (
+                  <tr
+                    key={t.id}
+                    data-testid={`email-template-row-${t.id}`}
+                    className="border-b border-slate-100 last:border-b-0 align-top"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-900">{t.name}</div>
+                      <div
+                        data-testid={`email-template-usage-${t.id}`}
+                        className="mt-0.5 text-[11px] text-slate-500"
                       >
-                        <Edit3 className="h-3.5 w-3.5" />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Remove "${t.name}" from the Email templates catalog? Timeline entries already logged with this template are kept as-is.`,
-                            )
-                          ) {
-                            onRemove(t.id);
-                          }
-                        }}
-                        data-testid={`button-remove-email-template-${t.id}`}
-                        className="inline-flex items-center gap-1 text-[12px] font-semibold text-rose-600 hover:text-rose-800"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Remove
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {usage === 0
+                          ? "No timeline entries reference this template"
+                          : `Referenced by ${usage} timeline ${usage === 1 ? "entry" : "entries"}`}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-[12px] text-slate-700">
+                        {t.subject || (
+                          <span className="italic text-slate-400">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-[12px] text-slate-600 whitespace-pre-wrap">
+                        {t.note || (
+                          <span className="italic text-slate-400">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(t.id)}
+                          data-testid={`button-edit-email-template-${t.id}`}
+                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-600 hover:text-slate-900"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                buildEmailTemplateRemoveConfirm(t.name, usage),
+                              )
+                            ) {
+                              onRemove(t.id);
+                            }
+                          }}
+                          data-testid={`button-remove-email-template-${t.id}`}
+                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-rose-600 hover:text-rose-800"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

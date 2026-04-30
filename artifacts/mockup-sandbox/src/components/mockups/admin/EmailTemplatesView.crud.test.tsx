@@ -41,7 +41,10 @@ import {
 } from "@/state/adminMockData";
 
 import { AdminApp } from "./AdminApp";
-import { EmailTemplatesView } from "./EmailTemplatesView";
+import {
+  buildEmailTemplateRemoveConfirm,
+  EmailTemplatesView,
+} from "./EmailTemplatesView";
 
 afterEach(() => {
   cleanup();
@@ -213,6 +216,85 @@ describe("EmailTemplatesView · CRUD", () => {
     confirmSpy.mockRestore();
   });
 
+  it("Remove confirm → 0 references path: shows the reassuring copy when usage is zero", () => {
+    render(<Harness initial={makeTemplates()} />);
+
+    expect(
+      screen.getByTestId("email-template-usage-tpl-seed-1").textContent,
+    ).toBe("No timeline entries reference this template");
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(
+      screen.getByTestId("button-remove-email-template-tpl-seed-1"),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledWith(
+      buildEmailTemplateRemoveConfirm("Sent rebook link", 0),
+    );
+    const message = confirmSpy.mock.calls[0]?.[0] as string;
+    expect(message).toContain("No timeline entries reference this template");
+    expect(message).not.toMatch(/Referenced by/i);
+    expect(message).not.toMatch(/historical entries/i);
+
+    confirmSpy.mockRestore();
+  });
+
+  it("Remove confirm → N>0 references path: warns with the count and reassurance; cancelling leaves the row in place", () => {
+    function PinnedHarness({ initial }: { initial: EmailTemplate[] }) {
+      const [templates, setTemplates] = useState<EmailTemplate[]>(initial);
+      return (
+        <EmailTemplatesView
+          templates={templates}
+          usageCounts={{
+            "tpl-seed-1": 4,
+            "tpl-seed-2": 1,
+          }}
+          onCreate={() => {}}
+          onUpdate={() => {}}
+          onRemove={(id) =>
+            setTemplates((prev) => prev.filter((t) => t.id !== id))
+          }
+        />
+      );
+    }
+    render(<PinnedHarness initial={makeTemplates()} />);
+
+    expect(
+      screen.getByTestId("email-template-usage-tpl-seed-1").textContent,
+    ).toBe("Referenced by 4 timeline entries");
+    expect(
+      screen.getByTestId("email-template-usage-tpl-seed-2").textContent,
+    ).toBe("Referenced by 1 timeline entry");
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(
+      screen.getByTestId("button-remove-email-template-tpl-seed-1"),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledWith(
+      buildEmailTemplateRemoveConfirm("Sent rebook link", 4),
+    );
+    const pluralMsg = confirmSpy.mock.calls[0]?.[0] as string;
+    expect(pluralMsg).toContain("4 timeline entries");
+    expect(pluralMsg).toContain("historical entries are preserved");
+    expect(screen.getByTestId("email-template-row-tpl-seed-1")).toBeTruthy();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(
+      screen.getByTestId("button-remove-email-template-tpl-seed-2"),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(confirmSpy).toHaveBeenLastCalledWith(
+      buildEmailTemplateRemoveConfirm("Awaiting confirmation nudge", 1),
+    );
+    const singularMsg = confirmSpy.mock.calls[1]?.[0] as string;
+    expect(singularMsg).toContain("1 timeline entry");
+    expect(singularMsg).not.toContain("1 timeline entries");
+    expect(screen.queryByTestId("email-template-row-tpl-seed-2")).toBeNull();
+
+    confirmSpy.mockRestore();
+  });
+
   it("Save is disabled while name or subject is blank/whitespace; a fully whitespace draft never reaches onCreate", () => {
     const onCreate = vi.fn();
     const onUpdate = vi.fn();
@@ -348,5 +430,48 @@ describe("EmailTemplatesView ↔ bulk Log email cross-view consistency", () => {
     for (const seeded of EMAIL_TEMPLATES) {
       expect(optionLabels).toContain(seeded.name);
     }
+  });
+
+  it("bulk-logging an email through a seeded template surfaces the live reference count on the panel and in the Remove confirm", () => {
+    render(<AdminApp />);
+
+    const tpl = EMAIL_TEMPLATES[0];
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1038"));
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1044"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+    fireEvent.change(screen.getByTestId("select-bulk-email-template"), {
+      target: { value: tpl.id },
+    });
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-email"));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Email templates" }),
+    );
+    expect(
+      screen.getByTestId(`email-template-usage-${tpl.id}`).textContent,
+    ).toBe("Referenced by 2 timeline entries");
+
+    const untouched = EMAIL_TEMPLATES.find((t) => t.id !== tpl.id);
+    if (untouched) {
+      expect(
+        screen.getByTestId(`email-template-usage-${untouched.id}`).textContent,
+      ).toBe("No timeline entries reference this template");
+    }
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(
+      screen.getByTestId(`button-remove-email-template-${tpl.id}`),
+    );
+    const message = confirmSpy.mock.calls[0]?.[0] as string;
+    expect(message).toContain(`"${tpl.name}"`);
+    expect(message).toContain("2 timeline entries");
+    expect(message).toContain("historical entries are preserved");
+    expect(screen.getByTestId(`email-template-row-${tpl.id}`)).toBeTruthy();
+
+    confirmSpy.mockRestore();
   });
 });

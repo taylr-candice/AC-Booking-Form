@@ -45,7 +45,10 @@ import {
 } from "@/state/adminMockData";
 
 import { AdminApp } from "./AdminApp";
-import { CallTemplatesView } from "./CallTemplatesView";
+import {
+  buildCallTemplateRemoveConfirm,
+  CallTemplatesView,
+} from "./CallTemplatesView";
 
 afterEach(() => {
   cleanup();
@@ -204,6 +207,89 @@ describe("CallTemplatesView · CRUD", () => {
       screen.queryByTestId("call-template-row-call-tpl-seed-1"),
     ).toBeNull();
     expect(screen.getByText("Spoke to them — confirmed window")).toBeTruthy();
+
+    confirmSpy.mockRestore();
+  });
+
+  it("Remove confirm → 0 references path: shows the reassuring copy when usage is zero", () => {
+    render(<Harness initial={makeTemplates()} />);
+
+    expect(
+      screen.getByTestId("call-template-usage-call-tpl-seed-1").textContent,
+    ).toBe("No timeline entries reference this template");
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(
+      screen.getByTestId("button-remove-call-template-call-tpl-seed-1"),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledWith(
+      buildCallTemplateRemoveConfirm("No answer — left voicemail", 0),
+    );
+    const message = confirmSpy.mock.calls[0]?.[0] as string;
+    expect(message).toContain("No timeline entries reference this template");
+    expect(message).not.toMatch(/Referenced by/i);
+    expect(message).not.toMatch(/historical entries/i);
+
+    confirmSpy.mockRestore();
+  });
+
+  it("Remove confirm → N>0 references path: warns with the count and reassurance; cancelling leaves the row in place", () => {
+    function PinnedHarness({ initial }: { initial: CallTemplate[] }) {
+      const [templates, setTemplates] = useState<CallTemplate[]>(initial);
+      return (
+        <CallTemplatesView
+          templates={templates}
+          usageCounts={{
+            "call-tpl-seed-1": 3,
+            "call-tpl-seed-2": 1,
+          }}
+          onCreate={() => {}}
+          onUpdate={() => {}}
+          onRemove={(id) =>
+            setTemplates((prev) => prev.filter((t) => t.id !== id))
+          }
+        />
+      );
+    }
+    render(<PinnedHarness initial={makeTemplates()} />);
+
+    expect(
+      screen.getByTestId("call-template-usage-call-tpl-seed-1").textContent,
+    ).toBe("Referenced by 3 timeline entries");
+    expect(
+      screen.getByTestId("call-template-usage-call-tpl-seed-2").textContent,
+    ).toBe("Referenced by 1 timeline entry");
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(
+      screen.getByTestId("button-remove-call-template-call-tpl-seed-1"),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).toHaveBeenCalledWith(
+      buildCallTemplateRemoveConfirm("No answer — left voicemail", 3),
+    );
+    const pluralMsg = confirmSpy.mock.calls[0]?.[0] as string;
+    expect(pluralMsg).toContain("3 timeline entries");
+    expect(pluralMsg).toContain("historical entries are preserved");
+    expect(
+      screen.getByTestId("call-template-row-call-tpl-seed-1"),
+    ).toBeTruthy();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(
+      screen.getByTestId("button-remove-call-template-call-tpl-seed-2"),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(confirmSpy).toHaveBeenLastCalledWith(
+      buildCallTemplateRemoveConfirm("Spoke to them — confirmed window", 1),
+    );
+    const singularMsg = confirmSpy.mock.calls[1]?.[0] as string;
+    expect(singularMsg).toContain("1 timeline entry");
+    expect(singularMsg).not.toContain("1 timeline entries");
+    expect(
+      screen.queryByTestId("call-template-row-call-tpl-seed-2"),
+    ).toBeNull();
 
     confirmSpy.mockRestore();
   });
@@ -459,5 +545,45 @@ describe("CallTemplatesView ↔ Log-call cross-view consistency", () => {
     });
     fireEvent.click(screen.getByTestId("button-confirm-log-call"));
     expect(screen.queryByTestId("log-call-form")).toBeNull();
+  });
+
+  it("bulk-logging a call through a seeded template surfaces the live reference count on the panel and in the Remove confirm", () => {
+    render(<AdminApp />);
+
+    const tpl = CALL_TEMPLATES[0];
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1038"));
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1044"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    fireEvent.change(screen.getByTestId("select-bulk-call-template"), {
+      target: { value: tpl.id },
+    });
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-call"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    expect(
+      screen.getByTestId(`call-template-usage-${tpl.id}`).textContent,
+    ).toBe("Referenced by 2 timeline entries");
+    const untouched = CALL_TEMPLATES.find((t) => t.id !== tpl.id);
+    if (untouched) {
+      expect(
+        screen.getByTestId(`call-template-usage-${untouched.id}`).textContent,
+      ).toBe("No timeline entries reference this template");
+    }
+
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(
+      screen.getByTestId(`button-remove-call-template-${tpl.id}`),
+    );
+    const message = confirmSpy.mock.calls[0]?.[0] as string;
+    expect(message).toContain(`"${tpl.name}"`);
+    expect(message).toContain("2 timeline entries");
+    expect(message).toContain("historical entries are preserved");
+    expect(screen.getByTestId(`call-template-row-${tpl.id}`)).toBeTruthy();
+
+    confirmSpy.mockRestore();
   });
 });

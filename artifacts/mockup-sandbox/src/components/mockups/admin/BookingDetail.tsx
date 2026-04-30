@@ -32,6 +32,7 @@ import {
   coordinationContactForBooking,
   EMAIL_TEMPLATE_CUSTOM_ID,
   EMAIL_TEMPLATE_CUSTOM_LABEL,
+  isCustomCallTemplateLabel,
   isCustomEmailTemplateLabel,
   EMAIL_TEMPLATES,
   formatAttemptRecency,
@@ -291,13 +292,19 @@ export function BookingDetail({
    * It does NOT change the timeline label — that stays
    * `Logged call · {Outcome}` so per-row entries line up with bulk-
    * logged ones in the Awaiting-coordination "Last attempt" cell.
-   * Instead it's forwarded to the optional {@link onLogCallToast}
-   * callback so the AdminApp shell can fire the same template-aware
-   * confirmation toast the bulk action does.
+   * Non-Custom picks are persisted on the timeline entry's
+   * `templateLabel` so the Call-templates panel can count historical
+   * references. The label is also forwarded to the optional
+   * {@link onLogCallToast} callback so the AdminApp shell can fire
+   * the same template-aware confirmation toast the bulk action does.
    */
   function logCall(outcome: CallOutcome, note: string, templateLabel: string) {
     if (!booking) return;
     const nowIso = new Date().toISOString();
+    const trimmedTemplate = templateLabel.trim();
+    const persistTemplate =
+      trimmedTemplate.length > 0 &&
+      !isCustomCallTemplateLabel(trimmedTemplate);
     const newEntry: TimelineEntry = {
       kind: "call",
       status: "logged_call",
@@ -306,6 +313,7 @@ export function BookingDetail({
       by: "Mia (admin)",
       loggedAt: nowIso,
       ...(note.trim().length > 0 ? { note: note.trim() } : {}),
+      ...(persistTemplate ? { templateLabel: trimmedTemplate } : {}),
     };
     onUpdate(booking.id, {
       lastContactedAt: nowIso,
