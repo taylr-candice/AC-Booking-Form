@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   findDefaultCallTemplate,
@@ -13,6 +14,8 @@ import {
 } from "@/state/adminMockData";
 
 import { AdminApp } from "./AdminApp";
+import { CallTemplatesView } from "./CallTemplatesView";
+import { EmailTemplatesView } from "./EmailTemplatesView";
 
 afterEach(() => {
   cleanup();
@@ -853,6 +856,197 @@ describe("Templates panel — default row pinned to the top", () => {
       expect(
         screen.queryByTestId(`pill-default-email-template-${id}`),
       ).toBeNull();
+    }
+  });
+});
+
+describe("Templates panel — focused-row one-shot pulse (Task #165)", () => {
+  /**
+   * Stateful harness so the test can flip `focusedTemplateId` between
+   * `null` → an id → a different id and verify each transition lands
+   * the pulse marker on exactly the right row. Mirrors the live
+   * AdminApp wiring (the focus prop is owned by the shell, not the
+   * view) without dragging the full app + chip flow into a rendering
+   * detail test.
+   */
+  function CallHarness({
+    initial = null,
+    seed,
+  }: {
+    initial?: string | null;
+    seed: CallTemplate[];
+  }) {
+    const [focused, setFocused] = useState<string | null>(initial);
+    return (
+      <div>
+        <button
+          type="button"
+          data-testid="harness-focus-call-a"
+          onClick={() => setFocused("a")}
+        >
+          focus a
+        </button>
+        <button
+          type="button"
+          data-testid="harness-focus-call-b"
+          onClick={() => setFocused("b")}
+        >
+          focus b
+        </button>
+        <CallTemplatesView
+          templates={seed}
+          onCreate={() => {}}
+          onUpdate={() => {}}
+          onRemove={() => {}}
+          onSetDefault={() => {}}
+          focusedTemplateId={focused}
+        />
+      </div>
+    );
+  }
+
+  function EmailHarness({
+    initial = null,
+    seed,
+  }: {
+    initial?: string | null;
+    seed: EmailTemplate[];
+  }) {
+    const [focused, setFocused] = useState<string | null>(initial);
+    return (
+      <div>
+        <button
+          type="button"
+          data-testid="harness-focus-email-a"
+          onClick={() => setFocused("a")}
+        >
+          focus a
+        </button>
+        <button
+          type="button"
+          data-testid="harness-focus-email-b"
+          onClick={() => setFocused("b")}
+        >
+          focus b
+        </button>
+        <EmailTemplatesView
+          templates={seed}
+          onCreate={() => {}}
+          onUpdate={() => {}}
+          onRemove={() => {}}
+          onSetDefault={() => {}}
+          focusedTemplateId={focused}
+        />
+      </div>
+    );
+  }
+
+  it("Call: pulse class arrives on the focused row, then auto-clears while the static focus stays", () => {
+    vi.useFakeTimers();
+    try {
+      const seed: CallTemplate[] = [
+        { id: "a", name: "Voicemail", note: "" },
+        { id: "b", name: "Spoke", note: "" },
+      ];
+      render(<CallHarness seed={seed} />);
+
+      // Before focus arrives, neither row pulses or is focused.
+      const aRow = () => screen.getByTestId("call-template-row-a");
+      const bRow = () => screen.getByTestId("call-template-row-b");
+      expect(aRow().getAttribute("data-pulsing")).toBeNull();
+      expect(aRow().getAttribute("data-focused")).toBeNull();
+
+      // Hand a fresh focus id to the view → row gets the pulse class
+      // AND the persistent focused marker.
+      act(() => {
+        fireEvent.click(screen.getByTestId("harness-focus-call-a"));
+      });
+      expect(aRow().getAttribute("data-pulsing")).toBe("true");
+      expect(aRow().getAttribute("data-focused")).toBe("true");
+      expect(aRow().className).toContain("template-row-focus-pulse");
+      // The other row stays quiet on both axes.
+      expect(bRow().getAttribute("data-pulsing")).toBeNull();
+      expect(bRow().getAttribute("data-focused")).toBeNull();
+
+      // After the auto-clear timer fires the pulse class drops, but
+      // the persistent focus highlight stays until the AdminApp shell
+      // resets `focusedTemplateId` (which only happens on sidebar nav).
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
+      expect(aRow().getAttribute("data-pulsing")).toBeNull();
+      expect(aRow().className).not.toContain("template-row-focus-pulse");
+      expect(aRow().getAttribute("data-focused")).toBe("true");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Call: changing focus to a different row re-arms the pulse on the new row only", () => {
+    vi.useFakeTimers();
+    try {
+      const seed: CallTemplate[] = [
+        { id: "a", name: "Voicemail", note: "" },
+        { id: "b", name: "Spoke", note: "" },
+      ];
+      render(<CallHarness seed={seed} />);
+
+      const aRow = () => screen.getByTestId("call-template-row-a");
+      const bRow = () => screen.getByTestId("call-template-row-b");
+
+      act(() => {
+        fireEvent.click(screen.getByTestId("harness-focus-call-a"));
+      });
+      expect(aRow().getAttribute("data-pulsing")).toBe("true");
+
+      // Let the pulse expire so we can verify the next focus change
+      // re-arms it on a fresh row.
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
+      expect(aRow().getAttribute("data-pulsing")).toBeNull();
+
+      act(() => {
+        fireEvent.click(screen.getByTestId("harness-focus-call-b"));
+      });
+      expect(bRow().getAttribute("data-pulsing")).toBe("true");
+      expect(bRow().getAttribute("data-focused")).toBe("true");
+      // Focus has moved off row a — no pulse, no static focus there.
+      expect(aRow().getAttribute("data-pulsing")).toBeNull();
+      expect(aRow().getAttribute("data-focused")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Email: pulse class arrives on the focused row, then auto-clears while the static focus stays", () => {
+    vi.useFakeTimers();
+    try {
+      const seed: EmailTemplate[] = [
+        { id: "a", name: "Rebook", subject: "Rebook", note: "" },
+        { id: "b", name: "Parcel", subject: "Parcel", note: "" },
+      ];
+      render(<EmailHarness seed={seed} />);
+
+      const aRow = () => screen.getByTestId("email-template-row-a");
+      const bRow = () => screen.getByTestId("email-template-row-b");
+
+      act(() => {
+        fireEvent.click(screen.getByTestId("harness-focus-email-a"));
+      });
+      expect(aRow().getAttribute("data-pulsing")).toBe("true");
+      expect(aRow().getAttribute("data-focused")).toBe("true");
+      expect(aRow().className).toContain("template-row-focus-pulse");
+      expect(bRow().getAttribute("data-pulsing")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
+      expect(aRow().getAttribute("data-pulsing")).toBeNull();
+      expect(aRow().className).not.toContain("template-row-focus-pulse");
+      expect(aRow().getAttribute("data-focused")).toBe("true");
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

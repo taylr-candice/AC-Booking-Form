@@ -156,3 +156,33 @@
     pointer-events: none;
   }
 }
+
+/* One-shot pulse for the Call / Email templates row that's focused
+   when arriving from a booking timeline "From template: …" chip
+   (Task #165). The static BRAND_SOFT background tint stays put — this
+   animation is a brief deeper-pink flash on top of it so the landing
+   row is unmistakable on long template lists. The keyframes animate
+   background-color, which beats the inline style for the duration of
+   the run and reverts to BRAND_SOFT (the inline style) on completion.
+   Reduced-motion users see only the static highlight. */
+@keyframes template-row-focus-pulse {
+  0% {
+    background-color: rgba(237, 1, 127, 0.35);
+  }
+  60% {
+    background-color: rgba(237, 1, 127, 0.18);
+  }
+  100% {
+    background-color: rgba(252, 231, 241, 1);
+  }
+}
+
+.template-row-focus-pulse {
+  animation: template-row-focus-pulse 1s ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-row-focus-pulse {
+    animation: none;
+  }
+}

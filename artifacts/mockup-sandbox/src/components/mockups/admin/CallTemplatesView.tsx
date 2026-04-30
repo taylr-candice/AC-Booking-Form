@@ -108,6 +108,15 @@ export function CallTemplatesView({
   //     sidebar nav).
   const rowRefs = useRef<Map<string, HTMLTableRowElement | null>>(new Map());
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  // One-shot pulse marker (Task #165). Set whenever the AdminApp
+  // shell hands us a fresh `focusedTemplateId` so the matching row
+  // briefly flashes a deeper-pink background on top of the persistent
+  // BRAND_SOFT tint — making the landing row unmistakable on long
+  // template lists. Tied to the focus-id change (not the scroll
+  // position), so scrolling away and back doesn't replay it. Reduced-
+  // motion users still get the static BRAND_SOFT highlight; the CSS
+  // `prefers-reduced-motion` rule simply suppresses the animation.
+  const [pulseId, setPulseId] = useState<string | null>(null);
 
   // Auto-clear the row highlight a moment after it's set, so the panel
   // stays visually quiet once ops has spotted the matching row.
@@ -119,7 +128,8 @@ export function CallTemplatesView({
 
   // Whenever the AdminApp shell hands us a fresh focus id (round-trip
   // from a booking timeline chip), scroll the matching row into view
-  // so the admin doesn't have to hunt for it on long template lists.
+  // so the admin doesn't have to hunt for it on long template lists,
+  // and trigger the one-shot pulse marker so the landing is obvious.
   // We intentionally don't drop the persistent focus highlight here —
   // it stays until the user navigates away via the sidebar so a quick
   // scroll back doesn't lose the marker.
@@ -129,7 +139,18 @@ export function CallTemplatesView({
     if (row && typeof row.scrollIntoView === "function") {
       row.scrollIntoView({ block: "center", behavior: "smooth" });
     }
+    setPulseId(focusedTemplateId);
   }, [focusedTemplateId]);
+
+  // Drop the one-shot pulse marker once the animation has had time to
+  // play. 1100ms gives the 1s keyframe a small buffer so the class is
+  // still on the row through the final frame. The marker re-arms the
+  // next time `focusedTemplateId` changes.
+  useEffect(() => {
+    if (!pulseId) return;
+    const t = setTimeout(() => setPulseId(null), 1100);
+    return () => clearTimeout(t);
+  }, [pulseId]);
 
   const defaultTemplate = findDefaultCallTemplate(templates);
 
@@ -242,6 +263,7 @@ export function CallTemplatesView({
                 const usage = usageCounts?.[t.id] ?? 0;
                 const bookings = usageBookings?.[t.id] ?? [];
                 const isFocused = focusedTemplateId === t.id;
+                const isPulsing = pulseId === t.id;
                 return (
                   <tr
                     key={t.id}
@@ -253,10 +275,13 @@ export function CallTemplatesView({
                       highlightedId === t.id ? "true" : "false"
                     }
                     data-focused={isFocused ? "true" : undefined}
+                    data-pulsing={isPulsing ? "true" : undefined}
                     className={
                       highlightedId === t.id
                         ? "border-b border-slate-100 last:border-b-0 align-top bg-amber-50 transition-colors"
-                        : "border-b border-slate-100 last:border-b-0 align-top transition-colors"
+                        : `border-b border-slate-100 last:border-b-0 align-top transition-colors${
+                            isPulsing ? " template-row-focus-pulse" : ""
+                          }`
                     }
                     style={
                       isFocused && highlightedId !== t.id
