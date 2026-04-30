@@ -685,4 +685,80 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
       screen.queryByTestId("coordination-template-filter-missing-hint"),
     ).toBeNull();
   });
+
+  it("hint disappears the moment the matching template is restored to the catalog (Task #194)", () => {
+    // Reactive guarantee: the hint reads from the current catalog
+    // props, not a frozen-on-pivot snapshot, so the moment an admin
+    // re-creates / renames-back the missing template the chip drops
+    // its "no longer in catalog" badge without the ops lead having
+    // to clear and re-pivot. This is the second half of the task's
+    // "Done looks like" line ("…or the matching template is
+    // restored").
+    function ReactiveCatalogHarness() {
+      const [filter, setFilter] = useState<
+        "all" | "awaiting_tenant" | "awaiting_agent"
+      >("all");
+      const [buildingFilter, setBuildingFilter] = useState("all");
+      const [search, setSearch] = useState("");
+      const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+      return (
+        <>
+          <button
+            type="button"
+            data-testid="restore-missing-template"
+            onClick={() =>
+              setEmailTemplates([
+                {
+                  id: "e-restored",
+                  name: "Old name template",
+                  subject: "x",
+                  note: "",
+                },
+              ])
+            }
+          >
+            Restore template
+          </button>
+          <AwaitingCoordinationView
+            bookings={[
+              makeBooking({
+                id: "bk-renamed",
+                unitId: "u-a1",
+                serviceTimeline: [emailEntry("Old name template")],
+              }),
+            ]}
+            units={makeUnits()}
+            buildings={makeBuildings()}
+            filter={filter}
+            onFilter={setFilter}
+            buildingFilter={buildingFilter}
+            onBuildingFilter={setBuildingFilter}
+            search={search}
+            onSearch={setSearch}
+            onOpen={() => {}}
+            emailTemplates={emailTemplates}
+            callTemplates={[]}
+          />
+        </>
+      );
+    }
+    render(<ReactiveCatalogHarness />);
+
+    fireEvent.click(
+      screen.getByTestId("coordinating-with-last-attempt-template"),
+    );
+    expect(
+      screen.getByTestId("coordination-template-filter-missing-hint"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("restore-missing-template"));
+
+    // Chip stays (the filter is still active), but the hint is gone.
+    expect(
+      screen.getByTestId("coordination-template-filter-chip"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("coordination-template-filter-missing-hint"),
+    ).toBeNull();
+  });
 });

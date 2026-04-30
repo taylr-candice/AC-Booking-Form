@@ -68,6 +68,7 @@ import {
   encodeTemplateFilter,
   matchesTemplateFilter,
   TEMPLATE_FILTER_ALL_VALUE,
+  templateFilterIsMissingFromCatalogs,
   type BookingsTemplateFilter,
 } from "./bookingsTemplateFilter";
 import { CustomerCell } from "./BookingsView";
@@ -1299,32 +1300,30 @@ export function AwaitingCoordinationView({
 
       {activeTemplateFilter !== null && (() => {
         // Mirror of the BookingsView chip's "no longer in catalog"
-        // hint (Task #173). The chip's name is a snapshot — it was
+        // hint (Tasks #173 / #194). The chip's name is a snapshot —
         // captured onto the timeline entry when the call/email was
-        // logged, and the queue filter still matches by that snapshot
-        // string. If the template has since been renamed or removed
-        // in the templates panel, the filter still works for any
-        // other timeline entries that share that snapshot, but the
-        // chip's name won't show up in the matching catalog
+        // logged — and the queue filter still matches by that
+        // snapshot string. If the template has since been renamed or
+        // removed in the templates panel, the filter still works for
+        // any other timeline entries that share that snapshot, but
+        // the chip's name won't show up in the matching catalog
         // anymore. We surface a small icon + label in that case so
-        // admins on the coordination queue get the same context as
+        // ops on the coordination queue get the same context as
         // those on the bookings list, without breaking the
         // snapshot-based match.
         //
-        // Now that the queue's `activeTemplateFilter` carries a
-        // `kind` (Task #161), we narrow the catalog lookup to the
-        // matching channel — a renamed-away email template stays
-        // flagged as missing even if a call template happens to
-        // share the snapshot name, matching how BookingsView's chip
-        // already behaves.
-        const matchingCatalog =
-          activeTemplateFilter.kind === "call"
-            ? callTemplates
-            : emailTemplates;
-        const stillExists = matchingCatalog.some(
-          (t) => t.name === activeTemplateFilter.name,
+        // The check goes through the shared
+        // `templateFilterIsMissingFromCatalogs` helper so this
+        // surface and the bookings list can never disagree about
+        // which filters count as stale — both narrow the lookup to
+        // the matching channel (so a renamed email template stays
+        // flagged even when a call template happens to share the
+        // name) and both suppress the hint when the catalog isn't
+        // threaded in.
+        const isMissing = templateFilterIsMissingFromCatalogs(
+          activeTemplateFilter,
+          { callTemplates, emailTemplates },
         );
-        const isMissing = !stillExists;
         return (
           <div
             className="flex items-center gap-2 text-[12px]"

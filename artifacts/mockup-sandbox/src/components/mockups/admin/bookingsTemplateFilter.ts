@@ -78,3 +78,37 @@ export function decodeTemplateFilter(value: string): BookingsTemplateFilter {
   if (name.length === 0) return null;
   return { kind, name };
 }
+
+/**
+ * Shared "is the chip's snapshot name still in its channel's catalog?"
+ * predicate, used by both the Bookings list and the
+ * Awaiting-coordination queue to render the "No longer in templates
+ * catalog" hint (Tasks #173 / #194). Centralising it here keeps the
+ * two surfaces from drifting — e.g. one channel-narrowing the lookup
+ * and the other not — now that both views show the same chip.
+ *
+ * Behaviour:
+ * - `null` filter → not missing (nothing to flag).
+ * - When the catalog for the filter's channel is `undefined` we
+ *   deliberately return `false`: an older harness that never threaded
+ *   the catalog in shouldn't get a false-positive "missing" hint
+ *   (we can't tell renamed/removed apart from "we just don't know").
+ * - Otherwise: missing iff no catalog entry shares the snapshot name.
+ *
+ * The lookup narrows to the matching channel's catalog so a renamed
+ * email template stays flagged as missing even when a call template
+ * happens to share the snapshot name (and vice versa).
+ */
+export function templateFilterIsMissingFromCatalogs(
+  filter: BookingsTemplateFilter,
+  catalogs: {
+    callTemplates?: ReadonlyArray<{ name: string }>;
+    emailTemplates?: ReadonlyArray<{ name: string }>;
+  },
+): boolean {
+  if (filter === null) return false;
+  const channelCatalog =
+    filter.kind === "call" ? catalogs.callTemplates : catalogs.emailTemplates;
+  if (channelCatalog === undefined) return false;
+  return !channelCatalog.some((t) => t.name === filter.name);
+}

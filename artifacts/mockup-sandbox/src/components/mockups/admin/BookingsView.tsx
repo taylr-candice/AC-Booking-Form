@@ -27,6 +27,7 @@ import {
   encodeTemplateFilter,
   matchesTemplateFilter,
   TEMPLATE_FILTER_ALL_VALUE,
+  templateFilterIsMissingFromCatalogs,
   type BookingsTemplateFilter,
 } from "./bookingsTemplateFilter";
 import type { UndoCancelResult } from "./BookingDetail";
@@ -186,27 +187,17 @@ export function BookingsView({
   // dropdown option (so the `<select>` displays the active filter
   // legibly even after a rename / remove) and the missing-template
   // chip hint below the toolbar. Hoisted so the two surfaces can never
-  // disagree about which filters count as stale. We require that the
-  // catalog for the filter's channel was actually threaded in, since
-  // without it we can't tell renamed/removed apart from "we just
-  // don't know" (older harnesses don't pass the catalogs).
-  const activeFilterChannelCatalog =
-    activeTemplateFilter === null
-      ? undefined
-      : activeTemplateFilter.kind === "call"
-        ? callTemplates
-        : emailTemplates;
-  const activeFilterCatalogKnown = activeFilterChannelCatalog !== undefined;
-  const activeFilterStillInCatalog =
-    activeTemplateFilter === null
-      ? true
-      : (activeFilterChannelCatalog ?? []).some(
-          (t) => t.name === activeTemplateFilter.name,
-        );
-  const activeFilterIsMissing =
-    activeTemplateFilter !== null &&
-    activeFilterCatalogKnown &&
-    !activeFilterStillInCatalog;
+  // disagree about which filters count as stale. The shared
+  // `templateFilterIsMissingFromCatalogs` helper also keeps this view
+  // aligned with the Awaiting-coordination queue's chip hint
+  // (Task #194) — both surfaces narrow the lookup to the matching
+  // channel and both suppress the hint when the catalogs aren't
+  // threaded in (older harnesses), since we can't tell
+  // renamed/removed apart from "we just don't know".
+  const activeFilterIsMissing = templateFilterIsMissingFromCatalogs(
+    activeTemplateFilter,
+    { callTemplates, emailTemplates },
+  );
   // "Show cancelled" is OFF by default — cancelled rows are an audit-trail
   // artefact, not the day-to-day work, so we hide them unless the admin
   // opts in. The toggle is local to this list (not lifted to AdminApp)
