@@ -16,6 +16,7 @@ export const modules: ModuleMap = {
   "./components/mockups/admin/CancelBookingModal.tsx": () => import("../components/mockups/admin/CancelBookingModal.tsx"),
   "./components/mockups/admin/EmailTemplatesView.tsx": () => import("../components/mockups/admin/EmailTemplatesView.tsx"),
   "./components/mockups/admin/InvoiceVoidAlerts.tsx": () => import("../components/mockups/admin/InvoiceVoidAlerts.tsx"),
+  "./components/mockups/admin/LatestTouchBadge.tsx": () => import("../components/mockups/admin/LatestTouchBadge.tsx"),
   "./components/mockups/admin/NewBookingFlow.tsx": () => import("../components/mockups/admin/NewBookingFlow.tsx"),
   "./components/mockups/admin/RolloutScheduleEditor.tsx": () => import("../components/mockups/admin/RolloutScheduleEditor.tsx"),
   "./components/mockups/admin/RolloutsView.tsx": () => import("../components/mockups/admin/RolloutsView.tsx"),

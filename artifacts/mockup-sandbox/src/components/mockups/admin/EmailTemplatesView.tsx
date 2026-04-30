@@ -30,6 +30,7 @@ import {
 } from "@/state/adminMockData";
 
 import { FormField } from "./atoms";
+import { LatestTouchBadge } from "./LatestTouchBadge";
 import { TemplateUsagePopover } from "./TemplateUsagePopover";
 import { BRAND, BRAND_SOFT } from "./theme";
 
@@ -50,6 +51,8 @@ export function EmailTemplatesView({
   templates,
   usageCounts,
   usageBookings,
+  latestTouchCounts,
+  onOpenFilteredBookings,
   onOpenBooking,
   onCreate,
   onUpdate,
@@ -65,6 +68,20 @@ export function EmailTemplatesView({
   /** Per-template list of bookings referencing each template, keyed
    *  by template id. Drives the drill-down popover. */
   usageBookings?: Readonly<Record<string, ReadonlyArray<TemplateUsageBooking>>>;
+  /** Per-template count of bookings whose **latest** email touch
+   *  references each template, keyed by template id (Task #160).
+   *  Drives the "Used in N bookings" pivot badge — same predicate
+   *  the BookingsView template filter uses, so the count rendered
+   *  here equals the row count the admin will see after clicking
+   *  through. Defaults to 0 per template. */
+  latestTouchCounts?: Readonly<Record<string, number>>;
+  /** Click-through handler for the "Used in N bookings" badge.
+   *  Receives the template's current name (the filter is
+   *  snapshot-on-use so it matches the literal string the timeline
+   *  carries). The AdminApp shell switches to the bookings list,
+   *  clears the other filters, and seeds the "latest touch used
+   *  this template" pivot on the freshly-mounted BookingsView. */
+  onOpenFilteredBookings?: (templateName: string) => void;
   /** Called when a booking row inside the drill-down popover is
    *  clicked. */
   onOpenBooking?: (bookingId: string) => void;
@@ -276,6 +293,7 @@ export function EmailTemplatesView({
               {orderedTemplates.map((t) => {
                 const usage = usageCounts?.[t.id] ?? 0;
                 const bookings = usageBookings?.[t.id] ?? [];
+                const latestTouch = latestTouchCounts?.[t.id] ?? 0;
                 const isFocused = focusedTemplateId === t.id;
                 const isPulsing = pulseId === t.id;
                 const isDragging = draggingId === t.id;
@@ -431,6 +449,13 @@ export function EmailTemplatesView({
                         usage={usage}
                         bookings={bookings}
                         onOpenBooking={onOpenBooking}
+                      />
+                      <LatestTouchBadge
+                        kind="email"
+                        templateId={t.id}
+                        templateName={t.name}
+                        count={latestTouch}
+                        onOpenFilteredBookings={onOpenFilteredBookings}
                       />
                     </td>
                     <td className="px-4 py-3">

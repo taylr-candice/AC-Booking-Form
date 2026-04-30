@@ -25,6 +25,7 @@ import {
   CALL_TEMPLATES,
   consumeBookingCapacity,
   convertCoordinationToScheduledPatch,
+  countLatestTouchUsageForTemplate,
   countTimelineUsageForTemplate,
   createRollout,
   EMAIL_TEMPLATES,
@@ -252,6 +253,34 @@ export function AdminApp() {
     return out;
   }, [allBookings, callTemplates]);
 
+  // Per-template count of bookings whose latest call/email touch is
+  // each template (Task #160). Different from the timeline-entry
+  // count above: this one matches the predicate that BookingsView's
+  // template filter uses, so the badge rendered on each template row
+  // equals the row count the admin will see on click-through.
+  const emailTemplateLatestTouchCounts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const t of emailTemplates) {
+      out[t.id] = countLatestTouchUsageForTemplate(
+        allBookings,
+        "email",
+        t.name,
+      );
+    }
+    return out;
+  }, [allBookings, emailTemplates]);
+  const callTemplateLatestTouchCounts = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const t of callTemplates) {
+      out[t.id] = countLatestTouchUsageForTemplate(
+        allBookings,
+        "call",
+        t.name,
+      );
+    }
+    return out;
+  }, [allBookings, callTemplates]);
+
   // Per-template list of bookings that reference each template,
   // pre-summarised so the templates panels stay agnostic of the units
   // list. Drives the drill-down popover on each template row.
@@ -403,6 +432,39 @@ export function AdminApp() {
   }
 
   /**
+   * Cross-view pivot from the Call / Email templates panel's
+   * "Used in N bookings" badge (Task #160). Switches to the bookings
+   * list, clears the other filters / search / building lens, and
+   * sets the (Task #156) lifted bookings template filter directly
+   * with the picked template's channel + name — the BookingsView
+   * toolbar select / clear chip then read straight from the lifted
+   * state, so the dropdown reflects the active filter on first
+   * render and the click-through "Used in N bookings" count and the
+   * resulting filtered row count stay byte-for-byte consistent.
+   *
+   * Mirrors {@link pivotToBookingsFilteredByTemplate} (Task #159's
+   * BookingDetail "View other bookings using this template" link) —
+   * both pivots land in the same lifted slot so re-clicking the same
+   * badge after manually clearing the chip just re-applies the same
+   * filter value (no nonce / remount needed).
+   */
+  function openBookingsForTemplate(
+    kind: "call" | "email",
+    templateName: string,
+  ) {
+    setView("bookings");
+    setSelectedBookingId(null);
+    setSelectedBuildingId(null);
+    setSelectedRolloutId(null);
+    setBookingsStatusFilter("all");
+    setSearch("");
+    setBookingsBuildingFilter("all");
+    setFocusedCallTemplateId(null);
+    setFocusedEmailTemplateId(null);
+    setBookingsTemplateFilter({ kind, name: templateName });
+  }
+
+  /**
    * Jump to a single booking's detail screen from the Call / Email
    * templates drill-down popover. Clears the list filters / search /
    * building lens so the booking is unambiguously selected.
@@ -414,6 +476,11 @@ export function AdminApp() {
     setBookingsStatusFilter("all");
     setSearch("");
     setBookingsBuildingFilter("all");
+    // The popover drill-down is a single-booking pivot, not a filter
+    // pivot, so any active lifted template filter (from a Task #159
+    // BookingDetail link or a Task #160 templates badge click) must
+    // clear here too — otherwise the BookingsView mount the admin
+    // hits via "back" would still be filtered down.
     setBookingsTemplateFilter(null);
     setSelectedBookingId(bookingId);
     // Drop any template focus on the way out — the next visit to a
@@ -1542,6 +1609,10 @@ export function AdminApp() {
               templates={emailTemplates}
               usageCounts={emailTemplateUsageCounts}
               usageBookings={emailTemplateUsageBookings}
+              latestTouchCounts={emailTemplateLatestTouchCounts}
+              onOpenFilteredBookings={(templateName) =>
+                openBookingsForTemplate("email", templateName)
+              }
               onOpenBooking={openBookingFromTemplate}
               onCreate={createEmailTemplate}
               onUpdate={updateEmailTemplate}
@@ -1557,6 +1628,10 @@ export function AdminApp() {
               templates={callTemplates}
               usageCounts={callTemplateUsageCounts}
               usageBookings={callTemplateUsageBookings}
+              latestTouchCounts={callTemplateLatestTouchCounts}
+              onOpenFilteredBookings={(templateName) =>
+                openBookingsForTemplate("call", templateName)
+              }
               onOpenBooking={openBookingFromTemplate}
               onCreate={createCallTemplate}
               onUpdate={updateCallTemplate}

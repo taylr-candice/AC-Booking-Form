@@ -2347,6 +2347,41 @@ export function bookingTimelineReferencesTemplate(
 }
 
 /**
+ * Count bookings whose **latest** call/email touch references
+ * `templateName` for the given `kind`. Mirrors the
+ * `latest.templateLabel === templateFilter` predicate that
+ * `BookingsView` and `AwaitingCoordinationView` use for their
+ * template-pivot filters (Tasks #153 / #154), so the number rendered
+ * on each template row in `*TemplatesView` is exactly the row count
+ * the admin will see after click-through to the filtered queue.
+ *
+ * Different from {@link countTimelineUsageForTemplate}, which counts
+ * every historical timeline entry across all bookings — this one is
+ * "how many bookings is this template currently the freshest touch
+ * on?" and intentionally drops to zero as soon as a fresher call /
+ * email lands on the same booking. Snapshot-on-use semantics still
+ * apply (the match is against the entry's literal `templateLabel`
+ * string), so renames don't retroactively reattribute history.
+ */
+export function countLatestTouchUsageForTemplate(
+  bookings: ReadonlyArray<AdminBooking>,
+  kind: "call" | "email",
+  templateName: string,
+): number {
+  const trimmed = templateName.trim();
+  if (trimmed.length === 0) return 0;
+  let count = 0;
+  for (const b of bookings) {
+    const latest = latestCoordinationAttempt(b.serviceTimeline);
+    if (latest === null) continue;
+    if (latest.kind !== kind) continue;
+    if (latest.templateLabel !== trimmed) continue;
+    count++;
+  }
+  return count;
+}
+
+/**
  * Find every booking whose service timeline references `templateName`
  * for the given `kind`. Sibling of {@link countTimelineUsageForTemplate}
  * — same snapshot-on-use match against the entry's `templateLabel`,
