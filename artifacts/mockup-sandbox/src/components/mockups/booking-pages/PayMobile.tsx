@@ -18,6 +18,7 @@ import {
   isCoordinationFlow,
   resolveOtherServiceQuantities,
 } from "../../../state/bookingDerived";
+import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
   BILLING_EMAIL_HELPER,
@@ -170,20 +171,14 @@ export function PayMobile() {
               )}
             </SummaryItem>
             {otherServices.length > 0 && (
-              <div className="space-y-2 border-t border-slate-100 pt-3">
+              <div className="space-y-3 border-t border-slate-100 pt-3">
                 {otherServices.map(({ rule, qty }) => (
-                  <div
+                  <PayOtherServiceRow
                     key={rule.id}
-                    className="flex items-start justify-between gap-3 text-sm"
-                    data-testid={`row-pay-other-${rule.id}`}
-                  >
-                    <span className="min-w-0 text-slate-700">
-                      {qty > 1 ? `${qty} × ${rule.name}` : rule.name}
-                    </span>
-                    <span className="tabular-nums font-medium text-slate-900 shrink-0">
-                      ${rule.priceAud * qty + rule.addonPriceAud * Math.max(qty - 1, 0)}
-                    </span>
-                  </div>
+                    rule={rule}
+                    qty={qty}
+                    variant="mobile"
+                  />
                 ))}
               </div>
             )}

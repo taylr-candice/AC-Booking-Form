@@ -5,6 +5,7 @@ import {
   isCoordinationFlow,
   resolveOtherServiceQuantities,
 } from "../../../state/bookingDerived";
+import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
   BILLING_EMAIL_HELPER,
@@ -102,15 +103,11 @@ export function PayDesktop() {
                   )
                 } />
                 {otherServices.map(({ rule, qty }) => (
-                  <SummaryRow
+                  <PayOtherServiceRow
                     key={rule.id}
-                    label={qty > 1 ? `${qty} × ${rule.name}` : rule.name}
-                    value={
-                      <span className="tabular-nums">
-                        ${rule.priceAud * qty + rule.addonPriceAud * Math.max(qty - 1, 0)}
-                      </span>
-                    }
-                    testId={`row-pay-other-${rule.id}`}
+                    rule={rule}
+                    qty={qty}
+                    variant="desktop"
                   />
                 ))}
               </div>
