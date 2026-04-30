@@ -7,9 +7,15 @@
  * link into the per-rollout schedule editor where admins actually
  * open / close days and edit per-window capacity.
  *
- * Read-only — editing schedule lives in the Rollouts view (per-rollout
- * editor); editing units / bookings lives in their own screens.
+ * The summary card lets ops edit the building's authoritative AC
+ * type / brand (Task #110 follow-up) and outdoor unit placement
+ * (Task #182) — both pre-fill the customer flow's AC step and the
+ * duration helper's rooftop overhead. Editing schedule lives in the
+ * Rollouts view (per-rollout editor); editing units / bookings lives
+ * in their own screens.
  */
+
+import { useEffect, useState } from "react";
 
 import { ArrowRight, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -34,6 +40,21 @@ import {
 import { Card } from "./atoms";
 import { ServiceChip } from "./chips";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
+
+/**
+ * One-click brand suggestions surfaced under the building's brand
+ * input. Mirrors the placeholder list documented on
+ * {@link AdminBuilding.acBrand} and the unit-level brand override in
+ * {@link UnitsView}, so admins land on the same canonical spellings
+ * across both editors. Free-text entry is still allowed for unusual
+ * brands.
+ */
+const AC_BRAND_SUGGESTIONS = [
+  "Daikin",
+  "Mitsubishi",
+  "Fujitsu",
+  "Panasonic",
+] as const;
 
 export function BuildingDetail({
   buildingId,
@@ -113,6 +134,22 @@ export function BuildingDetail({
   function setRooftopOverhead(minutes: number) {
     patchBuilding({ rooftopOverheadMinutes: Math.max(0, minutes) });
   }
+  const currentAcType = building.acType;
+  const currentAcBrand = building.acBrand;
+  function setAcType(next: "split" | "ducted") {
+    if (currentAcType === next) return;
+    patchBuilding({ acType: next });
+  }
+  function commitAcBrand(next: string) {
+    // `acBrand` is a mandatory non-empty field on AdminBuilding
+    // (Task #110); the editor keeps a local draft so admins can
+    // momentarily clear the input while typing, but only commits
+    // trimmed, non-empty values back to the buildings list.
+    const trimmed = next.trim();
+    if (trimmed.length === 0) return;
+    if (currentAcBrand === trimmed) return;
+    patchBuilding({ acBrand: trimmed });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -157,9 +194,13 @@ export function BuildingDetail({
             <div className="mt-0.5 text-[13px] text-slate-500">
               {building.addressLine1} · {building.addressLine2}
             </div>
-            <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium capitalize text-slate-700">
-              {building.acType} · {building.acBrand}
-              <span className="text-[10px] font-normal text-slate-500">
+            <div className="mt-1.5 text-[11px] font-medium uppercase tracking-wider text-slate-500">
+              <span className="capitalize text-slate-700">
+                {building.acType}
+              </span>
+              {" · "}
+              <span className="text-slate-700">{building.acBrand}</span>
+              <span className="ml-1.5 text-[10px] font-normal normal-case tracking-normal text-slate-500">
                 pre-fills new bookings
               </span>
             </div>
@@ -264,6 +305,13 @@ export function BuildingDetail({
             </div>
           )}
         </div>
+        <AcEditor
+          key={building.id}
+          acType={building.acType}
+          acBrand={building.acBrand}
+          onAcTypeChange={setAcType}
+          onAcBrandCommit={commitAcBrand}
+        />
       </Card>
 
       {/* Two-column body: units list + schedule strip */}
@@ -292,6 +340,168 @@ export function BuildingDetail({
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── AC type & brand editor ────────────────────────────────────────────────
+
+/**
+ * Lets ops change the building's authoritative AC type (`split` /
+ * `ducted`) and brand (free-text, mandatory). Both are inherited by
+ * the customer flow's AC step and the duration helper via
+ * `getAcType` / `getAcBrand` (Task #110), so a save here re-flows
+ * into the customer side on the next render thanks to the live
+ * buildings source registered in {@link AdminApp}.
+ *
+ * The brand input keeps a local draft so admins can momentarily clear
+ * the field while typing without violating the non-empty invariant on
+ * `AdminBuilding.acBrand`, and so we don't churn the parent buildings
+ * state on every keystroke. Commit happens on blur (or on Enter) —
+ * an empty / whitespace-only value snaps back to the last committed
+ * brand. Suggestion-chip clicks commit immediately, since they
+ * already represent a complete brand. The `key={building.id}` on the
+ * parent resets the draft when admins navigate between buildings.
+ */
+function AcEditor({
+  acType,
+  acBrand,
+  onAcTypeChange,
+  onAcBrandCommit,
+}: {
+  acType: "split" | "ducted";
+  acBrand: string;
+  onAcTypeChange: (next: "split" | "ducted") => void;
+  onAcBrandCommit: (next: string) => void;
+}) {
+  const [brandDraft, setBrandDraft] = useState(acBrand);
+
+  // Re-sync the draft when the committed brand changes from outside
+  // (e.g. another concurrent admin edit, or the suggestion-chip
+  // path below) so the input never shows stale text after a commit.
+  useEffect(() => {
+    setBrandDraft(acBrand);
+  }, [acBrand]);
+
+  const trimmedDraft = brandDraft.trim();
+  const draftIsEmpty = trimmedDraft.length === 0;
+
+  function handleBrandBlur() {
+    if (draftIsEmpty) {
+      // Snap back to the last committed brand — `acBrand` is
+      // mandatory and non-empty on AdminBuilding (Task #110).
+      setBrandDraft(acBrand);
+      return;
+    }
+    onAcBrandCommit(brandDraft);
+  }
+  function pickSuggestion(brand: string) {
+    setBrandDraft(brand);
+    onAcBrandCommit(brand);
+  }
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[12px] font-semibold uppercase tracking-wider text-slate-700">
+            AC type &amp; brand
+          </div>
+          <div className="text-[12px] text-slate-500">
+            Pre-fills the AC step on every new booking on this building.
+            Individual units can still override on the Units view.
+          </div>
+        </div>
+        <div
+          className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5 text-[12px]"
+          role="group"
+          aria-label="AC type"
+        >
+          <button
+            type="button"
+            onClick={() => onAcTypeChange("split")}
+            aria-pressed={acType === "split"}
+            className={`rounded-md px-3 py-1 font-semibold transition ${
+              acType === "split"
+                ? "text-white"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+            style={
+              acType === "split" ? { backgroundColor: BRAND } : undefined
+            }
+          >
+            Split
+          </button>
+          <button
+            type="button"
+            onClick={() => onAcTypeChange("ducted")}
+            aria-pressed={acType === "ducted"}
+            className={`rounded-md px-3 py-1 font-semibold transition ${
+              acType === "ducted"
+                ? "text-white"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+            style={
+              acType === "ducted" ? { backgroundColor: BRAND } : undefined
+            }
+          >
+            Ducted
+          </button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+            Brand
+          </span>
+          <input
+            type="text"
+            value={brandDraft}
+            onChange={(e) => setBrandDraft(e.target.value)}
+            onBlur={handleBrandBlur}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleBrandBlur();
+              }
+            }}
+            placeholder="Daikin, Mitsubishi, Fujitsu, Panasonic…"
+            aria-label="AC brand"
+            aria-invalid={draftIsEmpty}
+            className={`w-64 rounded-lg border bg-white px-3 py-1.5 text-[13px] focus:outline-none ${
+              draftIsEmpty
+                ? "border-rose-300 focus:border-rose-400"
+                : "border-slate-200 focus:border-slate-400"
+            }`}
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-1.5 pb-1.5">
+          {AC_BRAND_SUGGESTIONS.map((b) => {
+            const active = brandDraft.trim().toLowerCase() === b.toLowerCase();
+            return (
+              <button
+                key={b}
+                type="button"
+                onClick={() => pickSuggestion(b)}
+                aria-pressed={active}
+                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition ${
+                  active
+                    ? "border-transparent text-white"
+                    : "border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                }`}
+                style={active ? { backgroundColor: BRAND } : undefined}
+              >
+                {b}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {draftIsEmpty && (
+        <div className="mt-1.5 text-[11px] font-medium text-rose-600">
+          Brand can&apos;t be empty — keeps the last saved brand on blur.
+        </div>
+      )}
     </div>
   );
 }
