@@ -92,8 +92,14 @@ import {
   encodeTemplateFilter,
   type BookingsTemplateFilter,
 } from "./bookingsTemplateFilter";
-import { CallTemplatesView } from "./CallTemplatesView";
-import { EmailTemplatesView } from "./EmailTemplatesView";
+import {
+  CallTemplatesView,
+  type CallTemplateSortMode,
+} from "./CallTemplatesView";
+import {
+  EmailTemplatesView,
+  type EmailTemplateSortMode,
+} from "./EmailTemplatesView";
 import {
   BookingDetail,
   CALL_OUTCOME_LABEL,
@@ -547,6 +553,21 @@ export function AdminApp() {
   const [focusedEmailTemplateId, setFocusedEmailTemplateId] = useState<
     string | null
   >(null);
+
+  // Lifted sort-toggle state for the Call / Email templates panels
+  // (Task #192). Task #170 originally parked these `useState`s inside
+  // each panel component, but that meant the choice was thrown away
+  // every time ops popped over to Bookings (or to the other channel's
+  // templates view) and back — admins comparing usage across channels
+  // had to re-click "Most used first" on every return trip. Hoisting
+  // both slots up here makes the choice a property of the shell
+  // session: each channel remembers independently (so flipping the
+  // Call panel doesn't move the Email panel) and the choice survives
+  // any sidebar nav round-trip.
+  const [callTemplatesSortMode, setCallTemplatesSortMode] =
+    useState<CallTemplateSortMode>("default");
+  const [emailTemplatesSortMode, setEmailTemplatesSortMode] =
+    useState<EmailTemplateSortMode>("default");
 
   // Admin "New booking" (phone booking) overlay. `newBookingBuildingId`
   // pre-applies a building filter on Step 1 when the flow was opened
@@ -1961,6 +1982,8 @@ export function AdminApp() {
               onSetDefault={setDefaultEmailTemplate}
               onReorder={reorderEmailTemplate}
               focusedTemplateId={focusedEmailTemplateId}
+              sortMode={emailTemplatesSortMode}
+              onSortModeChange={setEmailTemplatesSortMode}
             />
           )}
 
@@ -1982,6 +2005,8 @@ export function AdminApp() {
               onSetDefault={setDefaultCallTemplate}
               onReorder={reorderCallTemplate}
               focusedTemplateId={focusedCallTemplateId}
+              sortMode={callTemplatesSortMode}
+              onSortModeChange={setCallTemplatesSortMode}
             />
           )}
         </main>

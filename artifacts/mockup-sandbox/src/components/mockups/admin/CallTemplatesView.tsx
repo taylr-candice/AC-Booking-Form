@@ -40,6 +40,13 @@ import { TemplateUsageSparkline } from "./TemplateUsageSparkline";
 import { BRAND, BRAND_SOFT } from "./theme";
 
 /**
+ * Sort modes for the Call templates panel toggle (Task #170 + #193 +
+ * #192). Exported so {@link AdminApp} can lift the choice into
+ * shell-level state and have it survive sidebar nav round-trips.
+ */
+export type CallTemplateSortMode = "default" | "mostUsed" | "mostReferenced";
+
+/**
  * Build the `window.confirm` message shown when ops clicks Remove on
  * a Call template. Returns the reassuring copy when no timeline
  * entries reference the template, or a warning with the live count
@@ -71,6 +78,8 @@ export function CallTemplatesView({
   onSetDefault,
   onReorder,
   focusedTemplateId,
+  sortMode: sortModeProp,
+  onSortModeChange,
 }: {
   templates: CallTemplate[];
   /** Per-template count of timeline entries referencing each template,
@@ -143,6 +152,18 @@ export function CallTemplatesView({
    *  the focus state on the next sidebar nav (see `handleNav` in
    *  `AdminApp`) so a subsequent re-entry to this panel opens clean. */
   focusedTemplateId?: string | null;
+  /** Controlled sort mode (Task #192). When provided alongside
+   *  {@link onSortModeChange}, the AdminApp shell owns the choice and
+   *  it survives sidebar nav round-trips. When omitted the panel
+   *  falls back to its own internal `useState` so the existing
+   *  per-view tests (which render this view standalone without the
+   *  shell) keep working unchanged. */
+  sortMode?: CallTemplateSortMode;
+  /** Companion setter for the controlled {@link sortMode} prop. Fired
+   *  on every toggle click — including a no-op click on the already
+   *  active button — so the shell can store the latest choice without
+   *  guessing whether anything actually changed. */
+  onSortModeChange?: (mode: CallTemplateSortMode) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -235,9 +256,21 @@ export function CallTemplatesView({
   // the per-row Pin icon and copy already promise that, and re-
   // sorting it down would conflict with the existing default-pinning
   // contract.
-  const [sortMode, setSortMode] = useState<
-    "default" | "mostUsed" | "mostReferenced"
-  >("default");
+  //
+  // Controlled vs uncontrolled (Task #192): when the AdminApp shell
+  // hands us a `sortMode` prop the choice lives at the shell level
+  // and survives sidebar nav round-trips between the Call and Email
+  // panels. When the prop is omitted (existing per-view tests render
+  // this view standalone) the local `useState` keeps the previous
+  // behavior verbatim. Both paths share the same `setSortMode`
+  // handler so the rest of the render code is oblivious.
+  const [internalSortMode, setInternalSortMode] =
+    useState<CallTemplateSortMode>("default");
+  const sortMode = sortModeProp ?? internalSortMode;
+  const setSortMode = (next: CallTemplateSortMode) => {
+    if (sortModeProp === undefined) setInternalSortMode(next);
+    onSortModeChange?.(next);
+  };
 
   const defaultTemplate = findDefaultCallTemplate(templates);
 
