@@ -122,16 +122,63 @@ import type { CoordinationKind } from "@/state/adminMockData";
 import type { ViewId } from "./types";
 
 /**
- * Query-string param name for the lifted `bookingsTemplateFilter`
- * state (Task #195). Refreshing or sharing a Bookings/Awaiting-
- * coordination URL with this param restores the active chip and
- * dropdown selection on first paint, so an ops lead triaging a long
- * batch can refresh / open new tabs without silently re-broadening
- * the queue. The encoded value is whatever {@link encodeTemplateFilter}
- * already produces, so the URL ↔ state round-trip uses the same
- * grammar as the toolbar's `<select>`.
+ * Query-string param names for the lifted Bookings / Awaiting-
+ * coordination toolbar filters. Task #195 wired the first one
+ * (`template`) so an ops lead refreshing or sharing the URL mid-
+ * batch wouldn't silently re-broaden the queue; Task #207 extends
+ * the same treatment to the rest of the toolbar so a refresh
+ * survives every lens, not just the template chip.
+ *
+ * All four params share the same grammar:
+ *  - The encoded value mirrors the toolbar control's own value
+ *    (the `<select>`'s string for the templates / status / building
+ *    chips, the raw search box text for `q`).
+ *  - Each filter's reset value (`null` template, `"all"` chip,
+ *    empty string search) is represented by **omitting** the param
+ *    so the URL of a fresh visit is byte-identical to one where
+ *    every filter was manually cleared. This lets `handleNav`
+ *    drop the params in lockstep with the state reset.
  */
 const BOOKINGS_TEMPLATE_FILTER_PARAM = "template";
+const BOOKINGS_STATUS_FILTER_PARAM = "status";
+const BOOKINGS_BUILDING_FILTER_PARAM = "building";
+const BOOKINGS_SEARCH_PARAM = "q";
+const COORDINATION_FILTER_PARAM = "coordination";
+
+/**
+ * Generic single-param read/write pair the per-filter helpers
+ * below all delegate to. Extracted from Task #195's
+ * template-filter helpers so adding three more filters in
+ * Task #207 didn't mean copy-pasting the same `URLSearchParams` /
+ * `replaceState` choreography four times. The shape mirrors the
+ * original template-filter pair exactly:
+ *  - SSR-safe (`typeof window === "undefined"` short-circuit), so
+ *    a server-rendered shell doesn't crash trying to read
+ *    `window.location`.
+ *  - Skip the `replaceState` call when the param is already
+ *    correct — keeps the history clean and avoids the browser's
+ *    own scroll/anchor side effects on a no-op write.
+ *  - `null` value deletes the param entirely so a cleared filter
+ *    leaves a URL identical to a fresh visit.
+ */
+function readUrlParam(name: string): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+function writeUrlParam(name: string, value: string | null): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  const current = url.searchParams.get(name);
+  if (value === null) {
+    if (current === null) return;
+    url.searchParams.delete(name);
+  } else {
+    if (current === value) return;
+    url.searchParams.set(name, value);
+  }
+  window.history.replaceState(window.history.state, "", url.toString());
+}
 
 /** Read the initial {@link BookingsTemplateFilter} from the URL on
  *  mount. Returns `null` (the toolbar's reset state) when the param
@@ -141,10 +188,7 @@ const BOOKINGS_TEMPLATE_FILTER_PARAM = "template";
  *  Bookings receives — both views share the lifted prop, so the
  *  helper is the symmetry boundary. */
 export function readBookingsTemplateFilterFromURL(): BookingsTemplateFilter {
-  if (typeof window === "undefined") return null;
-  const raw = new URLSearchParams(window.location.search).get(
-    BOOKINGS_TEMPLATE_FILTER_PARAM,
-  );
+  const raw = readUrlParam(BOOKINGS_TEMPLATE_FILTER_PARAM);
   if (raw === null) return null;
   return decodeTemplateFilter(raw);
 }
@@ -157,18 +201,99 @@ export function readBookingsTemplateFilterFromURL(): BookingsTemplateFilter {
 function writeBookingsTemplateFilterToURL(
   filter: BookingsTemplateFilter,
 ): void {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  const encoded = encodeTemplateFilter(filter);
-  const current = url.searchParams.get(BOOKINGS_TEMPLATE_FILTER_PARAM);
-  if (filter === null) {
-    if (current === null) return;
-    url.searchParams.delete(BOOKINGS_TEMPLATE_FILTER_PARAM);
-  } else {
-    if (current === encoded) return;
-    url.searchParams.set(BOOKINGS_TEMPLATE_FILTER_PARAM, encoded);
-  }
-  window.history.replaceState(window.history.state, "", url.toString());
+  writeUrlParam(
+    BOOKINGS_TEMPLATE_FILTER_PARAM,
+    filter === null ? null : encodeTemplateFilter(filter),
+  );
+}
+
+/** Whitelist of the status-filter chip values BookingsView /
+ *  Payments knows how to render — the union of `ServiceStatus`,
+ *  `PaymentStatus`, and the `"all"` reset. Used by
+ *  {@link readBookingsStatusFilterFromURL} to drop unknown
+ *  `?status=…` values back to the reset, so a typo'd or stale
+ *  URL doesn't crash the chip lookup or render a chip the
+ *  toolbar can't display. Mirrors the chip lists in
+ *  `BookingsView.tsx` so any future status added there must also
+ *  show up here to round-trip. */
+const VALID_BOOKINGS_STATUS_FILTERS: ReadonlySet<string> = new Set<string>([
+  "all",
+  // ServiceStatus
+  "scheduled",
+  "on_site",
+  "complete",
+  "invoice_adjusted",
+  "cancelled",
+  // PaymentStatus
+  "paid",
+  "pending",
+  "refund_pending",
+  "refunded",
+]);
+
+type BookingsStatusFilter = "all" | ServiceStatus | PaymentStatus;
+
+/** Read / write the Bookings list status chip from the URL. The
+ *  reset value (`"all"`) is encoded by **omitting** the param, so
+ *  picking the "All statuses" / "All payments" chip drops the
+ *  param the same way clearing the template filter does. */
+export function readBookingsStatusFilterFromURL(): BookingsStatusFilter {
+  const raw = readUrlParam(BOOKINGS_STATUS_FILTER_PARAM);
+  if (raw === null) return "all";
+  if (!VALID_BOOKINGS_STATUS_FILTERS.has(raw)) return "all";
+  return raw as BookingsStatusFilter;
+}
+
+function writeBookingsStatusFilterToURL(value: BookingsStatusFilter): void {
+  writeUrlParam(BOOKINGS_STATUS_FILTER_PARAM, value === "all" ? null : value);
+}
+
+/** Read / write the building filter (`"all"` reset / building id).
+ *  Building ids aren't whitelisted here on purpose: the catalog is
+ *  mutable for the demo session and a filter pointing at a since-
+ *  deleted building should still round-trip cleanly (the toolbar
+ *  will fall back to "all" when the option isn't found, same as
+ *  any out-of-catalog template filter). */
+export function readBookingsBuildingFilterFromURL(): string {
+  const raw = readUrlParam(BOOKINGS_BUILDING_FILTER_PARAM);
+  if (raw === null || raw.length === 0) return "all";
+  return raw;
+}
+
+function writeBookingsBuildingFilterToURL(value: string): void {
+  writeUrlParam(
+    BOOKINGS_BUILDING_FILTER_PARAM,
+    value === "all" || value.length === 0 ? null : value,
+  );
+}
+
+/** Read / write the toolbar search box. An empty / whitespace-only
+ *  search is the reset value (no param), matching the chip /
+ *  template-filter convention. */
+export function readSearchFromURL(): string {
+  const raw = readUrlParam(BOOKINGS_SEARCH_PARAM);
+  if (raw === null) return "";
+  return raw;
+}
+
+function writeSearchToURL(value: string): void {
+  writeUrlParam(
+    BOOKINGS_SEARCH_PARAM,
+    value.trim().length === 0 ? null : value,
+  );
+}
+
+/** Read / write the Awaiting-coordination "waiting on" chip. Same
+ *  reset-as-omitted contract; only the two real `CoordinationKind`
+ *  values are accepted so a stale URL falls back to "all". */
+export function readCoordinationFilterFromURL(): "all" | CoordinationKind {
+  const raw = readUrlParam(COORDINATION_FILTER_PARAM);
+  if (raw === "awaiting_agent" || raw === "awaiting_tenant") return raw;
+  return "all";
+}
+
+function writeCoordinationFilterToURL(value: "all" | CoordinationKind): void {
+  writeUrlParam(COORDINATION_FILTER_PARAM, value === "all" ? null : value);
 }
 
 /**
@@ -724,8 +849,23 @@ export function AdminApp() {
   } | null>(null);
 
   // When jumping to Payments, default the bookings list to the payments filter.
+  //
+  // Each toolbar filter below seeds from its own `?…` param on
+  // mount (Task #207 — extending Task #195's template-filter
+  // round-trip to the rest of the queue toolbar) and mirrors any
+  // subsequent state change back into the URL via the companion
+  // `useEffect`. The reset value (`"all"` chip / empty search /
+  // `null` template) is encoded by **omitting** the param so a
+  // cleared toolbar leaves a URL identical to a fresh visit, and
+  // `handleNav` can drop every param in lockstep with its own
+  // wholesale state reset just by setting state to the reset value.
   const [bookingsStatusFilter, setBookingsStatusFilter] =
-    useState<"all" | ServiceStatus | PaymentStatus>("all");
+    useState<"all" | ServiceStatus | PaymentStatus>(() =>
+      readBookingsStatusFilterFromURL(),
+    );
+  useEffect(() => {
+    writeBookingsStatusFilterToURL(bookingsStatusFilter);
+  }, [bookingsStatusFilter]);
   // One-shot seed: id of the booking the admin pivoted FROM, so
   // BookingsView can highlight the source row on first paint after a
   // BookingDetail timeline → BookingsView template-pivot.
@@ -740,10 +880,16 @@ export function AdminApp() {
   // queued up at once (the sidebar nav clears both).
   const [rolloutsFocusedRowSeed, setRolloutsFocusedRowSeed] =
     useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState<string>(() => readSearchFromURL());
+  useEffect(() => {
+    writeSearchToURL(search);
+  }, [search]);
   // Active building filter on the Bookings list ("all" = no filter).
   const [bookingsBuildingFilter, setBookingsBuildingFilter] =
-    useState<string>("all");
+    useState<string>(() => readBookingsBuildingFilterFromURL());
+  useEffect(() => {
+    writeBookingsBuildingFilterToURL(bookingsBuildingFilter);
+  }, [bookingsBuildingFilter]);
   // Active "Template used" filter on the Bookings list (Task #156).
   // `null` is the toolbar's reset state — no filter applied. The
   // template is identified by its snapshot `name` + channel, the
@@ -766,7 +912,10 @@ export function AdminApp() {
   // status filter so an admin can flip between views without losing
   // their coordination grouping. "all" shows both queues at once.
   const [coordinationFilter, setCoordinationFilter] =
-    useState<"all" | CoordinationKind>("all");
+    useState<"all" | CoordinationKind>(() => readCoordinationFilterFromURL());
+  useEffect(() => {
+    writeCoordinationFilterToURL(coordinationFilter);
+  }, [coordinationFilter]);
 
   function handleNav(id: ViewId) {
     setView(id);
@@ -780,6 +929,14 @@ export function AdminApp() {
     }
     setSearch("");
     setBookingsBuildingFilter("all");
+    // Reset the Awaiting-coordination "waiting on" chip on sidebar
+    // nav too, alongside the other queue lenses (search, building,
+    // template). Task #207 turned this filter into a round-tripped
+    // URL param, and the explicit "fresh start" gesture has to drop
+    // it back to the reset value so the URL the next mount reads is
+    // identical to a fresh visit — otherwise a refresh would silently
+    // re-apply a stale waiting-on filter from a prior session.
+    setCoordinationFilter("all");
     // Sidebar nav is an explicit "fresh start" gesture, so clear any
     // pending source-row highlight seed from a BookingDetail timeline
     // pivot — otherwise a later visit could light up the wrong row.
