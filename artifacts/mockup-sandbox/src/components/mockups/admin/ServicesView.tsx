@@ -8,10 +8,12 @@
  * customer pricing card, and the booking detail's duration breakdown.
  *
  * Mockup-only: changes live in the AdminApp's React state for the
- * demo session and reset on reload. Brand-new "other" entries
- * (e.g. "bathroom extraction") aren't yet wired into the customer
- * flow's step list — they exist in the catalogue so ops can author
- * the rule, but the booking flow integration is a follow-up task.
+ * demo session and reset on reload. "Other" entries
+ * (e.g. "bathroom extraction") render in the customer flow's AC step
+ * as toggleable cards (Task #186) — selecting one contributes the
+ * catalogue's `baseMinutes + addonMinutes` to the slot picker's
+ * duration math and `priceAud + addonPriceAud` to the customer
+ * pricing card and Pay step total.
  */
 
 import { Pencil, Plus, Trash2, Wrench, X } from "lucide-react";
@@ -110,10 +112,10 @@ export function ServicesView({
         </div>
       </Card>
 
-      <Card title="Other services" subtitle='Generic add-ons modelled in the catalogue ahead of being wired into the booking flow (e.g. "bathroom extraction")'>
+      <Card title="Other services" subtitle='Generic add-ons offered alongside the AC service (e.g. "bathroom extraction"). Each appears in the customer&rsquo;s AC step as a toggleable card.'>
         {otherEntries.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-500">
-            No additional services yet. Use <span className="font-semibold">Add service</span> above to create one — booking-flow wiring lands as a follow-up.
+            No additional services yet. Use <span className="font-semibold">Add service</span> above to create one — it&rsquo;ll appear in the customer&rsquo;s AC step right away.
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -308,7 +310,7 @@ function ServiceEditor({
             >
               <option value="split">Split</option>
               <option value="ducted">Ducted</option>
-              <option value="other">Other (not yet wired into booking flow)</option>
+              <option value="other">Other (toggleable add-on in AC step)</option>
             </select>
           </Field>
           {draft.acTypeKey === null && (

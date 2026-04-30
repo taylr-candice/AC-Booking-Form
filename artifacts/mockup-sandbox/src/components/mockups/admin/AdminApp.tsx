@@ -81,6 +81,7 @@ import {
   setServiceRuleResolver,
   setUnitDurationContextResolver,
 } from "@/state/bookingDerived";
+import { writeLiveOtherServices } from "@/state/liveOtherServices";
 import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
@@ -1316,6 +1317,30 @@ export function AdminApp() {
       acType: getRecordedAcTypeForUnit(unitId),
       placement: getEffectivePlacementForUnit(unitId),
     }));
+    // Task #186: project the live `services` list down to the
+    // customer-flow's `OtherServiceRule` shape and persist it via
+    // sessionStorage so the iframed booking flow
+    // (`BookingFlow{Mobile,Desktop}` renders each step in its own JS
+    // realm) sees ops-edited "other" services. Module-level state
+    // doesn't cross frames, but same-origin sessionStorage does — the
+    // bridge in `liveOtherServices.ts` mirrors how `bookingSession`
+    // already handles cross-frame state. The AC step's toggle cards,
+    // the slot picker's duration math, and the Pay step's total all
+    // read from this same key.
+    writeLiveOtherServices(
+      services
+        .filter((s) => s.acTypeKey === null)
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          baseMinutes: s.baseMinutes,
+          addonMinutes: s.addonMinutes,
+          priceAud: s.priceAud,
+          addonPriceAud: s.addonPriceAud,
+          appliesToNote: s.appliesToNote,
+          addonLabel: s.addonLabel,
+        })),
+    );
     setUniquenessGuard((sess, newBookingReference) => {
       if (!sess.unit_id) return "ok";
       const rollout = findRolloutForBooking("svc-ac", sess.unit_id);
@@ -1381,6 +1406,10 @@ export function AdminApp() {
       setLiveServiceCatalogueSource(null);
       setServiceRuleResolver(null);
       setUnitDurationContextResolver(null);
+      // Clear the cross-iframe "other" services bridge so a remount
+      // (or a different page that loads after AdminApp unmounts)
+      // doesn't see stale catalogue entries.
+      writeLiveOtherServices(null);
     };
   }, [seededBookings, units, buildings, services]);
 

@@ -3143,10 +3143,11 @@ export type AdminService = {
    * The AC type this catalogue entry's rule applies to (Task #182).
    * `split` and `ducted` entries drive the per-system / per-extra
    * duration math for AC bookings. `null` is used for "other"
-   * services modelled in the catalogue (e.g. bathroom extraction add-ons)
-   * which aren't yet wired into the booking flow's step list — they
-   * live in the catalogue so ops can author the rule, but the
-   * customer flow hasn't picked them up yet.
+   * services modelled in the catalogue (e.g. bathroom extraction
+   * add-ons). Task #186 wires those `null` entries into the customer
+   * flow's AC step as toggleable cards — selecting one contributes
+   * `baseMinutes + addonMinutes` to the slot picker's duration math
+   * and `priceAud + addonPriceAud` to the customer pricing card.
    */
   acTypeKey: "split" | "ducted" | null;
   /** Per-system base duration in minutes (default: 45). */

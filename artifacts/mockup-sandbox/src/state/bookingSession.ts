@@ -119,6 +119,16 @@ export type BookingState = {
   // Step 2 — AC
   num_systems: number;
   num_additional_indoor: number;
+  /** Catalogue ids of "other" services (Task #186) the customer has
+   *  toggled on in the AC step. Each id refers to an `AdminService`
+   *  with `acTypeKey === null` (e.g. "bathroom extraction"). The
+   *  catalogue's `baseMinutes` + `addonMinutes` for each selected id
+   *  contribute to the slot picker's duration math, and the `priceAud`
+   *  + `addonPriceAud` contribute to the customer pricing card and
+   *  the Pay step total. Order is preserved so the price card lists
+   *  services in the order the customer toggled them. Stale ids
+   *  (catalogue entry removed) are silently ignored by the resolver. */
+  selected_other_service_ids: string[];
   /** Snapshot of how the customer's selection on Step 2 differs from
    *  Taylr's records. Null while it matches (or the unit has no AC
    *  record to compare against). Read by the admin mockup to surface
@@ -316,6 +326,7 @@ const INITIAL_STATE: BookingState = {
   contact_phone: "",
   num_systems: 1,
   num_additional_indoor: 0,
+  selected_other_service_ids: [],
   ac_discrepancy: null,
   ac_override_active: false,
   primary_residence: null,
@@ -744,6 +755,41 @@ export const bookingActions = {
     setState((s) =>
       s.num_additional_indoor === clamped ? s : { ...s, num_additional_indoor: clamped },
     );
+  },
+  /** Replace the customer's currently-selected "other" services
+   *  (Task #186). Dedupes input order while preserving first-seen
+   *  order — useful if a caller hands us [a, b, a] from a checkbox
+   *  state shuffle. No-op if the resulting array is structurally
+   *  equal to what's already in state. */
+  setOtherServices(ids: readonly string[]) {
+    setState((s) => {
+      const seen = new Set<string>();
+      const next: string[] = [];
+      for (const id of ids) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        next.push(id);
+      }
+      const cur = s.selected_other_service_ids;
+      if (cur.length === next.length && cur.every((v, i) => v === next[i])) {
+        return s;
+      }
+      return { ...s, selected_other_service_ids: next };
+    });
+  },
+  /** Toggle a single "other" service id on/off. Appends new ids at
+   *  the end so the price-card display reflects the order the
+   *  customer ticked them. Idempotent for the no-op case (empty id
+   *  string). */
+  toggleOtherService(id: string) {
+    if (!id) return;
+    setState((s) => {
+      const cur = s.selected_other_service_ids;
+      const idx = cur.indexOf(id);
+      const next =
+        idx === -1 ? [...cur, id] : cur.filter((v) => v !== id);
+      return { ...s, selected_other_service_ids: next };
+    });
   },
   /** Persist the latest discrepancy snapshot from the AC step. Null when the
    *  customer's selection matches Taylr's records (or there's no record on

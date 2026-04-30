@@ -27,12 +27,14 @@ import {
   formatSystemsIncludes,
   getAddonHelperLines,
   type KnownType,
+  OtherServicesSection,
   PriceBlock,
   SYSTEM_PRICE,
   UnsureMergedCard,
   UnsurePriceReassurance,
   useAcOnFileSync,
   useAcStep,
+  useSelectedOtherServices,
 } from "./acStepShared";
 
 export function AcMobile() {
@@ -85,6 +87,7 @@ function OnFileView({
   cameFromSlotPicker: boolean;
 }) {
   useAcOnFileSync(recorded);
+  const selectedOtherServices = useSelectedOtherServices();
 
   const knownType: KnownType = recorded.type;
   const sysWord = knownType === "ducted" ? "ducted system" : "split system";
@@ -151,13 +154,22 @@ function OnFileView({
           </div>
         </div>
 
-        {/* Price block — base + per-extras + total */}
-        <PriceBlock
-          systems={recorded.systems}
-          additional={recorded.additional}
-          knownType={knownType}
-          variant="mobile"
-        />
+        {/* Task #186: customer-side Service catalogue toggles. Renders
+            nothing when ops hasn't authored any "other" services. */}
+        <div className="mt-5">
+          <OtherServicesSection variant="mobile" />
+        </div>
+
+        {/* Price block — base + per-extras + selected other services + total */}
+        <div className="mt-4">
+          <PriceBlock
+            systems={recorded.systems}
+            additional={recorded.additional}
+            knownType={knownType}
+            variant="mobile"
+            otherServices={selectedOtherServices}
+          />
+        </div>
 
         {/* Update affordance */}
         <div className="mt-4 flex justify-center">
@@ -202,6 +214,7 @@ function FullConfigView({
   recorded: AcRecord | null;
 }) {
   const ac = useAcStep({ unitId, mode, acTypeFromUnit, recorded });
+  const selectedOtherServices = useSelectedOtherServices();
   const {
     override,
     notSureCount,
@@ -456,12 +469,14 @@ function FullConfigView({
             read (Task #102). The count-level unsure state keeps the
             type-specific qualifier because the type IS known. */}
         {!needsTypePick && (
-          <div className="mt-6">
+          <div className="mt-6 space-y-4">
+            <OtherServicesSection variant="mobile" />
             <PriceBlock
               systems={displaySystems}
               additional={displayAdditional}
               knownType={override === "unsure" ? null : knownType}
               variant="mobile"
+              otherServices={selectedOtherServices}
             />
             {override === "unsure" && (
               <UnsurePriceReassurance variant="mobile" />

@@ -13,6 +13,7 @@ import {
   type StepId,
 } from "./bookingSession";
 import { isOtherAgency } from "./accessMethodCatalog";
+import { readLiveOtherServicesFromStorage } from "./liveOtherServices";
 
 export function isCoordinationFlow(s: Pick<BookingState, "access_method">): boolean {
   return s.access_method ? COORDINATION_ACCESS_METHODS.has(s.access_method) : false;
@@ -217,11 +218,54 @@ const DEFAULT_UNIT_CONTEXT: UnitDurationContext = {
   placement: { kind: "in_property" },
 };
 
+/**
+ * Per-id rule for a generic ("other") service (Task #186) — the
+ * customer-flow projection of an `AdminService` row whose `acTypeKey`
+ * is `null`. Carries everything the booking flow needs to size its
+ * duration math and render the customer pricing card without
+ * re-importing the AdminService type (and its admin-only `acTypeKey`,
+ * `defaultJobMinutes`, etc.) here.
+ */
+export type OtherServiceRule = {
+  id: string;
+  name: string;
+  baseMinutes: number;
+  addonMinutes: number;
+  priceAud: number;
+  addonPriceAud: number;
+  appliesToNote?: string;
+  /** Add-on stepper label (e.g. "additional bathroom"). The customer
+   *  flow doesn't expose a separate stepper for "other" service add-ons
+   *  — selecting the service contributes one base + one add-on — but
+   *  the label is surfaced in the price card so the customer sees what
+   *  the add-on charge covers. */
+  addonLabel: string;
+};
+
 let serviceRuleResolver: (acType: "split" | "ducted") => ServiceRule = () =>
   DEFAULT_SERVICE_RULE;
 let unitDurationContextResolver: (
   unitId: string | null,
 ) => UnitDurationContext = () => DEFAULT_UNIT_CONTEXT;
+
+/**
+ * Default "other" service lookup — reads from the cross-iframe
+ * sessionStorage bridge so the customer-flow iframe sees the parent
+ * frame's `AdminApp` Service-catalogue edits without needing a
+ * resolver to be registered in the iframe's JS realm. Tests / the
+ * canvas-isolated mode can register a custom resolver via
+ * {@link setOtherServiceLookup}; passing `null` resets to this
+ * sessionStorage-backed default (which itself returns `null` when
+ * storage is empty).
+ */
+const STORAGE_BACKED_OTHER_SERVICE_LOOKUP = (
+  id: string,
+): OtherServiceRule | null => {
+  const all = readLiveOtherServicesFromStorage();
+  return all.find((r) => r.id === id) ?? null;
+};
+let otherServiceLookup: (id: string) => OtherServiceRule | null =
+  STORAGE_BACKED_OTHER_SERVICE_LOOKUP;
 
 /**
  * Register a resolver that returns the per-AC-type service rule.
@@ -246,6 +290,46 @@ export function setUnitDurationContextResolver(
 }
 
 /**
+ * Register a resolver that maps a catalogue id to its
+ * {@link OtherServiceRule}. The admin shell wires this in
+ * `AdminApp.tsx` so the customer-facing booking flow sees ops-edited
+ * "other" services (Task #186). Returns `null` for unknown ids so
+ * callers can silently skip stale ids carried over from
+ * sessionStorage after the catalogue changed.
+ *
+ * Pass `null` to reset to the no-op default — used by tests and the
+ * canvas-isolated mode where no admin shell is mounted.
+ */
+export function setOtherServiceLookup(
+  fn: ((id: string) => OtherServiceRule | null) | null,
+): void {
+  otherServiceLookup = fn ?? STORAGE_BACKED_OTHER_SERVICE_LOOKUP;
+}
+
+/**
+ * Resolve a list of catalogue ids to their {@link OtherServiceRule}
+ * entries via the registered lookup. Stale / unknown ids are dropped
+ * silently — the customer flow is allowed to carry an id forward in
+ * sessionStorage even if ops removes the catalogue entry, and we
+ * prefer "service quietly disappears from the price card" over
+ * "booking flow throws and the customer can't continue".
+ *
+ * Order is preserved (matches the order of `ids`), so the price card
+ * lists services in the order the customer toggled them.
+ */
+export function resolveOtherServiceRules(
+  ids: readonly string[],
+): OtherServiceRule[] {
+  if (ids.length === 0) return [];
+  const out: OtherServiceRule[] = [];
+  for (const id of ids) {
+    const rule = otherServiceLookup(id);
+    if (rule) out.push(rule);
+  }
+  return out;
+}
+
+/**
  * How long the customer's current booking will take, in minutes.
  *
  * Formula:
@@ -264,7 +348,11 @@ export function setUnitDurationContextResolver(
  * (`ac_discrepancy.customer.type === "unsure"`) we don't trust the
  * seeded stepper values, so we fall back to
  * {@link UNSURE_FALLBACK_MINUTES} — the smallest job Taylr will
- * dispatch — without applying any rooftop surcharge.
+ * dispatch — without applying any rooftop surcharge. Any "other"
+ * services the customer ALSO toggled in the AC step (Task #186) still
+ * contribute their deterministic catalogue minutes on top of the
+ * unsure baseline — those services are independent of the AC
+ * head-count guesswork.
  *
  * Pure function — used by the slot picker (to size each slot's time
  * budget) and by the admin mockup (to render the booked job's
@@ -274,10 +362,25 @@ export function getBookingDurationMinutes(
   s: Pick<
     BookingState,
     "num_systems" | "num_additional_indoor" | "ac_discrepancy"
-  > & { unit_id?: string | null },
+  > & {
+    unit_id?: string | null;
+    selected_other_service_ids?: readonly string[];
+  },
 ): number {
+  // Task #186: even when the AC selection is "unsure", any "other"
+  // service the customer ALSO toggled on still has a known
+  // base+addon duration (the catalogue gives us deterministic
+  // minutes). The slot picker must size the slot to fit them, and
+  // the Pay-step total must reflect them, so add their minutes to
+  // the unsure-fallback baseline rather than dropping them on the
+  // floor (which would let the customer book a slot too small for
+  // the very services they just selected).
+  const otherIds = s.selected_other_service_ids ?? [];
+  const others = resolveOtherServiceRules(otherIds);
+  let othersMinutes = 0;
+  for (const r of others) othersMinutes += r.baseMinutes + r.addonMinutes;
   if (s.ac_discrepancy?.customer.type === "unsure") {
-    return UNSURE_FALLBACK_MINUTES;
+    return UNSURE_FALLBACK_MINUTES + othersMinutes;
   }
   const ctx = unitDurationContextResolver(s.unit_id ?? null);
   // Pick the AC type the rule resolver should key off. Prefer the
@@ -301,7 +404,12 @@ export function getBookingDurationMinutes(
     ctx.placement.kind === "rooftop"
       ? ctx.placement.overheadMinutes * s.num_systems
       : 0;
-  return base + overhead;
+  // Task #186: each selected "other" service contributes its base +
+  // add-on minutes (qty 1 of each — the customer flow exposes one
+  // toggle per service rather than a separate stepper). Stale ids are
+  // dropped silently by the resolver. `othersMinutes` was computed
+  // up-front so the unsure-fallback branch above could share it.
+  return base + overhead + othersMinutes;
 }
 
 // ─── Customer-side slot fit status ────────────────────────────────────────

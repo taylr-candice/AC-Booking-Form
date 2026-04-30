@@ -16,15 +16,30 @@
  *                        `variant` prop.
  */
 
-import { useEffect, useState } from "react";
-import { AirVent, ArrowRight, Grid3x3, Info, RefreshCw } from "lucide-react";
-import { bookingActions } from "../../../state/bookingSession";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  AirVent,
+  ArrowRight,
+  Check,
+  Grid3x3,
+  Info,
+  RefreshCw,
+} from "lucide-react";
+import {
+  bookingActions,
+  useBookingSession,
+} from "../../../state/bookingSession";
 import {
   computeAcDiscrepancy,
   type AcMode,
   type AcRecord,
   type AcType,
 } from "../../../state/bookingHelpers";
+import {
+  readLiveOtherServicesFromStorage,
+  subscribeLiveOtherServices,
+} from "../../../state/liveOtherServices";
+import { type OtherServiceRule } from "../../../state/bookingDerived";
 import { type ExampleVariant } from "./AcExampleModal";
 
 // ─── Visual constants ───────────────────────────────────────────────────────
@@ -439,15 +454,28 @@ export function PriceBlock({
   additional,
   knownType,
   variant,
+  otherServices = [],
 }: {
   systems: number;
   additional: number;
   knownType: KnownType | null;
   variant: Variant;
+  /**
+   * Selected "other" catalogue services (Task #186) to itemise in the
+   * price card. Each contributes one base + one add-on charge — so a
+   * single line per service shows `name + qualifier` and
+   * `priceAud + addonPriceAud`. Pass `[]` (or omit) for the
+   * AC-only path that pre-dates Task #186.
+   */
+  otherServices?: readonly OtherServiceRule[];
 }) {
   const base = systems * SYSTEM_PRICE;
   const extras = additional * ADDON_PRICE;
-  const total = base + extras;
+  const othersTotal = otherServices.reduce(
+    (sum, s) => sum + s.priceAud + s.addonPriceAud,
+    0,
+  );
+  const total = base + extras + othersTotal;
   const qualifier = knownType
     ? baseLineQualifier(knownType)
     : "Default — confirmed on the day";
@@ -518,6 +546,34 @@ export function PriceBlock({
             </span>
           </div>
         )}
+        {/* Task #186: one row per selected "other" catalogue service.
+            Each card toggle contributes one base + one add-on charge,
+            so the line shows the combined amount and a qualifier
+            with the catalogue's add-on label. */}
+        {otherServices.map((s) => (
+          <div
+            key={s.id}
+            className="flex items-start justify-between gap-3"
+            data-testid={`row-price-other-${s.id}`}
+          >
+            <div className="min-w-0">
+              <p>
+                {s.name}{" "}
+                <span className="text-slate-500">
+                  (base + {s.addonLabel})
+                </span>
+              </p>
+              {s.appliesToNote ? (
+                <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">
+                  {s.appliesToNote}
+                </p>
+              ) : null}
+            </div>
+            <span className="tabular-nums text-slate-900 font-medium shrink-0">
+              ${s.priceAud + s.addonPriceAud}
+            </span>
+          </div>
+        ))}
       </div>
       {isMobile ? (
         <div className="mt-4 flex items-end justify-between border-t border-slate-200 pt-4">
@@ -787,5 +843,150 @@ export function UnsurePriceReassurance({ variant }: { variant: Variant }) {
       the difference — ${SYSTEM_PRICE} per extra system, ${ADDON_PRICE} per
       extra unit.
     </p>
+  );
+}
+
+// ─── Other services (Task #186) ───────────────────────────────────────────
+
+/**
+ * Subscribe to the cross-iframe "other" service bridge (Task #186)
+ * and return the projected catalogue. Driven by
+ * `useSyncExternalStore` against `subscribeLiveOtherServices`, which
+ * fires on cross-window `storage` events AND on same-window writes
+ * by `AdminApp`. The empty-array default fires in canvas-isolated
+ * mode where no admin shell has populated sessionStorage — both the
+ * section and the price card collapse to nothing.
+ *
+ * The hook reads from sessionStorage rather than module-level state
+ * because each step of the customer flow renders inside an `<iframe>`
+ * with its own JS realm; module state in `AdminApp`'s frame isn't
+ * visible there, but same-origin sessionStorage is.
+ */
+export function useLiveOtherServices(): readonly OtherServiceRule[] {
+  return useSyncExternalStore(
+    subscribeLiveOtherServices,
+    readLiveOtherServicesFromStorage,
+    readLiveOtherServicesFromStorage,
+  );
+}
+
+/**
+ * Resolve the customer's currently-selected `selected_other_service_ids`
+ * against the live catalogue, preserving session order and dropping
+ * stale ids. Used by AC step price card so removed catalogue entries
+ * silently disappear instead of crashing the booking flow.
+ */
+export function useSelectedOtherServices(): OtherServiceRule[] {
+  const session = useBookingSession();
+  const others = useLiveOtherServices();
+  return useMemo(() => {
+    if (session.selected_other_service_ids.length === 0) return [];
+    const byId = new Map<string, OtherServiceRule>(
+      others.map((s) => [s.id, s]),
+    );
+    const out: OtherServiceRule[] = [];
+    for (const id of session.selected_other_service_ids) {
+      const m = byId.get(id);
+      if (m) out.push(m);
+    }
+    return out;
+  }, [others, session.selected_other_service_ids]);
+}
+
+/**
+ * Toggleable cards for the catalogue's "other" services (Task #186)
+ * — rendered between the AC config block and the price card on Step 2.
+ * Each card shows the service name, the "applies to" note (if any),
+ * the duration the rule contributes, and the combined base + add-on
+ * price. Selecting a card writes the id into
+ * `selected_other_service_ids` via `bookingActions.toggleOtherService`,
+ * which the slot picker (`getBookingDurationMinutes`) and the Pay
+ * step (`computeBookingTotal`) both consume.
+ *
+ * Returns `null` when the catalogue has no "other" entries — the
+ * customer flow stays visually identical to its pre-Task-#186 layout
+ * until ops actually authors a service.
+ */
+export function OtherServicesSection({ variant }: { variant: Variant }) {
+  const session = useBookingSession();
+  const others = useLiveOtherServices();
+  if (others.length === 0) return null;
+  const selected = new Set(session.selected_other_service_ids);
+  const isMobile = variant === "mobile";
+  const titleSize = isMobile ? "text-[15px]" : "text-base";
+  const helperSize = isMobile ? "text-[12px]" : "text-[13px]";
+  const cardPadding = isMobile ? "p-3" : "p-4";
+  return (
+    <div data-testid="block-other-services" className="space-y-3">
+      <div>
+        <h3 className={`${titleSize} font-semibold text-slate-900`}>
+          Add another service
+        </h3>
+        <p className={`mt-1 ${helperSize} text-slate-500 leading-snug`}>
+          Bundle a one-off task with this visit. Each option adds its
+          own time to the slot and to your total.
+        </p>
+      </div>
+      <div className="space-y-2">
+        {others.map((s) => {
+          const isOn = selected.has(s.id);
+          const totalMin = s.baseMinutes + s.addonMinutes;
+          const totalAud = s.priceAud + s.addonPriceAud;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              role="checkbox"
+              aria-checked={isOn}
+              data-testid={`toggle-other-service-${s.id}`}
+              onClick={() => bookingActions.toggleOtherService(s.id)}
+              className={`flex w-full items-start justify-between gap-3 rounded-xl border ${cardPadding} text-left transition`}
+              style={
+                isOn
+                  ? {
+                      borderColor: BRAND,
+                      backgroundColor: "rgba(237,1,127,0.04)",
+                    }
+                  : { borderColor: "#e2e8f0", backgroundColor: "#fff" }
+              }
+            >
+              <span className="flex items-start gap-3 min-w-0">
+                <span
+                  className="mt-0.5 grid h-5 w-5 place-items-center rounded-md border-2 shrink-0"
+                  style={
+                    isOn
+                      ? { backgroundColor: BRAND, borderColor: BRAND }
+                      : { borderColor: "#cbd5e1", backgroundColor: "#fff" }
+                  }
+                  aria-hidden="true"
+                >
+                  {isOn && (
+                    <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span
+                    className={`block ${helperSize} font-semibold text-slate-900`}
+                  >
+                    {s.name}
+                  </span>
+                  {s.appliesToNote && (
+                    <span className="mt-0.5 block text-[11px] text-slate-500 leading-snug">
+                      {s.appliesToNote}
+                    </span>
+                  )}
+                  <span className="mt-1 block text-[11px] text-slate-500">
+                    Adds ~{totalMin} min to the visit
+                  </span>
+                </span>
+              </span>
+              <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">
+                +${totalAud}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
