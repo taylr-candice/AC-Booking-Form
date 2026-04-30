@@ -15,6 +15,8 @@ import { useBookingSession } from "../../../state/bookingSession";
 import { isBeThereMethod } from "../../../state/accessMethodCatalog";
 import {
   accessRecapLabel,
+  dayHasAvailable,
+  dayWindows,
   type CustomerDay,
   type CustomerSlot,
   WINDOW_TIME_RANGE,
@@ -26,15 +28,6 @@ const SELECTED_GREEN = "#5FBB97";
 
 type Slot = CustomerSlot;
 type Day = CustomerDay;
-
-function dayWindows(day: Day): Slot[] {
-  const out: Slot[] = [day.morning, day.afternoon];
-  if (day.evening) out.push(day.evening);
-  return out;
-}
-function dayHasAvailable(day: Day): boolean {
-  return dayWindows(day).some((s) => s.status === "available");
-}
 
 export function SlotsMobileLite() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);

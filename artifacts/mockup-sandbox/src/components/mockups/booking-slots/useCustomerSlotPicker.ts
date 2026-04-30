@@ -34,9 +34,9 @@ import {
 } from "../../../state/adminMockData";
 import {
   alreadyScheduledByOther,
+  dayWindows,
   resolveCustomerSlotData,
   type CustomerDay,
-  type CustomerSlot,
   type CustomerSlotData,
 } from "./customerSlotData";
 
@@ -57,12 +57,6 @@ export type CustomerSlotPicker = {
   /** Setter for the picked slot id. */
   setSelected: (id: string | null) => void;
 };
-
-function dayWindows(day: CustomerDay): CustomerSlot[] {
-  const out: CustomerSlot[] = [day.morning, day.afternoon];
-  if (day.evening) out.push(day.evening);
-  return out;
-}
 
 export function useCustomerSlotPicker(
   unitId: string | null,

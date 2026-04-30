@@ -171,6 +171,35 @@ export function alreadyScheduledByOther(
 }
 
 /**
+ * Returns the booking windows on a customer day in render order
+ * (morning, afternoon, and evening when the rollout has opened the
+ * evening window).
+ *
+ * Hoisted here so every slot picker variant — production
+ * (`SlotsDesktop`, `SlotsMobile`, `SlotsMobileLite`), usability
+ * (`SlotsAccessibleReadable`, `SlotsAffordanceForward`,
+ * `SlotsHierarchyFirst`) and the shared {@link useCustomerSlotPicker}
+ * hook — agrees on what counts as "the windows for a day". Before
+ * Task #233 each picker carried its own copy of this trivial helper,
+ * which made any tweak to "what counts as a window" a six-file
+ * change.
+ */
+export function dayWindows(day: CustomerDay): CustomerSlot[] {
+  const out: CustomerSlot[] = [day.morning, day.afternoon];
+  if (day.evening) out.push(day.evening);
+  return out;
+}
+
+/**
+ * Convenience predicate — does the day have any window the customer
+ * could actually pick? Used by the day-row UI to grey out a date
+ * when every window is full / closed / not-enough-time.
+ */
+export function dayHasAvailable(day: CustomerDay): boolean {
+  return dayWindows(day).some((s) => s.status === "available");
+}
+
+/**
  * Customer-facing time range for each booking window. Hoisted so
  * the slot tiles and the "Selected window" summary panel can
  * render the same string (single source of truth — change here
