@@ -100,6 +100,16 @@ function makeBooking(overrides: Partial<AdminBooking> = {}): AdminBooking {
   };
 }
 
+// Strip `isDefault` so each test exercises the picker mechanics
+// against the historical "open on Custom…" baseline. Seeded-default
+// pre-selection is covered by `TemplateDefaults.test.tsx`.
+const NO_DEFAULT_CALL_TEMPLATES = CALL_TEMPLATES.map(
+  ({ isDefault: _isDefault, ...t }) => t,
+);
+const NO_DEFAULT_EMAIL_TEMPLATES = EMAIL_TEMPLATES.map(
+  ({ isDefault: _isDefault, ...t }) => t,
+);
+
 function renderDetail(
   booking: AdminBooking,
   handlers: Partial<React.ComponentProps<typeof BookingDetail>> = {},
@@ -111,6 +121,8 @@ function renderDetail(
       bookings={[booking]}
       units={[UNIT]}
       agents={AGENTS}
+      callTemplates={NO_DEFAULT_CALL_TEMPLATES}
+      emailTemplates={NO_DEFAULT_EMAIL_TEMPLATES}
       onBack={noop}
       onUpdate={noop}
       onCancelBooking={noop}

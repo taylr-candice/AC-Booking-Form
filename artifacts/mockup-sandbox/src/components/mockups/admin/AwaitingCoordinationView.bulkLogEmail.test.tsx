@@ -137,6 +137,13 @@ function makeBooking(overrides: Partial<AdminBooking>): AdminBooking {
   };
 }
 
+// Strip `isDefault` so the bulk form opens on Custom… (the baseline
+// these assertions were written against). Seeded-default pre-selection
+// is covered by `TemplateDefaults.test.tsx`.
+const NO_DEFAULT_EMAIL_TEMPLATES = EMAIL_TEMPLATES.map(
+  ({ isDefault: _isDefault, ...t }) => t,
+);
+
 function Harness({
   bookings,
   onBulkLogCall,
@@ -170,6 +177,7 @@ function Harness({
       onOpen={() => {}}
       onBulkLogCall={onBulkLogCall}
       onBulkLogEmail={onBulkLogEmail}
+      emailTemplates={NO_DEFAULT_EMAIL_TEMPLATES}
     />
   );
 }

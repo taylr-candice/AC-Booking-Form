@@ -2098,6 +2098,9 @@ export const EMAIL_TEMPLATES: ReadonlyArray<EmailTemplate> = [
     name: "Sent rebook link",
     subject: "Booking access — please pick a new window",
     note: "Sent rebook link so the tenant can grab a fresh appointment slot directly.",
+    // Seeded default: most common email out of the Awaiting-
+    // coordination queue. Movable / clearable via the panel star.
+    isDefault: true,
   },
   {
     id: "parcel_locker",
@@ -2194,6 +2197,9 @@ export const CALL_TEMPLATES: ReadonlyArray<CallTemplate> = [
     id: "voicemail_left",
     name: "No answer — left voicemail",
     note: "No answer on the listed number — left a voicemail with the booking ref and a callback number.",
+    // Seeded default: most common outcome the first time ops calls a
+    // tenant. Movable / clearable via the panel star.
+    isDefault: true,
   },
   {
     id: "no_answer",

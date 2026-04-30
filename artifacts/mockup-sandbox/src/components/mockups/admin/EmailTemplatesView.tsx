@@ -148,6 +148,12 @@ export function EmailTemplatesView({
           batch in one click. The template's subject + note are copied into
           the form when picked — editing or removing a template here never
           changes timeline entries that were already logged.
+          <div className="mt-2">
+            Click the star in the <strong>Default</strong> column to
+            promote a row — that template will pre-select in every
+            Log-email dropdown. Click the active star again to clear the
+            default and have the dropdowns open on Custom… instead.
+          </div>
         </div>
         <button
           type="button"

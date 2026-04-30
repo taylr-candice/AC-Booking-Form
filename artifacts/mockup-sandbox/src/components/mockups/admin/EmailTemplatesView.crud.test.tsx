@@ -255,10 +255,10 @@ describe("EmailTemplatesView · CRUD", () => {
           }}
           onCreate={() => {}}
           onUpdate={() => {}}
+          onSetDefault={() => {}}
           onRemove={(id) =>
             setTemplates((prev) => prev.filter((t) => t.id !== id))
           }
-          onSetDefault={() => {}}
         />
       );
     }
@@ -432,9 +432,14 @@ describe("EmailTemplatesView ↔ bulk Log email cross-view consistency", () => {
     expect(optionLabels).toContain(uniqueName);
     // Sanity: the seeded templates that AdminApp starts with are also
     // present, so the new entry was appended to (not replacing) the
-    // existing catalog.
+    // existing catalog. The seeded default's option label has a
+    // `(default)` suffix appended by the dropdown, so accept either
+    // shape.
     for (const seeded of EMAIL_TEMPLATES) {
-      expect(optionLabels).toContain(seeded.name);
+      const expected = seeded.isDefault
+        ? `${seeded.name} (default)`
+        : seeded.name;
+      expect(optionLabels).toContain(expected);
     }
   });
 

@@ -92,21 +92,104 @@ describe("setDefaultCallTemplate / setDefaultEmailTemplate · helpers", () => {
   });
 });
 
-describe("CallTemplatesView · default-template star toggle", () => {
-  it("starring a row pre-selects it in the per-row Log-call form with its note prefilled", () => {
+/**
+ * The seeded `isDefault` flags (`voicemail_left` for Call,
+ * `rebook_link` for Email) are the user-visible contract for fresh
+ * tenants — these tests pin both pre-selections plus their starred
+ * state in the templates panels.
+ */
+describe("Seeded defaults · pre-selection out of the box", () => {
+  it("the per-row Log-call form opens pre-selected on the seeded voicemail_left default", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Open booking bk-1038/ }),
+    );
+    fireEvent.click(screen.getByTestId("button-log-call"));
+
+    const select = screen.getByTestId(
+      "select-call-template",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("voicemail_left");
+    const noteInput = screen.getByTestId(
+      "input-call-note",
+    ) as HTMLTextAreaElement;
+    expect(noteInput.value.length).toBeGreaterThan(0);
+  });
+
+  it("the bulk Log-email form opens pre-selected on the seeded rebook_link default", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1038"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+
+    const select = screen.getByTestId(
+      "select-bulk-email-template",
+    ) as HTMLSelectElement;
+    expect(select.value).toBe("rebook_link");
+    const subjectInput = screen.getByTestId(
+      "input-bulk-email-subject",
+    ) as HTMLInputElement;
+    expect(subjectInput.value.length).toBeGreaterThan(0);
+    const noteInput = screen.getByTestId(
+      "input-bulk-email-note",
+    ) as HTMLTextAreaElement;
+    expect(noteInput.value.length).toBeGreaterThan(0);
+  });
+
+  it("the seeded Call default's star starts in the active state in the templates panel", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
-    const starBtn = screen.getByTestId(
-      "button-default-call-template-voicemail_left",
-    );
-    expect(starBtn.getAttribute("data-default")).toBe("false");
-    fireEvent.click(starBtn);
     expect(
       screen
         .getByTestId("button-default-call-template-voicemail_left")
         .getAttribute("data-default"),
     ).toBe("true");
+  });
+
+  it("the seeded Email default's star starts in the active state in the templates panel", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    expect(
+      screen
+        .getByTestId("button-default-email-template-rebook_link")
+        .getAttribute("data-default"),
+    ).toBe("true");
+  });
+});
+
+describe("CallTemplatesView · default-template star toggle", () => {
+  it("starring a non-default row pre-selects it in the per-row Log-call form with its note prefilled", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    // Promote a non-seeded row so the test exercises the user-driven
+    // star flip (the seeded `voicemail_left` baseline is covered above).
+    const starBtn = screen.getByTestId(
+      "button-default-call-template-spoke_confirmed",
+    );
+    expect(starBtn.getAttribute("data-default")).toBe("false");
+    fireEvent.click(starBtn);
+    expect(
+      screen
+        .getByTestId("button-default-call-template-spoke_confirmed")
+        .getAttribute("data-default"),
+    ).toBe("true");
+    // The previously-seeded default has been demoted as a side effect
+    // — only one row at a time is allowed to wear the flag.
+    expect(
+      screen
+        .getByTestId("button-default-call-template-voicemail_left")
+        .getAttribute("data-default"),
+    ).toBe("false");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Awaiting coordination" }),
@@ -118,7 +201,7 @@ describe("CallTemplatesView · default-template star toggle", () => {
     const select = screen.getByTestId(
       "select-call-template",
     ) as HTMLSelectElement;
-    expect(select.value).toBe("voicemail_left");
+    expect(select.value).toBe("spoke_confirmed");
     const noteInput = screen.getByTestId(
       "input-call-note",
     ) as HTMLTextAreaElement;
@@ -131,12 +214,12 @@ describe("CallTemplatesView · default-template star toggle", () => {
     expect(optionLabels).toContain("Custom…");
   });
 
-  it("starring a row pre-selects it in the bulk Log-call form with its note prefilled", () => {
+  it("starring a non-default row pre-selects it in the bulk Log-call form with its note prefilled", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
     fireEvent.click(
-      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+      screen.getByTestId("button-default-call-template-no_answer"),
     );
 
     fireEvent.click(
@@ -148,7 +231,7 @@ describe("CallTemplatesView · default-template star toggle", () => {
     const select = screen.getByTestId(
       "select-bulk-call-template",
     ) as HTMLSelectElement;
-    expect(select.value).toBe("spoke_confirmed");
+    expect(select.value).toBe("no_answer");
     const noteInput = screen.getByTestId(
       "input-bulk-call-note",
     ) as HTMLTextAreaElement;
@@ -159,6 +242,10 @@ describe("CallTemplatesView · default-template star toggle", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    // Walk: seeded `voicemail_left` is default → click it to clear →
+    // click `spoke_confirmed` to promote. End state: voicemail_left
+    // off, spoke_confirmed on. Same shape as a fresh tenant who first
+    // demotes the seeded default and then picks their own.
     fireEvent.click(
       screen.getByTestId("button-default-call-template-voicemail_left"),
     );
@@ -178,13 +265,11 @@ describe("CallTemplatesView · default-template star toggle", () => {
     ).toBe("true");
   });
 
-  it("clicking the active default's star unsets it — dropdowns fall back to Custom…", () => {
+  it("clicking the seeded default's star unsets it — dropdowns fall back to Custom…", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
-    fireEvent.click(
-      screen.getByTestId("button-default-call-template-voicemail_left"),
-    );
+    // Seeded `voicemail_left` starts active — one click demotes it.
     fireEvent.click(
       screen.getByTestId("button-default-call-template-voicemail_left"),
     );
@@ -212,20 +297,28 @@ describe("CallTemplatesView · default-template star toggle", () => {
 });
 
 describe("EmailTemplatesView · default-template star toggle", () => {
-  it("starring a row pre-selects it in the bulk Log-email form with subject + note prefilled", () => {
+  it("starring a non-default row pre-selects it in the bulk Log-email form with subject + note prefilled", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    // Promote a non-seeded row so the test exercises the user-driven
+    // star flip (the seeded `rebook_link` baseline is covered above).
     const star = screen.getByTestId(
-      "button-default-email-template-rebook_link",
+      "button-default-email-template-awaiting_confirm",
     );
     expect(star.getAttribute("data-default")).toBe("false");
     fireEvent.click(star);
     expect(
       screen
-        .getByTestId("button-default-email-template-rebook_link")
+        .getByTestId("button-default-email-template-awaiting_confirm")
         .getAttribute("data-default"),
     ).toBe("true");
+    // Seeded default has been demoted.
+    expect(
+      screen
+        .getByTestId("button-default-email-template-rebook_link")
+        .getAttribute("data-default"),
+    ).toBe("false");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Awaiting coordination" }),
@@ -236,7 +329,7 @@ describe("EmailTemplatesView · default-template star toggle", () => {
     const select = screen.getByTestId(
       "select-bulk-email-template",
     ) as HTMLSelectElement;
-    expect(select.value).toBe("rebook_link");
+    expect(select.value).toBe("awaiting_confirm");
     expect(
       (screen.getByTestId("input-bulk-email-subject") as HTMLInputElement)
         .value.length,
@@ -253,6 +346,8 @@ describe("EmailTemplatesView · default-template star toggle", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    // Same walk as the call-side test: clear the seeded default
+    // first, then promote a fresh row.
     fireEvent.click(
       screen.getByTestId("button-default-email-template-rebook_link"),
     );
@@ -272,12 +367,12 @@ describe("EmailTemplatesView · default-template star toggle", () => {
     ).toBe("true");
   });
 
-  it("starring a row pre-selects it in the per-row Log-email form too", () => {
+  it("starring a non-default row pre-selects it in the per-row Log-email form too", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
     fireEvent.click(
-      screen.getByTestId("button-default-email-template-rebook_link"),
+      screen.getByTestId("button-default-email-template-parcel_locker"),
     );
 
     fireEvent.click(
@@ -291,7 +386,7 @@ describe("EmailTemplatesView · default-template star toggle", () => {
     const select = screen.getByTestId(
       "select-email-template",
     ) as HTMLSelectElement;
-    expect(select.value).toBe("rebook_link");
+    expect(select.value).toBe("parcel_locker");
     expect(
       (screen.getByTestId("input-email-subject") as HTMLInputElement).value
         .length,
@@ -313,11 +408,8 @@ describe("Default-template marker in Log dropdown options", () => {
   it("per-row Log-call dropdown marks the default option and clears it when the default moves or is unset", () => {
     render(<AdminApp />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
-    fireEvent.click(
-      screen.getByTestId("button-default-call-template-voicemail_left"),
-    );
-
+    // The seeded default (`voicemail_left`) is active out of the box,
+    // so the marker must already be on its option without any setup.
     fireEvent.click(
       screen.getByRole("button", { name: "Awaiting coordination" }),
     );
@@ -376,11 +468,8 @@ describe("Default-template marker in Log dropdown options", () => {
   it("per-row Log-email dropdown marks the default option", () => {
     render(<AdminApp />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
-    fireEvent.click(
-      screen.getByTestId("button-default-email-template-rebook_link"),
-    );
-
+    // `rebook_link` is the seeded default — the marker should be on
+    // its option without any panel-level setup.
     fireEvent.click(
       screen.getByRole("button", { name: "Awaiting coordination" }),
     );
@@ -426,11 +515,7 @@ describe("Default-template marker in Log dropdown options", () => {
   it("bulk Log-email dropdown marks the default option", () => {
     render(<AdminApp />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
-    fireEvent.click(
-      screen.getByTestId("button-default-email-template-rebook_link"),
-    );
-
+    // Seeded `rebook_link` is the default — no setup needed.
     fireEvent.click(
       screen.getByRole("button", { name: "Awaiting coordination" }),
     );
@@ -449,21 +534,14 @@ describe("Default-template marker in Log dropdown options", () => {
 });
 
 describe("Templates panel header — default-template marker", () => {
-  it("Call templates header shows 'No default set' out of the box and updates when a default is starred / moved / unset", () => {
+  it("Call templates header reflects the seeded default out of the box and tracks star moves / unsets", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
 
-    // Out of the box no template is starred — header should call this out.
-    expect(
-      screen.getByTestId("text-call-templates-default-empty").textContent,
-    ).toMatch(/No default set/);
-    expect(screen.queryByTestId("link-call-templates-default")).toBeNull();
-
-    // Star the "Voicemail left" row — header should pick up its name.
-    fireEvent.click(
-      screen.getByTestId("button-default-call-template-voicemail_left"),
-    );
+    // Out of the box, the seeded `voicemail_left` default is shown
+    // in the header (no empty-state). The star is movable / clearable
+    // from the panel — the rest of this test exercises both.
     let link = screen.getByTestId("link-call-templates-default");
     expect(link.textContent).toBe("No answer — left voicemail");
     expect(
@@ -487,19 +565,13 @@ describe("Templates panel header — default-template marker", () => {
     expect(screen.queryByTestId("link-call-templates-default")).toBeNull();
   });
 
-  it("Email templates header shows 'No default set' out of the box and updates when a default is starred / moved / unset", () => {
+  it("Email templates header reflects the seeded default out of the box and tracks star moves / unsets", () => {
     render(<AdminApp />);
 
     fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
 
-    expect(
-      screen.getByTestId("text-email-templates-default-empty").textContent,
-    ).toMatch(/No default set/);
-    expect(screen.queryByTestId("link-email-templates-default")).toBeNull();
-
-    fireEvent.click(
-      screen.getByTestId("button-default-email-template-rebook_link"),
-    );
+    // Seeded `rebook_link` is the out-of-the-box default — the
+    // header link is rendered without any panel-side setup.
     let link = screen.getByTestId("link-email-templates-default");
     expect(link.textContent).toBe("Sent rebook link");
     expect(
@@ -524,10 +596,8 @@ describe("Templates panel header — default-template marker", () => {
   it("clicking the Call header link highlights the matching row", () => {
     render(<AdminApp />);
 
+    // Seeded `voicemail_left` default — no extra star setup needed.
     fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
-    fireEvent.click(
-      screen.getByTestId("button-default-call-template-voicemail_left"),
-    );
 
     // Before the click, no row is highlighted.
     expect(
@@ -554,10 +624,8 @@ describe("Templates panel header — default-template marker", () => {
   it("clicking the Email header link highlights the matching row", () => {
     render(<AdminApp />);
 
+    // Seeded `rebook_link` default — no extra star setup needed.
     fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
-    fireEvent.click(
-      screen.getByTestId("button-default-email-template-rebook_link"),
-    );
 
     expect(
       screen
@@ -581,8 +649,21 @@ describe("Templates panel header — default-template marker", () => {
 });
 
 describe("Default-template fallback to Custom…", () => {
-  it("with no default set, every Log form opens on Custom…", () => {
+  it("after clearing the seeded defaults, every Log form opens on Custom…", () => {
     render(<AdminApp />);
+
+    // Demote both seeded defaults. Once cleared, the per-channel
+    // dropdowns must collapse back to the Custom… sentinel — same
+    // baseline a brand-new tenant would have if the seed catalogs
+    // shipped without an `isDefault` row.
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-voicemail_left"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-rebook_link"),
+    );
 
     fireEvent.click(
       screen.getByRole("button", { name: "Awaiting coordination" }),

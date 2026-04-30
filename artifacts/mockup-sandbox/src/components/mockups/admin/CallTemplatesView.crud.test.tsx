@@ -419,9 +419,14 @@ describe("CallTemplatesView ↔ Log-call cross-view consistency", () => {
     expect(optionLabels).toContain(uniqueName);
     // Sanity: the seeded templates that AdminApp starts with are also
     // present, so the new entry was appended to (not replacing) the
-    // existing catalog.
+    // existing catalog. The seeded default's option label has a
+    // `(default)` suffix appended by the dropdown, so accept either
+    // shape.
     for (const seeded of CALL_TEMPLATES) {
-      expect(optionLabels).toContain(seeded.name);
+      const expected = seeded.isDefault
+        ? `${seeded.name} (default)`
+        : seeded.name;
+      expect(optionLabels).toContain(expected);
     }
   });
 
@@ -467,8 +472,12 @@ describe("CallTemplatesView ↔ Log-call cross-view consistency", () => {
       "select-call-template",
     ) as HTMLSelectElement;
     const optionLabels = Array.from(select.options).map((o) => o.textContent);
-    expect(optionLabels).toContain("Left voicemail (v2)");
+    // `voicemail_left` is the seeded default, so the dropdown appends
+    // a `(default)` marker to its label — assert against the marked
+    // shape and confirm the old name is gone in either form.
+    expect(optionLabels).toContain("Left voicemail (v2) (default)");
     expect(optionLabels).not.toContain("No answer — left voicemail");
+    expect(optionLabels).not.toContain("No answer — left voicemail (default)");
 
     // Picking the renamed template prefills the new suggested note —
     // the per-row form reads `note` straight off the live catalog
