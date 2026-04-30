@@ -18,7 +18,7 @@
  * — exactly the same click-through as the bookings list.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownNarrowWide,
   Clock,
@@ -262,6 +262,8 @@ export function AwaitingCoordinationView({
   onBulkLogEmail,
   emailTemplates = EMAIL_TEMPLATES,
   callTemplates = CALL_TEMPLATES,
+  initialFocusedRowId,
+  onFocusedRowConsumed,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -339,12 +341,88 @@ export function AwaitingCoordinationView({
    *  template's note onto the literal timeline entry, so editing or
    *  removing a template never rewrites historical entries. */
   callTemplates?: ReadonlyArray<CallTemplate>;
+  /** One-shot seed for the source-row highlight: id of the booking
+   *  the admin pivoted FROM (e.g. via the coordination-mode
+   *  BookingDetail "Back to list" button). Mirrors the
+   *  `initialFocusedRowId` prop on {@link BookingsView} so a pivot
+   *  back into the awaiting-coordination list keeps the same
+   *  source-row highlight + scroll-into-view behaviour the bookings
+   *  list has had since Task #172. Applied on first paint
+   *  (BRAND_SOFT tint + pulse + scroll-into-view), dismissed on
+   *  first interaction, then cleared via {@link onFocusedRowConsumed}
+   *  so re-renders never re-apply it. Optional. */
+  initialFocusedRowId?: string | null;
+  /** Fires once after AwaitingCoordinationView consumes
+   *  {@link initialFocusedRowId} so the parent can clear its seed
+   *  slot. Mirrors the BookingsView callback. */
+  onFocusedRowConsumed?: () => void;
 }) {
   // Selection lives entirely in this view — once a bulk action fires
   // we clear it. The live demo row is excluded from selection because
   // `updateBooking` is a no-op for it (mirrors the per-booking
   // affordance, which hides for live rows).
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Source-row highlight (Task #180): mirror of the same machinery in
+  // {@link BookingsView} so an admin pivoting back into this list
+  // (e.g. via the coordination-mode BookingDetail "Back to list"
+  // button) lands on a visibly highlighted source row instead of
+  // losing their place on a long queue. Persistent BRAND_SOFT tint +
+  // one-shot pulse + scroll-into-view, dismissed on first interaction
+  // (scroll / mousedown / keydown). Seeded from `initialFocusedRowId`
+  // so first paint already carries the highlight; re-seeded via the
+  // effect below when a fresh non-null value lands mid-life.
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(
+    initialFocusedRowId ?? null,
+  );
+  const [pulseRowId, setPulseRowId] = useState<string | null>(null);
+  const rowRefs = useRef<Map<string, HTMLTableRowElement | null>>(new Map());
+  // Re-apply when the parent hands us a fresh non-null seed mid-life
+  // (admin pivots, dismisses, navigates away, pivots again into the
+  // same component instance). Notify the parent so it can clear its
+  // slot — otherwise unrelated re-renders would re-apply the
+  // highlight after dismissal.
+  useEffect(() => {
+    if (initialFocusedRowId) {
+      setFocusedRowId(initialFocusedRowId);
+      setPulseRowId(initialFocusedRowId);
+      onFocusedRowConsumed?.();
+    }
+    // Depend on seed value only, not callback identity — re-running
+    // on consume-callback re-creation would defeat the one-shot
+    // handoff invariant. Mirrors BookingsView's approach.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFocusedRowId]);
+  useEffect(() => {
+    if (!focusedRowId) return;
+    const row = rowRefs.current.get(focusedRowId);
+    if (row && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [focusedRowId]);
+  // Drop the pulse marker after the keyframe plays (1100ms = 1s
+  // animation + small buffer so the class survives the final frame).
+  useEffect(() => {
+    if (!pulseRowId) return;
+    const t = setTimeout(() => setPulseRowId(null), 1100);
+    return () => clearTimeout(t);
+  }, [pulseRowId]);
+  // Dismiss on first interaction. Listeners are scoped to the
+  // focus-id lifecycle so the originating click can't dismiss
+  // mid-flight, and a subsequent pivot re-arms a fresh dismissal.
+  useEffect(() => {
+    if (!focusedRowId) return;
+    function dismiss() {
+      setFocusedRowId(null);
+    }
+    window.addEventListener("scroll", dismiss, { passive: true, capture: true });
+    window.addEventListener("mousedown", dismiss, true);
+    window.addEventListener("keydown", dismiss, true);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("mousedown", dismiss, true);
+      window.removeEventListener("keydown", dismiss, true);
+    };
+  }, [focusedRowId]);
   // Bulk-log-call form state — collapsed by default so the action bar
   // stays a slim pill, expands inline above the bar when ops chooses
   // to log a call. Outcome defaults to "no_answer" to match the
@@ -1101,9 +1179,14 @@ export function AwaitingCoordinationView({
                 const unit = units.find((u) => u.id === b.unitId);
                 const building = getBuildingForUnit(unit ?? null);
                 const isSelected = selectedIds.has(b.id);
+                const isFocused = focusedRowId === b.id;
+                const isPulsing = pulseRowId === b.id;
                 return (
                   <tr
                     key={b.id}
+                    ref={(el) => {
+                      rowRefs.current.set(b.id, el);
+                    }}
                     onClick={() => onOpen(b.id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -1115,9 +1198,15 @@ export function AwaitingCoordinationView({
                     role="button"
                     aria-label={`Open booking ${b.id} for ${b.customerName}`}
                     aria-selected={isSelected || undefined}
+                    data-testid={`coordination-row-${b.id}`}
+                    data-focused={isFocused ? "true" : undefined}
+                    data-pulsing={isPulsing ? "true" : undefined}
                     className={`cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
                       isSelected ? "bg-pink-50/60" : ""
-                    }`}
+                    }${isPulsing ? " template-row-focus-pulse" : ""}`}
+                    style={
+                      isFocused ? { backgroundColor: BRAND_SOFT } : undefined
+                    }
                   >
                     {bulkActionsEnabled && (
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>

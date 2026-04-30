@@ -622,6 +622,27 @@ export function AdminApp() {
     setFocusedEmailTemplateId(null);
   }
 
+  /**
+   * Companion pivot for the awaiting-coordination mount of
+   * `BookingDetail`'s "Back to list" button (Task #180). Going back
+   * to the coordination queue from a coordination-mode detail screen
+   * seeds the source booking id so `AwaitingCoordinationView`
+   * highlights the row the admin came from on first paint —
+   * mirroring the source-row highlight Task #172 introduced for the
+   * bookings/payments list. Without it, an admin who opened a row
+   * from a long queue, scrolled the detail, and went back would lose
+   * their starting point.
+   *
+   * Reuses the same `bookingsFocusedRowSeed` slot the bookings mount
+   * already drains because the two list views are mutually exclusive
+   * — only one is ever rendered at a time, so we never have to
+   * disambiguate which mount should consume the seed.
+   */
+  function returnToCoordinationListWithSource(sourceBookingId: string) {
+    setBookingsFocusedRowSeed(sourceBookingId);
+    setSelectedBookingId(null);
+  }
+
   // Service-status advance / payment status / notes edits flow back into
   // the local seeded list (live booking is read-only in this mockup).
   function updateBooking(id: string, patch: Partial<AdminBooking>) {
@@ -1566,7 +1587,7 @@ export function AdminApp() {
                 bookings={allBookings}
                 units={units}
                 agents={agents}
-                onBack={() => setSelectedBookingId(null)}
+                onBack={() => returnToCoordinationListWithSource(selectedBookingId)}
                 onUpdate={updateBooking}
                 onCancelBooking={cancelBooking}
                 onScheduleCoordination={openSchedule}
@@ -1600,6 +1621,10 @@ export function AdminApp() {
                 onBulkLogEmail={bulkLogEmail}
                 emailTemplates={emailTemplates}
                 callTemplates={callTemplates}
+                initialFocusedRowId={bookingsFocusedRowSeed}
+                onFocusedRowConsumed={() =>
+                  setBookingsFocusedRowSeed(null)
+                }
               />
             )
           ) : null}
