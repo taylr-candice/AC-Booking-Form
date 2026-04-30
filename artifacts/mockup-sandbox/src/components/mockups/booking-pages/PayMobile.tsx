@@ -16,7 +16,7 @@ import {
 } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
-  resolveOtherServiceRules,
+  resolveOtherServiceQuantities,
 } from "../../../state/bookingDerived";
 import {
   acSummary,
@@ -56,8 +56,8 @@ export function PayMobile() {
   const ack = session.cancellation_acknowledged;
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
-  const otherServices = resolveOtherServiceRules(
-    session.selected_other_service_ids,
+  const otherServices = resolveOtherServiceQuantities(
+    session.other_service_quantities ?? {},
   );
 
   // If role changes away from agent while invoice is selected, clear the selection.
@@ -171,15 +171,17 @@ export function PayMobile() {
             </SummaryItem>
             {otherServices.length > 0 && (
               <div className="space-y-2 border-t border-slate-100 pt-3">
-                {otherServices.map((s) => (
+                {otherServices.map(({ rule, qty }) => (
                   <div
-                    key={s.id}
+                    key={rule.id}
                     className="flex items-start justify-between gap-3 text-sm"
-                    data-testid={`row-pay-other-${s.id}`}
+                    data-testid={`row-pay-other-${rule.id}`}
                   >
-                    <span className="min-w-0 text-slate-700">{s.name}</span>
+                    <span className="min-w-0 text-slate-700">
+                      {qty > 1 ? `${qty} × ${rule.name}` : rule.name}
+                    </span>
                     <span className="tabular-nums font-medium text-slate-900 shrink-0">
-                      ${s.priceAud + s.addonPriceAud}
+                      ${rule.priceAud * qty + rule.addonPriceAud * Math.max(qty - 1, 0)}
                     </span>
                   </div>
                 ))}

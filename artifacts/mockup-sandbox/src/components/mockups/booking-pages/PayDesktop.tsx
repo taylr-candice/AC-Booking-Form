@@ -3,7 +3,7 @@ import { ArrowRight, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, Fil
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
-  resolveOtherServiceRules,
+  resolveOtherServiceQuantities,
 } from "../../../state/bookingDerived";
 import {
   acSummary,
@@ -48,8 +48,8 @@ export function PayDesktop() {
   const ack = session.cancellation_acknowledged;
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
-  const otherServices = resolveOtherServiceRules(
-    session.selected_other_service_ids,
+  const otherServices = resolveOtherServiceQuantities(
+    session.other_service_quantities ?? {},
   );
 
   const payEnabled = isPayStepEnabled(session) && method !== null;
@@ -101,16 +101,16 @@ export function PayDesktop() {
                     </span>
                   )
                 } />
-                {otherServices.map((s) => (
+                {otherServices.map(({ rule, qty }) => (
                   <SummaryRow
-                    key={s.id}
-                    label={s.name}
+                    key={rule.id}
+                    label={qty > 1 ? `${qty} × ${rule.name}` : rule.name}
                     value={
                       <span className="tabular-nums">
-                        ${s.priceAud + s.addonPriceAud}
+                        ${rule.priceAud * qty + rule.addonPriceAud * Math.max(qty - 1, 0)}
                       </span>
                     }
-                    testId={`row-pay-other-${s.id}`}
+                    testId={`row-pay-other-${rule.id}`}
                   />
                 ))}
               </div>
