@@ -43,6 +43,12 @@ import {
   subscribeLiveOtherServices,
 } from "../../../state/liveOtherServices";
 import {
+  DEFAULT_AC_INDOOR_CAPS,
+  readLiveAcCapsFromStorage,
+  subscribeLiveAcCaps,
+  type LiveAcCaps,
+} from "../../../state/liveAcServices";
+import {
   otherServiceMinutes,
   otherServicePrice,
   otherServicePriceBreakdown,
@@ -208,7 +214,17 @@ export function getAddonHelperLines(
 export function useAcOnFileSync(recorded: AcRecord): void {
   useEffect(() => {
     bookingActions.setSystems(recorded.systems);
-    bookingActions.setAdditionalIndoor(recorded.additional);
+    // Task #222 — pass the recorded type so the booking-session
+    // action can clamp to the per-AC-type catalogue cap. The
+    // recorded.type field is `"split" | "ducted"` here (the on-file
+    // path doesn't fire for unknown types), so the cap lookup is
+    // always meaningful.
+    bookingActions.setAdditionalIndoor(recorded.additional, {
+      acTypeKey:
+        recorded.type === "split" || recorded.type === "ducted"
+          ? recorded.type
+          : null,
+    });
     bookingActions.setAcDiscrepancy(null);
   }, [recorded.type, recorded.systems, recorded.additional]);
 }
@@ -238,6 +254,7 @@ export function useAcStep({
   const [override, setOverride] = useState<Override>(null);
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
   const [notSureCount, setNotSureCount] = useState(false);
+  const liveAcCaps = useLiveAcCaps();
 
   const effectiveType: AcType =
     override === "split" || override === "ducted" ? override : acTypeFromUnit;
@@ -246,6 +263,21 @@ export function useAcStep({
     effectiveType === "split" || effectiveType === "ducted"
       ? effectiveType
       : null;
+
+  /**
+   * Per-AC-type max for the indoor-unit / return-air grille
+   * stepper (Task #222). Always positive when the AC type is known:
+   * uses the live catalogue projection from AdminApp when present,
+   * else falls back to {@link DEFAULT_AC_INDOOR_CAPS} so the cap
+   * still applies in canvas-isolated previews and on fresh loads
+   * before AdminApp's `useEffect` has run. `null` only for the
+   * "type not yet picked" branch where the stepper isn't rendered.
+   */
+  const additionalMaxQty: number | null = knownType
+    ? liveAcCaps[knownType] != null && liveAcCaps[knownType]! > 0
+      ? Math.floor(liveAcCaps[knownType]!)
+      : DEFAULT_AC_INDOOR_CAPS[knownType]
+    : null;
 
   // The type picker shows when (a) we genuinely don't know the type
   // and the customer hasn't picked one yet, or (b) the customer
@@ -341,12 +373,48 @@ export function useAcStep({
       : null;
 
   const displaySystems = isUnsureMode ? 1 : systems;
-  const displayAdditional = isUnsureMode ? 0 : additional;
+  // Local cap-aware clamp so a stale `additional` from a previous
+  // type (or a catalogue edit that lowered the cap mid-flow) can't
+  // surface a value the stepper can't reach. The booking-session
+  // action also clamps as defence-in-depth (Task #222).
+  const displayAdditional = isUnsureMode
+    ? 0
+    : additionalMaxQty != null
+      ? Math.min(additional, additionalMaxQty)
+      : additional;
 
   useEffect(() => {
     bookingActions.setSystems(displaySystems);
-    bookingActions.setAdditionalIndoor(displayAdditional);
-  }, [displaySystems, displayAdditional]);
+    bookingActions.setAdditionalIndoor(displayAdditional, {
+      acTypeKey: knownType,
+    });
+  }, [displaySystems, displayAdditional, knownType]);
+
+  // Reconcile local state when the cap drops mid-flow (e.g. ops just
+  // edited the cap from 8 → 6 in Admin → Services). Without this the
+  // raw `additional` could sit above `additionalMaxQty` even though
+  // the displayed/written count is already clamped — every retry of
+  // `setAdditionalCapped(displayAdditional + 1)` would no-op until
+  // the customer lowered the count manually. (Task #222)
+  useEffect(() => {
+    if (additionalMaxQty != null && additional > additionalMaxQty) {
+      setAdditional(additionalMaxQty);
+    }
+  }, [additional, additionalMaxQty]);
+
+  /**
+   * Cap-aware setter for the indoor-unit stepper. Clamps the
+   * incoming value to `additionalMaxQty` so the local React state
+   * can't drift above the catalogue cap (the booking session action
+   * also clamps; this keeps the local view in lockstep so the
+   * displayed count never lies). Used by AcMobile / AcDesktop in
+   * place of the raw `setAdditional` setter (Task #222).
+   */
+  const setAdditionalCapped = (next: number) => {
+    const min = 0;
+    const max = additionalMaxQty != null ? additionalMaxQty : Infinity;
+    setAdditional(Math.max(min, Math.min(max, Math.floor(next))));
+  };
 
   const showAckError = touched && !confirmed;
   const AddonIcon = effectiveType === "ducted" ? Grid3x3 : AirVent;
@@ -419,6 +487,8 @@ export function useAcStep({
     setSystems,
     additional,
     setAdditional,
+    setAdditionalCapped,
+    additionalMaxQty,
     confirmed,
     setConfirmed,
     touched,
@@ -931,6 +1001,24 @@ export function useLiveOtherServices(): readonly OtherServiceRule[] {
     subscribeLiveOtherServices,
     readLiveOtherServicesFromStorage,
     readLiveOtherServicesFromStorage,
+  );
+}
+
+/**
+ * Subscribe to the cross-iframe AC caps bridge (Task #222) and
+ * return the projected per-AC-type max-add-on map. Driven by
+ * `useSyncExternalStore` against `subscribeLiveAcCaps`, which fires
+ * on cross-window `storage` events AND on same-window writes by
+ * `AdminApp`. The empty `{split: null, ducted: null}` default fires
+ * in canvas-isolated mode where no admin shell has populated
+ * sessionStorage — in that case the stepper has no per-type cap
+ * and the booking session falls back to its legacy 0..29 ceiling.
+ */
+export function useLiveAcCaps(): LiveAcCaps {
+  return useSyncExternalStore(
+    subscribeLiveAcCaps,
+    readLiveAcCapsFromStorage,
+    readLiveAcCapsFromStorage,
   );
 }
 

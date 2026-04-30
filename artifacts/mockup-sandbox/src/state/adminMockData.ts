@@ -3234,6 +3234,16 @@ export type AdminService = {
    */
   maxQty: number;
   /**
+   * Maximum quantity a customer can pick on the Step 2 AC stepper
+   * for the per-system add-on (extra indoor heads / return-air
+   * grilles). Only meaningful when `acTypeKey === "split" | "ducted"`.
+   * Mirrors the per-service cap used for "other" services
+   * (Task #212) so a fat-finger on a split system can't book 20
+   * indoor heads either (Task #222). Defaults: 6 for split (typical
+   * residential ceiling), 8 for ducted return-air grilles.
+   */
+  additionalIndoorMaxQty?: number;
+  /**
    * Optional free-text "applies to" note, used for generic catalogue
    * entries that aren't keyed off an AC type (e.g. "applies to:
    * bathroom extraction"). Empty / undefined for the seeded AC entries.
@@ -3265,6 +3275,7 @@ export const SEEDED_SERVICES: AdminService[] = [
     priceAud: 179,
     addonPriceAud: 39,
     maxQty: 5,
+    additionalIndoorMaxQty: 6,
     defaultJobMinutes: 45,
   },
   {
@@ -3277,6 +3288,7 @@ export const SEEDED_SERVICES: AdminService[] = [
     priceAud: 179,
     addonPriceAud: 39,
     maxQty: 5,
+    additionalIndoorMaxQty: 8,
     defaultJobMinutes: 45,
   },
 ];

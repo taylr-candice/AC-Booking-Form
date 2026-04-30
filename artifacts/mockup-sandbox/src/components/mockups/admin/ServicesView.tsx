@@ -222,6 +222,17 @@ function ServiceCard({
               .
             </div>
           )}
+          {(service.acTypeKey === "split" ||
+            service.acTypeKey === "ducted") &&
+            service.additionalIndoorMaxQty != null && (
+              <div className="mt-2 text-[11px] text-slate-500">
+                Indoor-unit stepper caps at{" "}
+                <span className="font-semibold text-slate-700">
+                  {service.additionalIndoorMaxQty}
+                </span>
+                .
+              </div>
+            )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -356,6 +367,42 @@ function ServiceEditor({
                 </span>
               </Field>
             </>
+          )}
+          {(draft.acTypeKey === "split" || draft.acTypeKey === "ducted") && (
+            <Field
+              label={
+                draft.acTypeKey === "ducted"
+                  ? "Max return-air grilles (customer stepper)"
+                  : "Max indoor heads (customer stepper)"
+              }
+            >
+              <input
+                type="number"
+                min={1}
+                max={29}
+                step={1}
+                value={draft.additionalIndoorMaxQty ?? ""}
+                placeholder={draft.acTypeKey === "ducted" ? "8" : "6"}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    patch({ additionalIndoorMaxQty: undefined });
+                    return;
+                  }
+                  patch({
+                    additionalIndoorMaxQty: Math.min(
+                      29,
+                      Math.max(1, Math.floor(Number(raw) || 1)),
+                    ),
+                  });
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] focus:border-slate-400 focus:outline-none"
+              />
+              <span className="mt-1 text-[11px] text-slate-500">
+                Caps the Step 2 indoor-unit stepper. Bigger jobs need to call
+                in.
+              </span>
+            </Field>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Base time (min / system)">

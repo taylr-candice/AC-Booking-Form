@@ -15,6 +15,7 @@
 import { useSyncExternalStore } from "react";
 
 import { findLiveOtherServiceRuleById } from "./liveOtherServices";
+import { getLiveAdditionalIndoorCap } from "./liveAcServices";
 
 // Mirror of `OTHER_AGENCY_ID` in `./accessMethodCatalog`. Kept as a local
 // constant so this module remains dependency-free per the file header
@@ -849,8 +850,35 @@ export const bookingActions = {
     const clamped = Math.max(1, Math.min(10, Math.round(n)));
     setState((s) => (s.num_systems === clamped ? s : { ...s, num_systems: clamped }));
   },
-  setAdditionalIndoor(n: number) {
-    const clamped = Math.max(0, Math.min(29, Math.round(n)));
+  /**
+   * Set the per-system add-on count (Step 2 indoor-unit / return-air
+   * grille stepper). When `acTypeKey` is `"split"` or `"ducted"`, the
+   * value is strictly clamped to the per-AC-type catalogue cap from
+   * `getLiveAdditionalIndoorCap` (Task #222 — mirrors the per-service
+   * cap Task #212 added for "other" services so a customer can't
+   * fat-finger "20 indoor heads"). The cap helper has a built-in
+   * fallback (DEFAULT_AC_INDOOR_CAPS) so the limit applies even when
+   * AdminApp hasn't published a projection (canvas-isolated previews,
+   * fresh tabs). Unknown / legacy callers (no acTypeKey, "other"
+   * services, on-file sync for unrecognised types) keep the
+   * historical 0..29 ceiling so they don't accidentally inherit a
+   * stricter customer-flow limit.
+   */
+  setAdditionalIndoor(
+    n: number,
+    opts?: { acTypeKey?: "split" | "ducted" | null },
+  ) {
+    const acTypeKey = opts?.acTypeKey ?? null;
+    // Known split/ducted callers clamp strictly to the live (or
+    // default) per-AC-type cap — Task #222. Unknown / legacy callers
+    // (admin staff form, on-file sync for unrecognised types, older
+    // tests) keep the historical 0..29 ceiling so they don't
+    // accidentally inherit a stricter customer-flow limit.
+    const ceiling =
+      acTypeKey === "split" || acTypeKey === "ducted"
+        ? getLiveAdditionalIndoorCap(acTypeKey)
+        : 29;
+    const clamped = Math.max(0, Math.min(ceiling, Math.round(n)));
     setState((s) =>
       s.num_additional_indoor === clamped ? s : { ...s, num_additional_indoor: clamped },
     );

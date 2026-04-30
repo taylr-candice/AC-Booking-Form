@@ -226,8 +226,8 @@ function FullConfigView({
     copy,
     systems,
     setSystems,
-    additional,
-    setAdditional,
+    setAdditionalCapped,
+    additionalMaxQty,
     confirmed,
     setConfirmed,
     setTouched,
@@ -393,36 +393,68 @@ function FullConfigView({
                   ${ADDON_PRICE} ea.
                 </p>
               </div>
-              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
-                <button
-                  type="button"
-                  onClick={() => setAdditional(Math.max(0, additional - 1))}
-                  className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
-                  disabled={additional <= 0}
-                  data-testid="btn-additional-minus"
-                  aria-label={`Decrease ${copy.addonLabel.toLowerCase()}`}
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <div className="text-lg font-bold text-slate-900 w-12 text-center">{additional}</div>
-                <button
-                  type="button"
-                  onClick={() => setAdditional(additional + 1)}
-                  className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  data-testid="btn-additional-plus"
-                  aria-label={`Increase ${copy.addonLabel.toLowerCase()}`}
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-              <div
-                className="mt-2 space-y-1.5 text-[11px] text-slate-500"
-                data-testid="text-extras-helper"
-              >
-                {getAddonHelperLines(effectiveType, copy).map((p, i) => (
-                  <p key={i}>{p}</p>
-                ))}
-              </div>
+              {(() => {
+                // Drive the stepper from the cap-clamped `displayAdditional`
+                // (Task #222) — never the raw local `additional`. If a stale
+                // value or a catalogue edit pushes the local count above the
+                // cap, the displayed number, the +/- enabled state and the
+                // booking session all stay in lockstep.
+                const atCap =
+                  additionalMaxQty != null &&
+                  displayAdditional >= additionalMaxQty;
+                return (
+                  <>
+                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAdditionalCapped(displayAdditional - 1)
+                        }
+                        className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+                        disabled={displayAdditional <= 0}
+                        data-testid="btn-additional-minus"
+                        aria-label={`Decrease ${copy.addonLabel.toLowerCase()}`}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <div className="text-lg font-bold text-slate-900 w-12 text-center">{displayAdditional}</div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAdditionalCapped(displayAdditional + 1)
+                        }
+                        disabled={atCap}
+                        title={
+                          atCap
+                            ? `Max ${additionalMaxQty} — call us for more`
+                            : undefined
+                        }
+                        className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50 disabled:hover:bg-slate-100"
+                        data-testid="btn-additional-plus"
+                        aria-label={`Increase ${copy.addonLabel.toLowerCase()}`}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {atCap && (
+                      <p
+                        className="mt-2 text-[11px] text-slate-500"
+                        data-testid="text-additional-cap-hint"
+                      >
+                        Max {additionalMaxQty} — call us for more.
+                      </p>
+                    )}
+                    <div
+                      className="mt-2 space-y-1.5 text-[11px] text-slate-500"
+                      data-testid="text-extras-helper"
+                    >
+                      {getAddonHelperLines(effectiveType, copy).map((p, i) => (
+                        <p key={i}>{p}</p>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}

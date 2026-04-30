@@ -215,8 +215,8 @@ function FullConfigView({
     copy,
     systems,
     setSystems,
-    additional,
-    setAdditional,
+    setAdditionalCapped,
+    additionalMaxQty,
     confirmed,
     setConfirmed,
     setTouched,
@@ -365,30 +365,61 @@ function FullConfigView({
                         ${ADDON_PRICE} per extra {effectiveType === "ducted" ? "grille" : "unit"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setAdditional(Math.max(0, additional - 1))}
-                        disabled={additional <= 0}
-                        data-testid="btn-additional-minus"
-                        aria-label={`Decrease ${copy.addonLabel.toLowerCase()}`}
-                        className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <div className="w-8 text-center text-xl font-bold text-slate-900">{additional}</div>
-                      <button
-                        type="button"
-                        onClick={() => setAdditional(additional + 1)}
-                        data-testid="btn-additional-plus"
-                        aria-label={`Increase ${copy.addonLabel.toLowerCase()}`}
-                        className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
+                    {(() => {
+                      // Drive the stepper from the cap-clamped
+                      // `displayAdditional` (Task #222) — never the raw local
+                      // `additional` — so the displayed count, the +/-
+                      // enabled state and the booking session stay in
+                      // lockstep when caps change mid-flow.
+                      const atCap =
+                        additionalMaxQty != null &&
+                        displayAdditional >= additionalMaxQty;
+                      return (
+                        <div className="flex items-center gap-4 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAdditionalCapped(displayAdditional - 1)
+                            }
+                            disabled={displayAdditional <= 0}
+                            data-testid="btn-additional-minus"
+                            aria-label={`Decrease ${copy.addonLabel.toLowerCase()}`}
+                            className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <div className="w-8 text-center text-xl font-bold text-slate-900">{displayAdditional}</div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAdditionalCapped(displayAdditional + 1)
+                            }
+                            disabled={atCap}
+                            title={
+                              atCap
+                                ? `Max ${additionalMaxQty} — call us for more`
+                                : undefined
+                            }
+                            data-testid="btn-additional-plus"
+                            aria-label={`Increase ${copy.addonLabel.toLowerCase()}`}
+                            className="grid h-10 w-10 place-items-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
 
+                  {additionalMaxQty != null &&
+                    displayAdditional >= additionalMaxQty && (
+                      <p
+                        className="mt-3 text-xs text-slate-500"
+                        data-testid="text-additional-cap-hint"
+                      >
+                        Max {additionalMaxQty} — call us for more.
+                      </p>
+                    )}
                   <div
                     className="mt-3 space-y-2 text-xs text-slate-500"
                     data-testid="text-extras-helper"

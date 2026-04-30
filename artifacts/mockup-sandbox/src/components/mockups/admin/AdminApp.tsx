@@ -83,6 +83,7 @@ import {
   setUnitDurationContextResolver,
 } from "@/state/bookingDerived";
 import { writeLiveOtherServices } from "@/state/liveOtherServices";
+import { writeLiveAcCaps } from "@/state/liveAcServices";
 import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
@@ -1889,6 +1890,28 @@ export function AdminApp() {
           maxQty: s.maxQty,
         })),
     );
+    // Task #222 — project the AC entries' per-add-on caps so the
+    // customer flow's iframe-rendered AC step can disable "+" at
+    // the cap and `bookingActions.setAdditionalIndoor` can clamp
+    // without crashing when the parent frame isn't reachable.
+    // Same cross-iframe sessionStorage pattern as the "other"
+    // services bridge above.
+    {
+      const splitEntry = services.find((s) => s.acTypeKey === "split");
+      const ductedEntry = services.find((s) => s.acTypeKey === "ducted");
+      writeLiveAcCaps({
+        split:
+          splitEntry?.additionalIndoorMaxQty != null &&
+          splitEntry.additionalIndoorMaxQty > 0
+            ? Math.floor(splitEntry.additionalIndoorMaxQty)
+            : null,
+        ducted:
+          ductedEntry?.additionalIndoorMaxQty != null &&
+          ductedEntry.additionalIndoorMaxQty > 0
+            ? Math.floor(ductedEntry.additionalIndoorMaxQty)
+            : null,
+      });
+    }
     setUniquenessGuard((sess, newBookingReference) => {
       if (!sess.unit_id) return "ok";
       const rollout = findRolloutForBooking("svc-ac", sess.unit_id);
@@ -1958,6 +1981,9 @@ export function AdminApp() {
       // (or a different page that loads after AdminApp unmounts)
       // doesn't see stale catalogue entries.
       writeLiveOtherServices(null);
+      // Same rationale for the AC caps bridge (Task #222) — clear so
+      // a fresh mount doesn't pick up a stale cap.
+      writeLiveAcCaps(null);
     };
   }, [seededBookings, units, buildings, services]);
 
