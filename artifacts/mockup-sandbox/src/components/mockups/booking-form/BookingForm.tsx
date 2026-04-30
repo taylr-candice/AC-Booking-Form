@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Check,
@@ -49,6 +49,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { bookingActions } from "@/state/bookingSession";
+import { useLiveAcCaps } from "@/components/mockups/booking-pages/acStepShared";
+import {
+  DEFAULT_AC_INDOOR_CAPS,
+  type LiveAcCaps,
+} from "@/state/liveAcServices";
 
 const BRAND = "#ED017F";
 const SYSTEM_PRICE = 179;
@@ -208,8 +213,46 @@ function genReference() {
   return `TLR-${r(alpha, 2)}${r(num, 2)}${r(alpha, 2)}`;
 }
 
+/**
+ * Resolve the "Additional indoor units" cap for the legacy form,
+ * which has no AC-type selector. Returns `min(split, ducted)` so
+ * the form never accepts a quantity the strictest canonical type
+ * would refuse, and lowering EITHER per-type cap in Admin →
+ * Services shrinks the stepper. Falls back to
+ * {@link DEFAULT_AC_INDOOR_CAPS} when the live bridge hasn't been
+ * populated yet (canvas-isolated previews / fresh loads).
+ */
+function resolveLegacyAdditionalCap(caps: LiveAcCaps): number {
+  const split =
+    caps.split != null && caps.split > 0
+      ? Math.floor(caps.split)
+      : DEFAULT_AC_INDOOR_CAPS.split;
+  const ducted =
+    caps.ducted != null && caps.ducted > 0
+      ? Math.floor(caps.ducted)
+      : DEFAULT_AC_INDOOR_CAPS.ducted;
+  return Math.min(split, ducted);
+}
+
 export function BookingForm() {
   const [s, setS] = useState<State>(initialState);
+
+  // Per-AC-type cap on the "Additional indoor units" stepper,
+  // sourced from Admin → Services via the live bridge so edits
+  // there flow through here without remounting.
+  const liveAcCaps = useLiveAcCaps();
+  const additionalMaxQty = resolveLegacyAdditionalCap(liveAcCaps);
+
+  // Clamp the in-flight count if the catalogue cap shrinks
+  // mid-form, so the user is never sitting above the live cap.
+  useEffect(() => {
+    if (s.ac.additional > additionalMaxQty) {
+      setS((prev) => ({
+        ...prev,
+        ac: { ...prev.ac, additional: additionalMaxQty },
+      }));
+    }
+  }, [additionalMaxQty, s.ac.additional]);
 
   const unit = useMemo(() => UNITS.find((u) => u.id === s.unitId) ?? null, [s.unitId]);
   const agency = useMemo(() => AGENCIES.find((a) => a.id === s.agencyId) ?? null, [s.agencyId]);
@@ -316,7 +359,12 @@ export function BookingForm() {
         return !!baseOk;
       }
       case 3:
-        return s.ac.systems >= 1 && s.ac.systems <= 10 && s.ac.additional >= 0 && s.ac.additional <= 29;
+        return (
+          s.ac.systems >= 1 &&
+          s.ac.systems <= 10 &&
+          s.ac.additional >= 0 &&
+          s.ac.additional <= additionalMaxQty
+        );
       case 4: {
         if (s.role === "owner" && !s.ownerType) return false;
         if (!s.accessMethod) return false;
@@ -446,7 +494,7 @@ export function BookingForm() {
           <div className="px-5 py-5 sm:px-7 sm:py-7">
             {s.step === 1 && <Step1 unit={unit} onSelect={selectUnit} role={s.role} setRole={setRole} />}
             {s.step === 2 && <Step2 s={s} update={update} />}
-            {s.step === 3 && <Step3 s={s} update={update} unit={unit} total={total} />}
+            {s.step === 3 && <Step3 s={s} update={update} unit={unit} total={total} additionalMaxQty={additionalMaxQty} />}
             {s.step === 4 && <Step4 s={s} update={update} setOwnerType={setOwnerType} setAccessMethod={setAccessMethod} />}
             {s.step === 5 && !isCoordination && <Step5 s={s} update={update} />}
             {s.step === 6 && <Step6 s={s} unit={unit} agency={agency} arrangeAgency={arrangeAgency} slot={slot} total={total} isCoordination={isCoordination} onPay={submitPayment} />}
@@ -784,8 +832,24 @@ function Step2({ s, update }: { s: State; update: (p: Partial<State>) => void })
 }
 
 /* ---------- Step 3: AC details ---------- */
-function Step3({ s, update, unit, total }: { s: State; update: (p: Partial<State>) => void; unit: Unit | null; total: number }) {
+function Step3({
+  s,
+  update,
+  unit,
+  total,
+  additionalMaxQty,
+}: {
+  s: State;
+  update: (p: Partial<State>) => void;
+  unit: Unit | null;
+  total: number;
+  /** Strictest per-AC-type indoor-unit cap projected from
+   *  Admin → Services — `min(splitCap, ductedCap)`. See
+   *  {@link resolveLegacyAdditionalCap}. */
+  additionalMaxQty: number;
+}) {
   const hasSaved = unit && (unit.savedSystems != null || unit.savedAdditional != null);
+  const additionalAtCap = s.ac.additional >= additionalMaxQty;
   return (
     <StepShell
       icon={<Wind className="h-5 w-5" />}
@@ -813,15 +877,30 @@ function Step3({ s, update, unit, total }: { s: State; update: (p: Partial<State
           subLabel={`× $${SYSTEM_PRICE}`}
           testId="systems"
         />
-        <Counter
-          label="Additional indoor units"
-          value={s.ac.additional}
-          min={0}
-          max={29}
-          onChange={(v) => update({ ac: { ...s.ac, additional: v } })}
-          subLabel={`× $${ADDON_PRICE}`}
-          testId="additional"
-        />
+        <div>
+          <Counter
+            label="Additional indoor units"
+            value={s.ac.additional}
+            min={0}
+            max={additionalMaxQty}
+            onChange={(v) => update({ ac: { ...s.ac, additional: v } })}
+            subLabel={`× $${ADDON_PRICE}`}
+            testId="additional"
+            incrementTitle={
+              additionalAtCap
+                ? `Max ${additionalMaxQty} — call us for more`
+                : undefined
+            }
+          />
+          {additionalAtCap && (
+            <p
+              className="mt-1 text-[11px] text-slate-500"
+              data-testid="text-additional-cap-hint"
+            >
+              Max {additionalMaxQty} — call us for more.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/60 p-4 text-xs text-slate-600">
@@ -847,8 +926,19 @@ function Step3({ s, update, unit, total }: { s: State; update: (p: Partial<State
 }
 
 function Counter({
-  label, value, min, max, onChange, subLabel, testId,
-}: { label: string; value: number; min: number; max: number; onChange: (v: number) => void; subLabel: string; testId: string }) {
+  label, value, min, max, onChange, subLabel, testId, incrementTitle,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  subLabel: string;
+  testId: string;
+  /** Hover hint for the "+" button — surfaces the per-AC-type
+   *  cap message ("Max N — call us for more") at the cap. */
+  incrementTitle?: string;
+}) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="mb-2 flex items-baseline justify-between">
@@ -874,6 +964,7 @@ function Counter({
           size="icon"
           onClick={() => onChange(Math.min(max, value + 1))}
           disabled={value >= max}
+          title={incrementTitle}
           data-testid={`button-${testId}-inc`}
           className="h-9 w-9"
         >
