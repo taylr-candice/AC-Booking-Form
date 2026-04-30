@@ -196,10 +196,11 @@ function CoordinatingWithCell({
               {recency ? ` · ${recency.label}` : ""}
             </span>
             {latestAttempt.templateLabel && (
-              // Small grey suffix naming the email template the admin
-              // picked when logging the email (Task #141), so a team
-              // lead can triage the queue at a glance — "spoke ·
-              // 2h ago · Sent rebook link" reads naturally inline
+              // Small grey suffix naming the Call/Email template the
+              // admin picked when logging the entry (Task #141 for
+              // emails, Task #149 for calls), so a team lead can
+              // triage the queue at a glance — "spoke · 2h ago ·
+              // No answer — left voicemail" reads naturally inline
               // without an extra row. Custom / legacy entries leave
               // `templateLabel` as `null` and skip this entirely.
               <span

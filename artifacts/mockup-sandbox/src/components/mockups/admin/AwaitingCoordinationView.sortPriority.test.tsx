@@ -504,10 +504,11 @@ describe("AwaitingCoordinationView last-attempt template suffix", () => {
     ).toBeNull();
   });
 
-  it("never renders the suffix on a logged-call row", () => {
-    // `templateLabel` is an email-only concept; the suffix must not
-    // bleed into call entries even if a stale field somehow survives
-    // a future schema change.
+  it("appends the picked call template name when the latest call entry carries one (Task #149)", () => {
+    // Call entries snapshot the picked Call template's name onto
+    // `templateLabel` the same way email entries do — the suffix
+    // surfaces it on the queue's "Last attempt" cell so a team lead
+    // can triage by template without opening each booking.
     expect(
       renderQueueCellText([
         {
@@ -516,7 +517,29 @@ describe("AwaitingCoordinationView last-attempt template suffix", () => {
           label: "Logged call · Spoke to them",
           at: "Just now",
           by: "Mia (admin)",
-          templateLabel: "Sent rebook link",
+          templateLabel: "Spoke — confirmed window",
+        },
+      ]),
+    ).toBe("Last attempt: spoke · Spoke — confirmed window");
+    const suffix = screen.getByTestId(
+      "coordinating-with-last-attempt-template",
+    );
+    expect(suffix.textContent).toContain("Spoke — confirmed window");
+    expect(suffix.className).toContain("text-slate-500");
+  });
+
+  it("omits the suffix when the latest call entry has no templateLabel (Custom / legacy) (Task #149)", () => {
+    // Custom / pre-Task-149 call entries don't carry `templateLabel`
+    // — the suffix must stay hidden so legacy rows keep the existing
+    // label-only line.
+    expect(
+      renderQueueCellText([
+        {
+          kind: "call",
+          status: "logged_call",
+          label: "Logged call · Spoke to them",
+          at: "Just now",
+          by: "Mia (admin)",
         },
       ]),
     ).toBe("Last attempt: spoke");

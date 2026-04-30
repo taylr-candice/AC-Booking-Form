@@ -692,6 +692,38 @@ describe("BookingDetail · timeline · call/email entry rendering", () => {
     ).toBeTruthy();
   });
 
+  it("renders the Template chip beneath the call entry label when templateLabel is set (Task #149)", () => {
+    // Call entries carry the same `templateLabel` snapshot the Log
+    // call form persists for non-Custom picks; the chip mirrors the
+    // email path so an admin can retrace which preset wrote the row
+    // without opening the panel and counting references.
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [
+          callEntry({ templateLabel: "No answer — left voicemail" }),
+        ],
+      }),
+    );
+    const row = within(screen.getByTestId("timeline-entry-0"));
+    const chip = row.getByTestId("timeline-entry-0-template");
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toMatch(
+      /template:\s*no answer\s*—\s*left voicemail/i,
+    );
+    // Chip sits between the label and the note line so ops can see
+    // the template at a glance even with a long free-text note.
+    const label = row.getByText("Logged call · Spoke to them");
+    const note = row.getByText("Confirmed Wed afternoon");
+    expect(
+      label.compareDocumentPosition(chip) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      chip.compareDocumentPosition(note) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("omits the Template chip when the email entry has no templateLabel (Custom + legacy entries) (Task #138)", () => {
     renderDetail(
       makeBooking({
@@ -707,14 +739,36 @@ describe("BookingDetail · timeline · call/email entry rendering", () => {
     expect(row.queryByText(/template:/i)).toBeNull();
   });
 
-  it("never renders a Template chip for non-email entries (Task #138)", () => {
+  it("omits the Template chip when the call entry has no templateLabel (Custom + legacy entries) (Task #149)", () => {
     renderDetail(
       makeBooking({
         serviceTimeline: [
-          // Same field on a call entry must be ignored — the chip is
-          // an email-only affordance because only the Log email form
-          // ever picks a template.
-          callEntry({ templateLabel: "Sent rebook link" } as never),
+          // Custom / pre-Task-149 call entries don't carry
+          // templateLabel — the chip must not render so the timeline
+          // stays clean for legacy rows.
+          callEntry({ templateLabel: undefined }),
+        ],
+      }),
+    );
+    const row = within(screen.getByTestId("timeline-entry-0"));
+    expect(row.queryByTestId("timeline-entry-0-template")).toBeNull();
+    expect(row.queryByText(/template:/i)).toBeNull();
+  });
+
+  it("never renders a Template chip on generic status entries even if templateLabel slips through (Task #149)", () => {
+    renderDetail(
+      makeBooking({
+        serviceTimeline: [
+          // The chip is an audit affordance for logged Call/Email
+          // touches; lifecycle status rows must never render it even
+          // if a stale field somehow survives a future schema change.
+          {
+            status: "scheduled",
+            label: "Scheduled",
+            at: "Today 09:00",
+            by: "System",
+            templateLabel: "Sent rebook link",
+          } as never,
         ],
       }),
     );

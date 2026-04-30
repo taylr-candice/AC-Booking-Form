@@ -258,6 +258,7 @@ describe("EmailTemplatesView · CRUD", () => {
           onRemove={(id) =>
             setTemplates((prev) => prev.filter((t) => t.id !== id))
           }
+          onSetDefault={() => {}}
         />
       );
     }

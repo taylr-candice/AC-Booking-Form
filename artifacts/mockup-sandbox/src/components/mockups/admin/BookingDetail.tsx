@@ -935,7 +935,15 @@ function Timeline({
               <div className="text-[12px] font-medium text-slate-900">
                 {e.label}
               </div>
-              {kind === "email" && e.templateLabel && (
+              {(kind === "email" || kind === "call") && e.templateLabel && (
+                // Small grey chip naming the Call/Email template the
+                // admin picked when logging this entry. Email entries
+                // got the chip first (Task #138); call entries reuse
+                // the same affordance so an admin can retrace which
+                // preset wrote each row without opening the Log call /
+                // Log email panel and counting references (Task #149).
+                // Custom / legacy entries leave `templateLabel`
+                // undefined and skip the chip entirely.
                 <div
                   className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700"
                   data-testid={`timeline-entry-${i}-template`}

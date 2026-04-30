@@ -414,10 +414,12 @@ describe("BookingsView last-attempt template suffix", () => {
     expect(templateNode()).toBeNull();
   });
 
-  it("never renders a suffix on a logged-call row", () => {
-    // `templateLabel` is an email-only concept; the suffix must not
-    // bleed into call entries even if a stale field somehow survives
-    // a future schema change.
+  it("appends the picked call template name when the latest call entry carries one (Task #149)", () => {
+    // Call entries snapshot the picked Call template's name onto
+    // `templateLabel` the same way email entries do (Task #138 → #149),
+    // so the row-level "Last attempt" suffix surfaces it inline so a
+    // team lead can triage the queue at a glance without opening
+    // each booking.
     const timeline: TimelineEntry[] = [
       {
         kind: "call",
@@ -425,13 +427,36 @@ describe("BookingsView last-attempt template suffix", () => {
         label: "Logged call · Spoke to them",
         at: "Just now",
         by: "Mia (admin)",
-        // Intentionally pretend the field made it onto a call row —
-        // the renderer should still ignore it.
-        templateLabel: "Sent rebook link",
+        templateLabel: "Spoke — confirmed window",
       },
     ];
     renderView(
       makeBooking({ id: "bk-call-tpl", serviceTimeline: timeline }),
+    );
+    expect(attemptText()).toBe(
+      "Last attempt: spoke · Spoke — confirmed window",
+    );
+    const suffix = templateNode();
+    expect(suffix).not.toBeNull();
+    expect(suffix!.textContent).toContain("Spoke — confirmed window");
+    expect(suffix!.className).toContain("text-slate-500");
+  });
+
+  it("omits the suffix when the latest call entry has no templateLabel (Custom / legacy) (Task #149)", () => {
+    // Custom / pre-Task-149 call entries don't carry `templateLabel`
+    // — the suffix must stay hidden so legacy rows keep the existing
+    // label-only line.
+    const timeline: TimelineEntry[] = [
+      {
+        kind: "call",
+        status: "logged_call",
+        label: "Logged call · Spoke to them",
+        at: "Just now",
+        by: "Mia (admin)",
+      },
+    ];
+    renderView(
+      makeBooking({ id: "bk-call-no-tpl", serviceTimeline: timeline }),
     );
     expect(attemptText()).toBe("Last attempt: spoke");
     expect(templateNode()).toBeNull();
