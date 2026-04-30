@@ -19,18 +19,24 @@
  *     dismiss X, styled the same as the inline undo toast in
  *     RolloutScheduleEditor. Clicking it runs the callback and then
  *     dismisses the toast.
+ *   - Optional `variant` prop — "success" (default, emerald) or
+ *     "info" (amber tint with an Info icon) for non-blocking hints.
+ *     Both share layout, auto-dismiss, and dismiss controls.
  */
 
 import { useEffect } from "react";
-import { CheckCircle2, Undo2, X } from "lucide-react";
+import { CheckCircle2, Info, Undo2, X } from "lucide-react";
 
 import { BRAND_DEEP, BRAND_SOFT } from "./theme";
+
+export type ToastVariant = "success" | "info";
 
 export function Toast({
   id,
   message,
   onDismiss,
   onUndo,
+  variant = "success",
   durationMs = 4000,
 }: {
   /** Stable per-toast id so the auto-dismiss timer resets on a new toast. */
@@ -39,6 +45,8 @@ export function Toast({
   onDismiss: () => void;
   /** Optional one-click undo. When provided, an "Undo" pill is rendered. */
   onUndo?: () => void;
+  /** Visual treatment + leading icon. Defaults to "success". */
+  variant?: ToastVariant;
   durationMs?: number;
 }) {
   useEffect(() => {
@@ -46,16 +54,32 @@ export function Toast({
     return () => clearTimeout(t);
   }, [id, durationMs, onDismiss]);
 
+  const isInfo = variant === "info";
+  const containerClass = isInfo
+    ? "fixed bottom-6 right-6 z-50 flex cursor-pointer items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg"
+    : "fixed bottom-6 right-6 z-50 flex cursor-pointer items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-lg";
+  const messageClass = isInfo
+    ? "text-[13px] font-medium text-amber-900"
+    : "text-[13px] font-medium text-slate-800";
+  const dismissClass = isInfo
+    ? "text-amber-500 hover:text-amber-800"
+    : "text-slate-400 hover:text-slate-700";
+
   return (
     <div
       role="status"
       aria-live="polite"
-      data-testid="toast-success"
+      data-testid={isInfo ? "toast-info" : "toast-success"}
+      data-variant={variant}
       onClick={onDismiss}
-      className="fixed bottom-6 right-6 z-50 flex cursor-pointer items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-lg"
+      className={containerClass}
     >
-      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-      <span className="text-[13px] font-medium text-slate-800">{message}</span>
+      {isInfo ? (
+        <Info className="h-4 w-4 shrink-0 text-amber-600" />
+      ) : (
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+      )}
+      <span className={messageClass}>{message}</span>
       {onUndo && (
         <button
           type="button"
@@ -77,7 +101,7 @@ export function Toast({
           e.stopPropagation();
           onDismiss();
         }}
-        className="text-slate-400 hover:text-slate-700"
+        className={dismissClass}
         aria-label="Dismiss"
       >
         <X className="h-3.5 w-3.5" />

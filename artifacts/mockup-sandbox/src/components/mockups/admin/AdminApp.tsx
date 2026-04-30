@@ -84,11 +84,24 @@ import { RolloutsView } from "./RolloutsView";
 import { SchedulingModal, type SchedulingMode } from "./SchedulingModal";
 import { selectPendingInvoiceVoids } from "./InvoiceVoidAlerts";
 import { Sidebar } from "./Sidebar";
-import { Toast } from "./Toast";
+import { Toast, type ToastVariant } from "./Toast";
 import { TopBar } from "./TopBar";
 import { UnitsView } from "./UnitsView";
 import type { CoordinationKind } from "@/state/adminMockData";
 import type { ViewId } from "./types";
+
+/**
+ * Copy for the missing-template hint toast: ops clicked a
+ * `From template: <name>` chip but the catalog no longer has a row
+ * with that name. Exported so the regression test can pin the wording.
+ */
+export function buildMissingTemplateHint(
+  kind: "call" | "email",
+  templateName: string,
+): string {
+  const channel = kind === "call" ? "Call" : "Email";
+  return `"${templateName}" is no longer in the ${channel} templates catalog. Historical timeline entry kept.`;
+}
 
 export function AdminApp() {
   // Mutable working copies of the seeded data (so admin "edits" stick
@@ -308,6 +321,14 @@ export function AdminApp() {
     id: string;
     message: string;
     undo?: () => void;
+    /** Visual variant — defaults to "success". The "info" variant
+     *  is used for the missing-template hint from
+     *  {@link openTemplateFromBooking}. */
+    variant?: ToastVariant;
+    /** When true, the toast clears on the next sidebar nav. Used by
+     *  the missing-template hint; scheduling / bulk-log toasts opt
+     *  out so they persist when ops switches view. */
+    dismissOnNav?: boolean;
   } | null>(null);
 
   // When jumping to Payments, default the bookings list to the payments filter.
@@ -356,6 +377,9 @@ export function AdminApp() {
     // navigates here themselves rather than via a booking chip.
     setFocusedCallTemplateId(null);
     setFocusedEmailTemplateId(null);
+    // Drop dismiss-on-nav toasts (the missing-template hint) — other
+    // toasts persist so ops can flip view without losing them.
+    setToast((t) => (t && t.dismissOnNav ? null : t));
   }
 
   /**
@@ -396,13 +420,15 @@ export function AdminApp() {
    * Inverse of {@link openBookingFromTemplate}: jump from a booking's
    * timeline `From template: <name>` chip back to the matching row in
    * the Call / Email templates panel (Task #155). Looks the template
-   * up by name on the live catalog so renamed templates still resolve
-   * (the timeline carries the snapshot label, but here we want the
-   * current id). The matched row id is stashed in
-   * {@link focusedCallTemplateId} / {@link focusedEmailTemplateId} so
-   * the panel can highlight + scroll into view. If the template has
-   * since been removed entirely we still switch to the panel — the
-   * admin can see at a glance that the template is gone.
+   * up by name so renamed templates still resolve, then stashes the
+   * matched id in {@link focusedCallTemplateId} /
+   * {@link focusedEmailTemplateId} so the panel can highlight + scroll
+   * into view.
+   *
+   * If the template has since been renamed or removed there's no row
+   * to focus — fire a non-blocking info toast naming the missing
+   * template (Task #166). The toast is `dismissOnNav` so it clears
+   * when ops moves on; otherwise it auto-dismisses after 4s.
    */
   function openTemplateFromBooking(
     kind: "call" | "email",
@@ -421,6 +447,18 @@ export function AdminApp() {
       setView("email_templates");
       setFocusedEmailTemplateId(match ? match.id : null);
       setFocusedCallTemplateId(null);
+    }
+    if (match) {
+      // Drop any stale missing-template hint from a prior click so a
+      // clean resolve doesn't open over a "missing" toast.
+      setToast((t) => (t && t.dismissOnNav ? null : t));
+    } else {
+      setToast({
+        id: `missing-template-${kind}-${Date.now()}`,
+        message: buildMissingTemplateHint(kind, templateName),
+        variant: "info",
+        dismissOnNav: true,
+      });
     }
   }
 
@@ -1531,6 +1569,7 @@ export function AdminApp() {
         <Toast
           id={toast.id}
           message={toast.message}
+          variant={toast.variant}
           onUndo={toast.undo}
           onDismiss={() => setToast(null)}
         />
