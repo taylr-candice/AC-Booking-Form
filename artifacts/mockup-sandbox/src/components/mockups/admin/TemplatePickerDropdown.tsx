@@ -106,6 +106,13 @@ export function TemplatePickerDropdown({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listboxRef = useRef<HTMLUListElement | null>(null);
+  // Type-to-jump buffer (printable characters typed inside the open
+  // listbox accumulate here so the highlight jumps to the next matching
+  // option, mirroring what a native <select> does for free). Repeated
+  // single-letter presses cycle through matches; the buffer resets
+  // after a short idle so a new search can start fresh.
+  const typeAheadBufferRef = useRef("");
+  const typeAheadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionDomId = (rowId: string) => `${optionTestIdPrefix}-${rowId}-opt`;
 
   useEffect(() => {
@@ -162,11 +169,75 @@ export function TemplatePickerDropdown({
     }
   }, [open, activeIndex, allRows, optionTestIdPrefix]);
 
+  // Drop any pending type-to-jump search when the popover closes (or
+  // the picker unmounts) so the next open starts with a fresh buffer
+  // and no stray timer fires after teardown.
+  useEffect(() => {
+    if (!open) {
+      typeAheadBufferRef.current = "";
+      if (typeAheadTimerRef.current !== null) {
+        clearTimeout(typeAheadTimerRef.current);
+        typeAheadTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (typeAheadTimerRef.current !== null) {
+        clearTimeout(typeAheadTimerRef.current);
+        typeAheadTimerRef.current = null;
+      }
+    };
+  }, [open]);
+
   function closeAndRefocusTrigger() {
     setOpen(false);
     // Wait for the listbox to unmount before returning focus, so the
     // trigger doesn't fight the popover's focus management.
     requestAnimationFrame(() => triggerRef.current?.focus());
+  }
+
+  // Move the highlight to the next option whose label starts with the
+  // accumulated typed buffer (case-insensitive). Behaviour mirrors a
+  // native <select>:
+  //   - First printable key sets the buffer and jumps to the first
+  //     match starting at the current highlight (so a row that already
+  //     matches stays put).
+  //   - Pressing the same single letter again cycles to the next match
+  //     starting *after* the current highlight (wraps around).
+  //   - Pressing a different letter within the idle window appends to
+  //     the buffer and re-searches from the current highlight.
+  // The buffer resets after ~500ms of no typing so a fresh prefix can
+  // start a new search.
+  function handleTypeAhead(char: string) {
+    const lower = char.toLowerCase();
+    if (typeAheadTimerRef.current !== null) {
+      clearTimeout(typeAheadTimerRef.current);
+    }
+    typeAheadTimerRef.current = setTimeout(() => {
+      typeAheadBufferRef.current = "";
+      typeAheadTimerRef.current = null;
+    }, 500);
+
+    let newBuffer: string;
+    let startIdx: number;
+    if (typeAheadBufferRef.current === lower) {
+      // Same single letter pressed again — cycle to the next match.
+      newBuffer = lower;
+      startIdx = (activeIndex + 1) % allRows.length;
+    } else {
+      newBuffer = typeAheadBufferRef.current + lower;
+      startIdx = activeIndex;
+    }
+
+    for (let i = 0; i < allRows.length; i++) {
+      const idx = (startIdx + i) % allRows.length;
+      const row = allRows[idx]!;
+      if (row.label.toLowerCase().startsWith(newBuffer)) {
+        setActiveIndex(idx);
+        break;
+      }
+    }
+
+    typeAheadBufferRef.current = newBuffer;
   }
 
   function commitOption(index: number) {
@@ -223,6 +294,19 @@ export function TemplatePickerDropdown({
       // Let Tab move focus away naturally, but close the popover so the
       // hidden <select> isn't shadowed by a stale highlight.
       setOpen(false);
+    } else if (
+      // Type-to-jump: any single printable character (letters,
+      // digits, punctuation) without a modifier moves the highlight
+      // to the next matching option. Space is reserved above for
+      // commit, so it never falls through to here.
+      e.key.length === 1 &&
+      e.key !== " " &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      e.preventDefault();
+      handleTypeAhead(e.key);
     }
   }
 

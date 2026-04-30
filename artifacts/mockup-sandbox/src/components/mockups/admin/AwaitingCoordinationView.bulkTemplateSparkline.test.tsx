@@ -462,3 +462,204 @@ describe("AwaitingCoordinationView · bulk template picker keyboard nav", () => 
     }
   });
 });
+
+describe("AwaitingCoordinationView · bulk template picker type-to-jump", () => {
+  function openCallPicker() {
+    const bookings = [
+      makeBooking("bk-1", "u1", []),
+      makeBooking("bk-2", "u2", []),
+    ];
+    render(<Harness bookings={bookings} />);
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1"));
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-2"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    return screen.getByTestId("trigger-bulk-call-template");
+  }
+
+  function openEmailPicker() {
+    const bookings = [
+      makeBooking("bk-1", "u1", []),
+      makeBooking("bk-2", "u2", []),
+    ];
+    render(<Harness bookings={bookings} />);
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1"));
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-2"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+    return screen.getByTestId("trigger-bulk-email-template");
+  }
+
+  function activeOption(prefix: string): HTMLElement | null {
+    const list = screen.queryByTestId(`${prefix}-listbox`);
+    if (!list) return null;
+    return list.querySelector('[data-active="true"]');
+  }
+
+  it("typing a single printable letter jumps the highlight to the first matching option", () => {
+    const trigger = openCallPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+    // 'w' → "Wrong number on file" is the only Wxxx option.
+    const wrongTpl = NO_DEFAULT_CALL_TEMPLATES.find((t) =>
+      /^wrong/i.test(t.name),
+    )!;
+    fireEvent.keyDown(listbox, { key: "w" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      wrongTpl.id,
+    );
+    expect(listbox.getAttribute("aria-activedescendant")).toBe(
+      `option-bulk-call-template-${wrongTpl.id}-opt`,
+    );
+  });
+
+  it("repeated single-letter presses cycle through matching options (and wrap)", () => {
+    const trigger = openCallPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+    // Both "No answer — left voicemail" and "No answer — no voicemail"
+    // start with 'n' (they're listed in that order in CALL_TEMPLATES).
+    const noOptions = NO_DEFAULT_CALL_TEMPLATES.filter((t) =>
+      /^no/i.test(t.name),
+    );
+    expect(noOptions.length).toBeGreaterThanOrEqual(2);
+
+    fireEvent.keyDown(listbox, { key: "n" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      noOptions[0]!.id,
+    );
+
+    fireEvent.keyDown(listbox, { key: "n" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      noOptions[1]!.id,
+    );
+
+    // Wraps back to the first match after the last one.
+    fireEvent.keyDown(listbox, { key: "n" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      noOptions[0]!.id,
+    );
+  });
+
+  it("typing multiple different characters quickly narrows the match by prefix", () => {
+    const trigger = openCallPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+    // 's' lands on the first Sxxx ("Spoke to them — confirmed window"),
+    // then 'p' keeps the buffer as "sp" so it stays / advances to a
+    // Spxxx match. Both Spoke entries match — the highlight should
+    // land on a "Spoke" option (not "Sent" / etc.).
+    fireEvent.keyDown(listbox, { key: "s" });
+    fireEvent.keyDown(listbox, { key: "p" });
+    const value = activeOption("option-bulk-call-template")?.dataset.value;
+    const matched = NO_DEFAULT_CALL_TEMPLATES.find((t) => t.id === value);
+    expect(matched?.name).toMatch(/^Sp/i);
+  });
+
+  it("the type-to-jump match is case-insensitive", () => {
+    const trigger = openCallPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+    const wrongTpl = NO_DEFAULT_CALL_TEMPLATES.find((t) =>
+      /^wrong/i.test(t.name),
+    )!;
+    // Uppercase key event still matches the lowercase-folded label.
+    fireEvent.keyDown(listbox, { key: "W" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      wrongTpl.id,
+    );
+  });
+
+  it("the buffer resets after a short idle so a new prefix can start fresh", async () => {
+    vi.useFakeTimers();
+    try {
+      const trigger = openCallPicker();
+      fireEvent.keyDown(trigger, { key: "ArrowDown" });
+      const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+      const noOptions = NO_DEFAULT_CALL_TEMPLATES.filter((t) =>
+        /^no/i.test(t.name),
+      );
+      const wrongTpl = NO_DEFAULT_CALL_TEMPLATES.find((t) =>
+        /^wrong/i.test(t.name),
+      )!;
+
+      // Build "no" → matches a No-answer entry.
+      fireEvent.keyDown(listbox, { key: "n" });
+      fireEvent.keyDown(listbox, { key: "o" });
+      expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+        noOptions[0]!.id,
+      );
+
+      // Wait past the idle window so the buffer drops back to empty.
+      vi.advanceTimersByTime(600);
+
+      // 'w' on its own should now jump to "Wrong number on file" — if
+      // the buffer hadn't reset it'd be "now" with no matches.
+      fireEvent.keyDown(listbox, { key: "w" });
+      expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+        wrongTpl.id,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("type-to-jump also works on the email picker", () => {
+    const trigger = openEmailPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-email-template-listbox");
+
+    const awaitingTpl = NO_DEFAULT_EMAIL_TEMPLATES.find((t) =>
+      /^awaiting/i.test(t.name),
+    )!;
+    fireEvent.keyDown(listbox, { key: "a" });
+    expect(activeOption("option-bulk-email-template")?.dataset.value).toBe(
+      awaitingTpl.id,
+    );
+  });
+
+  it("typing a letter that matches no option leaves the highlight where it was", () => {
+    const trigger = openCallPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+    // Move to a known starting point first so we can detect any drift.
+    fireEvent.keyDown(listbox, { key: "End" });
+    const before = activeOption("option-bulk-call-template")?.dataset.value;
+    expect(before).toBeTruthy();
+
+    // No template name starts with 'z'.
+    fireEvent.keyDown(listbox, { key: "z" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      before,
+    );
+  });
+
+  it("Enter still commits after a type-to-jump — typing didn't break commit", () => {
+    const trigger = openCallPicker();
+    const select = screen.getByTestId(
+      "select-bulk-call-template",
+    ) as HTMLSelectElement;
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+    const wrongTpl = NO_DEFAULT_CALL_TEMPLATES.find((t) =>
+      /^wrong/i.test(t.name),
+    )!;
+    fireEvent.keyDown(listbox, { key: "w" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      wrongTpl.id,
+    );
+
+    fireEvent.keyDown(listbox, { key: "Enter" });
+    expect(select.value).toBe(wrongTpl.id);
+    // Listbox closed after commit.
+    expect(
+      screen.queryByTestId("option-bulk-call-template-listbox"),
+    ).toBeNull();
+  });
+});
