@@ -355,6 +355,139 @@ describe("Templates panels · sandbox-only reorder note (Task #176)", () => {
   });
 });
 
+describe("CallTemplatesView · keyboard reorder (Task #174)", () => {
+  it("non-default grip handles render as focusable buttons with arrow-key shortcuts", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const handle = screen.getByTestId("drag-handle-call-template-b");
+    expect(handle.tagName).toBe("BUTTON");
+    expect(handle.getAttribute("type")).toBe("button");
+    // The grip handle advertises its keyboard shortcuts so screen-
+    // reader users discover the move semantics without having to
+    // experiment.
+    expect(handle.getAttribute("aria-keyshortcuts")).toContain("ArrowUp");
+    expect(handle.getAttribute("aria-keyshortcuts")).toContain("ArrowDown");
+    // Default row exposes a pin marker, not a focusable handle —
+    // there's nothing to keyboard-move.
+    expect(screen.queryByTestId("drag-handle-call-template-a")).toBeNull();
+  });
+
+  it("ArrowDown on the focused handle moves the row down by one and keeps focus on the moved row", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const bHandle = screen.getByTestId("drag-handle-call-template-b");
+    bHandle.focus();
+    expect(document.activeElement).toBe(bHandle);
+
+    fireEvent.keyDown(bHandle, { key: "ArrowDown" });
+
+    // b moved past c — display order is now [a, c, b, d, e].
+    expect(callRowIds()).toEqual(["a", "c", "b", "d", "e"]);
+    // Focus follows the moved row so the user can keep pressing
+    // ArrowDown to keep nudging.
+    expect(document.activeElement).toBe(
+      screen.getByTestId("drag-handle-call-template-b"),
+    );
+  });
+
+  it("ArrowUp on the focused handle moves the row up by one and keeps focus on the moved row", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const dHandle = screen.getByTestId("drag-handle-call-template-d");
+    dHandle.focus();
+    fireEvent.keyDown(dHandle, { key: "ArrowUp" });
+
+    expect(callRowIds()).toEqual(["a", "b", "d", "c", "e"]);
+    expect(document.activeElement).toBe(
+      screen.getByTestId("drag-handle-call-template-d"),
+    );
+  });
+
+  it("ArrowUp at the top of the movable list is a no-op (the default stays pinned above)", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const bHandle = screen.getByTestId("drag-handle-call-template-b");
+    bHandle.focus();
+    fireEvent.keyDown(bHandle, { key: "ArrowUp" });
+
+    // b was already the first non-default row — order unchanged.
+    expect(callRowIds()).toEqual(["a", "b", "c", "d", "e"]);
+    expect(document.activeElement).toBe(
+      screen.getByTestId("drag-handle-call-template-b"),
+    );
+  });
+
+  it("ArrowDown at the bottom of the movable list is a no-op", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const eHandle = screen.getByTestId("drag-handle-call-template-e");
+    eHandle.focus();
+    fireEvent.keyDown(eHandle, { key: "ArrowDown" });
+
+    expect(callRowIds()).toEqual(["a", "b", "c", "d", "e"]);
+    expect(document.activeElement).toBe(
+      screen.getByTestId("drag-handle-call-template-e"),
+    );
+  });
+
+  it("Home jumps the row to the top of the movable list, End jumps it to the bottom", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const dHandle = screen.getByTestId("drag-handle-call-template-d");
+    dHandle.focus();
+    fireEvent.keyDown(dHandle, { key: "Home" });
+    expect(callRowIds()).toEqual(["a", "d", "b", "c", "e"]);
+
+    const cHandle = screen.getByTestId("drag-handle-call-template-c");
+    cHandle.focus();
+    fireEvent.keyDown(cHandle, { key: "End" });
+    expect(callRowIds()).toEqual(["a", "d", "b", "e", "c"]);
+  });
+
+  it("announces the row's new 1-based position in the live region after each keyboard move", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const live = screen.getByTestId("call-templates-reorder-live-region");
+    expect(live.getAttribute("aria-live")).toBe("polite");
+    expect(live.textContent).toBe("");
+
+    const bHandle = screen.getByTestId("drag-handle-call-template-b");
+    bHandle.focus();
+    fireEvent.keyDown(bHandle, { key: "ArrowDown" });
+
+    // 4 movable rows total (b, c, d, e); b moved into position 2.
+    expect(live.textContent).toBe('Moved "Bbbb" to position 2 of 4.');
+
+    fireEvent.keyDown(
+      screen.getByTestId("drag-handle-call-template-b"),
+      { key: "End" },
+    );
+    expect(live.textContent).toBe('Moved "Bbbb" to position 4 of 4.');
+  });
+
+  it("a no-op move (ArrowUp at the top of the movable list) does not announce a position change", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const live = screen.getByTestId("call-templates-reorder-live-region");
+    const bHandle = screen.getByTestId("drag-handle-call-template-b");
+    bHandle.focus();
+    fireEvent.keyDown(bHandle, { key: "ArrowUp" });
+
+    expect(live.textContent).toBe("");
+  });
+
+  it("the grip handle's accessible label includes its current 1-based position out of the movable rows", () => {
+    render(<CallHarness initial={makeCallCatalog()} />);
+
+    const bHandle = screen.getByTestId("drag-handle-call-template-b");
+    expect(bHandle.getAttribute("aria-label")).toContain('"Bbbb"');
+    expect(bHandle.getAttribute("aria-label")).toContain("position 1 of 4");
+
+    const eHandle = screen.getByTestId("drag-handle-call-template-e");
+    expect(eHandle.getAttribute("aria-label")).toContain("position 4 of 4");
+  });
+});
+
 describe("EmailTemplatesView · drag-and-drop reorder", () => {
   it("dragging a non-default row onto another updates the visible order", () => {
     render(<EmailHarness initial={makeEmailCatalog()} />);
@@ -408,5 +541,54 @@ describe("EmailTemplatesView · drag-and-drop reorder", () => {
     expect(screen.queryByTestId("email-template-pinned-a")).toBeNull();
     expect(screen.queryByTestId("pill-default-email-template-a")).toBeNull();
     expect(screen.getByTestId("drag-handle-email-template-a")).toBeTruthy();
+  });
+});
+
+describe("EmailTemplatesView · keyboard reorder (Task #174)", () => {
+  it("ArrowDown on the focused handle moves the row down by one and keeps focus on the moved row", () => {
+    render(<EmailHarness initial={makeEmailCatalog()} />);
+
+    const bHandle = screen.getByTestId("drag-handle-email-template-b");
+    bHandle.focus();
+    fireEvent.keyDown(bHandle, { key: "ArrowDown" });
+
+    expect(emailRowIds()).toEqual(["a", "c", "b", "d", "e"]);
+    expect(document.activeElement).toBe(
+      screen.getByTestId("drag-handle-email-template-b"),
+    );
+  });
+
+  it("ArrowUp + Home + End all reach the same final order across multiple presses", () => {
+    render(<EmailHarness initial={makeEmailCatalog()} />);
+
+    // Start: [a, b, c, d, e]. Send e to the top of the movable
+    // list with Home, then nudge it down once with ArrowDown to
+    // settle at index 2 (display position 3).
+    const eHandle = screen.getByTestId("drag-handle-email-template-e");
+    eHandle.focus();
+    fireEvent.keyDown(eHandle, { key: "Home" });
+    expect(emailRowIds()).toEqual(["a", "e", "b", "c", "d"]);
+    fireEvent.keyDown(
+      screen.getByTestId("drag-handle-email-template-e"),
+      { key: "ArrowDown" },
+    );
+    expect(emailRowIds()).toEqual(["a", "b", "e", "c", "d"]);
+    expect(document.activeElement).toBe(
+      screen.getByTestId("drag-handle-email-template-e"),
+    );
+  });
+
+  it("the live region announces the moved row's new position", () => {
+    render(<EmailHarness initial={makeEmailCatalog()} />);
+
+    const live = screen.getByTestId("email-templates-reorder-live-region");
+    expect(live.textContent).toBe("");
+
+    const cHandle = screen.getByTestId("drag-handle-email-template-c");
+    cHandle.focus();
+    fireEvent.keyDown(cHandle, { key: "End" });
+
+    expect(emailRowIds()).toEqual(["a", "b", "d", "e", "c"]);
+    expect(live.textContent).toBe('Moved "Cccc" to position 4 of 4.');
   });
 });

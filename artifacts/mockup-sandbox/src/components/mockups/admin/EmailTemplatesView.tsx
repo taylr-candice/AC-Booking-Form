@@ -130,6 +130,18 @@ export function EmailTemplatesView({
   // visual residue.
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  // Keyboard reorder support (Task #174). The grip handle is a real
+  // focusable button — ArrowUp/ArrowDown swap the row past its
+  // immediate neighbour in the movable (non-default) list, Home/End
+  // jump to the top/bottom of that list. After every keyboard move
+  // we re-focus the moved row's grip handle so consecutive presses
+  // keep nudging the same row, and we update the screen-reader live
+  // region with the row's new 1-based position.
+  const dragHandleRefs = useRef<Map<string, HTMLButtonElement | null>>(
+    new Map(),
+  );
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+  const [liveMessage, setLiveMessage] = useState<string>("");
   // Single shared ref-map covering both row-scroll callers:
   //   - the "Default Email template" header link (transient amber
   //     highlight that auto-clears),
@@ -204,6 +216,55 @@ export function EmailTemplatesView({
     setHighlightedId(defaultTemplate.id);
   };
 
+  // Reorderable rows in display order — the default is pinned and
+  // refuses both ends of a reorder, so it's intentionally excluded
+  // from the movable list. Used for both the keyboard move targets
+  // and the per-row "position N of M" label that the grip handle
+  // exposes to assistive tech.
+  const movableTemplates = orderedTemplates.filter((t) => !t.isDefault);
+
+  // Re-focus the grip handle of the row that was just moved by the
+  // keyboard. The reorder runs through `onReorder` so the templates
+  // prop (and therefore the rendered row order) updates *before* this
+  // effect fires; resetting `pendingFocusId` afterwards prevents the
+  // focus from following the row across an unrelated re-render.
+  useEffect(() => {
+    if (!pendingFocusId) return;
+    const handle = dragHandleRefs.current.get(pendingFocusId);
+    if (handle && typeof handle.focus === "function") {
+      handle.focus();
+    }
+    setPendingFocusId(null);
+  }, [templates, pendingFocusId]);
+
+  const handleKeyboardMove = (
+    currentId: string,
+    direction: "up" | "down" | "first" | "last",
+  ) => {
+    if (!onReorder) return;
+    const idx = movableTemplates.findIndex((t) => t.id === currentId);
+    if (idx === -1) return;
+    let targetIdx: number;
+    if (direction === "up") targetIdx = idx - 1;
+    else if (direction === "down") targetIdx = idx + 1;
+    else if (direction === "first") targetIdx = 0;
+    else targetIdx = movableTemplates.length - 1;
+    if (
+      targetIdx < 0 ||
+      targetIdx >= movableTemplates.length ||
+      targetIdx === idx
+    ) {
+      return;
+    }
+    const targetId = movableTemplates[targetIdx].id;
+    const moved = movableTemplates[idx];
+    onReorder(currentId, targetId);
+    setPendingFocusId(currentId);
+    setLiveMessage(
+      `Moved "${moved.name}" to position ${targetIdx + 1} of ${movableTemplates.length}.`,
+    );
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div
@@ -270,6 +331,16 @@ export function EmailTemplatesView({
           <Plus className="h-4 w-4" />
           Add template
         </button>
+      </div>
+
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="email-templates-reorder-live-region"
+        className="sr-only"
+      >
+        {liveMessage}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -392,14 +463,46 @@ export function EmailTemplatesView({
                           <Pin className="h-3.5 w-3.5" fill="currentColor" />
                         </span>
                       ) : (
-                        <span
-                          data-testid={`drag-handle-email-template-${t.id}`}
-                          aria-label={`Drag to reorder "${t.name}"`}
-                          title="Drag to reorder"
-                          className="inline-flex h-7 w-5 cursor-grab items-center justify-center text-slate-400 hover:text-slate-600 active:cursor-grabbing"
-                        >
-                          <GripVertical className="h-4 w-4" />
-                        </span>
+                        (() => {
+                          const movableIdx = movableTemplates.findIndex(
+                            (m) => m.id === t.id,
+                          );
+                          const movableTotal = movableTemplates.length;
+                          const positionLabel =
+                            movableIdx >= 0
+                              ? ` Currently at position ${movableIdx + 1} of ${movableTotal}.`
+                              : "";
+                          return (
+                            <button
+                              type="button"
+                              ref={(el) => {
+                                dragHandleRefs.current.set(t.id, el);
+                              }}
+                              data-testid={`drag-handle-email-template-${t.id}`}
+                              aria-label={`Reorder "${t.name}".${positionLabel} Press Up or Down arrow to move, Home or End to jump to top or bottom.`}
+                              aria-keyshortcuts="ArrowUp ArrowDown Home End"
+                              title="Drag, or press Up/Down arrow keys to reorder"
+                              onKeyDown={(e) => {
+                                if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  handleKeyboardMove(t.id, "up");
+                                } else if (e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  handleKeyboardMove(t.id, "down");
+                                } else if (e.key === "Home") {
+                                  e.preventDefault();
+                                  handleKeyboardMove(t.id, "first");
+                                } else if (e.key === "End") {
+                                  e.preventDefault();
+                                  handleKeyboardMove(t.id, "last");
+                                }
+                              }}
+                              className="inline-flex h-7 w-5 cursor-grab items-center justify-center rounded text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 active:cursor-grabbing"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </button>
+                          );
+                        })()
                       )}
                     </td>
                     <td className="px-4 py-3">
