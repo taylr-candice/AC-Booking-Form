@@ -87,6 +87,11 @@ import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
 
 import { AgentsView } from "./AgentsView";
 import { AwaitingCoordinationView } from "./AwaitingCoordinationView";
+import {
+  decodeTemplateFilter,
+  encodeTemplateFilter,
+  type BookingsTemplateFilter,
+} from "./bookingsTemplateFilter";
 import { CallTemplatesView } from "./CallTemplatesView";
 import { EmailTemplatesView } from "./EmailTemplatesView";
 import {
@@ -109,6 +114,56 @@ import { TopBar } from "./TopBar";
 import { UnitsView } from "./UnitsView";
 import type { CoordinationKind } from "@/state/adminMockData";
 import type { ViewId } from "./types";
+
+/**
+ * Query-string param name for the lifted `bookingsTemplateFilter`
+ * state (Task #195). Refreshing or sharing a Bookings/Awaiting-
+ * coordination URL with this param restores the active chip and
+ * dropdown selection on first paint, so an ops lead triaging a long
+ * batch can refresh / open new tabs without silently re-broadening
+ * the queue. The encoded value is whatever {@link encodeTemplateFilter}
+ * already produces, so the URL ↔ state round-trip uses the same
+ * grammar as the toolbar's `<select>`.
+ */
+const BOOKINGS_TEMPLATE_FILTER_PARAM = "template";
+
+/** Read the initial {@link BookingsTemplateFilter} from the URL on
+ *  mount. Returns `null` (the toolbar's reset state) when the param
+ *  is missing, malformed, or we're not in a browser. Exported so
+ *  the Task #195 round-trip integration tests can assert that the
+ *  URL → state seed Awaiting-coordination receives is the same one
+ *  Bookings receives — both views share the lifted prop, so the
+ *  helper is the symmetry boundary. */
+export function readBookingsTemplateFilterFromURL(): BookingsTemplateFilter {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get(
+    BOOKINGS_TEMPLATE_FILTER_PARAM,
+  );
+  if (raw === null) return null;
+  return decodeTemplateFilter(raw);
+}
+
+/** Mirror the {@link BookingsTemplateFilter} state back into the URL
+ *  with `replaceState` (no history entry per chip flip). A `null`
+ *  filter removes the param so the URL is identical to a fresh
+ *  visit — clearing the chip / picking "All templates" therefore
+ *  also "removes the param" as the task spec requires. */
+function writeBookingsTemplateFilterToURL(
+  filter: BookingsTemplateFilter,
+): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  const encoded = encodeTemplateFilter(filter);
+  const current = url.searchParams.get(BOOKINGS_TEMPLATE_FILTER_PARAM);
+  if (filter === null) {
+    if (current === null) return;
+    url.searchParams.delete(BOOKINGS_TEMPLATE_FILTER_PARAM);
+  } else {
+    if (current === encoded) return;
+    url.searchParams.set(BOOKINGS_TEMPLATE_FILTER_PARAM, encoded);
+  }
+  window.history.replaceState(window.history.state, "", url.toString());
+}
 
 /**
  * Copy for the missing-template hint toast: ops clicked a
@@ -554,9 +609,18 @@ export function AdminApp() {
   // same shape `findUsageBookingsForTemplate` matches against, so
   // a renamed template doesn't silently drag historical bookings
   // out of view (their timeline entries keep the old name).
-  const [bookingsTemplateFilter, setBookingsTemplateFilter] = useState<
-    { kind: "call" | "email"; name: string } | null
-  >(null);
+  //
+  // Initial value is read from the `?template=…` query param (Task
+  // #195) so refreshing or sharing the URL restores the active chip
+  // and dropdown selection on first paint. The companion effect
+  // below mirrors any subsequent state change back into the URL.
+  // Both Bookings and Awaiting-coordination read this same lifted
+  // state, so the URL works on either view symmetrically.
+  const [bookingsTemplateFilter, setBookingsTemplateFilter] =
+    useState<BookingsTemplateFilter>(() => readBookingsTemplateFilterFromURL());
+  useEffect(() => {
+    writeBookingsTemplateFilterToURL(bookingsTemplateFilter);
+  }, [bookingsTemplateFilter]);
   // Awaiting-coordination view filter — independent from the bookings
   // status filter so an admin can flip between views without losing
   // their coordination grouping. "all" shows both queues at once.
