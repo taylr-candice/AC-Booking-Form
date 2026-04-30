@@ -1,0 +1,392 @@
+# Taylr Admin Simulator — Project Handover
+
+## 1. What this is
+
+The **Taylr Admin Simulator** is an interactive demonstration prototype of the
+back-of-house admin panel for **Taylr**, an Australian strata property
+management platform. It simulates how Taylr's internal team would manage
+ownership cards, members, units, buildings, leads, services, sales orders,
+finance, and email workflows.
+
+It is **not a production system**. It has no database, no authentication
+beyond a single demo password, and no write persistence — every interaction
+runs against static seed data that resets on reload. Its job is to show
+stakeholders, partners, and the Taylr team what the eventual product can look
+and feel like and how the underlying object model behaves.
+
+### Vision the prototype is illustrating
+
+Taylr aims to manage properties through their **entire lifecycle**:
+`DEVELOPMENT → PRE_SETTLEMENT → REGISTERED → LIVE_OPERATION`. The admin
+panel models the interplay between two parallel structures:
+
+- **Physical / Property Structure**: Developer → Strata Organisation →
+  Building → Unit → Ownership Card.
+- **Identity / Relationship Structure**: Person → Member Profile → Member ×
+  Unit (MxU) — the join that links a real person to a specific unit and a
+  specific role/state.
+
+Identity rules are deliberately strict: **One Person, One Persistent Member
+Account**. Services and entitlements are always tied to a particular MxU /
+unit, never to a free-floating person.
+
+---
+
+## 2. How to run it
+
+```bash
+npm install      # one-time
+npm run dev      # serves on http://localhost:5000
+```
+
+The default workflow `Start application` runs `npm run dev`, which boots an
+Express 5 server (`server/index.ts`) that mounts the Vite dev middleware in
+development. Production build is `npm run build` (writes `dist/`) and is
+served with `npm start`.
+
+| Script    | What it does                                                   |
+| --------- | -------------------------------------------------------------- |
+| `dev`     | Dev server (Express + Vite middleware) on port 5000            |
+| `dev:client` | Vite-only client dev server (no API, rarely used)           |
+| `build`   | Bundles client + server into `dist/` via `script/build.ts`     |
+| `start`   | Runs the production bundle (`dist/index.cjs`)                  |
+| `check`   | TypeScript type-check (`tsc --noEmit`)                         |
+| `db:push` | `drizzle-kit push` — kept for future use; no DB is wired today |
+
+**Demo password** for the admin: `taylroc2026`. Enforced client-side in the
+gate component; not security, just to keep the link from leaking publicly.
+
+---
+
+## 3. Architecture
+
+A TypeScript monorepo split into three layers, all type-shared.
+
+```
+client/    React 19 + TS + Vite — the SPA the user actually sees
+server/    Express 5 + tsx     — thin API serving static seed data
+shared/    Zod schemas, types, seed data, pure business logic
+```
+
+### 3.1 Frontend (`client/`)
+
+- React 19, TypeScript, Vite 7, Tailwind v4.
+- Routing: **wouter** (small, hooks-based).
+- Client state: **Zustand** stores under `client/src/store/`.
+- Server-state / cache: **TanStack React Query v5** (used lightly because
+  most data is bundled at build time).
+- Forms: **React Hook Form** + `@hookform/resolvers` + Zod schemas from
+  `shared/`.
+- UI kit: **shadcn/ui** in `client/src/components/ui/` (style: `new-york`,
+  baseColor: `neutral`, configured in `components.json`). Underlying
+  primitives are **Radix UI**. Icons are **Lucide React** only.
+- Animations: **Framer Motion**.
+- Toast: **sonner**.
+- Page layout: routed pages in `client/src/pages/`. Detail views are
+  full-route pages, **not** drawers — drawers (`Sheet` from shadcn) are only
+  for secondary overlays.
+
+### 3.2 Backend (`server/`)
+
+- Express 5 served via `tsx` in dev, bundled with `esbuild` for production.
+- Files:
+  - `index.ts` — server entry, mounts Vite middleware in dev or static files
+    in prod
+  - `routes.ts` — REST endpoints that read from `shared/` seed data
+  - `storage.ts` — in-memory storage façade (no DB)
+  - `auth.ts` — demo password check
+  - `vite.ts`, `static.ts` — dev/prod asset serving
+- **No write operations, no persistence.** Every endpoint returns or
+  derives from the static seed; mutations happen only in client-side Zustand
+  state and disappear on reload.
+
+### 3.3 Shared module (`shared/`)
+
+The single source of truth for the domain. Anything used on both sides of the
+wire — types, validators, business logic — lives here.
+
+- `schema.ts` — Zod schemas + inferred types for every domain entity.
+- `seed.ts`, `ocSeeds.ts`, `ocListSeed.ts`, `portfolioSeed.ts`,
+  `pendingImportsSeed.ts`, `s119OrdersSeed.ts`, `emailHistorySeed.ts`,
+  `emailTemplatesSeed.ts`, `strataServices.ts`, `onboardingFlows.ts` —
+  static demo data for buildings, units, ownership cards, S119 orders,
+  email templates, etc.
+- `pricing.ts` — pricing, vendor, service-assignment, and coupon model
+  with a `resolvePricing` resolver.
+- `csvImport.ts` — CSV-import schema + parser (used by the OC Import flow).
+- `certificates.ts`, `enrichmentStats.ts` — domain helpers.
+- `logic/` — pure functions, easy to unit-test:
+  - `health.ts` — derived health status calculation
+  - `contacts.ts` — contact merge / dedupe rules
+  - `emails.ts` — email-template generation
+  - `tenancy.ts` — tenancy lifecycle transitions
+  - `ownership.ts` — ownership-card update rules
+  - `index.ts` — barrel re-export
+
+---
+
+## 4. Module map
+
+Everything below lives under `client/src/pages/modules/` unless noted. Each
+module has a list/index page and (where applicable) a routed detail page.
+
+| Module                 | Page(s)                                              | What it does                                                                                  |
+| ---------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **Members**            | `MembersModule.tsx`, `MemberDetail.tsx`              | People with Taylr dashboard access — owners, occupiers, agents.                               |
+| **Member × Unit**      | `MxUDetail.tsx`                                      | The link between a person and a specific unit + role + state.                                 |
+| **Units**              | `UnitsModule.tsx`, `UnitDetail.tsx`                  | Apartment / lot records, linked to ownership cards and the building.                          |
+| **Ownership Cards**    | `OwnershipCardsModule.tsx`, `AddOCPage.tsx`          | 68 OCs (one per lot) modelling who owns what. Add-OC is a 3-step wizard.                      |
+| **OC Inbox**           | `OCInboxModule.tsx`                                  | Incoming OC updates / requests pending review.                                                |
+| **OC Import**          | `OCImportPage.tsx`                                   | CSV-based bulk OC import with validation against `shared/csvImport.ts`.                       |
+| **Leads**              | `LeadsModule.tsx`, `LeadDetail.tsx`                  | Pre-agreement pursuit pipeline. Distinguishes Partner-Sourced vs Taylr-Direct leads.          |
+| **Buildings**          | `BuildingsModule.tsx`, `BuildingDetail.tsx`          | Buildings with current/prior agreements. Detail tabs: Overview, Services, Utilities, S119, Files, Settings. |
+| **Strata**             | `StrataModule.tsx`                                   | Strata companies, their service catalogue, contacts, and buildings.                           |
+| **Strata Portal**      | `StrataPortalBuildings.tsx`, `StrataPortalLeads.tsx` | A "view as the strata company" sub-app for previewing what the partner sees.                  |
+| **Services**           | `ServicesModule.tsx`, `ServiceDetail.tsx`            | Master catalogue of Taylr services — relationship type, status, category, logistics flags.    |
+| **Sales Orders**       | `SalesOrdersModule.tsx`, `SalesOrderDetail.tsx`, `S119OrderDetail.tsx` | Service-related orders, primarily S119 Rental Certificates today.       |
+| **Certificates**       | `CertificatesModule.tsx`                             | Issued S119 certificates and their compliance status.                                         |
+| **Finance**            | `FinanceModule.tsx`, `PaymentDetail.tsx`, `RemittanceDetail.tsx`, `PricingTab.tsx` | Payments, pricing, remittance tracking.                          |
+| **Communications**     | `CommunicationsModule.tsx`                           | Email-template library and outgoing email history.                                            |
+| **Agents**             | `AgentsModule.tsx`, `AgentDetail.tsx`                | Managing agents with their own portal access.                                                 |
+| **Vendors**            | `VendorDetail.tsx`                                   | Registry of external service providers (linked from `shared/pricing.ts`).                     |
+
+The home page (`client/src/pages/Home.tsx`) and modules dashboard
+(`client/src/pages/ModulesDashboard.tsx`) are the entry points to all of the
+above. `App.tsx` is the route table — start there to add a new page.
+
+---
+
+## 5. Domain concepts
+
+### 5.1 Building lifecycle
+
+Each building lives in one of four states, and the rules that apply to it
+adapt to the state:
+
+| State              | Meaning                                                                  |
+| ------------------ | ------------------------------------------------------------------------ |
+| `DEVELOPMENT`      | Under construction. Provisional units exist; no real occupants yet.      |
+| `PRE_SETTLEMENT`   | Built, awaiting handover to the strata. Initial owners being assigned.   |
+| `REGISTERED`       | Strata is established but Taylr isn't fully operational at the building. |
+| `LIVE_OPERATION`   | Taylr is the active service provider; full feature set applies.          |
+
+### 5.2 Identity model
+
+- `Person` is the durable identity record (name, email, mobile).
+- `MemberProfile` is the Taylr-account-side of a person — gives them
+  dashboard access.
+- `MemberXUnit` (MxU) is the join: this person, at this unit, in this role
+  (Owner, Owner-Occupier, Tenant, Managing Agent, etc.) and this state
+  (Active, Suspended, Archived, etc.).
+
+A single person can have many MxU rows across many units; their account is
+persistent. Services entitlement always flows from MxU → unit, never from
+the person directly.
+
+### 5.3 Ownership Card (OC)
+
+An OC is a per-lot record of *who owns this unit and how*. It supports
+single owners, joint owners, company owners, trust owners, etc. There are 68
+seeded OCs (one per unit / lot) and a 3-step wizard (`AddOCPage.tsx`) for
+adding more.
+
+### 5.4 S119 (rental certificates)
+
+S119 is a NSW strata compliance certificate required for certain rentals.
+The simulator implements a derived status system that classifies each
+certificate as *compliant* or *non-compliant* based on:
+
+- Issue date
+- Expiry date
+- Payment status
+
+Logic is in `shared/logic/` (see `shared/certificates.ts` for the schema).
+The Sales Orders module includes a dedicated `S119OrderDetail.tsx` page and a
+*zero-margin* pricing model for the S119 base SKU, plus a strata-portal
+"S119 handover" flow for migrating certificates between strata companies.
+
+### 5.5 Pricing model (`shared/pricing.ts`)
+
+Five top-level types: `Service`, `Vendor`, `ServiceAssignment`,
+`UnitPricingOverride`, `OrderLine`, `Coupon`. The function `resolvePricing`
+computes the effective price for a `(service, unit, member)` tuple, applying
+unit-level overrides and any coupons. A small adapter
+(`client/src/lib/pricingAdapter.ts`) bridges this model into legacy UI
+components. Pricing data is editable at runtime via
+`client/src/store/pricingStore.ts`.
+
+### 5.6 Refund lifecycle
+
+Three-stage workflow: `Request` → `Approve` → `Mark Stripe complete`. Each
+transition writes a ledger entry and updates the order's `refundStatus`.
+`PaymentOrder` carries an optional `lines?: OrderLine[]` for forward
+compatibility with the new pricing model.
+
+---
+
+## 6. Conventions
+
+### 6.1 UI
+
+- **Sentence case** for every heading, tab label, table header, and section
+  title. Never Title Case.
+- **Status pills** are text-only — no leading icons on operational statuses.
+  Decorative / brand badges may include icons.
+- **Detail views are routed pages**, not drawers. Drawers (`Sheet`) are for
+  secondary overlays only.
+- **Brand pink** (`#ED017F`) for primary CTAs, active nav, links, focus
+  rings. Pink is also the `--primary` and `--ring` HSL token, so any shadcn
+  component using `bg-primary` / `ring-ring` is on-brand by default.
+- **Sentence-case + pink CTA + rounded-xl card** is the shared visual
+  signature across modules.
+
+### 6.2 Data display
+
+- **AU 10% GST** is baked into every customer-facing price; show the
+  GST-inclusive value with a small `incl. GST` caption.
+- **Date format**: `EEEE, d MMMM yyyy` (e.g. `Tuesday, 14 May 2026`) for
+  human-facing dates; ISO for machine-facing fields. Use `date-fns/format`.
+- **Currency**: `Intl.NumberFormat('en-AU', { style: 'currency', currency:
+  'AUD' })`.
+
+### 6.3 Code
+
+- Every interactive element gets a `data-testid` of the form
+  `{action}-{target}` (`button-submit`, `input-email`) or `{type}-{content}`
+  (`text-username`, `status-payment`). Lists append a unique id:
+  `card-product-${productId}`.
+- Path aliases: `@/...` → `client/src/...`, `@shared/...` → `shared/...`,
+  `@assets/...` → `attached_assets/...` (configured in `tsconfig.json` and
+  the Vite alias config).
+- Type imports prefer `import type { Foo }` to keep runtime bundles lean.
+
+For full design tokens (HSL palettes light + dark, radius scale, typography,
+component patterns, exact dependency versions), see
+**`docs/design-system.md`**.
+
+---
+
+## 7. Data flow at a glance
+
+```
+shared/seed.ts + ocSeeds.ts + portfolioSeed.ts + ...
+   │
+   ▼
+server/storage.ts   (in-memory façade — no DB writes)
+   │
+   ▼
+server/routes.ts    (Express GET endpoints)
+   │
+   ▼  (HTTP, JSON)
+client/src/lib/queryClient.ts   (TanStack Query)
+   │
+   ▼
+client/src/pages/modules/*.tsx  (UI components, Zustand stores)
+```
+
+Mutations happen entirely client-side in Zustand stores
+(`client/src/store/*`). On reload the seed wins again — there's no
+persistence layer.
+
+---
+
+## 8. What's intentionally not here
+
+- **No PostgreSQL / Drizzle migrations applied.** `drizzle.config.ts` and
+  `db:push` are scaffolded for future use, but no schema is wired and no
+  database connection is established. All data is static JSON.
+- **No write API.** Every server endpoint is read-only.
+- **No auth beyond the demo password.** No sessions, no JWTs, no per-user
+  identity on the server side.
+- **No external integrations.** Stripe, email providers, accounting
+  systems are stubbed by seed data and console logs.
+- **No analytics, no telemetry.**
+- **No customer-facing flows.** This repo is the admin panel only. Any
+  customer-facing prototypes (e.g. service-booking forms, member dashboards)
+  live in their own repos and consume the same design tokens via
+  `docs/design-system.md`.
+
+---
+
+## 9. File map quick reference
+
+```
+client/
+  index.html                      Google Fonts + meta tags
+  src/
+    main.tsx                      Mounts <App />
+    App.tsx                       Route table — start here for new pages
+    index.css                     Token CSS (light + dark) + Tailwind directives
+    pages/
+      Home.tsx
+      ModulesDashboard.tsx
+      ModulePage.tsx              Generic module shell
+      not-found.tsx
+      modules/                    All module list + detail pages
+    components/
+      ui/                         shadcn primitives (Button, Card, Sheet, …)
+      …                           Feature components (AddOCModal, etc.)
+    contexts/                     React contexts (auth gate, theme, …)
+    hooks/                        Reusable hooks
+    lib/                          queryClient, pricingAdapter, helpers
+    state/, store/                Zustand stores
+    assets/                       Images, fonts shipped with the bundle
+
+server/
+  index.ts                        Server entry
+  routes.ts                       REST endpoints (read-only)
+  storage.ts                      In-memory façade
+  auth.ts                         Demo-password check
+  vite.ts, static.ts              Dev / prod asset serving
+  db.ts                           Drizzle config (unused at runtime)
+
+shared/
+  schema.ts                       Zod + inferred types
+  seed.ts, *Seed.ts               Static demo data
+  pricing.ts                      Pricing model + resolver
+  csvImport.ts                    CSV-import schema
+  certificates.ts                 S119 helpers
+  logic/
+    health.ts, contacts.ts, emails.ts,
+    tenancy.ts, ownership.ts, index.ts
+
+docs/
+  design-system.md                Brand tokens, typography, shadcn config
+  admin-overview.md               This document
+
+components.json                   shadcn config (style: new-york)
+tailwind.config.ts                Tailwind v4 config
+postcss.config.js
+drizzle.config.ts                 Reserved for future DB use
+package.json
+tsconfig.json
+```
+
+---
+
+## 10. Glossary
+
+| Acronym  | Meaning                                                             |
+| -------- | ------------------------------------------------------------------- |
+| **OC**   | Ownership Card — per-lot record of who owns the unit and how        |
+| **MxU**  | Member × Unit — the join row tying a person to a unit + role + state |
+| **S119** | NSW strata Section 119 rental compliance certificate                |
+| **GST**  | Australian Goods and Services Tax (10%, included in displayed prices) |
+| **CTA**  | Call-to-action button (the pink `Continue` / `Save` buttons)        |
+| **PWA**  | Progressive Web App (Taylr's broader product category)              |
+
+---
+
+## 11. Where to look for…
+
+| You want to…                              | Open                                                  |
+| ----------------------------------------- | ----------------------------------------------------- |
+| Add a new routed page                     | `client/src/App.tsx`                                  |
+| Add a new module list/detail              | `client/src/pages/modules/`                           |
+| Change a domain type or validator         | `shared/schema.ts`                                    |
+| Tweak demo data                           | `shared/seed.ts` + the topic-specific `*Seed.ts` file |
+| Change pricing rules                      | `shared/pricing.ts` + `client/src/store/pricingStore.ts` |
+| Change brand colours / radius / fonts     | `client/src/index.css` + `docs/design-system.md`      |
+| Add a shadcn primitive                    | `client/src/components/ui/`                           |
+| Wire a new endpoint                       | `server/routes.ts` (and a `*Seed.ts` if needed)       |
+| Hand the design system to another project | `docs/design-system.md`                               |
