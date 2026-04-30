@@ -19,7 +19,7 @@
  * editor for create / edit, with a single tabular row per template.
  */
 
-import { Edit3, Mail, Plus, Star, Trash2, X } from "lucide-react";
+import { Edit3, GripVertical, Mail, Pin, Plus, Star, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -55,6 +55,7 @@ export function EmailTemplatesView({
   onUpdate,
   onRemove,
   onSetDefault,
+  onReorder,
   focusedTemplateId,
 }: {
   templates: EmailTemplate[];
@@ -83,6 +84,13 @@ export function EmailTemplatesView({
   onRemove: (id: string) => void;
   /** Toggle the default flag on the given template. */
   onSetDefault: (id: string) => void;
+  /** Reorder the catalog so the row with `fromId` is moved to the
+   *  position currently held by `toId`. Wired to the per-row drag
+   *  handles — both rows are always non-default (the default stays
+   *  pinned at the top, see {@link reorderEmailTemplates}). When
+   *  omitted the drag handles still render but do nothing, which
+   *  keeps the per-view tests that don't care about reorder simple. */
+  onReorder?: (fromId: string, toId: string) => void;
   /** Round-trip with Task #149's "Referenced by N entries" popover:
    *  when the admin clicks a `From template: <name>` chip on a
    *  booking timeline (Task #155), the AdminApp shell switches to
@@ -96,6 +104,15 @@ export function EmailTemplatesView({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // Drag-and-drop reorder state (Task #164). `draggingId` is the row
+  // currently being dragged; `dragOverId` is the row the cursor is
+  // hovering over and would drop onto. Both are scoped to non-default
+  // rows — the default row is `draggable={false}` and refuses drops
+  // (the row stays pinned regardless of drag state). Cleared on
+  // `dragend` so a cancelled drag (Esc, drop outside) leaves no
+  // visual residue.
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   // Single shared ref-map covering both row-scroll callers:
   //   - the "Default Email template" header link (transient amber
   //     highlight that auto-clears),
@@ -247,6 +264,7 @@ export function EmailTemplatesView({
           <table className="w-full text-left text-[13px]">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="px-2 py-3 font-semibold w-8" aria-label="Drag to reorder"></th>
                 <th className="px-4 py-3 font-semibold w-12">Default</th>
                 <th className="px-4 py-3 font-semibold">Template</th>
                 <th className="px-4 py-3 font-semibold">Subject</th>
@@ -260,6 +278,12 @@ export function EmailTemplatesView({
                 const bookings = usageBookings?.[t.id] ?? [];
                 const isFocused = focusedTemplateId === t.id;
                 const isPulsing = pulseId === t.id;
+                const isDragging = draggingId === t.id;
+                const isDropTarget =
+                  dragOverId === t.id &&
+                  draggingId !== null &&
+                  draggingId !== t.id &&
+                  !t.isDefault;
                 return (
                   <tr
                     key={t.id}
@@ -272,19 +296,86 @@ export function EmailTemplatesView({
                     }
                     data-focused={isFocused ? "true" : undefined}
                     data-pulsing={isPulsing ? "true" : undefined}
+                    data-dragging={isDragging ? "true" : undefined}
+                    data-drop-target={isDropTarget ? "true" : undefined}
+                    draggable={!t.isDefault}
+                    onDragStart={(e) => {
+                      if (t.isDefault) return;
+                      try {
+                        e.dataTransfer.setData("text/plain", t.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      } catch {
+                        // happy-dom / older test envs
+                      }
+                      setDraggingId(t.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingId(null);
+                      setDragOverId(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (!draggingId || t.isDefault || draggingId === t.id) {
+                        return;
+                      }
+                      e.preventDefault();
+                      try {
+                        e.dataTransfer.dropEffect = "move";
+                      } catch {
+                        // happy-dom / older test envs
+                      }
+                      if (dragOverId !== t.id) setDragOverId(t.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverId === t.id) setDragOverId(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = draggingId;
+                      setDraggingId(null);
+                      setDragOverId(null);
+                      if (!from || t.isDefault || from === t.id) return;
+                      onReorder?.(from, t.id);
+                    }}
                     className={
-                      highlightedId === t.id
+                      isDropTarget
+                        ? "border-b border-slate-100 last:border-b-0 align-top bg-slate-50 outline outline-2 outline-offset-[-2px] transition-colors"
+                        : highlightedId === t.id
                         ? "border-b border-slate-100 last:border-b-0 align-top bg-amber-50 transition-colors"
                         : `border-b border-slate-100 last:border-b-0 align-top transition-colors${
                             isPulsing ? " template-row-focus-pulse" : ""
+                          }${isDragging ? " opacity-50" : ""}${
+                            isDropTarget ? " outline outline-2 outline-offset-[-2px]" : ""
                           }`
                     }
-                    style={
-                      isFocused && highlightedId !== t.id
+                    style={{
+                      ...(isFocused && highlightedId !== t.id && !isDropTarget
                         ? { backgroundColor: BRAND_SOFT }
-                        : undefined
-                    }
+                        : null),
+                      ...(isDropTarget ? { outlineColor: BRAND } : null),
+                      ...(isDragging ? { opacity: 0.5 } : null),
+                    }}
                   >
+                    <td className="px-2 py-3 align-middle">
+                      {t.isDefault ? (
+                        <span
+                          data-testid={`email-template-pinned-${t.id}`}
+                          aria-label="Pinned to the top — default template"
+                          title="Default templates stay pinned at the top of the list and can't be reordered."
+                          className="inline-flex h-7 w-5 items-center justify-center text-amber-400"
+                        >
+                          <Pin className="h-3.5 w-3.5" fill="currentColor" />
+                        </span>
+                      ) : (
+                        <span
+                          data-testid={`drag-handle-email-template-${t.id}`}
+                          aria-label={`Drag to reorder "${t.name}"`}
+                          title="Drag to reorder"
+                          className="inline-flex h-7 w-5 cursor-grab items-center justify-center text-slate-400 hover:text-slate-600 active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         type="button"

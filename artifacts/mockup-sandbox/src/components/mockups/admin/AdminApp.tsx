@@ -43,6 +43,8 @@ import {
   notifyLiveUnitsChanged,
   priorServiceStatusFromTimeline,
   releaseBookingCapacity,
+  reorderCallTemplates,
+  reorderEmailTemplates,
   revertScheduledToCoordinationPatch,
   setDefaultCallTemplate as setDefaultCallTemplateInCatalog,
   setDefaultEmailTemplate as setDefaultEmailTemplateInCatalog,
@@ -182,6 +184,9 @@ export function AdminApp() {
   function setDefaultEmailTemplate(id: string) {
     setEmailTemplates((prev) => setDefaultEmailTemplateInCatalog(prev, id));
   }
+  function reorderEmailTemplate(fromId: string, toId: string) {
+    setEmailTemplates((prev) => reorderEmailTemplates(prev, fromId, toId));
+  }
 
   // Mutable call-template catalog for the per-row Log-call form on
   // `BookingDetail` and the bulk Log-call form on
@@ -223,6 +228,9 @@ export function AdminApp() {
   }
   function setDefaultCallTemplate(id: string) {
     setCallTemplates((prev) => setDefaultCallTemplateInCatalog(prev, id));
+  }
+  function reorderCallTemplate(fromId: string, toId: string) {
+    setCallTemplates((prev) => reorderCallTemplates(prev, fromId, toId));
   }
 
   // Per-template count of timeline entries that reference each
@@ -1539,6 +1547,7 @@ export function AdminApp() {
               onUpdate={updateEmailTemplate}
               onRemove={removeEmailTemplate}
               onSetDefault={setDefaultEmailTemplate}
+              onReorder={reorderEmailTemplate}
               focusedTemplateId={focusedEmailTemplateId}
             />
           )}
@@ -1553,6 +1562,7 @@ export function AdminApp() {
               onUpdate={updateCallTemplate}
               onRemove={removeCallTemplate}
               onSetDefault={setDefaultCallTemplate}
+              onReorder={reorderCallTemplate}
               focusedTemplateId={focusedCallTemplateId}
             />
           )}

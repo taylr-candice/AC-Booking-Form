@@ -2557,6 +2557,68 @@ export function setDefaultEmailTemplate(
 }
 
 /**
+ * Reorder the catalog so the row with `fromId` is moved to the
+ * position of the row with `toId`. Drives the drag-and-drop reorder
+ * affordance on the Call/Email templates panels (Task #164) — ops can
+ * drag the second- and third-most-useful templates next to the pinned
+ * default without having to re-create them.
+ *
+ * Semantics:
+ *   - Dragging a row down past `toId` lands the row immediately AFTER
+ *     `toId` in the array.
+ *   - Dragging a row up past `toId` lands the row immediately BEFORE
+ *     `toId` in the array.
+ *   - The default row stays pinned at the top of the rendered list
+ *     regardless of where it sits in the array, so we refuse moves
+ *     where either side is the default — the panel hides the drag
+ *     handle on that row to begin with, but a future programmatic
+ *     caller would otherwise be able to slip the default into a
+ *     non-pinned slot. Such calls are silently no-ops (the panel
+ *     just re-renders with the same order).
+ *   - Same-id and unknown-id moves are no-ops.
+ *
+ * Pure / data-only — returns a fresh array of fresh objects so callers
+ * can pass it straight into `setState` without aliasing the input.
+ */
+export function reorderCallTemplates(
+  templates: readonly CallTemplate[],
+  fromId: string,
+  toId: string,
+): CallTemplate[] {
+  if (fromId === toId) return templates.map((t) => ({ ...t }));
+  const fromIdx = templates.findIndex((t) => t.id === fromId);
+  const toIdx = templates.findIndex((t) => t.id === toId);
+  if (fromIdx === -1 || toIdx === -1) return templates.map((t) => ({ ...t }));
+  if (templates[fromIdx].isDefault || templates[toIdx].isDefault) {
+    return templates.map((t) => ({ ...t }));
+  }
+  const next = templates.map((t) => ({ ...t }));
+  const [moved] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, moved);
+  return next;
+}
+
+/** Mirror of {@link reorderCallTemplates} for the email channel —
+ *  same semantics and pure-helper guarantees. */
+export function reorderEmailTemplates(
+  templates: readonly EmailTemplate[],
+  fromId: string,
+  toId: string,
+): EmailTemplate[] {
+  if (fromId === toId) return templates.map((t) => ({ ...t }));
+  const fromIdx = templates.findIndex((t) => t.id === fromId);
+  const toIdx = templates.findIndex((t) => t.id === toId);
+  if (fromIdx === -1 || toIdx === -1) return templates.map((t) => ({ ...t }));
+  if (templates[fromIdx].isDefault || templates[toIdx].isDefault) {
+    return templates.map((t) => ({ ...t }));
+  }
+  const next = templates.map((t) => ({ ...t }));
+  const [moved] = next.splice(fromIdx, 1);
+  next.splice(toIdx, 0, moved);
+  return next;
+}
+
+/**
  * Per-system / per-extra prices used to compute `totalAud` for an
  * admin-created booking. Mirrors the customer-side total (see
  * `liveBookingFromSession` and the customer pricing card). Kept here so
