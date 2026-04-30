@@ -696,6 +696,13 @@ describe("Templates panel — default row pinned to the top", () => {
     render(<AdminApp />);
     fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
 
+    // Clear the seeded `voicemail_left` default first so the
+    // "no default" precondition this test cares about actually
+    // holds. Task #151 added this seed after the test was written.
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-voicemail_left"),
+    );
+
     expect(callRowIdsInOrder()).toEqual(CALL_SEED_ORDER);
     for (const id of CALL_SEED_ORDER) {
       expect(
@@ -780,6 +787,13 @@ describe("Templates panel — default row pinned to the top", () => {
   it("Email templates list keeps its seed order while no default is set", () => {
     render(<AdminApp />);
     fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+
+    // Clear the seeded `rebook_link` default first so the
+    // "no default" precondition this test cares about actually
+    // holds. Task #151 added this seed after the test was written.
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-rebook_link"),
+    );
 
     expect(emailRowIdsInOrder()).toEqual(EMAIL_SEED_ORDER);
     for (const id of EMAIL_SEED_ORDER) {

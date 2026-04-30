@@ -131,9 +131,27 @@ function Harness({
   );
 }
 
+// Strip the seeded `isDefault` flags (Task #151 added
+// `voicemail_left` and `rebook_link` as seeded defaults). These tests
+// were written for the original "no seeded default" baseline and
+// describe the "no default set" branch of the hint banner — so we
+// override the templates props with default-cleared copies. Tests
+// that *want* a seeded default keep using the un-stripped CALL_TEMPLATES
+// / EMAIL_TEMPLATES exports below.
+const CALL_TEMPLATES_NO_DEFAULT: ReadonlyArray<CallTemplate> = CALL_TEMPLATES.map(
+  ({ isDefault: _isDefault, ...rest }) => rest,
+);
+const EMAIL_TEMPLATES_NO_DEFAULT: ReadonlyArray<EmailTemplate> =
+  EMAIL_TEMPLATES.map(({ isDefault: _isDefault, ...rest }) => rest);
+
 describe("AwaitingCoordinationView · bulk-action default-template hint", () => {
-  it("with no defaults set, the hint banner is omitted (seeded catalogs leave isDefault unset)", () => {
-    render(<Harness />);
+  it("with no defaults set, the hint banner is omitted", () => {
+    render(
+      <Harness
+        callTemplates={CALL_TEMPLATES_NO_DEFAULT}
+        emailTemplates={EMAIL_TEMPLATES_NO_DEFAULT}
+      />,
+    );
     // Need a selection to mount the bulk-action bar at all.
     fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1"));
 
@@ -164,7 +182,10 @@ describe("AwaitingCoordinationView · bulk-action default-template hint", () => 
           >
             flip
           </button>
-          <Harness callTemplates={calls} />
+          <Harness
+            callTemplates={calls}
+            emailTemplates={EMAIL_TEMPLATES_NO_DEFAULT}
+          />
         </>
       );
     }
@@ -206,7 +227,12 @@ describe("AwaitingCoordinationView · bulk-action default-template hint", () => 
     const emails = EMAIL_TEMPLATES.map((t, i) =>
       i === 0 ? { ...t, isDefault: true } : t,
     );
-    render(<Harness emailTemplates={emails} />);
+    render(
+      <Harness
+        callTemplates={CALL_TEMPLATES_NO_DEFAULT}
+        emailTemplates={emails}
+      />,
+    );
     fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1"));
 
     expect(screen.getByTestId("bulk-action-bar-default-hint")).toBeTruthy();
