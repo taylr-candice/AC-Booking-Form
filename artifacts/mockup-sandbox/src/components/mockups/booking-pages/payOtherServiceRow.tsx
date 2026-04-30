@@ -1,6 +1,7 @@
 import {
   type OtherServiceRule,
   otherServicePrice,
+  otherServicePriceBreakdown,
 } from "../../../state/bookingDerived";
 
 const BRAND = "#ED017F";
@@ -73,7 +74,14 @@ export function PayOtherServiceRow({
   }
 
   // qty > 1 — distinct multi-line treatment with chip + breakdown.
+  // Task #211: qty ≥ 3 expands the inline "$base × qty + $addon × N−1"
+  // sub-line into two indented sub-rows, each with its own subtotal,
+  // so the receipt itemises the same way as the Step-2 price card.
   const addonCount = qty - 1;
+  const showItemizedBreakdown = qty >= 3;
+  const breakdown = showItemizedBreakdown
+    ? otherServicePriceBreakdown(rule, qty)
+    : null;
   return (
     <div className={containerClass} data-testid={`row-pay-other-${rule.id}`}>
       <div className="min-w-0 flex-1">
@@ -99,22 +107,55 @@ export function PayOtherServiceRow({
             {rule.name}
           </span>
         </div>
-        <div
-          className={
-            isMobile
-              ? "mt-1 text-[11.5px] leading-snug text-slate-500"
-              : "mt-1 text-[11.5px] leading-snug text-slate-500"
-          }
-        >
-          <span className="tabular-nums">${rule.priceAud}</span>
-          {" base × "}
-          <span className="tabular-nums">{qty}</span>
-          {" + "}
-          <span className="tabular-nums">${rule.addonPriceAud}</span>
-          {" × "}
-          <span className="tabular-nums">{addonCount}</span>{" "}
-          {rule.addonLabel}
-        </div>
+        {showItemizedBreakdown && breakdown ? (
+          <div className="mt-1 ml-3 space-y-1 border-l border-slate-200 pl-3 text-[13px]">
+            <div
+              className="flex items-start justify-between gap-3"
+              data-testid={`row-pay-other-${rule.id}-base`}
+            >
+              <span className="text-slate-600">
+                <span className="tabular-nums">{breakdown.baseQty}</span>
+                {" × "}
+                <span className="tabular-nums">${breakdown.baseUnitAud}</span>{" "}
+                <span className="text-slate-500">base price</span>
+              </span>
+              <span className="tabular-nums font-medium text-slate-900 shrink-0">
+                ${breakdown.baseSubtotalAud}
+              </span>
+            </div>
+            <div
+              className="flex items-start justify-between gap-3"
+              data-testid={`row-pay-other-${rule.id}-addon`}
+            >
+              <span className="text-slate-600">
+                <span className="tabular-nums">{breakdown.addonQty}</span>
+                {" × "}
+                <span className="tabular-nums">${breakdown.addonUnitAud}</span>{" "}
+                <span className="text-slate-500">{rule.addonLabel}</span>
+              </span>
+              <span className="tabular-nums font-medium text-slate-900 shrink-0">
+                ${breakdown.addonSubtotalAud}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={
+              isMobile
+                ? "mt-1 text-[11.5px] leading-snug text-slate-500"
+                : "mt-1 text-[11.5px] leading-snug text-slate-500"
+            }
+          >
+            <span className="tabular-nums">${rule.priceAud}</span>
+            {" base × "}
+            <span className="tabular-nums">{qty}</span>
+            {" + "}
+            <span className="tabular-nums">${rule.addonPriceAud}</span>
+            {" × "}
+            <span className="tabular-nums">{addonCount}</span>{" "}
+            {rule.addonLabel}
+          </div>
+        )}
       </div>
       <div className="text-right shrink-0">
         <div

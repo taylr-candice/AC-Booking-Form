@@ -21,6 +21,8 @@ import {
   MINUTES_PER_ADDITIONAL_INDOOR,
   MINUTES_PER_SYSTEM,
   nextStepId,
+  otherServicePrice,
+  otherServicePriceBreakdown,
   prevStepId,
   slotFitStatus,
   totalSteps,
@@ -433,5 +435,67 @@ describe("slotFitStatus — customer-side slot picker label", () => {
     // Mirrors the admin-side `slotIsAvailable` semantics in adminMockData.ts.
     expect(slotFitStatus(slot(240, 239), 0)).toBe("available");
     expect(slotFitStatus(slot(240, 240), 0)).toBe("full");
+  });
+});
+
+describe("otherServicePriceBreakdown — Task #211 per-tier helper", () => {
+  // Mirrors the test-fixture catalogue numbers used by
+  // booking-other-service-multi-add.spec.ts so a regression in either
+  // direction surfaces with consistent expected values.
+  const SVC = { priceAud: 120, addonPriceAud: 50 } as const;
+
+  it("returns zeroed counts and subtotals for non-positive qty", () => {
+    expect(otherServicePriceBreakdown(SVC, 0)).toEqual({
+      baseQty: 0,
+      baseUnitAud: 120,
+      baseSubtotalAud: 0,
+      addonQty: 0,
+      addonUnitAud: 50,
+      addonSubtotalAud: 0,
+      totalAud: 0,
+    });
+    expect(otherServicePriceBreakdown(SVC, -3)).toEqual({
+      baseQty: 0,
+      baseUnitAud: 120,
+      baseSubtotalAud: 0,
+      addonQty: 0,
+      addonUnitAud: 50,
+      addonSubtotalAud: 0,
+      totalAud: 0,
+    });
+  });
+
+  it("collapses qty=1 to a base-only line (no addon tier)", () => {
+    const b = otherServicePriceBreakdown(SVC, 1);
+    expect(b.baseQty).toBe(1);
+    expect(b.baseSubtotalAud).toBe(120);
+    expect(b.addonQty).toBe(0);
+    expect(b.addonSubtotalAud).toBe(0);
+    expect(b.totalAud).toBe(120);
+  });
+
+  it("splits qty≥2 into base × qty plus addon × (qty − 1)", () => {
+    expect(otherServicePriceBreakdown(SVC, 2)).toMatchObject({
+      baseQty: 2,
+      baseSubtotalAud: 240,
+      addonQty: 1,
+      addonSubtotalAud: 50,
+      totalAud: 290,
+    });
+    expect(otherServicePriceBreakdown(SVC, 3)).toMatchObject({
+      baseQty: 3,
+      baseSubtotalAud: 360,
+      addonQty: 2,
+      addonSubtotalAud: 100,
+      totalAud: 460,
+    });
+  });
+
+  it("agrees with otherServicePrice() across the qty range so the two helpers cannot drift", () => {
+    for (const qty of [0, 1, 2, 3, 5, 10, 99]) {
+      expect(otherServicePriceBreakdown(SVC, qty).totalAud).toBe(
+        otherServicePrice(SVC, qty),
+      );
+    }
   });
 });

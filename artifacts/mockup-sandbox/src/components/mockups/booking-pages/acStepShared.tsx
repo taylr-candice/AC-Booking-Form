@@ -45,6 +45,7 @@ import {
 import {
   otherServiceMinutes,
   otherServicePrice,
+  otherServicePriceBreakdown,
   type OtherServiceRule,
 } from "../../../state/bookingDerived";
 import { type ExampleVariant } from "./AcExampleModal";
@@ -554,37 +555,89 @@ export function PriceBlock({
             </span>
           </div>
         )}
-        {/* Task #186 / Task #201: one row per selected "other"
-            catalogue service. Qty 1 reads the same as the original
-            single-toggle path; qty > 1 prefixes "n × " to the name
-            so the multi-bathroom case is unambiguous, and uses the
-            base × qty + add-on × (qty − 1) total. */}
-        {otherServices.map(({ rule, qty }) => (
-          <div
-            key={rule.id}
-            className="flex items-start justify-between gap-3"
-            data-testid={`row-price-other-${rule.id}`}
-          >
-            <div className="min-w-0">
-              <p>
-                {qty > 1 ? `${qty} × ${rule.name}` : rule.name}{" "}
-                <span className="text-slate-500">
-                  {qty > 1
-                    ? `(base + ${qty - 1} × ${rule.addonLabel})`
-                    : "(base)"}
+        {/* Task #186 / Task #201 / Task #211: one block per selected
+            "other" catalogue service. Qty 1 reads the same as the
+            original single-toggle path; qty 2 prefixes "n × " to the
+            name and keeps a single combined row so the compact
+            common-case stays compact. Qty ≥ 3 expands into a header
+            row plus two indented sub-rows — `qty × $base` and
+            `(qty − 1) × $addon` — each carrying its own subtotal so
+            the math behind the combined formula is self-explanatory
+            and matches the customer's post-payment receipt. */}
+        {otherServices.map(({ rule, qty }) => {
+          const breakdown = otherServicePriceBreakdown(rule, qty);
+          const showBreakdown = qty >= 3;
+          if (!showBreakdown) {
+            return (
+              <div
+                key={rule.id}
+                className="flex items-start justify-between gap-3"
+                data-testid={`row-price-other-${rule.id}`}
+              >
+                <div className="min-w-0">
+                  <p>
+                    {qty > 1 ? `${qty} × ${rule.name}` : rule.name}{" "}
+                    <span className="text-slate-500">
+                      {qty > 1
+                        ? `(base + ${qty - 1} × ${rule.addonLabel})`
+                        : "(base)"}
+                    </span>
+                  </p>
+                  {rule.appliesToNote ? (
+                    <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">
+                      {rule.appliesToNote}
+                    </p>
+                  ) : null}
+                </div>
+                <span className="tabular-nums text-slate-900 font-medium shrink-0">
+                  ${breakdown.totalAud}
                 </span>
+              </div>
+            );
+          }
+          return (
+            <div
+              key={rule.id}
+              data-testid={`row-price-other-${rule.id}`}
+              className="space-y-1.5"
+            >
+              <p className="text-slate-700">
+                {qty} × {rule.name}
               </p>
               {rule.appliesToNote ? (
-                <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">
+                <p className="text-[11px] text-slate-500 leading-snug">
                   {rule.appliesToNote}
                 </p>
               ) : null}
+              <div className="ml-3 space-y-1 border-l border-slate-200 pl-3 text-[13px]">
+                <div
+                  className="flex items-start justify-between gap-3"
+                  data-testid={`row-price-other-${rule.id}-base`}
+                >
+                  <p className="text-slate-600">
+                    {breakdown.baseQty} × ${breakdown.baseUnitAud}{" "}
+                    <span className="text-slate-500">base price</span>
+                  </p>
+                  <span className="tabular-nums text-slate-900 font-medium shrink-0">
+                    ${breakdown.baseSubtotalAud}
+                  </span>
+                </div>
+                <div
+                  className="flex items-start justify-between gap-3"
+                  data-testid={`row-price-other-${rule.id}-addon`}
+                >
+                  <p className="text-slate-600">
+                    {breakdown.addonQty} × ${breakdown.addonUnitAud}{" "}
+                    <span className="text-slate-500">{rule.addonLabel}</span>
+                  </p>
+                  <span className="tabular-nums text-slate-900 font-medium shrink-0">
+                    ${breakdown.addonSubtotalAud}
+                  </span>
+                </div>
+              </div>
             </div>
-            <span className="tabular-nums text-slate-900 font-medium shrink-0">
-              ${otherServicePrice(rule, qty)}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {isMobile ? (
         <div className="mt-4 flex items-end justify-between border-t border-slate-200 pt-4">

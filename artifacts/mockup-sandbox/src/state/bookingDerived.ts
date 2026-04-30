@@ -384,6 +384,45 @@ export function otherServicePrice(
 }
 
 /**
+ * Two-tier breakdown of {@link otherServicePrice} (Task #211): splits the
+ * combined per-service total into the base-price tier (`qty × priceAud`)
+ * and the add-on tier (`(qty − 1) × addonPriceAud`) so the price card
+ * and the Pay-step receipt can render them as separate self-explanatory
+ * line items for higher quantities. The combined `total` always equals
+ * {@link otherServicePrice}, so callers comparing against the pricing
+ * formula can use either helper interchangeably.
+ *
+ * Returns zeroed counts / subtotals when `qty ≤ 0` so callers can
+ * treat it as a safe pure formatter without guards.
+ */
+export function otherServicePriceBreakdown(
+  rule: Pick<OtherServiceRule, "priceAud" | "addonPriceAud">,
+  qty: number,
+): {
+  baseQty: number;
+  baseUnitAud: number;
+  baseSubtotalAud: number;
+  addonQty: number;
+  addonUnitAud: number;
+  addonSubtotalAud: number;
+  totalAud: number;
+} {
+  const safeQty = qty > 0 ? qty : 0;
+  const addonQty = Math.max(safeQty - 1, 0);
+  const baseSubtotalAud = rule.priceAud * safeQty;
+  const addonSubtotalAud = rule.addonPriceAud * addonQty;
+  return {
+    baseQty: safeQty,
+    baseUnitAud: rule.priceAud,
+    baseSubtotalAud,
+    addonQty,
+    addonUnitAud: rule.addonPriceAud,
+    addonSubtotalAud,
+    totalAud: baseSubtotalAud + addonSubtotalAud,
+  };
+}
+
+/**
  * How long the customer's current booking will take, in minutes.
  *
  * Formula:

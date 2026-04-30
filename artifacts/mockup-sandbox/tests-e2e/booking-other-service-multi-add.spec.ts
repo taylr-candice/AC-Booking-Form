@@ -194,12 +194,23 @@ test.describe("Booking flow — multi-quantity 'other' service", () => {
     await plus.click();
     await plus.click();
 
-    // ── Acceptance (1) — price-card row reads "3 × <name>" with the
-    //                    combined dollar amount ($120·3 + $50·2 = $460).
+    // ── Acceptance (1) — price-card row reads "3 × <name>" with a
+    //                    Task #211 two-tier breakdown:
+    //                      base sub-row : 3 × $120 = $360
+    //                      addon sub-row: 2 × $50  = $100
+    //                    The two sub-rows still sum to the existing
+    //                    formula ($120·3 + $50·2 = $460), which the
+    //                    price-card Total then rolls into the AC line.
     const priceRow = ac.getByTestId(`row-price-other-${SVC.id}`);
     await expect(priceRow).toBeVisible();
     await expect(priceRow).toContainText(`3 × ${SVC.name}`);
-    await expect(priceRow).toContainText("$460");
+    const priceBase = ac.getByTestId(`row-price-other-${SVC.id}-base`);
+    await expect(priceBase).toContainText(`3 × $${SVC.priceAud}`);
+    await expect(priceBase).toContainText(`$${SVC.priceAud * 3}`);
+    const priceAddon = ac.getByTestId(`row-price-other-${SVC.id}-addon`);
+    await expect(priceAddon).toContainText(`2 × $${SVC.addonPriceAud}`);
+    await expect(priceAddon).toContainText(SVC.addonLabel);
+    await expect(priceAddon).toContainText(`$${SVC.addonPriceAud * 2}`);
     // Price card total = AC ($179, no addon row) + service ($460) = $639.
     await expect(ac.getByTestId("text-price-total")).toHaveText("$639");
     // Card stepper readout mirrors the qty-aware minutes / dollars.
@@ -228,9 +239,22 @@ test.describe("Booking flow — multi-quantity 'other' service", () => {
     // rendered (the day grid hasn't expanded its slot panel).
     await expect(slots.getByTestId("desktop-slot-20260504-am")).toHaveCount(0);
 
-    // ── Acceptance (2) — Pay-step total matches the formula ────────────
+    // ── Acceptance (2) — Pay-step total matches the formula, and the
+    //                    receipt row mirrors the price-card breakdown
+    //                    (Task #211): a header line for the service
+    //                    and two indented sub-rows for base × qty and
+    //                    addon × (qty − 1).
     const pay = await gotoStep(page, 5);
     await expect(pay.getByTestId("text-total")).toHaveText("$639");
+    const payRow = pay.getByTestId(`row-pay-other-${SVC.id}`);
+    await expect(payRow).toContainText(`3 × ${SVC.name}`);
+    const payBase = pay.getByTestId(`row-pay-other-${SVC.id}-base`);
+    await expect(payBase).toContainText(`3 × $${SVC.priceAud}`);
+    await expect(payBase).toContainText(`$${SVC.priceAud * 3}`);
+    const payAddon = pay.getByTestId(`row-pay-other-${SVC.id}-addon`);
+    await expect(payAddon).toContainText(`2 × $${SVC.addonPriceAud}`);
+    await expect(payAddon).toContainText(SVC.addonLabel);
+    await expect(payAddon).toContainText(`$${SVC.addonPriceAud * 2}`);
 
     // ── qty back down to 1 — same slot becomes selectable again ────────
     await gotoStep(page, 2);
