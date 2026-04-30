@@ -18,7 +18,7 @@
  * — exactly the same click-through as the bookings list.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   ArrowDownNarrowWide,
   ChevronDown,
@@ -317,9 +317,17 @@ function BulkTemplatePickerDropdown({
     { id: customId, label: customLabel, isDefault: false },
     ...options,
   ];
-  const selected = allRows.find((r) => r.id === value) ?? allRows[0]!;
+  const selectedIndex = Math.max(
+    0,
+    allRows.findIndex((r) => r.id === value),
+  );
+  const selected = allRows[selectedIndex]!;
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const listboxRef = useRef<HTMLUListElement | null>(null);
+  const optionDomId = (rowId: string) => `${optionTestIdPrefix}-${rowId}-opt`;
 
   useEffect(() => {
     if (!open) return;
@@ -345,26 +353,120 @@ function BulkTemplatePickerDropdown({
       }
       setOpen(false);
     }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
     document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKey);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKey);
     };
   }, [open, kind]);
+
+  // When the popover opens, move focus to the listbox so keyboard
+  // navigation (ArrowUp/Down/Home/End) is announced via
+  // aria-activedescendant. The initial activeIndex is set by whichever
+  // open path ran (click, ArrowDown, Home, End, ...).
+  useEffect(() => {
+    if (!open) return;
+    const node = listboxRef.current;
+    if (node) node.focus();
+  }, [open]);
+
+  // Keep the highlighted option scrolled into view as the user
+  // arrow-keys through a long list.
+  useEffect(() => {
+    if (!open) return;
+    const list = listboxRef.current;
+    if (!list) return;
+    const active = list.querySelector(
+      `#${CSS.escape(optionDomId(allRows[activeIndex]!.id))}`,
+    );
+    if (active && "scrollIntoView" in active) {
+      (active as HTMLElement).scrollIntoView({ block: "nearest" });
+    }
+  }, [open, activeIndex, allRows, optionTestIdPrefix]);
+
+  function closeAndRefocusTrigger() {
+    setOpen(false);
+    // Wait for the listbox to unmount before returning focus, so the
+    // trigger doesn't fight the popover's focus management.
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }
+
+  function commitOption(index: number) {
+    const row = allRows[index];
+    if (!row) return;
+    onChange(row.id);
+    closeAndRefocusTrigger();
+  }
+
+  function handleTriggerKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    if (open) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex(
+        e.key === "ArrowDown"
+          ? Math.min(allRows.length - 1, selectedIndex)
+          : selectedIndex,
+      );
+      setOpen(true);
+    } else if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      setOpen(true);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveIndex(0);
+      setOpen(true);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActiveIndex(allRows.length - 1);
+      setOpen(true);
+    }
+  }
+
+  function handleListboxKeyDown(e: KeyboardEvent<HTMLUListElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(allRows.length - 1, i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(0, i - 1));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActiveIndex(allRows.length - 1);
+    } else if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      commitOption(activeIndex);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeAndRefocusTrigger();
+    } else if (e.key === "Tab") {
+      // Let Tab move focus away naturally, but close the popover so the
+      // hidden <select> isn't shadowed by a stale highlight.
+      setOpen(false);
+    }
+  }
+
+  const activeRow = allRows[activeIndex];
+  const activeDescendantId = open && activeRow ? optionDomId(activeRow.id) : undefined;
 
   return (
     <div ref={containerRef} className="relative flex-1">
       <button
+        ref={triggerRef}
         type="button"
         id={triggerId}
         data-testid={triggerTestId}
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        aria-controls={open ? `${optionTestIdPrefix}-listbox` : undefined}
+        onClick={() => {
+          setOpen((o) => {
+            if (!o) setActiveIndex(selectedIndex);
+            return !o;
+          });
+        }}
+        onKeyDown={handleTriggerKeyDown}
         className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-left text-[12px] text-slate-800 hover:border-slate-400"
       >
         <span className="truncate">{selected.label}</span>
@@ -376,40 +478,42 @@ function BulkTemplatePickerDropdown({
       </button>
       {open ? (
         <ul
+          ref={listboxRef}
+          id={`${optionTestIdPrefix}-listbox`}
           role="listbox"
           aria-labelledby={triggerId}
+          aria-activedescendant={activeDescendantId}
+          tabIndex={-1}
+          onKeyDown={handleListboxKeyDown}
           data-testid={`${optionTestIdPrefix}-listbox`}
-          className="absolute z-20 mt-1 flex w-full flex-col gap-0.5 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          className="absolute z-20 mt-1 flex w-full flex-col gap-0.5 rounded-lg border border-slate-200 bg-white p-1 shadow-lg focus:outline-none"
         >
-          {allRows.map((row) => {
+          {allRows.map((row, idx) => {
             const isSelected = row.id === value;
+            const isActive = idx === activeIndex;
             return (
               <li key={row.id} className="m-0 list-none">
                 {/* Option row is a `div` (not a `button`) so the
                     sparkline's day-scoped drill-down popover (Task #209)
                     — which renders its own nested `<button>` bars and
                     booking-row buttons — can sit legally inside this
-                    row without nesting buttons. Click + Enter/Space
-                    keep the same picker semantics the original
-                    `<button role="option">` carried. */}
+                    row without nesting buttons. Keyboard navigation
+                    (ArrowUp/Down/Home/End/Enter/Space — Task #206) is
+                    driven by the parent listbox via aria-activedescendant,
+                    so this row only needs an `id` for the
+                    aria-activedescendant pointer plus mouse-enter sync
+                    so hover and the keyboard highlight stay aligned. */}
                 <div
+                  id={optionDomId(row.id)}
                   role="option"
                   aria-selected={isSelected}
                   tabIndex={-1}
-                  onClick={() => {
-                    onChange(row.id);
-                    setOpen(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onChange(row.id);
-                      setOpen(false);
-                    }
-                  }}
+                  onClick={() => commitOption(idx)}
+                  onMouseEnter={() => setActiveIndex(idx)}
                   data-testid={`${optionTestIdPrefix}-${row.id}`}
                   data-value={row.id}
                   data-selected={isSelected ? "true" : "false"}
+                  data-active={isActive ? "true" : "false"}
                   className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[12px] hover:bg-slate-50"
                   style={
                     isSelected
@@ -417,7 +521,9 @@ function BulkTemplatePickerDropdown({
                           backgroundColor: BRAND_SOFT,
                           boxShadow: `inset 0 0 0 1px ${BRAND}`,
                         }
-                      : undefined
+                      : isActive
+                        ? { backgroundColor: "#f1f5f9" }
+                        : undefined
                   }
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-1.5">

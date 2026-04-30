@@ -281,3 +281,184 @@ describe("AwaitingCoordinationView · bulk template picker sparklines", () => {
     ).toMatch(sentLinkLabel);
   });
 });
+
+describe("AwaitingCoordinationView · bulk template picker keyboard nav", () => {
+  function openCallPicker() {
+    const bookings = [
+      makeBooking("bk-1", "u1", []),
+      makeBooking("bk-2", "u2", []),
+    ];
+    render(<Harness bookings={bookings} />);
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1"));
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-2"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    return screen.getByTestId("trigger-bulk-call-template");
+  }
+
+  function activeOption(prefix: string): HTMLElement | null {
+    const list = screen.queryByTestId(`${prefix}-listbox`);
+    if (!list) return null;
+    return list.querySelector('[data-active="true"]');
+  }
+
+  it("ArrowDown on the closed trigger opens the listbox anchored on the current selection", () => {
+    const trigger = openCallPicker();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    // aria-activedescendant is announced via the listbox (it owns focus).
+    expect(listbox.getAttribute("aria-activedescendant")).toBe(
+      "option-bulk-call-template-custom-opt",
+    );
+    // The current selection (Custom) is the highlighted option.
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      "custom",
+    );
+  });
+
+  it("ArrowDown / ArrowUp / Home / End move the highlight inside the open listbox", () => {
+    const trigger = openCallPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+
+    const expectedRows = [
+      "custom",
+      ...NO_DEFAULT_CALL_TEMPLATES.map((t) => t.id),
+    ];
+
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      expectedRows[1],
+    );
+    expect(listbox.getAttribute("aria-activedescendant")).toBe(
+      `option-bulk-call-template-${expectedRows[1]}-opt`,
+    );
+
+    fireEvent.keyDown(listbox, { key: "End" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      expectedRows[expectedRows.length - 1],
+    );
+
+    fireEvent.keyDown(listbox, { key: "Home" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      expectedRows[0],
+    );
+
+    // ArrowUp at the top clamps (does not wrap).
+    fireEvent.keyDown(listbox, { key: "ArrowUp" });
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      expectedRows[0],
+    );
+  });
+
+  it("Enter on the highlighted option commits the selection and syncs the hidden <select>", () => {
+    const trigger = openCallPicker();
+    const select = screen.getByTestId(
+      "select-bulk-call-template",
+    ) as HTMLSelectElement;
+    const initialValue = select.value;
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    const targetId = NO_DEFAULT_CALL_TEMPLATES[0]!.id;
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      targetId,
+    );
+
+    fireEvent.keyDown(listbox, { key: "Enter" });
+
+    expect(select.value).toBe(targetId);
+    expect(select.value).not.toBe(initialValue);
+    // Listbox is closed after commit.
+    expect(
+      screen.queryByTestId("option-bulk-call-template-listbox"),
+    ).toBeNull();
+    // Trigger reflects the new selection.
+    expect(trigger.textContent).toMatch(NO_DEFAULT_CALL_TEMPLATES[0]!.name);
+  });
+
+  it("Space on the highlighted option also commits the selection", () => {
+    const trigger = openCallPicker();
+    const select = screen.getByTestId(
+      "select-bulk-call-template",
+    ) as HTMLSelectElement;
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+    fireEvent.keyDown(listbox, { key: "End" });
+    const targetId =
+      NO_DEFAULT_CALL_TEMPLATES[NO_DEFAULT_CALL_TEMPLATES.length - 1]!.id;
+
+    fireEvent.keyDown(listbox, { key: " " });
+
+    expect(select.value).toBe(targetId);
+    expect(
+      screen.queryByTestId("option-bulk-call-template-listbox"),
+    ).toBeNull();
+  });
+
+  it("Escape closes the listbox without changing the selection", () => {
+    const trigger = openCallPicker();
+    const select = screen.getByTestId(
+      "select-bulk-call-template",
+    ) as HTMLSelectElement;
+    const initialValue = select.value;
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    fireEvent.keyDown(listbox, { key: "Escape" });
+
+    expect(
+      screen.queryByTestId("option-bulk-call-template-listbox"),
+    ).toBeNull();
+    expect(select.value).toBe(initialValue);
+  });
+
+  it("driving the hidden <select> updates the visible listbox highlight on next open", () => {
+    const trigger = openCallPicker();
+    const select = screen.getByTestId(
+      "select-bulk-call-template",
+    ) as HTMLSelectElement;
+    const targetId = NO_DEFAULT_CALL_TEMPLATES[1]!.id;
+
+    // Simulate a sighted keyboard user driving the hidden mirror select
+    // (or any other code path that sets the bulk template id).
+    fireEvent.change(select, { target: { value: targetId } });
+
+    // The visible trigger label updates to mirror the hidden select.
+    expect(trigger.textContent).toMatch(NO_DEFAULT_CALL_TEMPLATES[1]!.name);
+
+    // Reopening the listbox anchors the highlight on that same option.
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+    expect(listbox.getAttribute("aria-activedescendant")).toBe(
+      `option-bulk-call-template-${targetId}-opt`,
+    );
+    expect(activeOption("option-bulk-call-template")?.dataset.value).toBe(
+      targetId,
+    );
+  });
+
+  it("the listbox is wired up as role=listbox with aria-activedescendant + tabindex roving", () => {
+    const trigger = openCallPicker();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    const listbox = screen.getByTestId("option-bulk-call-template-listbox");
+    expect(listbox.getAttribute("role")).toBe("listbox");
+    expect(listbox.getAttribute("tabindex")).toBe("-1");
+    expect(listbox.getAttribute("aria-activedescendant")).toBeTruthy();
+
+    // Every option carries tabindex=-1 so focus stays on the listbox and
+    // screen readers can follow aria-activedescendant.
+    const options = Array.from(listbox.querySelectorAll('[role="option"]'));
+    expect(options.length).toBeGreaterThan(0);
+    for (const opt of options) {
+      expect(opt.getAttribute("tabindex")).toBe("-1");
+    }
+  });
+});
