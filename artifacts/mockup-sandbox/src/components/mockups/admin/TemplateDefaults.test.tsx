@@ -303,6 +303,151 @@ describe("EmailTemplatesView · default-template star toggle", () => {
   });
 });
 
+describe("Default-template marker in Log dropdown options", () => {
+  const optionFor = (select: HTMLSelectElement, value: string): HTMLOptionElement => {
+    const opt = Array.from(select.options).find((o) => o.value === value);
+    if (!opt) throw new Error(`option ${value} not found`);
+    return opt;
+  };
+
+  it("per-row Log-call dropdown marks the default option and clears it when the default moves or is unset", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-voicemail_left"),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Open booking bk-1038/ }),
+    );
+    fireEvent.click(screen.getByTestId("button-log-call"));
+    let select = screen.getByTestId(
+      "select-call-template",
+    ) as HTMLSelectElement;
+    expect(optionFor(select, "voicemail_left").textContent).toMatch(
+      /\(default\)$/,
+    );
+    expect(optionFor(select, "spoke_confirmed").textContent).not.toMatch(
+      /\(default\)/,
+    );
+
+    // Move the default to a different row and confirm the marker moves with it.
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Open booking bk-1038/ }),
+    );
+    fireEvent.click(screen.getByTestId("button-log-call"));
+    select = screen.getByTestId("select-call-template") as HTMLSelectElement;
+    expect(optionFor(select, "spoke_confirmed").textContent).toMatch(
+      /\(default\)$/,
+    );
+    expect(optionFor(select, "voicemail_left").textContent).not.toMatch(
+      /\(default\)/,
+    );
+
+    // Unset the default; no option should carry the marker.
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Open booking bk-1038/ }),
+    );
+    fireEvent.click(screen.getByTestId("button-log-call"));
+    select = screen.getByTestId("select-call-template") as HTMLSelectElement;
+    for (const opt of Array.from(select.options)) {
+      expect(opt.textContent ?? "").not.toMatch(/\(default\)/);
+    }
+  });
+
+  it("per-row Log-email dropdown marks the default option", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-rebook_link"),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Open booking bk-1038/ }),
+    );
+    fireEvent.click(screen.getByTestId("button-log-email"));
+    const select = screen.getByTestId(
+      "select-email-template",
+    ) as HTMLSelectElement;
+    expect(optionFor(select, "rebook_link").textContent).toMatch(
+      /\(default\)$/,
+    );
+    expect(optionFor(select, "awaiting_confirm").textContent).not.toMatch(
+      /\(default\)/,
+    );
+  });
+
+  it("bulk Log-call dropdown marks the default option", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-call-template-spoke_confirmed"),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1038"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    const select = screen.getByTestId(
+      "select-bulk-call-template",
+    ) as HTMLSelectElement;
+    expect(optionFor(select, "spoke_confirmed").textContent).toMatch(
+      /\(default\)$/,
+    );
+    expect(optionFor(select, "voicemail_left").textContent).not.toMatch(
+      /\(default\)/,
+    );
+  });
+
+  it("bulk Log-email dropdown marks the default option", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    fireEvent.click(
+      screen.getByTestId("button-default-email-template-rebook_link"),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    fireEvent.click(screen.getByTestId("checkbox-coordination-row-bk-1038"));
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+    const select = screen.getByTestId(
+      "select-bulk-email-template",
+    ) as HTMLSelectElement;
+    expect(optionFor(select, "rebook_link").textContent).toMatch(
+      /\(default\)$/,
+    );
+    expect(optionFor(select, "awaiting_confirm").textContent).not.toMatch(
+      /\(default\)/,
+    );
+  });
+});
+
 describe("Default-template fallback to Custom…", () => {
   it("with no default set, every Log form opens on Custom…", () => {
     render(<AdminApp />);

@@ -1406,7 +1406,7 @@ function LogCallForm({
         <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
         {callTemplates.map((tpl) => (
           <option key={tpl.id} value={tpl.id}>
-            {tpl.name}
+            {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
           </option>
         ))}
       </select>
@@ -1590,7 +1590,7 @@ function LogEmailForm({
         <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
         {emailTemplates.map((tpl) => (
           <option key={tpl.id} value={tpl.id}>
-            {tpl.name}
+            {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
           </option>
         ))}
       </select>
