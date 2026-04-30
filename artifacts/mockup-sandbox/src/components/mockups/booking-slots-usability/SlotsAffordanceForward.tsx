@@ -95,6 +95,20 @@ export function SlotsAffordanceForward() {
     [],
   );
 
+  // Earliest bookable slot across the visible days — first day with at
+  // least one `available` window, picking morning before afternoon.
+  // Purely visual: doesn't pre-select, doesn't change Continue logic.
+  const nextAvailableSlotId = useMemo<string | null>(() => {
+    for (const d of visibleDays) {
+      for (const slot of [d.morning, d.afternoon]) {
+        if (slotFitStatus(slot, jobMinutes) === "available") {
+          return slot.id;
+        }
+      }
+    }
+    return null;
+  }, [visibleDays, jobMinutes]);
+
   const selectedSlotFits = useMemo(() => {
     if (!selected) return true;
     for (const d of visibleDays) {
@@ -260,7 +274,7 @@ export function SlotsAffordanceForward() {
           </h2>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-2">
           {visibleDays.map((d) => (
             <DayBlock
               key={d.date}
@@ -268,6 +282,7 @@ export function SlotsAffordanceForward() {
               jobMinutes={jobMinutes}
               selected={selected}
               onSelect={(id) => setSelected(id)}
+              nextAvailableSlotId={nextAvailableSlotId}
             />
           ))}
         </div>
@@ -312,36 +327,44 @@ export function SlotsAffordanceForward() {
 }
 
 function DayBlock({
-  day, jobMinutes, selected, onSelect,
-}: { day: Day; jobMinutes: number; selected: string | null; onSelect: (id: string) => void }) {
+  day, jobMinutes, selected, onSelect, nextAvailableSlotId,
+}: {
+  day: Day;
+  jobMinutes: number;
+  selected: string | null;
+  onSelect: (id: string) => void;
+  nextAvailableSlotId: string | null;
+}) {
   return (
-    <div className="flex gap-3 relative">
-      {/* Date Column */}
-      <div className="flex w-[68px] shrink-0 flex-col items-center justify-start pt-1 pb-4">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{day.weekday}</div>
-        <div className="text-[28px] font-black leading-none text-slate-900 tracking-tight">{day.day}</div>
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mt-1">{day.month}</div>
+    <div className="flex items-stretch gap-2 relative">
+      {/* Compact date pill */}
+      <div className="flex w-[44px] shrink-0 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white py-1.5 shadow-sm">
+        <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-none">{day.weekday}</div>
+        <div className="mt-0.5 text-[20px] font-black leading-none text-slate-900 tracking-tight">{day.day}</div>
+        <div className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 leading-none">{day.month}</div>
       </div>
 
-      {/* Slots Column */}
-      <div className="flex flex-1 flex-col gap-3">
+      {/* AM/PM 2-column grid */}
+      <div className="grid flex-1 grid-cols-2 gap-2">
         <SlotCard
           slot={day.morning}
           jobMinutes={jobMinutes}
-          icon={<Sunrise className="h-6 w-6" />}
+          icon={<Sunrise className="h-4 w-4" />}
           label="Morning"
           hint="8am – 12pm"
           selected={selected === day.morning.id}
           onClick={() => onSelect(day.morning.id)}
+          isNextAvailable={day.morning.id === nextAvailableSlotId}
         />
         <SlotCard
           slot={day.afternoon}
           jobMinutes={jobMinutes}
-          icon={<Sun className="h-6 w-6" />}
+          icon={<Sun className="h-4 w-4" />}
           label="Afternoon"
           hint="12pm – 5pm"
           selected={selected === day.afternoon.id}
           onClick={() => onSelect(day.afternoon.id)}
+          isNextAvailable={day.afternoon.id === nextAvailableSlotId}
         />
       </div>
     </div>
@@ -349,7 +372,7 @@ function DayBlock({
 }
 
 function SlotCard({
-  slot, jobMinutes, icon, label, hint, selected, onClick,
+  slot, jobMinutes, icon, label, hint, selected, onClick, isNextAvailable,
 }: {
   slot: Slot;
   jobMinutes: number;
@@ -358,13 +381,18 @@ function SlotCard({
   hint: string;
   selected: boolean;
   onClick: () => void;
+  isNextAvailable: boolean;
 }) {
   const status = slotFitStatus(slot, jobMinutes);
   const fits = status === "available";
   const disabled = !fits;
   const isSelected = selected && fits;
+  // Visual accent only — once the customer picks any slot the
+  // selected-green state should win, so we hide the badge while this
+  // tile is the chosen one.
+  const showNextBadge = isNextAvailable && !disabled && !isSelected;
 
-  const reason = status === "full" ? "Full" : "Not enough time left for this service";
+  const reason = status === "full" ? "Full" : "Not enough time";
 
   return (
     <button
@@ -373,73 +401,82 @@ function SlotCard({
       onClick={onClick}
       data-testid={`mobile-slot-${slot.id}`}
       aria-pressed={isSelected}
-      className={`relative w-full rounded-2xl text-left transition-all duration-200 outline-none select-none min-h-[88px] flex flex-col justify-center
+      data-next-available={showNextBadge ? "true" : undefined}
+      className={`relative w-full rounded-xl text-left transition-all duration-150 outline-none select-none flex flex-col justify-center px-2.5 py-2 min-h-[64px]
         ${disabled
-          ? "bg-slate-100/50 cursor-not-allowed"
+          ? "cursor-not-allowed border-2 border-slate-200"
           : isSelected
-            ? "shadow-lg scale-[1.02] ring-[3px]"
-            : "bg-white border-2 border-slate-200 hover:border-slate-300 hover:shadow-md active:scale-[0.98] shadow-sm"
+            ? "shadow-md scale-[1.02] border-2"
+            : showNextBadge
+              ? "border-2 shadow-sm hover:shadow-md active:scale-[0.98]"
+              : "bg-white border-2 border-slate-200 hover:border-slate-300 hover:shadow-sm active:scale-[0.98] shadow-sm"
         }
       `}
       style={{
         ...(isSelected ? {
           backgroundColor: SELECTED_GREEN,
           borderColor: SELECTED_GREEN,
-          ringColor: SELECTED_GREEN,
-          boxShadow: `0 10px 25px -5px ${SELECTED_GREEN}60, 0 4px 10px -5px ${SELECTED_GREEN}60`
+          boxShadow: `0 6px 16px -6px ${SELECTED_GREEN}80`,
         } : {}),
-        // Add diagonal stripe pattern for disabled slots
+        ...(showNextBadge ? {
+          backgroundColor: "#FFF1F8",
+          borderColor: "#F9A8D4",
+        } : {}),
         ...(disabled ? {
           backgroundImage: 'repeating-linear-gradient(45deg, #f8fafc, #f8fafc 10px, #f1f5f9 10px, #f1f5f9 20px)',
           borderColor: '#e2e8f0',
-          borderWidth: '2px'
-        } : {})
+        } : {}),
       }}
     >
-      <div className="flex w-full items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className={`flex items-center justify-center p-2 rounded-xl transition-colors ${
-            disabled ? "bg-white text-slate-300 shadow-sm" : 
-            isSelected ? "bg-white/20 text-white" : 
-            "bg-slate-50 border border-slate-100 text-slate-700 shadow-sm"
+      {showNextBadge && (
+        <div
+          className="absolute -top-2 left-2 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white shadow-sm"
+          style={{ backgroundColor: BRAND }}
+          data-testid={`next-available-badge-${slot.id}`}
+        >
+          Next available
+        </div>
+      )}
+
+      <div className="flex w-full items-center justify-between gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <div className={`shrink-0 ${
+            disabled ? "text-slate-300" :
+            isSelected ? "text-white" :
+            showNextBadge ? "text-pink-600" :
+            "text-slate-700"
           }`}>
             {icon}
           </div>
-          <div>
-            <div className={`text-[17px] font-bold leading-tight ${
-              disabled ? "text-slate-400" : isSelected ? "text-white" : "text-slate-900"
+          <div className="min-w-0">
+            <div className={`text-[13px] font-bold leading-tight ${
+              disabled ? "text-slate-400" : isSelected ? "text-white" : showNextBadge ? "text-pink-900" : "text-slate-900"
             }`}>
               {label}
             </div>
-            <div className={`text-[12px] font-medium mt-0.5 ${
-              disabled ? "text-slate-400" : isSelected ? "text-white/90" : "text-slate-500"
+            <div className={`mt-0.5 text-[10px] font-medium leading-tight ${
+              disabled ? "text-slate-400" : isSelected ? "text-white/90" : showNextBadge ? "text-pink-700/80" : "text-slate-500"
             }`}>
               {hint}
             </div>
           </div>
         </div>
 
-        <div className="shrink-0 ml-2">
+        <div className="shrink-0">
           {isSelected ? (
-            <div className="bg-white rounded-full p-1 shadow-sm">
-              <CheckCircle2 className="h-6 w-6" style={{ color: SELECTED_GREEN }} />
-            </div>
+            <CheckCircle2 className="h-4 w-4 text-white" />
           ) : disabled ? (
-            <div className="bg-white/80 p-2 rounded-full shadow-sm border border-slate-200">
-              <Lock className="h-4 w-4 text-slate-400" />
-            </div>
-          ) : (
-            <div className="h-8 w-8 rounded-full border-2 border-slate-200" />
-          )}
+            <Lock className="h-3.5 w-3.5 text-slate-400" />
+          ) : null}
         </div>
       </div>
-      
-      {/* Explicit disabled reason pill */}
+
+      {/* Disabled reason pill */}
       {disabled && (
-        <div className="px-4 pb-3 pt-0">
-          <div className="inline-flex items-center bg-white border border-slate-200 rounded-full px-3 py-1 shadow-sm">
-            <span className="text-[11px] font-bold text-slate-500">{reason}</span>
-          </div>
+        <div className="mt-1.5">
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500 shadow-sm">
+            {reason}
+          </span>
         </div>
       )}
     </button>
