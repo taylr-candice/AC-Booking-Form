@@ -17,6 +17,7 @@ import {
   Phone,
   ReceiptText,
   RotateCcw,
+  Star,
   TriangleAlert,
   Users,
   XCircle,
@@ -1496,6 +1497,9 @@ function LogCallForm({
     const templateLabel = tpl ? tpl.name : CALL_TEMPLATE_CUSTOM_LABEL;
     onSubmit(outcome, note, templateLabel);
   }
+  // Drives the "Default" pill next to the collapsed dropdown trigger.
+  const selectedCallIsDefault =
+    callTemplates.find((t) => t.id === templateId)?.isDefault ?? false;
   return (
     <div
       className="rounded-lg border border-slate-200 bg-white p-3"
@@ -1517,20 +1521,32 @@ function LogCallForm({
       >
         Template
       </label>
-      <select
-        id="log-call-template"
-        value={templateId}
-        onChange={(e) => handleSelectTemplate(e.target.value)}
-        data-testid="select-call-template"
-        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
-      >
-        <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-        {callTemplates.map((tpl) => (
-          <option key={tpl.id} value={tpl.id}>
-            {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
-          </option>
-        ))}
-      </select>
+      <div className="mt-1 flex items-center gap-2">
+        <select
+          id="log-call-template"
+          value={templateId}
+          onChange={(e) => handleSelectTemplate(e.target.value)}
+          data-testid="select-call-template"
+          className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+        >
+          <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+          {callTemplates.map((tpl) => (
+            <option key={tpl.id} value={tpl.id}>
+              {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
+            </option>
+          ))}
+        </select>
+        {selectedCallIsDefault ? (
+          <span
+            data-testid="pill-default-selected-call-template"
+            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+            title="Default Call template"
+          >
+            <Star className="h-2.5 w-2.5" fill="currentColor" />
+            Default
+          </span>
+        ) : null}
+      </div>
       <label
         className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
         htmlFor="log-call-outcome"
@@ -1680,6 +1696,10 @@ function LogEmailForm({
     onSubmit(subject, note, templateLabel);
   }
 
+  // Drives the "Default" pill next to the collapsed dropdown trigger.
+  const selectedEmailIsDefault =
+    emailTemplates.find((t) => t.id === templateId)?.isDefault ?? false;
+
   return (
     <div
       className="rounded-lg border border-slate-200 bg-white p-3"
@@ -1701,20 +1721,32 @@ function LogEmailForm({
       >
         Template
       </label>
-      <select
-        id="log-email-template"
-        value={templateId}
-        onChange={(e) => handleSelectTemplate(e.target.value)}
-        data-testid="select-email-template"
-        className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
-      >
-        <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-        {emailTemplates.map((tpl) => (
-          <option key={tpl.id} value={tpl.id}>
-            {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
-          </option>
-        ))}
-      </select>
+      <div className="mt-1 flex items-center gap-2">
+        <select
+          id="log-email-template"
+          value={templateId}
+          onChange={(e) => handleSelectTemplate(e.target.value)}
+          data-testid="select-email-template"
+          className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+        >
+          <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+          {emailTemplates.map((tpl) => (
+            <option key={tpl.id} value={tpl.id}>
+              {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
+            </option>
+          ))}
+        </select>
+        {selectedEmailIsDefault ? (
+          <span
+            data-testid="pill-default-selected-email-template"
+            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+            title="Default Email template"
+          >
+            <Star className="h-2.5 w-2.5" fill="currentColor" />
+            Default
+          </span>
+        ) : null}
+      </div>
       <label
         className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
         htmlFor="log-email-subject"

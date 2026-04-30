@@ -19,7 +19,15 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownNarrowWide, Clock, Mail, Phone, Search, X } from "lucide-react";
+import {
+  ArrowDownNarrowWide,
+  Clock,
+  Mail,
+  Phone,
+  Search,
+  Star,
+  X,
+} from "lucide-react";
 
 import {
   bookerAgencyName,
@@ -779,6 +787,13 @@ export function AwaitingCoordinationView({
   const defaultCallTemplateForHint = findDefaultCallTemplate(callTemplates);
   const defaultEmailTemplateForHint = findDefaultEmailTemplate(emailTemplates);
 
+  // Drives the "Default" pill next to each collapsed bulk dropdown trigger.
+  const bulkSelectedCallIsDefault =
+    callTemplates.find((t) => t.id === bulkCallTemplateId)?.isDefault ?? false;
+  const bulkSelectedEmailIsDefault =
+    emailTemplates.find((t) => t.id === bulkEmailTemplateId)?.isDefault ??
+    false;
+
   return (
     <div className="flex flex-col gap-4">
       {/* Summary */}
@@ -1210,20 +1225,32 @@ export function AwaitingCoordinationView({
                 >
                   Template
                 </label>
-                <select
-                  id="bulk-log-call-template"
-                  value={bulkCallTemplateId}
-                  onChange={(e) => handleSelectCallTemplate(e.target.value)}
-                  data-testid="select-bulk-call-template"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
-                >
-                  <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-                  {callTemplates.map((tpl) => (
-                    <option key={tpl.id} value={tpl.id}>
-                      {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-1 flex items-center gap-2">
+                  <select
+                    id="bulk-log-call-template"
+                    value={bulkCallTemplateId}
+                    onChange={(e) => handleSelectCallTemplate(e.target.value)}
+                    data-testid="select-bulk-call-template"
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                  >
+                    <option value={CALL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+                    {callTemplates.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
+                      </option>
+                    ))}
+                  </select>
+                  {bulkSelectedCallIsDefault ? (
+                    <span
+                      data-testid="pill-default-selected-bulk-call-template"
+                      className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                      title="Default Call template"
+                    >
+                      <Star className="h-2.5 w-2.5" fill="currentColor" />
+                      Default
+                    </span>
+                  ) : null}
+                </div>
                 <label
                   className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
                   htmlFor="bulk-log-call-outcome"
@@ -1312,20 +1339,32 @@ export function AwaitingCoordinationView({
                 >
                   Template
                 </label>
-                <select
-                  id="bulk-log-email-template"
-                  value={bulkEmailTemplateId}
-                  onChange={(e) => handleSelectEmailTemplate(e.target.value)}
-                  data-testid="select-bulk-email-template"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
-                >
-                  <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
-                  {emailTemplates.map((tpl) => (
-                    <option key={tpl.id} value={tpl.id}>
-                      {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-1 flex items-center gap-2">
+                  <select
+                    id="bulk-log-email-template"
+                    value={bulkEmailTemplateId}
+                    onChange={(e) => handleSelectEmailTemplate(e.target.value)}
+                    data-testid="select-bulk-email-template"
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[12px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                  >
+                    <option value={EMAIL_TEMPLATE_CUSTOM_ID}>Custom…</option>
+                    {emailTemplates.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.isDefault ? `${tpl.name} (default)` : tpl.name}
+                      </option>
+                    ))}
+                  </select>
+                  {bulkSelectedEmailIsDefault ? (
+                    <span
+                      data-testid="pill-default-selected-bulk-email-template"
+                      className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                      title="Default Email template"
+                    >
+                      <Star className="h-2.5 w-2.5" fill="currentColor" />
+                      Default
+                    </span>
+                  ) : null}
+                </div>
                 <label
                   className="mt-2 block text-[11px] font-medium uppercase tracking-wider text-slate-500"
                   htmlFor="bulk-log-email-subject"
