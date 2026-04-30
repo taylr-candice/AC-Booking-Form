@@ -157,32 +157,6 @@ export function buildAck(type: AcType) {
   };
 }
 
-export function overrideBannerTitle(
-  acTypeFromUnit: AcType,
-  override: Override,
-): string {
-  const originUnknown = acTypeFromUnit === "unknown";
-  if (override === "ducted")
-    return originUnknown ? "AC type: Ducted" : "Updated AC type: Ducted";
-  if (override === "split")
-    return originUnknown
-      ? "AC type: Split system"
-      : "Updated AC type: Split system";
-  if (override === "unsure")
-    return "No problem — our technician will confirm your AC setup on-site.";
-  return "";
-}
-
-export function overrideBannerDetail(override: Override): string {
-  if (override === "ducted")
-    return "Showing ducted setup. Adjust systems and return-air grilles below.";
-  if (override === "split")
-    return "Showing split setup. Adjust systems and indoor units below.";
-  if (override === "unsure")
-    return "We’ll book a default of 1 system with 0 additional components and confirm on-site.";
-  return "";
-}
-
 /** Helper / addon-explainer text shown under the extras stepper.
  *  Ducted gets a slightly different sentence because the inclusions
  *  cover both indoor units and return-air grilles. */
@@ -274,12 +248,12 @@ export function useAcStep({
       : DEFAULT_AC_INDOOR_CAPS[knownType]
     : null;
 
-  // The type picker shows when we genuinely don't know the type and
-  // the customer hasn't picked one yet. Task #110 removed the
-  // "Change AC type" affordance that used to re-open the picker on a
-  // known unit, so this is the only entry path now.
-  const needsTypePick =
-    acTypeFromUnit === "unknown" && override === null;
+  // The type picker only shows when we genuinely don't know the type
+  // and the customer hasn't picked one yet. Customers who want to
+  // change a known type use the inline "I now have a [opposite type]
+  // system" link in AcMobile / AcDesktop, which calls `toggleType`
+  // directly rather than reopening a picker.
+  const needsTypePick = acTypeFromUnit === "unknown" && override === null;
   const isUnsureMode = override === "unsure" || notSureCount;
   const hasOverride = override !== null;
 
@@ -419,9 +393,10 @@ export function useAcStep({
   /**
    * Task #110 — flip the effective AC type for this booking when the
    * customer reports they've swapped systems since we last looked.
-   * Counts reset to the new type's prefill defaults because the
-   * previous counts no longer apply (a 3-system split doesn't
-   * translate cleanly to a 3-system ducted etc.).
+   * Writes into the `override` slot so the discrepancy capture effect
+   * picks the change up. Counts reset to the new type's prefill
+   * defaults because the previous counts no longer apply (a 3-system
+   * split doesn't translate cleanly to a 3-system ducted etc.).
    *
    * The opposite type is computed off `effectiveType` rather than
    * `acTypeFromUnit` so that consecutive flips bounce back and forth
@@ -720,8 +695,7 @@ export function PriceBlock({
 
 /**
  * Single card shown above the price block whenever the customer is in
- * an "unsure" state (Task #102). Replaces the old OverrideBanner +
- * UnsureCard pair so the customer sees one clear message about the
+ * an "unsure" state (Task #102). Shows one clear message about the
  * default-1-system, invoice-extras-on-the-day deal — with an inline
  * "see terms" link to the existing AcTermsModal — and the appropriate
  * affordance to back out:
