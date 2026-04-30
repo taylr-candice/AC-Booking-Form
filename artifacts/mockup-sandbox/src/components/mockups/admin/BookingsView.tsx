@@ -6,7 +6,7 @@
  */
 
 import { Info, Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   bookerAgencyName,
@@ -168,6 +168,8 @@ export function BookingsView({
   onAcknowledgeSupersede,
   onUndoCancelBooking,
   onUndoCancelBookingAndReschedule,
+  initialFocusedRowId,
+  onFocusedRowConsumed,
 }: {
   bookings: AdminBooking[];
   units: AdminUnit[];
@@ -209,6 +211,17 @@ export function BookingsView({
    *  The AdminApp shell performs the atomic restore + reschedule on
    *  confirm. */
   onUndoCancelBookingAndReschedule?: (id: string) => void;
+  /** One-shot seed for the source-row highlight: id of the booking
+   *  the admin pivoted FROM via a BookingDetail timeline "View other
+   *  bookings using this template" link. Applied on first paint
+   *  (BRAND_SOFT tint + pulse + scroll-into-view, mirroring the
+   *  focused-row pattern in Call/EmailTemplatesView), dismissed on
+   *  first interaction, then cleared via {@link onFocusedRowConsumed}
+   *  so re-renders never re-apply it. Optional. */
+  initialFocusedRowId?: string | null;
+  /** Fires once after BookingsView consumes {@link initialFocusedRowId}
+   *  so the parent can clear its seed slot. */
+  onFocusedRowConsumed?: () => void;
 }) {
   // Default the template filter to "no filter applied" + a no-op
   // setter so the prop stays strictly optional — older harnesses
@@ -242,6 +255,68 @@ export function BookingsView({
   const [attemptSort, setAttemptSort] = useState<
     "default" | "stalest_first" | "freshest_first"
   >("default");
+  // Source-row highlight: mirrors the `focusedTemplateId` pattern in
+  // Call/EmailTemplatesView — persistent BRAND_SOFT tint + one-shot
+  // pulse so the landing row is unmistakable on a long filtered list.
+  // Seeded from `initialFocusedRowId` so first paint already carries
+  // the highlight; re-seeded via the effect below if a fresh non-null
+  // value lands mid-life. Dismissed on first interaction (scroll /
+  // click / keydown) so it doesn't linger.
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(
+    initialFocusedRowId ?? null,
+  );
+  const [pulseRowId, setPulseRowId] = useState<string | null>(null);
+  const rowRefs = useRef<Map<string, HTMLTableRowElement | null>>(new Map());
+  // Re-apply when the parent hands us a fresh non-null seed mid-life
+  // (admin pivots, dismisses, navigates away, pivots again into the
+  // same component instance). Notify the parent so it can clear its
+  // slot — otherwise unrelated re-renders would re-apply the
+  // highlight after dismissal.
+  useEffect(() => {
+    if (initialFocusedRowId) {
+      setFocusedRowId(initialFocusedRowId);
+      setPulseRowId(initialFocusedRowId);
+      onFocusedRowConsumed?.();
+    }
+    // Depend on seed value only, not callback identity — re-running
+    // on consume-callback re-creation would defeat the one-shot
+    // handoff invariant.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFocusedRowId]);
+  useEffect(() => {
+    if (!focusedRowId) return;
+    const row = rowRefs.current.get(focusedRowId);
+    if (row && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [focusedRowId]);
+  // Drop the pulse marker after the keyframe plays (1100ms = 1s
+  // animation + small buffer so the class survives the final frame).
+  useEffect(() => {
+    if (!pulseRowId) return;
+    const t = setTimeout(() => setPulseRowId(null), 1100);
+    return () => clearTimeout(t);
+  }, [pulseRowId]);
+  // Dismiss on first interaction. Listeners are scoped to the
+  // focus-id lifecycle so the originating click can't dismiss
+  // mid-flight, and a subsequent pivot re-arms a fresh dismissal.
+  // Filter changes flow through clicks / keystrokes / selects that
+  // already fire these events, so the global listener catches them
+  // without us enumerating every filter knob.
+  useEffect(() => {
+    if (!focusedRowId) return;
+    function dismiss() {
+      setFocusedRowId(null);
+    }
+    window.addEventListener("scroll", dismiss, { passive: true, capture: true });
+    window.addEventListener("mousedown", dismiss, true);
+    window.addEventListener("keydown", dismiss, true);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("mousedown", dismiss, true);
+      window.removeEventListener("keydown", dismiss, true);
+    };
+  }, [focusedRowId]);
   // Inline-undo pivot state. When the row-level "Undo" affordance hits
   // a "slot_taken" verdict we surface the same conflict dialog the
   // detail page uses; clicking "Open Reschedule" then asks the
@@ -715,9 +790,14 @@ export function BookingsView({
                 // both views (spoke / no answer / voicemail / email
                 // subject) without ops having to open the booking.
                 const latestAttempt = latestCoordinationAttempt(b.serviceTimeline);
+                const isFocused = focusedRowId === b.id;
+                const isPulsing = pulseRowId === b.id;
                 return (
                   <tr
                     key={b.id}
+                    ref={(el) => {
+                      rowRefs.current.set(b.id, el);
+                    }}
                     onClick={() => onOpen(b.id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -728,7 +808,15 @@ export function BookingsView({
                     tabIndex={0}
                     role="button"
                     aria-label={`Open booking ${b.id} for ${b.customerName}`}
-                    className="cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500"
+                    data-testid={`bookings-row-${b.id}`}
+                    data-focused={isFocused ? "true" : undefined}
+                    data-pulsing={isPulsing ? "true" : undefined}
+                    className={`cursor-pointer border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-500${
+                      isPulsing ? " template-row-focus-pulse" : ""
+                    }`}
+                    style={
+                      isFocused ? { backgroundColor: BRAND_SOFT } : undefined
+                    }
                   >
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">

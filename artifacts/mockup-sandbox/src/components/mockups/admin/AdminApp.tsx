@@ -373,6 +373,11 @@ export function AdminApp() {
   // When jumping to Payments, default the bookings list to the payments filter.
   const [bookingsStatusFilter, setBookingsStatusFilter] =
     useState<"all" | ServiceStatus | PaymentStatus>("all");
+  // One-shot seed: id of the booking the admin pivoted FROM, so
+  // BookingsView can highlight the source row on first paint after a
+  // BookingDetail timeline → BookingsView template-pivot.
+  const [bookingsFocusedRowSeed, setBookingsFocusedRowSeed] =
+    useState<string | null>(null);
   const [search, setSearch] = useState("");
   // Active building filter on the Bookings list ("all" = no filter).
   const [bookingsBuildingFilter, setBookingsBuildingFilter] =
@@ -404,6 +409,10 @@ export function AdminApp() {
     }
     setSearch("");
     setBookingsBuildingFilter("all");
+    // Sidebar nav is an explicit "fresh start" gesture, so clear any
+    // pending source-row highlight seed from a BookingDetail timeline
+    // pivot — otherwise a later visit could light up the wrong row.
+    setBookingsFocusedRowSeed(null);
     // Sidebar nav is an explicit "fresh start" gesture, so clear any
     // template focus left behind by a chip click — the templates
     // panel should open in its default unfocused state when the user
@@ -560,10 +569,15 @@ export function AdminApp() {
    * Always switches to "bookings" view (not "payments") regardless of
    * where the admin came from — the destination is the bookings list,
    * matching the BookingsView pivot-chip wording the link mirrors.
+   *
+   * `sourceBookingId` is the id of the booking the admin pivoted
+   * FROM, stashed as a one-shot seed so BookingsView can highlight
+   * that row on first paint.
    */
   function pivotToBookingsFilteredByTemplate(
     kind: "call" | "email",
     templateLabel: string,
+    sourceBookingId: string,
   ) {
     setView("bookings");
     setSelectedBookingId(null);
@@ -573,6 +587,7 @@ export function AdminApp() {
     setSearch("");
     setBookingsBuildingFilter("all");
     setBookingsTemplateFilter({ kind, name: templateLabel });
+    setBookingsFocusedRowSeed(sourceBookingId);
     // Drop any template focus on the way out — the next visit to a
     // templates panel should open in its default unfocused state.
     setFocusedCallTemplateId(null);
@@ -1478,6 +1493,10 @@ export function AdminApp() {
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onUndoCancelBooking={undoCancelBooking}
                 onUndoCancelBookingAndReschedule={openUndoReschedule}
+                initialFocusedRowId={bookingsFocusedRowSeed}
+                onFocusedRowConsumed={() =>
+                  setBookingsFocusedRowSeed(null)
+                }
               />
             )
           ) : null}

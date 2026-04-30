@@ -183,8 +183,15 @@ export function BookingDetail({
    *  Optional so screens that don't expose the bookings list (or
    *  tests that don't care about the pivot) can omit it — the link
    *  is then suppressed and the chip alone (when {@link onOpenTemplate}
-   *  is wired) still gives admins their templates-panel jump. */
-  onPivotToBookingsFilteredByTemplate?: (kind: "call" | "email", templateLabel: string) => void;
+   *  is wired) still gives admins their templates-panel jump.
+   *
+   *  Third arg: the id of the booking we pivoted FROM, so the
+   *  destination view can highlight the source row on first paint. */
+  onPivotToBookingsFilteredByTemplate?: (
+    kind: "call" | "email",
+    templateLabel: string,
+    sourceBookingId: string,
+  ) => void;
   /** Live email-template catalog the per-row Log-email form's
    *  template dropdown reads from. Defaults to the seeded
    *  {@link EMAIL_TEMPLATES} so the screen stays usable in isolation
@@ -673,6 +680,7 @@ export function BookingDetail({
               onPivotToBookingsFilteredByTemplate={
                 onPivotToBookingsFilteredByTemplate
               }
+              sourceBookingId={booking.id}
             />
             <div className="mt-3">
               <PaymentChip status={booking.paymentStatus} />
@@ -686,6 +694,7 @@ export function BookingDetail({
               onPivotToBookingsFilteredByTemplate={
                 onPivotToBookingsFilteredByTemplate
               }
+              sourceBookingId={booking.id}
             />
             <div className="mt-3">
               <ServiceChip status={booking.serviceStatus} />
@@ -965,6 +974,7 @@ function Timeline({
   accent,
   onOpenTemplate,
   onPivotToBookingsFilteredByTemplate,
+  sourceBookingId,
 }: {
   entries: ReadonlyArray<TimelineEntry>;
   accent: string;
@@ -983,8 +993,20 @@ function Timeline({
    *  BookingsView "Last attempt: …" template-name suffix introduced
    *  in Task #153). When omitted the link is suppressed; the chip
    *  alone (when {@link onOpenTemplate} is wired) still gives admins
-   *  their templates-panel jump. */
-  onPivotToBookingsFilteredByTemplate?: (kind: "call" | "email", templateLabel: string) => void;
+   *  their templates-panel jump.
+   *
+   *  Third arg: the source booking id, forwarded from
+   *  {@link sourceBookingId}. */
+  onPivotToBookingsFilteredByTemplate?: (
+    kind: "call" | "email",
+    templateLabel: string,
+    sourceBookingId: string,
+  ) => void;
+  /** Id of the booking whose timeline we're rendering — threaded
+   *  through to {@link onPivotToBookingsFilteredByTemplate} so the
+   *  destination view can highlight the source row. Optional for
+   *  isolated test mounts. */
+  sourceBookingId?: string;
 }) {
   if (entries.length === 0) {
     return <div className="text-[12px] text-slate-500">No events yet.</div>;
@@ -1070,6 +1092,7 @@ function Timeline({
                         onPivotToBookingsFilteredByTemplate(
                           templateChipKind,
                           e.templateLabel!,
+                          sourceBookingId ?? "",
                         )
                       }
                       data-testid={`timeline-entry-${i}-pivot-bookings`}
