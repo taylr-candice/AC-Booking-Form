@@ -99,6 +99,7 @@ export function BookingDetail({
   onAcknowledgeSupersede,
   onLogCallToast,
   onLogEmailToast,
+  onOpenTemplate,
   emailTemplates = EMAIL_TEMPLATES,
   callTemplates = CALL_TEMPLATES,
 }: {
@@ -157,6 +158,16 @@ export function BookingDetail({
    *  call-sites and tests that don't care about the toast remain
    *  valid — the timeline write happens regardless. */
   onLogEmailToast?: (templateLabel: string, subject: string) => void;
+  /** Round-trip companion to the Call / Email templates panel's
+   *  "Referenced by N entries" popover (Task #149): a timeline entry
+   *  that was logged from a saved template renders a clickable
+   *  `From template: <name>` chip, and clicking it asks the AdminApp
+   *  shell to switch to the matching templates panel and focus the
+   *  same row the popover surfaces. Optional so screens that don't
+   *  expose template panels (or tests that don't care) can omit the
+   *  prop — the chip then degrades to a non-interactive label so the
+   *  audit trail still shows which template wrote the entry. */
+  onOpenTemplate?: (kind: "call" | "email", templateName: string) => void;
   /** Live email-template catalog the per-row Log-email form's
    *  template dropdown reads from. Defaults to the seeded
    *  {@link EMAIL_TEMPLATES} so the screen stays usable in isolation
@@ -639,13 +650,18 @@ export function BookingDetail({
             <Timeline
               entries={booking.paymentTimeline}
               accent={booking.paymentStatus === "paid" ? "#16A34A" : BRAND}
+              onOpenTemplate={onOpenTemplate}
             />
             <div className="mt-3">
               <PaymentChip status={booking.paymentStatus} />
             </div>
           </Card>
           <Card title="Service timeline">
-            <Timeline entries={booking.serviceTimeline} accent={BRAND} />
+            <Timeline
+              entries={booking.serviceTimeline}
+              accent={BRAND}
+              onOpenTemplate={onOpenTemplate}
+            />
             <div className="mt-3">
               <ServiceChip status={booking.serviceStatus} />
             </div>
@@ -915,9 +931,18 @@ function AcDiscrepancyBlock({
 function Timeline({
   entries,
   accent,
+  onOpenTemplate,
 }: {
   entries: ReadonlyArray<TimelineEntry>;
   accent: string;
+  /** When provided, the per-entry "From template: …" chip becomes a
+   *  clickable button that asks the AdminApp shell to switch to the
+   *  matching templates panel and focus the same row the popover
+   *  surfaces (Task #155 round-trip with Task #149's popover).
+   *  When omitted (older / isolated mounts) the chip degrades to a
+   *  plain non-interactive label so the audit trail still shows
+   *  which template wrote the entry. */
+  onOpenTemplate?: (kind: "call" | "email", templateName: string) => void;
 }) {
   if (entries.length === 0) {
     return <div className="text-[12px] text-slate-500">No events yet.</div>;
@@ -926,6 +951,10 @@ function Timeline({
     <ol className="flex flex-col gap-3">
       {entries.map((e, i) => {
         const kind = e.kind ?? "status";
+        const templateChipKind: "call" | "email" | null =
+          (kind === "email" || kind === "call") && e.templateLabel
+            ? kind
+            : null;
         return (
           <li key={i} className="flex gap-3" data-testid={`timeline-entry-${i}`}>
             <div className="flex flex-col items-center">
@@ -938,21 +967,44 @@ function Timeline({
               <div className="text-[12px] font-medium text-slate-900">
                 {e.label}
               </div>
-              {(kind === "email" || kind === "call") && e.templateLabel && (
+              {templateChipKind && e.templateLabel && (
                 // Small grey chip naming the Call/Email template the
                 // admin picked when logging this entry. Email entries
                 // got the chip first (Task #138); call entries reuse
                 // the same affordance so an admin can retrace which
                 // preset wrote each row without opening the Log call /
                 // Log email panel and counting references (Task #149).
-                // Custom / legacy entries leave `templateLabel`
-                // undefined and skip the chip entirely.
-                <div
-                  className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700"
-                  data-testid={`timeline-entry-${i}-template`}
-                >
-                  Template: {e.templateLabel}
-                </div>
+                // When `onOpenTemplate` is wired (Task #155) the chip
+                // becomes a button that round-trips back to the
+                // matching row in the Call/Email templates panel —
+                // the inverse of that panel's "Referenced by N entries"
+                // popover. Custom / legacy entries leave
+                // `templateLabel` undefined and skip the chip entirely.
+                onOpenTemplate ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenTemplate(templateChipKind, e.templateLabel!)
+                    }
+                    data-testid={`timeline-entry-${i}-template`}
+                    aria-label={`Open ${
+                      templateChipKind === "call" ? "Call" : "Email"
+                    } template "${e.templateLabel}" in the templates panel`}
+                    title={`Open this ${
+                      templateChipKind === "call" ? "Call" : "Email"
+                    } template in the templates panel`}
+                    className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 underline decoration-dotted underline-offset-2 transition hover:bg-slate-200 hover:text-slate-900"
+                  >
+                    From template: {e.templateLabel}
+                  </button>
+                ) : (
+                  <div
+                    className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+                    data-testid={`timeline-entry-${i}-template`}
+                  >
+                    From template: {e.templateLabel}
+                  </div>
+                )
               )}
               {e.note && (
                 <div className="mt-0.5 text-[11px] text-slate-600">

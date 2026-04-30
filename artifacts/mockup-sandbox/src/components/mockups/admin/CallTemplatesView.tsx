@@ -34,7 +34,7 @@ import {
 
 import { FormField } from "./atoms";
 import { TemplateUsagePopover } from "./TemplateUsagePopover";
-import { BRAND } from "./theme";
+import { BRAND, BRAND_SOFT } from "./theme";
 
 /**
  * Build the `window.confirm` message shown when ops clicks Remove on
@@ -62,6 +62,7 @@ export function CallTemplatesView({
   onUpdate,
   onRemove,
   onSetDefault,
+  focusedTemplateId,
 }: {
   templates: CallTemplate[];
   /** Per-template count of timeline entries referencing each template,
@@ -86,11 +87,27 @@ export function CallTemplatesView({
   onRemove: (id: string) => void;
   /** Toggle the default flag on the given template. */
   onSetDefault: (id: string) => void;
+  /** Round-trip with Task #149's "Referenced by N entries" popover:
+   *  when the admin clicks a `From template: <name>` chip on a
+   *  booking timeline (Task #155), the AdminApp shell switches to
+   *  this view and stamps the matched template id here. The matching
+   *  row gets a soft brand-tinted background and is scrolled into
+   *  view so the admin can immediately see which row was opened.
+   *  `null` means no row is focused (the default). The shell drops
+   *  the focus state on the next sidebar nav (see `handleNav` in
+   *  `AdminApp`) so a subsequent re-entry to this panel opens clean. */
+  focusedTemplateId?: string | null;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  // Single shared ref-map covering both row-scroll callers:
+  //   - the "Default Call template" header link (transient amber
+  //     highlight that auto-clears),
+  //   - the AdminApp round-trip from a booking timeline chip
+  //     (Task #155, persistent BRAND_SOFT highlight cleared on
+  //     sidebar nav).
   const rowRefs = useRef<Map<string, HTMLTableRowElement | null>>(new Map());
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   // Auto-clear the row highlight a moment after it's set, so the panel
   // stays visually quiet once ops has spotted the matching row.
@@ -99,6 +116,20 @@ export function CallTemplatesView({
     const t = setTimeout(() => setHighlightedId(null), 1500);
     return () => clearTimeout(t);
   }, [highlightedId]);
+
+  // Whenever the AdminApp shell hands us a fresh focus id (round-trip
+  // from a booking timeline chip), scroll the matching row into view
+  // so the admin doesn't have to hunt for it on long template lists.
+  // We intentionally don't drop the persistent focus highlight here —
+  // it stays until the user navigates away via the sidebar so a quick
+  // scroll back doesn't lose the marker.
+  useEffect(() => {
+    if (!focusedTemplateId) return;
+    const row = rowRefs.current.get(focusedTemplateId);
+    if (row && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [focusedTemplateId]);
 
   const defaultTemplate = findDefaultCallTemplate(templates);
 
@@ -210,6 +241,7 @@ export function CallTemplatesView({
               {orderedTemplates.map((t) => {
                 const usage = usageCounts?.[t.id] ?? 0;
                 const bookings = usageBookings?.[t.id] ?? [];
+                const isFocused = focusedTemplateId === t.id;
                 return (
                   <tr
                     key={t.id}
@@ -220,10 +252,16 @@ export function CallTemplatesView({
                     data-highlighted={
                       highlightedId === t.id ? "true" : "false"
                     }
+                    data-focused={isFocused ? "true" : undefined}
                     className={
                       highlightedId === t.id
                         ? "border-b border-slate-100 last:border-b-0 align-top bg-amber-50 transition-colors"
                         : "border-b border-slate-100 last:border-b-0 align-top transition-colors"
+                    }
+                    style={
+                      isFocused && highlightedId !== t.id
+                        ? { backgroundColor: BRAND_SOFT }
+                        : undefined
                     }
                   >
                     <td className="px-4 py-3">

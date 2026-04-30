@@ -260,6 +260,21 @@ export function AdminApp() {
     null,
   );
 
+  // Round-trip companion to the Call/Email templates panel's
+  // "Referenced by N entries" popover (Task #149): when ops clicks
+  // the new "From template: …" chip on a booking timeline entry
+  // (Task #155), the AdminApp shell switches to the matching
+  // templates panel and highlights the row that's identified here.
+  // Independent slots per channel so a focus from one panel doesn't
+  // leak into the other when the user toggles between them. `null`
+  // means no row is currently focused.
+  const [focusedCallTemplateId, setFocusedCallTemplateId] = useState<
+    string | null
+  >(null);
+  const [focusedEmailTemplateId, setFocusedEmailTemplateId] = useState<
+    string | null
+  >(null);
+
   // Admin "New booking" (phone booking) overlay. `newBookingBuildingId`
   // pre-applies a building filter on Step 1 when the flow was opened
   // from a building detail screen.
@@ -320,6 +335,12 @@ export function AdminApp() {
     }
     setSearch("");
     setBookingsBuildingFilter("all");
+    // Sidebar nav is an explicit "fresh start" gesture, so clear any
+    // template focus left behind by a chip click — the templates
+    // panel should open in its default unfocused state when the user
+    // navigates here themselves rather than via a booking chip.
+    setFocusedCallTemplateId(null);
+    setFocusedEmailTemplateId(null);
   }
 
   /**
@@ -349,6 +370,43 @@ export function AdminApp() {
     setSearch("");
     setBookingsBuildingFilter("all");
     setSelectedBookingId(bookingId);
+    // Drop any template focus on the way out — the next visit to a
+    // templates panel should open in its default unfocused state
+    // unless the admin explicitly clicks another timeline chip.
+    setFocusedCallTemplateId(null);
+    setFocusedEmailTemplateId(null);
+  }
+
+  /**
+   * Inverse of {@link openBookingFromTemplate}: jump from a booking's
+   * timeline `From template: <name>` chip back to the matching row in
+   * the Call / Email templates panel (Task #155). Looks the template
+   * up by name on the live catalog so renamed templates still resolve
+   * (the timeline carries the snapshot label, but here we want the
+   * current id). The matched row id is stashed in
+   * {@link focusedCallTemplateId} / {@link focusedEmailTemplateId} so
+   * the panel can highlight + scroll into view. If the template has
+   * since been removed entirely we still switch to the panel — the
+   * admin can see at a glance that the template is gone.
+   */
+  function openTemplateFromBooking(
+    kind: "call" | "email",
+    templateName: string,
+  ) {
+    const list = kind === "call" ? callTemplates : emailTemplates;
+    const match = list.find((t) => t.name === templateName);
+    setSelectedBookingId(null);
+    setSelectedBuildingId(null);
+    setSelectedRolloutId(null);
+    if (kind === "call") {
+      setView("call_templates");
+      setFocusedCallTemplateId(match ? match.id : null);
+      setFocusedEmailTemplateId(null);
+    } else {
+      setView("email_templates");
+      setFocusedEmailTemplateId(match ? match.id : null);
+      setFocusedCallTemplateId(null);
+    }
   }
 
   // Service-status advance / payment status / notes edits flow back into
@@ -1198,6 +1256,7 @@ export function AdminApp() {
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
+                onOpenTemplate={openTemplateFromBooking}
                 emailTemplates={emailTemplates}
                 callTemplates={callTemplates}
               />
@@ -1239,6 +1298,7 @@ export function AdminApp() {
                 onAcknowledgeSupersede={acknowledgeSupersede}
                 onLogCallToast={logCallToast}
                 onLogEmailToast={logEmailToast}
+                onOpenTemplate={openTemplateFromBooking}
                 emailTemplates={emailTemplates}
                 callTemplates={callTemplates}
               />
@@ -1349,6 +1409,7 @@ export function AdminApp() {
               onUpdate={updateEmailTemplate}
               onRemove={removeEmailTemplate}
               onSetDefault={setDefaultEmailTemplate}
+              focusedTemplateId={focusedEmailTemplateId}
             />
           )}
 
@@ -1362,6 +1423,7 @@ export function AdminApp() {
               onUpdate={updateCallTemplate}
               onRemove={removeCallTemplate}
               onSetDefault={setDefaultCallTemplate}
+              focusedTemplateId={focusedCallTemplateId}
             />
           )}
         </main>

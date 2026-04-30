@@ -577,3 +577,201 @@ describe("Templates drill-down ↔ Bookings cross-view navigation", () => {
     ).toBeTruthy();
   });
 });
+
+// ─── Inverse round-trip: chip → templates panel (Task #155) ────────
+
+describe("Booking timeline 'From template' chip ↔ templates panel round-trip", () => {
+  it("clicking the chip on a call timeline entry switches to Call templates and highlights the matching row", () => {
+    render(<AdminApp />);
+
+    // Seed a templated call timeline entry by bulk-logging one
+    // through the Awaiting coordination view — same path the
+    // popover-direction e2e test uses, just to get a real
+    // `templateLabel` on a real booking timeline.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    const rowCheckboxes = screen
+      .getAllByRole("checkbox")
+      .filter((el) =>
+        (el as HTMLInputElement)
+          .getAttribute("data-testid")
+          ?.startsWith("checkbox-coordination-row-"),
+      );
+    expect(rowCheckboxes.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(rowCheckboxes[0]!);
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    fireEvent.change(
+      screen.getByTestId("select-bulk-call-template") as HTMLSelectElement,
+      { target: { value: "voicemail_left" } },
+    );
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-call"));
+
+    // Drill into the booking via the Call templates popover so we
+    // land on a BookingDetail whose timeline carries the
+    // templateLabel snapshot we just stamped.
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(screen.getByTestId("call-template-usage-voicemail_left"));
+    const popover = screen.getByTestId(
+      "call-template-usage-popover-voicemail_left",
+    );
+    const firstBookingRow = within(popover)
+      .getAllByRole("button")
+      .find((btn) =>
+        btn
+          .getAttribute("data-testid")
+          ?.startsWith("call-template-usage-booking-voicemail_left-"),
+      )!;
+    fireEvent.click(firstBookingRow);
+
+    // Find the chip — its label is the seeded template's display
+    // name, scoped through the case-insensitive "template:" pattern
+    // shared with the existing chip-render assertions.
+    const chip = screen.getByRole("button", {
+      name: /template "No answer — left voicemail"/i,
+    });
+    expect(chip.textContent).toMatch(
+      /from template:\s*no answer\s*—\s*left voicemail/i,
+    );
+
+    fireEvent.click(chip);
+
+    // We should now be back on the Call templates panel with the
+    // matching row marked as focused. The data-focused attribute is
+    // the round-trip's stable contract — same shape as the popover's
+    // direction uses booking-detail testids to pin the landing.
+    const focusedRow = screen.getByTestId(
+      "call-template-row-voicemail_left",
+    );
+    expect(focusedRow.getAttribute("data-focused")).toBe("true");
+    // No other call template row is focused.
+    const otherRows = screen
+      .getAllByRole("row")
+      .filter(
+        (r) =>
+          r
+            .getAttribute("data-testid")
+            ?.startsWith("call-template-row-") &&
+          r.getAttribute("data-testid") !== "call-template-row-voicemail_left",
+      );
+    for (const r of otherRows) {
+      expect(r.getAttribute("data-focused")).not.toBe("true");
+    }
+  });
+
+  it("clicking the chip on an email timeline entry switches to Email templates and highlights the matching row", () => {
+    render(<AdminApp />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    const rowCheckboxes = screen
+      .getAllByRole("checkbox")
+      .filter((el) =>
+        (el as HTMLInputElement)
+          .getAttribute("data-testid")
+          ?.startsWith("checkbox-coordination-row-"),
+      );
+    expect(rowCheckboxes.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(rowCheckboxes[0]!);
+    fireEvent.click(screen.getByTestId("button-bulk-log-email"));
+    fireEvent.change(
+      screen.getByTestId("select-bulk-email-template") as HTMLSelectElement,
+      { target: { value: "rebook_link" } },
+    );
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-email"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Email templates" }));
+    fireEvent.click(screen.getByTestId("email-template-usage-rebook_link"));
+    const popover = screen.getByTestId(
+      "email-template-usage-popover-rebook_link",
+    );
+    const firstBookingRow = within(popover)
+      .getAllByRole("button")
+      .find((btn) =>
+        btn
+          .getAttribute("data-testid")
+          ?.startsWith("email-template-usage-booking-rebook_link-"),
+      )!;
+    fireEvent.click(firstBookingRow);
+
+    const chip = screen.getByRole("button", {
+      name: /template "Sent rebook link"/i,
+    });
+    expect(chip.textContent).toMatch(/from template:\s*sent rebook link/i);
+
+    fireEvent.click(chip);
+
+    const focusedRow = screen.getByTestId("email-template-row-rebook_link");
+    expect(focusedRow.getAttribute("data-focused")).toBe("true");
+    const otherRows = screen
+      .getAllByRole("row")
+      .filter(
+        (r) =>
+          r
+            .getAttribute("data-testid")
+            ?.startsWith("email-template-row-") &&
+          r.getAttribute("data-testid") !== "email-template-row-rebook_link",
+      );
+    for (const r of otherRows) {
+      expect(r.getAttribute("data-focused")).not.toBe("true");
+    }
+  });
+
+  it("navigating away via the sidebar clears the focused-row highlight (re-entering the panel opens clean)", () => {
+    render(<AdminApp />);
+
+    // Quickest path to a focused state: bulk-log a call, drill to
+    // the booking, click the chip — same first-half as the call test
+    // above.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Awaiting coordination" }),
+    );
+    const rowCheckboxes = screen
+      .getAllByRole("checkbox")
+      .filter((el) =>
+        (el as HTMLInputElement)
+          .getAttribute("data-testid")
+          ?.startsWith("checkbox-coordination-row-"),
+      );
+    fireEvent.click(rowCheckboxes[0]!);
+    fireEvent.click(screen.getByTestId("button-bulk-log-call"));
+    fireEvent.change(
+      screen.getByTestId("select-bulk-call-template") as HTMLSelectElement,
+      { target: { value: "voicemail_left" } },
+    );
+    fireEvent.click(screen.getByTestId("button-bulk-confirm-log-call"));
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    fireEvent.click(screen.getByTestId("call-template-usage-voicemail_left"));
+    const popover = screen.getByTestId(
+      "call-template-usage-popover-voicemail_left",
+    );
+    const firstBookingRow = within(popover)
+      .getAllByRole("button")
+      .find((btn) =>
+        btn
+          .getAttribute("data-testid")
+          ?.startsWith("call-template-usage-booking-voicemail_left-"),
+      )!;
+    fireEvent.click(firstBookingRow);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /template "No answer — left voicemail"/i,
+      }),
+    );
+    expect(
+      screen
+        .getByTestId("call-template-row-voicemail_left")
+        .getAttribute("data-focused"),
+    ).toBe("true");
+
+    // Navigate elsewhere then back — the highlight should be gone.
+    fireEvent.click(screen.getByRole("button", { name: "Awaiting coordination" }));
+    fireEvent.click(screen.getByRole("button", { name: "Call templates" }));
+    expect(
+      screen
+        .getByTestId("call-template-row-voicemail_left")
+        .getAttribute("data-focused"),
+    ).not.toBe("true");
+  });
+});
