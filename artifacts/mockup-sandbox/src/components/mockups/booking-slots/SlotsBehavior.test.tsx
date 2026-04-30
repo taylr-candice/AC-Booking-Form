@@ -154,11 +154,35 @@ function applyScenario(role: Role, s: Scenario) {
  * Each variant exposes its own testid for the be-there ack-checkbox so
  * the gate can be exercised in tests. The two mobile pickers share the
  * "button-continue-mobile" CTA testid; the desktop picker has its own.
+ *
+ * Task #121 added a second ack — the cancellation-terms ack — which
+ * sits above Confirm on every variant and must also be ticked before
+ * the booking can be confirmed. We thread its testids through the
+ * same per-variant lookup so the existing tests can clear it whenever
+ * they need Confirm to enable.
  */
 const ACK_TESTID_BY_VARIANT: Record<(typeof VARIANTS)[number]["name"], string> = {
   SlotsMobile: "ack-checkbox-mobile",
   SlotsMobileLite: "ack-checkbox-mobile-lite",
   SlotsDesktop: "ack-checkbox-desktop",
+};
+
+const CANCELLATION_ACK_TESTID_BY_VARIANT: Record<
+  (typeof VARIANTS)[number]["name"],
+  string
+> = {
+  SlotsMobile: "checkbox-cancellation-ack-mobile",
+  SlotsMobileLite: "checkbox-cancellation-ack-mobile-lite",
+  SlotsDesktop: "checkbox-cancellation-ack-desktop",
+};
+
+const VIEW_TERMS_TESTID_BY_VARIANT: Record<
+  (typeof VARIANTS)[number]["name"],
+  string
+> = {
+  SlotsMobile: "button-view-cancellation-terms-mobile",
+  SlotsMobileLite: "button-view-cancellation-terms-mobile-lite",
+  SlotsDesktop: "button-view-cancellation-terms-desktop",
 };
 
 const CONTINUE_TESTID_BY_VARIANT: Record<(typeof VARIANTS)[number]["name"], string> = {
@@ -243,10 +267,10 @@ describe.each(VARIANTS)("$name slot picker", ({
   });
 
   describe("be-there ack checkbox gates Confirm (Task #72)", () => {
-    it("for be-there access methods: Confirm stays disabled until the customer ticks the ack checkbox, then enables", () => {
+    it("for be-there access methods: Confirm stays disabled until both the be-there ack and the cancellation ack are ticked", () => {
       // owner_live_at_unit is a be-there method, so the ack checkbox
-      // must appear and gate Confirm. Use the tiny job so every
-      // window fits and we can deterministically pick the morning.
+      // must appear and gate Confirm. Task #121 adds a second gate —
+      // the cancellation-terms ack — that must also be ticked.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -265,7 +289,7 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(continueBtn.disabled).toBe(true);
 
       // Pick a day, then a window. Confirm must STILL be disabled
-      // because the ack checkbox hasn't been ticked yet.
+      // because neither ack has been ticked yet.
       const firstDay = container.querySelector<HTMLButtonElement>(
         'button[data-testid^="day-card-"]:not([disabled])',
       );
@@ -280,21 +304,32 @@ describe.each(VARIANTS)("$name slot picker", ({
 
       expect(continueBtn.disabled).toBe(true);
 
-      // Tick the ack — Confirm must enable now.
-      const ack = getByTestId(
+      // Tick the be-there ack only — Confirm must STAY disabled,
+      // because the cancellation ack is still untouched.
+      const beThereAck = getByTestId(
         ACK_TESTID_BY_VARIANT[name],
       ) as HTMLInputElement;
-      expect(ack.checked).toBe(false);
-      fireEvent.click(ack);
-      expect(ack.checked).toBe(true);
+      expect(beThereAck.checked).toBe(false);
+      fireEvent.click(beThereAck);
+      expect(beThereAck.checked).toBe(true);
+      expect(continueBtn.disabled).toBe(true);
+
+      // Tick the cancellation ack — both gates clear, Confirm enables.
+      const cancellationAck = getByTestId(
+        CANCELLATION_ACK_TESTID_BY_VARIANT[name],
+      ) as HTMLInputElement;
+      expect(cancellationAck.checked).toBe(false);
+      fireEvent.click(cancellationAck);
+      expect(cancellationAck.checked).toBe(true);
 
       expect(continueBtn.disabled).toBe(false);
     });
 
-    it("for non-be-there access methods: no ack checkbox is rendered, and Confirm enables once a slot is picked", () => {
+    it("for non-be-there access methods: no be-there ack is rendered, but the cancellation ack still gates Confirm", () => {
       // owner_leased_leave_key is a non-be-there (key-holder) method.
-      // The ack checkbox must NOT be in the DOM, and Confirm must
-      // enable as soon as the customer picks a slot.
+      // The be-there ack must NOT be in the DOM, but the cancellation
+      // ack added by Task #121 still gates Confirm — the customer
+      // must tick it before picking the slot is enough.
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -322,10 +357,93 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(firstSlot).not.toBeNull();
       fireEvent.click(firstSlot!);
 
-      // Ack checkbox must not exist for non-be-there methods.
+      // Be-there ack checkbox must not exist for non-be-there methods.
       expect(queryByTestId(ACK_TESTID_BY_VARIANT[name])).toBeNull();
-      // Confirm must enable on slot selection alone.
+      // Cancellation ack alone still gates Confirm.
+      expect(continueBtn.disabled).toBe(true);
+
+      const cancellationAck = getByTestId(
+        CANCELLATION_ACK_TESTID_BY_VARIANT[name],
+      ) as HTMLInputElement;
+      fireEvent.click(cancellationAck);
+
       expect(continueBtn.disabled).toBe(false);
+    });
+  });
+
+  describe("cancellation-terms ack on Schedule (Task #121)", () => {
+    it("renders the cancellation ack and View terms link regardless of access method or whether a slot has been picked", () => {
+      // No access method is set — the ack must still be visible. The
+      // cancellation policy applies to every booking, not just the
+      // ones that need a be-there ack.
+      applyScenario("owner", {
+        label: "tiny",
+        systems: 1,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+
+      const { getByTestId } = render(<Component />);
+
+      // The ack and the View terms link both render before any slot
+      // is picked, so the customer can tick it any time on the page.
+      const ack = getByTestId(
+        CANCELLATION_ACK_TESTID_BY_VARIANT[name],
+      ) as HTMLInputElement;
+      expect(ack.checked).toBe(false);
+      expect(getByTestId(VIEW_TERMS_TESTID_BY_VARIANT[name])).toBeTruthy();
+    });
+
+    it("uses the universal ack label that drops 'above' so it reads cleanly with the link to the modal", () => {
+      // Task #121: the label moved from "...terms above." (when the
+      // policy was inline above the tickbox on Pay) to a self-
+      // contained sentence so it reads naturally next to the
+      // separate "View terms" affordance on Schedule.
+      applyScenario("owner", {
+        label: "tiny",
+        systems: 1,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+
+      const { getByTestId, container } = render(<Component />);
+
+      const ack = getByTestId(CANCELLATION_ACK_TESTID_BY_VARIANT[name]);
+      const ackLabel = ack.closest("label");
+      expect(ackLabel?.textContent ?? "").toContain(
+        "I have read and accept the cancellation and rescheduling terms.",
+      );
+      // The old "above" wording must not leak back in anywhere.
+      expect(container.textContent ?? "").not.toMatch(/terms above/i);
+    });
+
+    it("opens the cancellation terms modal when View terms is clicked, and closes it on the close button", () => {
+      applyScenario("owner", {
+        label: "tiny",
+        systems: 1,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+
+      const { getByTestId, queryByTestId } = render(<Component />);
+
+      // Modal isn't mounted by default.
+      expect(queryByTestId("modal-cancellation-terms")).toBeNull();
+
+      fireEvent.click(getByTestId(VIEW_TERMS_TESTID_BY_VARIANT[name]));
+
+      // Modal mounts, with the policy paragraphs and the support
+      // contact line both rendered inside it.
+      expect(getByTestId("modal-cancellation-terms")).toBeTruthy();
+      expect(
+        getByTestId("cancellation-terms-paragraphs").textContent ?? "",
+      ).toMatch(/48 hours/);
+      expect(
+        getByTestId("cancellation-terms-contact").textContent ?? "",
+      ).toContain("support@taylr.com.au");
+
+      fireEvent.click(getByTestId("button-cancellation-terms-close"));
+      expect(queryByTestId("modal-cancellation-terms")).toBeNull();
     });
   });
 

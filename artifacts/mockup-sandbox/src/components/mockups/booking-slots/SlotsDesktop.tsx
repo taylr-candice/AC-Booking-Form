@@ -11,9 +11,16 @@ import {
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
-import { useBookingSession } from "../../../state/bookingSession";
+import {
+  bookingActions,
+  useBookingSession,
+} from "../../../state/bookingSession";
 import { isBeThereMethod } from "../../../state/accessMethodCatalog";
-import { unitCity } from "../../../state/bookingHelpers";
+import {
+  CANCELLATION_ACK_LABEL,
+  unitCity,
+} from "../../../state/bookingHelpers";
+import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
   accessRecapLabel,
   dayHasAvailable,
@@ -23,6 +30,7 @@ import {
   type CustomerSlot,
 } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
+import { TermsAckRow } from "./TermsAckRow";
 import { Lock } from "lucide-react";
 
 const BRAND = "#ED017F";
@@ -35,7 +43,9 @@ export function SlotsDesktop() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [ack, setAck] = useState(false);
   const [weekIdx, setWeekIdx] = useState(0);
+  const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSession();
+  const cancellationAck = session.cancellation_acknowledged;
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
   const beThere = isBeThereMethod(accessMethod);
@@ -97,7 +107,10 @@ export function SlotsDesktop() {
   }, [week]);
 
   const canConfirm =
-    !!selectedSlotId && !lockedByOther && (!beThere || ack);
+    !!selectedSlotId &&
+    !lockedByOther &&
+    (!beThere || ack) &&
+    cancellationAck;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
@@ -303,7 +316,26 @@ export function SlotsDesktop() {
             )}
           </div>
 
-          <div className="mt-12 pt-6 border-t border-slate-100 flex items-center justify-between">
+          {/* Cancellation ack — always visible, sits directly above
+              the Confirm row so it reads as the final check before
+              the customer commits (Task #121). Same panel pattern as
+              the mobile pickers, just sized for the desktop card. */}
+          <div className="mt-8">
+            <TermsAckRow
+              checked={cancellationAck}
+              onChange={(next) =>
+                bookingActions.setCancellationAcknowledged(next)
+              }
+              label={CANCELLATION_ACK_LABEL}
+              onViewTerms={() => setTermsOpen(true)}
+              ackTestId="checkbox-cancellation-ack-desktop"
+              rowTestId="cancellation-ack-row-desktop"
+              viewTermsTestId="button-view-cancellation-terms-desktop"
+              size="regular"
+            />
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
             <button
               type="button"
               className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
@@ -324,6 +356,9 @@ export function SlotsDesktop() {
           </div>
         </div>
       </div>
+      {termsOpen && (
+        <CancellationTermsModal onClose={() => setTermsOpen(false)} />
+      )}
     </div>
   );
 }

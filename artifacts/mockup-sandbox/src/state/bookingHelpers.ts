@@ -425,9 +425,14 @@ export const CANCELLATION_POLICY_PARAGRAPHS: readonly string[] = [
  */
 export const CANCELLATION_CONTACT_EMAIL = "support@taylr.com.au";
 
-/** Required tickbox label. Spec §8.2. */
+/** Required tickbox label, shown on the Schedule step (Step 6) above
+ *  the Confirm button. Universal phrasing — the booking flow isn't
+ *  behind a login, so the same wording must read sensibly for owners,
+ *  agents and tenants alike. Liability detail (cancellation fees fall
+ *  to the unit owner regardless of who books) lives inside the modal,
+ *  not in the tickbox label itself. */
 export const CANCELLATION_ACK_LABEL =
-  "I have read and accept the cancellation and rescheduling terms above.";
+  "I have read and accept the cancellation and rescheduling terms.";
 
 // ─── Pay step: payment method copy ────────────────────────────────────────
 //
@@ -477,13 +482,17 @@ export const BILLING_EMAIL_HELPER =
 // ─── Step 5 (Review & Pay) validation ─────────────────────────────────────
 
 /**
- * Spec §14: Pay is enabled only when the cancellation tickbox is ticked.
- * For non-coordination flows, a date + slot must also be set (Step 4 was
- * shown). For coordination flows, scheduling is irrelevant (Step 4 was
- * skipped).
+ * Pay is enabled only when the booking is in a coordinatable state.
+ * For non-coordination flows, a date + slot must be set (Step 6 was
+ * shown). For coordination flows, scheduling is irrelevant (Step 6
+ * was skipped).
+ *
+ * Task #121: the cancellation-terms acknowledgement is no longer
+ * gated here — it now lives on Step 6 (Schedule), so by the time the
+ * customer reaches Pay it's always true. The Pay step keeps a short
+ * support-email line for context but no longer carries the ack.
  */
 export function isPayStepEnabled(s: BookingState): boolean {
-  if (!s.cancellation_acknowledged) return false;
   if (isCoordinationFlow(s)) return true;
   return Boolean(s.service_date && s.service_slot);
 }

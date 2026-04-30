@@ -11,8 +11,13 @@ import {
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
-import { useBookingSession } from "../../../state/bookingSession";
+import {
+  bookingActions,
+  useBookingSession,
+} from "../../../state/bookingSession";
 import { isBeThereMethod } from "../../../state/accessMethodCatalog";
+import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
+import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
   accessRecapLabel,
   dayHasAvailable,
@@ -22,6 +27,7 @@ import {
   WINDOW_TIME_RANGE,
 } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
+import { TermsAckRow } from "./TermsAckRow";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -32,7 +38,9 @@ type Day = CustomerDay;
 export function SlotsMobileLite() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [ack, setAck] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSession();
+  const cancellationAck = session.cancellation_acknowledged;
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
   const beThere = isBeThereMethod(accessMethod);
@@ -71,7 +79,10 @@ export function SlotsMobileLite() {
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const canConfirm =
-    !!selectedSlotId && !lockedByOther && (!beThere || ack);
+    !!selectedSlotId &&
+    !lockedByOther &&
+    (!beThere || ack) &&
+    cancellationAck;
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -263,18 +274,35 @@ export function SlotsMobileLite() {
         )}
       </div>
 
+      {/* Docked CTA — see SlotsMobile for the rationale on placing
+          the cancellation ack directly above Confirm (Task #121). */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
+        <TermsAckRow
+          checked={cancellationAck}
+          onChange={(next) =>
+            bookingActions.setCancellationAcknowledged(next)
+          }
+          label={CANCELLATION_ACK_LABEL}
+          onViewTerms={() => setTermsOpen(true)}
+          ackTestId="checkbox-cancellation-ack-mobile-lite"
+          rowTestId="cancellation-ack-row-mobile-lite"
+          viewTermsTestId="button-view-cancellation-terms-mobile-lite"
+          size="compact"
+        />
         <button
           type="button"
           disabled={!canConfirm}
           data-testid="button-continue-mobile"
-          className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
           style={{ backgroundColor: BRAND }}
         >
           Confirm
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
+      {termsOpen && (
+        <CancellationTermsModal onClose={() => setTermsOpen(false)} />
+      )}
     </div>
   );
 }

@@ -11,8 +11,13 @@ import {
 } from "lucide-react";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
-import { useBookingSession } from "../../../state/bookingSession";
+import {
+  bookingActions,
+  useBookingSession,
+} from "../../../state/bookingSession";
 import { isBeThereMethod } from "../../../state/accessMethodCatalog";
+import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
+import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
   accessRecapLabel,
   dayHasAvailable,
@@ -22,6 +27,7 @@ import {
   WINDOW_TIME_RANGE,
 } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
+import { TermsAckRow } from "./TermsAckRow";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN = "#5FBB97";
@@ -32,11 +38,16 @@ type Day = CustomerDay;
 export function SlotsMobile() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [ack, setAck] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
   const beThere = isBeThereMethod(accessMethod);
   const recapLabel = accessRecapLabel(accessMethod);
+  // Cancellation ack moved here from Pay (Task #121). Reads/writes the
+  // existing `cancellation_acknowledged` boolean on the session store —
+  // single source of truth, unchanged across the rest of the flow.
+  const cancellationAck = session.cancellation_acknowledged;
 
   // Shared customer slot-picker wiring (Task #214): rollout
   // resolution, live-bookings subscription, past-date filtering, and
@@ -72,7 +83,10 @@ export function SlotsMobile() {
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const canConfirm =
-    !!selectedSlotId && !lockedByOther && (!beThere || ack);
+    !!selectedSlotId &&
+    !lockedByOther &&
+    (!beThere || ack) &&
+    cancellationAck;
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -274,19 +288,39 @@ export function SlotsMobile() {
         )}
       </div>
 
-      {/* Docked CTA */}
+      {/* Docked CTA — cancellation ack always sits directly above
+          Confirm so the customer is reading the same line they're
+          gating on, regardless of whether a slot has been picked yet
+          (Task #121). When the be-there ack is also showing it sits
+          inside the body above this panel, giving a consistent
+          "checks before you confirm" stack. */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
+        <TermsAckRow
+          checked={cancellationAck}
+          onChange={(next) =>
+            bookingActions.setCancellationAcknowledged(next)
+          }
+          label={CANCELLATION_ACK_LABEL}
+          onViewTerms={() => setTermsOpen(true)}
+          ackTestId="checkbox-cancellation-ack-mobile"
+          rowTestId="cancellation-ack-row-mobile"
+          viewTermsTestId="button-view-cancellation-terms-mobile"
+          size="compact"
+        />
         <button
           type="button"
           disabled={!canConfirm}
           data-testid="button-continue-mobile"
-          className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
           style={{ backgroundColor: BRAND }}
         >
           Confirm
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
+      {termsOpen && (
+        <CancellationTermsModal onClose={() => setTermsOpen(false)} />
+      )}
     </div>
   );
 }

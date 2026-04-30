@@ -9,9 +9,7 @@ import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
   BILLING_EMAIL_HELPER,
-  CANCELLATION_ACK_LABEL,
   CANCELLATION_CONTACT_EMAIL,
-  CANCELLATION_POLICY_PARAGRAPHS,
   computeBookingTotal,
   COORDINATION_NOTE,
   INVOICE_LABEL,
@@ -46,7 +44,9 @@ export function PayDesktop() {
 
   const total = computeBookingTotal(session);
   const isCoordination = isCoordinationFlow(session);
-  const ack = session.cancellation_acknowledged;
+  // Task #121: cancellation ack now lives on the Schedule step, so by
+  // the time the customer reaches Pay it's already true. Pay no longer
+  // renders a tickbox or derives `ack`.
   const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
   const otherServices = resolveOtherServiceQuantities(
@@ -261,44 +261,25 @@ export function PayDesktop() {
               )}
             </div>
 
-            {/* Cancellation policy */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Cancellation terms</h3>
-              <div className="space-y-3 text-sm leading-relaxed text-slate-600 mb-6">
-                {CANCELLATION_POLICY_PARAGRAPHS.map((p, i) => (
-                  <p key={i}>{p}</p>
-                ))}
-                <p data-testid="cancellation-contact-desktop">
-                  To request a change or cancellation, email us at{" "}
-                  <a
-                    href={`mailto:${CANCELLATION_CONTACT_EMAIL}`}
-                    className="font-medium underline underline-offset-2"
-                    style={{ color: "#A30058" }}
-                  >
-                    {CANCELLATION_CONTACT_EMAIL}
-                  </a>
-                  .
-                </p>
-              </div>
-              <label
-                className="flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition"
-                style={
-                  ack
-                    ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }
-                    : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
-                }
+            {/* Short support-email line — the full cancellation
+                policy now lives behind the Schedule-step ack
+                (Task #121). We keep this single contact line on Pay
+                so customers tweaking payment details still know where
+                to write if they need to reschedule. */}
+            <p
+              className="text-sm text-slate-500"
+              data-testid="cancellation-contact-desktop"
+            >
+              Need to change or cancel? Email{" "}
+              <a
+                href={`mailto:${CANCELLATION_CONTACT_EMAIL}`}
+                className="font-medium underline underline-offset-2"
+                style={{ color: "#A30058" }}
               >
-                <input
-                  type="checkbox"
-                  checked={ack}
-                  onChange={(e) => bookingActions.setCancellationAcknowledged(e.target.checked)}
-                  data-testid="checkbox-cancellation-ack"
-                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-slate-300"
-                  style={{ accentColor: SELECTED_GREEN }}
-                />
-                <span className="text-sm font-medium text-slate-700">{CANCELLATION_ACK_LABEL}</span>
-              </label>
-            </div>
+                {CANCELLATION_CONTACT_EMAIL}
+              </a>
+              .
+            </p>
 
           </div>
 

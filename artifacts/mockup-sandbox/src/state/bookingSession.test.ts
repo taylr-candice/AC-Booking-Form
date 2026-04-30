@@ -1078,6 +1078,62 @@ describe("return_to — short-circuit hint for the booking flow wrapper", () => 
   });
 });
 
+// ─── D2. cancellation_acknowledged — cascade-clear regression (Task #121) ─
+
+/**
+ * Task #121 moves the cancellation & rescheduling ack from Step 7 (Pay)
+ * up to Step 6 (Schedule). Once ticked, the customer's acceptance must
+ * survive every kind of mid-flow churn — bouncing back to Pay and
+ * forward again, swapping the slot, swapping the access method —
+ * because the acceptance is contractual, not slot-specific. Only the
+ * hard reset paths (reset / bookAnother) clear it back to false; those
+ * paths already have coverage above and in bookingSession.bookAnother.
+ */
+describe("cancellation_acknowledged — survives mid-flow navigation (Task #121)", () => {
+  beforeEach(() => bookingActions.reset());
+
+  it("defaults to false on a fresh session", () => {
+    expect(getBookingSession().cancellation_acknowledged).toBe(false);
+  });
+
+  it("setCancellationAcknowledged toggles the flag", () => {
+    bookingActions.setCancellationAcknowledged(true);
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+    bookingActions.setCancellationAcknowledged(false);
+    expect(getBookingSession().cancellation_acknowledged).toBe(false);
+  });
+
+  it("going Step 6 → Pay → Step 6 → Pay keeps the ack ticked", () => {
+    bookingActions.setCancellationAcknowledged(true);
+    bookingActions.goToStep(6);
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+    bookingActions.goToStep(7);
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+    bookingActions.goToStep(6);
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+    bookingActions.goToStep(7);
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+  });
+
+  it("changing the slot does NOT clear the ack", () => {
+    bookingActions.setCancellationAcknowledged(true);
+    bookingActions.setSchedule("2026-05-10", "morning");
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+    bookingActions.setSchedule("2026-05-11", "afternoon");
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+  });
+
+  it("changing the access method does NOT clear the ack", () => {
+    bookingActions.setRole("owner");
+    bookingActions.setPrimaryResidence("live_in");
+    bookingActions.setAccessMethod("owner_live_at_unit");
+    bookingActions.setCancellationAcknowledged(true);
+    bookingActions.setPrimaryResidence("rented_out");
+    bookingActions.setAccessMethod("leave_key");
+    expect(getBookingSession().cancellation_acknowledged).toBe(true);
+  });
+});
+
 // ─── E. Unit-unavailable terminal state (spec §9 row "Unit unavailable") ──
 
 /**
