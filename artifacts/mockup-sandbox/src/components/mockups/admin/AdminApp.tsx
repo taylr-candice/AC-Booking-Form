@@ -620,6 +620,15 @@ export function AdminApp() {
   // BookingDetail timeline → BookingsView template-pivot.
   const [bookingsFocusedRowSeed, setBookingsFocusedRowSeed] =
     useState<string | null>(null);
+  // One-shot seed: id of the rollout the admin pivoted FROM, so
+  // RolloutsView can highlight the source row on first paint after
+  // a RolloutScheduleEditor → RolloutsView "Back to rollouts"
+  // pivot. Mirror of `bookingsFocusedRowSeed` for the rollouts
+  // mount (Task #190); independent slot because the rollouts list
+  // and bookings list can both have a pending source-row highlight
+  // queued up at once (the sidebar nav clears both).
+  const [rolloutsFocusedRowSeed, setRolloutsFocusedRowSeed] =
+    useState<string | null>(null);
   const [search, setSearch] = useState("");
   // Active building filter on the Bookings list ("all" = no filter).
   const [bookingsBuildingFilter, setBookingsBuildingFilter] =
@@ -664,6 +673,11 @@ export function AdminApp() {
     // pending source-row highlight seed from a BookingDetail timeline
     // pivot — otherwise a later visit could light up the wrong row.
     setBookingsFocusedRowSeed(null);
+    // Same fresh-start convention for the rollouts mount: clear any
+    // pending source-row seed from a RolloutScheduleEditor → list
+    // back-pivot so an unrelated sidebar visit doesn't light up the
+    // wrong rollout row.
+    setRolloutsFocusedRowSeed(null);
     // Sidebar nav is an explicit "fresh start" gesture, so clear any
     // template focus left behind by a chip click — the templates
     // panel should open in its default unfocused state when the user
@@ -864,6 +878,27 @@ export function AdminApp() {
   function returnToCoordinationListWithSource(sourceBookingId: string) {
     setBookingsFocusedRowSeed(sourceBookingId);
     setSelectedBookingId(null);
+  }
+
+  /**
+   * Companion pivot for the rollouts mount of
+   * {@link RolloutScheduleEditor}'s "Back to rollouts" button
+   * (Task #190). Going back to the rollouts list from the per-rollout
+   * editor seeds the source rollout id so {@link RolloutsView}
+   * highlights the row the admin came from on first paint —
+   * mirroring the source-row highlight Task #172 introduced for the
+   * bookings list and Task #180 mirrored to the awaiting-coordination
+   * list. Without it, an admin who opened a rollout from a long list,
+   * scrolled the editor, and went back would lose their starting
+   * point.
+   *
+   * Independent slot from `bookingsFocusedRowSeed` because the
+   * rollouts list and bookings list can both have a pending seed at
+   * once (sidebar nav clears both via {@link handleNav}).
+   */
+  function returnToRolloutsListWithSource(sourceRolloutId: string) {
+    setRolloutsFocusedRowSeed(sourceRolloutId);
+    setSelectedRolloutId(null);
   }
 
   // Service-status advance / payment status / notes edits flow back into
@@ -1890,7 +1925,9 @@ export function AdminApp() {
                 buildings={buildings}
                 refreshKey={rolloutsRefreshKey}
                 bumpRefreshKey={bumpRolloutsRefreshKey}
-                onBack={() => setSelectedRolloutId(null)}
+                onBack={() =>
+                  returnToRolloutsListWithSource(selectedRolloutId)
+                }
               />
             ) : (
               <RolloutsView
@@ -1903,6 +1940,10 @@ export function AdminApp() {
                   setSelectedRolloutId(created.id);
                 }}
                 onOpen={(id) => setSelectedRolloutId(id)}
+                initialFocusedRowId={rolloutsFocusedRowSeed}
+                onFocusedRowConsumed={() =>
+                  setRolloutsFocusedRowSeed(null)
+                }
               />
             )
           ) : null}

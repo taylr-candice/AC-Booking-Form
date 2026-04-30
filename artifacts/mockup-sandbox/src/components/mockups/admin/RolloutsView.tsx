@@ -11,7 +11,7 @@
  */
 
 import { CalendarRange, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   formatRolloutDateRange,
@@ -34,6 +34,8 @@ export function RolloutsView({
   /** Bumped on every create so the list refreshes from the
    *  module-level store. */
   refreshKey,
+  initialFocusedRowId,
+  onFocusedRowConsumed,
 }: {
   buildings: AdminBuilding[];
   bookings: AdminBooking[];
@@ -48,10 +50,89 @@ export function RolloutsView({
   }) => void;
   onOpen: (rolloutId: string) => void;
   refreshKey: number;
+  /** One-shot seed for the source-row highlight: id of the rollout
+   *  the admin pivoted FROM (e.g. via the `RolloutScheduleEditor`'s
+   *  "Back to rollouts" button). Mirrors the `initialFocusedRowId`
+   *  prop on {@link BookingsView} / {@link AwaitingCoordinationView}
+   *  so a pivot back into the rollouts list keeps the same
+   *  source-row highlight + scroll-into-view behaviour the other
+   *  list views have. Applied on first paint (BRAND_SOFT tint +
+   *  pulse + scroll-into-view), dismissed on first interaction,
+   *  then cleared via {@link onFocusedRowConsumed} so re-renders
+   *  never re-apply it. Optional. */
+  initialFocusedRowId?: string | null;
+  /** Fires once after RolloutsView consumes
+   *  {@link initialFocusedRowId} so the parent can clear its seed
+   *  slot. Mirrors the BookingsView / AwaitingCoordinationView
+   *  callback. */
+  onFocusedRowConsumed?: () => void;
 }) {
   const rollouts = useMemo(() => getRollouts(), [refreshKey]);
   const services = getServices();
   const [showCreate, setShowCreate] = useState(false);
+
+  // Source-row highlight (Task #190): mirror of the same machinery
+  // in {@link BookingsView} / {@link AwaitingCoordinationView} so an
+  // admin pivoting back into this list (via the
+  // RolloutScheduleEditor "Back to rollouts" button) lands on a
+  // visibly highlighted source row instead of losing their place.
+  // Persistent BRAND_SOFT tint + one-shot pulse + scroll-into-view,
+  // dismissed on first interaction (scroll / mousedown / keydown).
+  // Seeded from `initialFocusedRowId` so first paint already carries
+  // the highlight; re-seeded via the effect below when a fresh
+  // non-null value lands mid-life.
+  const [focusedRowId, setFocusedRowId] = useState<string | null>(
+    initialFocusedRowId ?? null,
+  );
+  const [pulseRowId, setPulseRowId] = useState<string | null>(null);
+  const rowRefs = useRef<Map<string, HTMLElement | null>>(new Map());
+  // Re-apply when the parent hands us a fresh non-null seed mid-life
+  // (admin pivots, dismisses, navigates away, pivots again into the
+  // same component instance). Notify the parent so it can clear its
+  // slot — otherwise unrelated re-renders would re-apply the
+  // highlight after dismissal.
+  useEffect(() => {
+    if (initialFocusedRowId) {
+      setFocusedRowId(initialFocusedRowId);
+      setPulseRowId(initialFocusedRowId);
+      onFocusedRowConsumed?.();
+    }
+    // Depend on seed value only, not callback identity — re-running
+    // on consume-callback re-creation would defeat the one-shot
+    // handoff invariant. Mirrors BookingsView's approach.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFocusedRowId]);
+  useEffect(() => {
+    if (!focusedRowId) return;
+    const row = rowRefs.current.get(focusedRowId);
+    if (row && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [focusedRowId]);
+  // Drop the pulse marker after the keyframe plays (1100ms = 1s
+  // animation + small buffer so the class survives the final frame).
+  useEffect(() => {
+    if (!pulseRowId) return;
+    const t = setTimeout(() => setPulseRowId(null), 1100);
+    return () => clearTimeout(t);
+  }, [pulseRowId]);
+  // Dismiss on first interaction. Listeners are scoped to the
+  // focus-id lifecycle so the originating click can't dismiss
+  // mid-flight, and a subsequent pivot re-arms a fresh dismissal.
+  useEffect(() => {
+    if (!focusedRowId) return;
+    function dismiss() {
+      setFocusedRowId(null);
+    }
+    window.addEventListener("scroll", dismiss, { passive: true, capture: true });
+    window.addEventListener("mousedown", dismiss, true);
+    window.addEventListener("keydown", dismiss, true);
+    return () => {
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("mousedown", dismiss, true);
+      window.removeEventListener("keydown", dismiss, true);
+    };
+  }, [focusedRowId]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -94,16 +175,25 @@ export function RolloutsView({
           </div>
         ) : (
           <ol className="flex flex-col gap-2">
-            {rollouts.map((r) => (
-              <li key={r.id}>
-                <RolloutListRow
-                  rollout={r}
-                  buildings={buildings}
-                  bookings={bookings}
-                  onOpen={() => onOpen(r.id)}
-                />
-              </li>
-            ))}
+            {rollouts.map((r) => {
+              const isFocused = focusedRowId === r.id;
+              const isPulsing = pulseRowId === r.id;
+              return (
+                <li key={r.id}>
+                  <RolloutListRow
+                    rollout={r}
+                    buildings={buildings}
+                    bookings={bookings}
+                    onOpen={() => onOpen(r.id)}
+                    isFocused={isFocused}
+                    isPulsing={isPulsing}
+                    rowRef={(el) => {
+                      rowRefs.current.set(r.id, el);
+                    }}
+                  />
+                </li>
+              );
+            })}
           </ol>
         )}
       </Card>
@@ -116,11 +206,17 @@ function RolloutListRow({
   buildings,
   bookings,
   onOpen,
+  isFocused = false,
+  isPulsing = false,
+  rowRef,
 }: {
   rollout: AdminRollout;
   buildings: AdminBuilding[];
   bookings: AdminBooking[];
   onOpen: () => void;
+  isFocused?: boolean;
+  isPulsing?: boolean;
+  rowRef?: (el: HTMLButtonElement | null) => void;
 }) {
   const building = buildings.find((b) => b.id === rollout.buildingId);
   const openWindows = rollout.days.reduce(
@@ -143,8 +239,15 @@ function RolloutListRow({
   return (
     <button
       type="button"
+      ref={rowRef}
       onClick={onOpen}
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50"
+      data-testid={`rollouts-row-${rollout.id}`}
+      data-focused={isFocused ? "true" : undefined}
+      data-pulsing={isPulsing ? "true" : undefined}
+      className={`flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50${
+        isPulsing ? " template-row-focus-pulse" : ""
+      }`}
+      style={isFocused ? { backgroundColor: BRAND_SOFT } : undefined}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
