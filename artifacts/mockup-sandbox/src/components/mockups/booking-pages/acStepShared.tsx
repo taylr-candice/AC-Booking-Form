@@ -10,19 +10,17 @@
  * - `useAcOnFileSync`  — keeps the booking session in sync with the
  *                        on-file values when the customer accepts what
  *                        we have on record.
- * - Presentational     — `PriceBlock`, `ChoicePanel`, `OverrideBanner`,
- *                        `UnsureCard` share structure across mobile and
- *                        desktop; the visual differences are gated on a
- *                        `variant` prop.
+ * - Presentational     — `PriceBlock` and `UnsureMergedCard` share
+ *                        structure across mobile and desktop; the
+ *                        visual differences are gated on a `variant`
+ *                        prop.
  */
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   AirVent,
-  ArrowRight,
   Check,
   Grid3x3,
-  Info,
   Minus,
   Plus,
   RefreshCw,
@@ -80,8 +78,6 @@ export type Copy = {
 };
 
 export type Override = null | "split" | "ducted" | "unsure";
-/** Which inline panel (if any) is open under the pre-filled banner. */
-export type OpenPanel = null | "type" | "numbers";
 
 export type Variant = "mobile" | "desktop";
 
@@ -252,7 +248,6 @@ export function useAcStep({
   recorded,
 }: UseAcStepArgs) {
   const [override, setOverride] = useState<Override>(null);
-  const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
   const [notSureCount, setNotSureCount] = useState(false);
   const liveAcCaps = useLiveAcCaps();
 
@@ -279,15 +274,12 @@ export function useAcStep({
       : DEFAULT_AC_INDOOR_CAPS[knownType]
     : null;
 
-  // The type picker shows when (a) we genuinely don't know the type
-  // and the customer hasn't picked one yet, or (b) the customer
-  // explicitly opened it via "Change AC type" (`openPanel === "type"`).
-  // Branch (b) is what lets a customer in overridden mode change the
-  // recorded type — Task #50 acceptance criteria require type editing
-  // in overridden / no-record modes, not just for unknown units.
+  // The type picker shows when we genuinely don't know the type and
+  // the customer hasn't picked one yet. Task #110 removed the
+  // "Change AC type" affordance that used to re-open the picker on a
+  // known unit, so this is the only entry path now.
   const needsTypePick =
-    (acTypeFromUnit === "unknown" && override === null) ||
-    openPanel === "type";
+    acTypeFromUnit === "unknown" && override === null;
   const isUnsureMode = override === "unsure" || notSureCount;
   const hasOverride = override !== null;
 
@@ -318,7 +310,6 @@ export function useAcStep({
 
   useEffect(() => {
     setOverride(null);
-    setOpenPanel(null);
     setNotSureCount(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acTypeFromUnit]);
@@ -422,25 +413,15 @@ export function useAcStep({
 
   const resetOverride = () => {
     setOverride(null);
-    setOpenPanel(null);
     setNotSureCount(false);
-  };
-
-  const handleTypeChoice = (choice: string) => {
-    if (choice === "ducted") setOverride("ducted");
-    else if (choice === "split") setOverride("split");
-    else setOverride("unsure");
-    setOpenPanel(null);
   };
 
   /**
    * Task #110 — flip the effective AC type for this booking when the
    * customer reports they've swapped systems since we last looked.
-   * Uses the same `override` slot that the (now-removed) ChoicePanel
-   * used to write into, so the discrepancy capture effect picks the
-   * change up unchanged. Counts reset to the new type's prefill
-   * defaults because the previous counts no longer apply (a 3-system
-   * split doesn't translate cleanly to a 3-system ducted etc.).
+   * Counts reset to the new type's prefill defaults because the
+   * previous counts no longer apply (a 3-system split doesn't
+   * translate cleanly to a 3-system ducted etc.).
    *
    * The opposite type is computed off `effectiveType` rather than
    * `acTypeFromUnit` so that consecutive flips bounce back and forth
@@ -452,7 +433,6 @@ export function useAcStep({
     const next: KnownType =
       effectiveType === "ducted" ? "split" : "ducted";
     setOverride(next);
-    setOpenPanel(null);
     setNotSureCount(false);
   };
 
@@ -472,8 +452,6 @@ export function useAcStep({
   return {
     // mode / type
     override,
-    openPanel,
-    setOpenPanel,
     notSureCount,
     setNotSureCount,
     effectiveType,
@@ -510,7 +488,6 @@ export function useAcStep({
     liveDiscrepancy,
     // actions
     resetOverride,
-    handleTypeChoice,
     toggleType,
     oppositeType,
   };
@@ -737,119 +714,6 @@ export function PriceBlock({
           </span>
         </div>
       )}
-    </div>
-  );
-}
-
-export function ChoicePanel({
-  eyebrow,
-  title,
-  options,
-  onSelect,
-  onClose,
-  variant,
-}: {
-  eyebrow: string;
-  title: string;
-  options: { value: string; label: string }[];
-  onSelect: (value: string) => void;
-  onClose?: () => void;
-  variant: Variant;
-}) {
-  const isMobile = variant === "mobile";
-  const padding = isMobile ? "p-3.5" : "p-4";
-  const eyebrowSize = isMobile ? "text-[10px]" : "text-[11px]";
-  const titleSize = isMobile ? "text-[13px]" : "text-sm";
-  const cancelSize = isMobile ? "text-[11px]" : "text-xs";
-  const optionSize = isMobile ? "text-[13px]" : "text-sm";
-
-  return (
-    <div
-      className={`rounded-xl border border-slate-200 bg-white ${padding} shadow-sm`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p
-            className={`${eyebrowSize} font-semibold uppercase tracking-wide text-slate-500`}
-          >
-            {eyebrow}
-          </p>
-          <p className={`mt-1 ${titleSize} font-medium text-slate-900`}>
-            {title}
-          </p>
-        </div>
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className={`${cancelSize} font-medium text-slate-400 hover:text-slate-700`}
-          >
-            Cancel
-          </button>
-        )}
-      </div>
-      <div className="mt-3 space-y-2">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onSelect(o.value)}
-            data-testid={`choice-${o.value}`}
-            className={`flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-left ${optionSize} text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-colors`}
-          >
-            <span>{o.label}</span>
-            <ArrowRight className="h-4 w-4 text-slate-400" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function OverrideBanner({
-  title,
-  detail,
-  onReset,
-  resetLabel,
-  variant,
-}: {
-  title: string;
-  detail: string;
-  onReset: () => void;
-  resetLabel: string;
-  variant: Variant;
-}) {
-  const isMobile = variant === "mobile";
-  const wrapper = isMobile
-    ? "mb-5 flex gap-2.5 rounded-lg border p-3"
-    : "mb-6 flex gap-3 rounded-xl border p-4";
-  const iconClass = isMobile ? "h-4 w-4 mt-0.5 shrink-0" : "h-5 w-5 shrink-0";
-  const bodyText = isMobile ? "flex-1 text-[12px]" : "flex-1 text-sm";
-  const detailClass = isMobile
-    ? "mt-1 text-slate-600 leading-relaxed"
-    : "mt-1 text-slate-600";
-  const buttonSize = isMobile ? "text-[11px]" : "text-xs";
-
-  return (
-    <div
-      className={wrapper}
-      style={{ borderColor: BRAND + "40", backgroundColor: BRAND + "0d" }}
-    >
-      <Info className={iconClass} style={{ color: BRAND }} />
-      <div className={bodyText}>
-        <p className="font-semibold text-slate-900">{title}</p>
-        <p className={detailClass}>{detail}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onReset}
-        data-testid="button-override-reset"
-        className={`self-start ${buttonSize} font-medium underline underline-offset-2 hover:opacity-80`}
-        style={{ color: BRAND }}
-      >
-        {resetLabel}
-      </button>
     </div>
   );
 }
