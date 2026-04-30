@@ -26,12 +26,23 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { AdminApp } from "./AdminApp";
 
+// Task #215 made the templates-panel Sort choice survive a full
+// page reload by mirroring it into `localStorage`. happy-dom's
+// localStorage persists across tests in the same file, so without
+// an explicit reset between tests the second test's "Most referenced
+// overall" would leak into the third test's "expect default" seed —
+// these in-memory nav round-trip assertions still want a clean slate.
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
 });
 
 function gotoBookings() {

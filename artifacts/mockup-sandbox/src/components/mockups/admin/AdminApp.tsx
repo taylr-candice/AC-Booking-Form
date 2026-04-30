@@ -172,6 +172,99 @@ function writeBookingsTemplateFilterToURL(
 }
 
 /**
+ * `localStorage` keys for the lifted Call / Email templates panel
+ * Sort toggle (Task #215). Task #192 hoisted both `sortMode` slots
+ * into AdminApp shell state so the choice survived sidebar nav
+ * round-trips, but the state was still in-memory only — a full
+ * page reload reset both panels back to "Default order". Mirroring
+ * the per-channel split here (one key per channel) means flipping
+ * the Call panel doesn't move the Email panel's persisted choice
+ * either. Namespaced under `admin.` so the same key can't collide
+ * with any other artifact's persisted state.
+ */
+const CALL_TEMPLATES_SORT_MODE_STORAGE_KEY = "admin.callTemplatesSortMode";
+const EMAIL_TEMPLATES_SORT_MODE_STORAGE_KEY = "admin.emailTemplatesSortMode";
+
+/** All Sort modes the Call templates panel currently understands.
+ *  Used as an allow-list when validating a value read back from
+ *  localStorage so a stale / hand-edited entry can't smuggle an
+ *  unknown string into typed shell state. Kept in lock-step with
+ *  {@link CallTemplateSortMode}. */
+const CALL_TEMPLATES_SORT_MODES: ReadonlyArray<CallTemplateSortMode> = [
+  "default",
+  "mostUsed",
+  "mostReferenced",
+];
+
+/** Mirror of {@link CALL_TEMPLATES_SORT_MODES} for the Email panel.
+ *  Kept separate so a future divergence in either channel's mode
+ *  set doesn't silently widen the other's allow-list. */
+const EMAIL_TEMPLATES_SORT_MODES: ReadonlyArray<EmailTemplateSortMode> = [
+  "default",
+  "mostUsed",
+  "mostReferenced",
+];
+
+/** Read the persisted Call templates Sort choice on mount. Returns
+ *  the panel's default (`"default"`) when we're not in a browser,
+ *  when the storage entry is missing, when access throws (e.g.
+ *  Safari private mode, quota), or when the stored string isn't
+ *  one of the allow-listed modes — so a stale entry from an older
+ *  build can never put the shell into an unknown sort state. */
+export function readPersistedCallTemplatesSortMode(): CallTemplateSortMode {
+  if (typeof window === "undefined") return "default";
+  try {
+    const raw = window.localStorage.getItem(
+      CALL_TEMPLATES_SORT_MODE_STORAGE_KEY,
+    );
+    if (
+      raw !== null &&
+      (CALL_TEMPLATES_SORT_MODES as ReadonlyArray<string>).includes(raw)
+    ) {
+      return raw as CallTemplateSortMode;
+    }
+  } catch {
+    // localStorage may throw (private mode, quota, disabled) — fall
+    // through to the panel default.
+  }
+  return "default";
+}
+
+/** Email-side companion to {@link readPersistedCallTemplatesSortMode}.
+ *  Same fallbacks, separate key, separate allow-list — flipping
+ *  one panel's persisted mode never moves the other. */
+export function readPersistedEmailTemplatesSortMode(): EmailTemplateSortMode {
+  if (typeof window === "undefined") return "default";
+  try {
+    const raw = window.localStorage.getItem(
+      EMAIL_TEMPLATES_SORT_MODE_STORAGE_KEY,
+    );
+    if (
+      raw !== null &&
+      (EMAIL_TEMPLATES_SORT_MODES as ReadonlyArray<string>).includes(raw)
+    ) {
+      return raw as EmailTemplateSortMode;
+    }
+  } catch {
+    // See readPersistedCallTemplatesSortMode for why we swallow.
+  }
+  return "default";
+}
+
+/** Write the active Sort choice back to localStorage. Swallows
+ *  storage errors so a quota-full / private-mode browser still
+ *  renders the panel — the persistence is a nice-to-have, not a
+ *  correctness requirement. */
+function writePersistedSortMode(key: string, mode: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, mode);
+  } catch {
+    // See readPersistedCallTemplatesSortMode for why we swallow.
+  }
+}
+
+/**
  * Copy for the missing-template hint toast: ops clicked a
  * `From template: <name>` chip but the catalog no longer has a row
  * with that name. Exported so the regression test can pin the wording.
@@ -564,10 +657,28 @@ export function AdminApp() {
   // session: each channel remembers independently (so flipping the
   // Call panel doesn't move the Email panel) and the choice survives
   // any sidebar nav round-trip.
+  //
+  // Task #215 then made the choice survive a full page reload too,
+  // by seeding each slot from `localStorage` on first paint and
+  // mirroring writes back. Independent keys per channel preserve
+  // the same don't-leak-between-panels invariant the in-memory
+  // version enforces.
   const [callTemplatesSortMode, setCallTemplatesSortMode] =
-    useState<CallTemplateSortMode>("default");
+    useState<CallTemplateSortMode>(readPersistedCallTemplatesSortMode);
   const [emailTemplatesSortMode, setEmailTemplatesSortMode] =
-    useState<EmailTemplateSortMode>("default");
+    useState<EmailTemplateSortMode>(readPersistedEmailTemplatesSortMode);
+  useEffect(() => {
+    writePersistedSortMode(
+      CALL_TEMPLATES_SORT_MODE_STORAGE_KEY,
+      callTemplatesSortMode,
+    );
+  }, [callTemplatesSortMode]);
+  useEffect(() => {
+    writePersistedSortMode(
+      EMAIL_TEMPLATES_SORT_MODE_STORAGE_KEY,
+      emailTemplatesSortMode,
+    );
+  }, [emailTemplatesSortMode]);
 
   // Admin "New booking" (phone booking) overlay. `newBookingBuildingId`
   // pre-applies a building filter on Step 1 when the flow was opened
