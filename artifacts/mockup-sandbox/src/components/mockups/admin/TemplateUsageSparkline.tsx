@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { createPortal } from "react-dom";
 
 import type {
@@ -59,6 +67,53 @@ export function TemplateUsageSparkline({
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(
     null,
   );
+
+  const interactiveDates = useMemo(() => {
+    if (!bookingsByDay || !onOpenBooking) return [] as string[];
+    return trend
+      .filter((p) => p.count > 0 && (bookingsByDay[p.date]?.length ?? 0) > 0)
+      .map((p) => p.date);
+  }, [trend, bookingsByDay, onOpenBooking]);
+
+  const [activeDay, setActiveDay] = useState<string | null>(
+    interactiveDates[0] ?? null,
+  );
+
+  useEffect(() => {
+    if (interactiveDates.length === 0) {
+      if (activeDay !== null) setActiveDay(null);
+      return;
+    }
+    if (!activeDay || !interactiveDates.includes(activeDay)) {
+      setActiveDay(interactiveDates[0]!);
+    }
+  }, [interactiveDates, activeDay]);
+
+  function handleBarKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentDay: string,
+  ) {
+    if (interactiveDates.length === 0) return;
+    const idx = interactiveDates.indexOf(currentDay);
+    let nextIdx: number;
+    if (event.key === "ArrowRight") {
+      nextIdx = idx < 0 ? 0 : Math.min(idx + 1, interactiveDates.length - 1);
+    } else if (event.key === "ArrowLeft") {
+      nextIdx = idx < 0 ? 0 : Math.max(idx - 1, 0);
+    } else if (event.key === "Home") {
+      nextIdx = 0;
+    } else if (event.key === "End") {
+      nextIdx = interactiveDates.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    const nextDay = interactiveDates[nextIdx]!;
+    if (nextDay === currentDay) return;
+    setActiveDay(nextDay);
+    const btn = barRefs.current.get(nextDay);
+    btn?.focus();
+  }
 
   useLayoutEffect(() => {
     if (!openDay) return;
@@ -158,6 +213,9 @@ export function TemplateUsageSparkline({
 
           if (interactive) {
             const isOpen = openDay === p.date;
+            const isActive =
+              activeDay === p.date ||
+              (activeDay === null && interactiveDates[0] === p.date);
             const bookingWord = dayList.length === 1 ? "booking" : "bookings";
             const buttonStyle: CSSProperties & Record<string, string> = {
               width: `${barWidth}px`,
@@ -171,12 +229,19 @@ export function TemplateUsageSparkline({
                 ref={(el) => {
                   barRefs.current.set(p.date, el);
                 }}
-                onClick={() =>
-                  setOpenDay((current) => (current === p.date ? null : p.date))
-                }
+                onClick={() => {
+                  setActiveDay(p.date);
+                  setOpenDay((current) =>
+                    current === p.date ? null : p.date,
+                  );
+                }}
+                onFocus={() => setActiveDay(p.date)}
+                onKeyDown={(event) => handleBarKeyDown(event, p.date)}
+                tabIndex={isActive ? 0 : -1}
                 data-testid={`${kind}-template-usage-sparkline-bar-${templateId}-${p.date}`}
                 data-count={p.count}
                 data-interactive="true"
+                data-active={isActive ? "true" : "false"}
                 data-day={p.date}
                 aria-haspopup="dialog"
                 aria-expanded={isOpen}

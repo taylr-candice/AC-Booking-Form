@@ -634,6 +634,83 @@ describe("TemplateUsageSparkline · click-to-filter (Task #197)", () => {
     ).toBeNull();
   });
 
+  it("uses a roving tabindex so only one bar per sparkline is in the tab order, and Left/Right/Home/End move focus across non-zero bars only (Task #210)", () => {
+    render(
+      <TemplateUsageSparkline
+        kind="call"
+        templateId="voicemail"
+        trend={SEEDED_TREND}
+        templateName="Voicemail"
+        bookingsByDay={BOOKINGS_BY_DAY}
+        onOpenBooking={() => {}}
+      />,
+    );
+
+    const apr26 = screen.getByTestId(
+      "call-template-usage-sparkline-bar-voicemail-2026-04-26",
+    );
+    const apr27 = screen.getByTestId(
+      "call-template-usage-sparkline-bar-voicemail-2026-04-27",
+    );
+    const apr28 = screen.getByTestId(
+      "call-template-usage-sparkline-bar-voicemail-2026-04-28",
+    );
+
+    // Roving tabindex: only the first non-zero bar starts with tabIndex 0,
+    // every other interactive bar sits at -1 so Tab lands on the strip
+    // exactly once.
+    expect(apr26.getAttribute("tabindex")).toBe("0");
+    expect(apr27.getAttribute("tabindex")).toBe("-1");
+    expect(apr28.getAttribute("tabindex")).toBe("-1");
+    expect(apr26.getAttribute("data-active")).toBe("true");
+
+    // ArrowRight from the first non-zero bar moves focus & rovers tabindex
+    // to the next non-zero bar, skipping any zero-count gap.
+    apr26.focus();
+    fireEvent.keyDown(apr26, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(apr27);
+    expect(apr27.getAttribute("tabindex")).toBe("0");
+    expect(apr26.getAttribute("tabindex")).toBe("-1");
+
+    // ArrowRight again → Apr 28 (last non-zero bar in the seeded trend).
+    fireEvent.keyDown(apr27, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(apr28);
+
+    // ArrowRight at the end clamps (no wrap) so focus stays on Apr 28.
+    fireEvent.keyDown(apr28, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(apr28);
+
+    // ArrowLeft walks back across non-zero bars only.
+    fireEvent.keyDown(apr28, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(apr27);
+    fireEvent.keyDown(apr27, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(apr26);
+
+    // ArrowLeft at the start clamps, never hops to a zero-count bar.
+    fireEvent.keyDown(apr26, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(apr26);
+
+    // End jumps to the last non-zero bar; Home jumps back to the first.
+    fireEvent.keyDown(apr26, { key: "End" });
+    expect(document.activeElement).toBe(apr28);
+    fireEvent.keyDown(apr28, { key: "Home" });
+    expect(document.activeElement).toBe(apr26);
+
+    // Arrow navigation must not open the popover — Enter/Space stay the
+    // sole activation keys (preserved native button behavior).
+    expect(
+      screen.queryByTestId("call-template-usage-sparkline-popover-voicemail"),
+    ).toBeNull();
+
+    // Zero-count bars are still non-interactive — they aren't visited by
+    // the roving navigation and stay rendered as inert spans.
+    const apr25 = screen.getByTestId(
+      "call-template-usage-sparkline-bar-voicemail-2026-04-25",
+    );
+    expect(apr25.tagName).toBe("SPAN");
+    expect(apr25.getAttribute("tabindex")).toBeNull();
+  });
+
   it("leaves bars non-interactive when bookingsByDay or onOpenBooking is omitted", () => {
     render(
       <TemplateUsageSparkline

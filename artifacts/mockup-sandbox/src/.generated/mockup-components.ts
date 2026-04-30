@@ -45,10 +45,10 @@ export const modules: ModuleMap = {
   "./components/mockups/booking-pages/UnitDesktop.tsx": () => import("../components/mockups/booking-pages/UnitDesktop.tsx"),
   "./components/mockups/booking-pages/UnitMobile.tsx": () => import("../components/mockups/booking-pages/UnitMobile.tsx"),
   "./components/mockups/booking-pages/acStepShared.tsx": () => import("../components/mockups/booking-pages/acStepShared.tsx"),
-  "./components/mockups/booking-slots/SlotsDesktop.tsx": () => import("../components/mockups/booking-slots/SlotsDesktop.tsx"),
-  "./components/mockups/booking-slots/SlotsMobile.tsx": () => import("../components/mockups/booking-slots/SlotsMobile.tsx"),
-  "./components/mockups/booking-slots/SlotsMobileLite.tsx": () => import("../components/mockups/booking-slots/SlotsMobileLite.tsx"),
   "./components/mockups/booking-slots-usability/SlotsAccessibleReadable.tsx": () => import("../components/mockups/booking-slots-usability/SlotsAccessibleReadable.tsx"),
   "./components/mockups/booking-slots-usability/SlotsAffordanceForward.tsx": () => import("../components/mockups/booking-slots-usability/SlotsAffordanceForward.tsx"),
-  "./components/mockups/booking-slots-usability/SlotsHierarchyFirst.tsx": () => import("../components/mockups/booking-slots-usability/SlotsHierarchyFirst.tsx")
+  "./components/mockups/booking-slots-usability/SlotsHierarchyFirst.tsx": () => import("../components/mockups/booking-slots-usability/SlotsHierarchyFirst.tsx"),
+  "./components/mockups/booking-slots/SlotsDesktop.tsx": () => import("../components/mockups/booking-slots/SlotsDesktop.tsx"),
+  "./components/mockups/booking-slots/SlotsMobile.tsx": () => import("../components/mockups/booking-slots/SlotsMobile.tsx"),
+  "./components/mockups/booking-slots/SlotsMobileLite.tsx": () => import("../components/mockups/booking-slots/SlotsMobileLite.tsx")
 };
