@@ -17,16 +17,19 @@ import {
   getBookingDurationMinutes,
   setServiceRuleResolver,
   setUnitDurationContextResolver,
+  UNSURE_FALLBACK_MINUTES,
   type ServiceRule,
   type UnitDurationContext,
 } from "./bookingDerived";
 import {
+  bookingDurationMinutes,
   DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   getEffectivePlacementForUnit,
   getServiceRuleForAcType,
   setLiveBuildingsSource,
   setLiveServiceCatalogueSource,
   setLiveUnitsSource,
+  type AdminBooking,
   type AdminBuilding,
   type AdminService,
   type AdminUnit,
@@ -319,5 +322,162 @@ describe("resolver primitives — explicit per-acType wiring", () => {
         ac_discrepancy: null,
       }),
     ).toBe(3 * 33 + 2 * 7 + 3 * 5);
+  });
+});
+
+// ─── Admin-side `bookingDurationMinutes(b: AdminBooking)` ────────────────────
+//
+// The admin Bookings list + booking detail breakdown call this helper
+// directly (it shares the catalogue + rooftop-overhead pipeline with
+// the customer-flow `getBookingDurationMinutes`, but has its own
+// `acType === "unsure"` short-circuit). These cases pin every branch
+// the admin UI relies on so a future refactor of the catalogue or the
+// `AdminBooking` shape can't silently shift the Duration column.
+
+/** Build a minimal `AdminBooking` for duration tests. The fixture
+ *  defaults to a paid, scheduled, owner-placed booking — every field
+ *  the helper reads (`unitId`, `acType`, `systems`, `additional`) can
+ *  be overridden via `over`. */
+function makeAdminBooking(over: Partial<AdminBooking> = {}): AdminBooking {
+  return {
+    id: "bk-duration-test",
+    unitId: "u-flat-default",
+    customerName: "Test Customer",
+    customerEmail: "test@example.com",
+    customerPhone: "0400 000 000",
+    bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_at_unit",
+    tenants: [],
+    systems: 1,
+    additional: 0,
+    acType: "split",
+    discrepancy: null,
+    serviceDate: "2026-04-30",
+    serviceSlot: "morning",
+    paymentStatus: "paid",
+    serviceStatus: "scheduled",
+    totalAud: 199,
+    paymentTimeline: [],
+    serviceTimeline: [],
+    notes: "",
+    rolloutId: null,
+    createdAt: "2026-04-29T09:00:00+10:00",
+    lastContactedAt: null,
+    ...over,
+  };
+}
+
+describe("bookingDurationMinutes (admin) — catalogue + rooftop end-to-end", () => {
+  it("returns the catalogue split base + addon for an in-property building unit", () => {
+    installAdminLikeWiring();
+    expect(
+      bookingDurationMinutes(
+        makeAdminBooking({
+          unitId: "u-flat-default",
+          acType: "split",
+          systems: 2,
+          additional: 1,
+        }),
+      ),
+    ).toBe(2 * 50 + 1 * 20);
+  });
+
+  it("returns the catalogue ducted base + addon plus per-system rooftop overhead for a rooftop building unit", () => {
+    installAdminLikeWiring();
+    // `bldg-tower` is rooftop with rooftopOverheadMinutes: 12, so the
+    // expected total is base + addon + (systems × 12).
+    expect(
+      bookingDurationMinutes(
+        makeAdminBooking({
+          unitId: "u-tower-default",
+          acType: "ducted",
+          systems: 2,
+          additional: 1,
+        }),
+      ),
+    ).toBe(2 * 80 + 1 * 25 + 2 * 12);
+  });
+});
+
+describe("bookingDurationMinutes (admin) — `unsure` short-circuit", () => {
+  it("returns UNSURE_FALLBACK_MINUTES regardless of systems / additional", () => {
+    installAdminLikeWiring();
+    // Pile on systems + additional values that would dwarf the
+    // fallback if the short-circuit ever regressed.
+    expect(
+      bookingDurationMinutes(
+        makeAdminBooking({
+          unitId: "u-tower-default",
+          acType: "unsure",
+          systems: 5,
+          additional: 7,
+        }),
+      ),
+    ).toBe(UNSURE_FALLBACK_MINUTES);
+    // …and on a rooftop unit, to lock down that the per-system
+    // overhead surcharge isn't quietly added either.
+    expect(
+      bookingDurationMinutes(
+        makeAdminBooking({
+          unitId: "u-flat-rooftop",
+          acType: "unsure",
+          systems: 3,
+          additional: 2,
+        }),
+      ),
+    ).toBe(UNSURE_FALLBACK_MINUTES);
+  });
+});
+
+describe("bookingDurationMinutes (admin) — per-unit outdoorPlacementOverride", () => {
+  it("flips an in_property building's unit to rooftop end-to-end when the override says so", () => {
+    installAdminLikeWiring();
+    const inherited = bookingDurationMinutes(
+      makeAdminBooking({
+        unitId: "u-flat-default",
+        acType: "split",
+        systems: 2,
+        additional: 0,
+      }),
+    );
+    const overridden = bookingDurationMinutes(
+      makeAdminBooking({
+        // Same building (in_property), but this unit carries
+        // outdoorPlacementOverride: "rooftop".
+        unitId: "u-flat-rooftop",
+        acType: "split",
+        systems: 2,
+        additional: 0,
+      }),
+    );
+    expect(inherited).toBe(2 * 50);
+    expect(overridden).toBe(2 * 50 + 2 * DEFAULT_ROOFTOP_OVERHEAD_MINUTES);
+    expect(overridden - inherited).toBe(2 * DEFAULT_ROOFTOP_OVERHEAD_MINUTES);
+  });
+
+  it("flips a rooftop building's unit to in_property end-to-end when the override says so", () => {
+    installAdminLikeWiring();
+    const inherited = bookingDurationMinutes(
+      makeAdminBooking({
+        unitId: "u-tower-default",
+        acType: "ducted",
+        systems: 2,
+        additional: 1,
+      }),
+    );
+    const overridden = bookingDurationMinutes(
+      makeAdminBooking({
+        // Same building (rooftop, overhead 12), but this unit carries
+        // outdoorPlacementOverride: "in_property".
+        unitId: "u-tower-flat",
+        acType: "ducted",
+        systems: 2,
+        additional: 1,
+      }),
+    );
+    expect(inherited).toBe(2 * 80 + 1 * 25 + 2 * 12);
+    expect(overridden).toBe(2 * 80 + 1 * 25);
   });
 });
