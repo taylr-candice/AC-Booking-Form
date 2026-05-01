@@ -102,6 +102,7 @@ export function UnitMobile() {
   const [attemptedContinue, setAttemptedContinue] = useState(false);
   const [query, setQuery] = useState("");
   const [agencyOpen, setAgencyOpen] = useState(false);
+  const [agencyQuery, setAgencyQuery] = useState("");
   // When a customer taps a unit that already has a paid/confirmed
   // service booked, we show a generic "this unit is already booked,
   // contact Taylr" modal instead of selecting the unit. We never show
@@ -133,6 +134,10 @@ export function UnitMobile() {
   useEffect(() => {
     if (!open) setQuery("");
   }, [open]);
+
+  useEffect(() => {
+    if (!agencyOpen) setAgencyQuery("");
+  }, [agencyOpen]);
 
   useEffect(() => {
     if (!isAgent) {
@@ -264,7 +269,7 @@ export function UnitMobile() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-6 pt-4">
+      <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6 pt-4">
         <div className="relative">
           <button
             ref={unitDropdownTriggerRef}
@@ -475,8 +480,32 @@ export function UnitMobile() {
                   </button>
 
                   {agencyOpen && (
-                    <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                      {DEMO_MANAGING_AGENCIES.map((a) => {
+                    <div className="absolute inset-x-0 top-full z-20 mt-2 flex max-h-[300px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                      <div className="border-b border-slate-100 p-2">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            autoFocus
+                            value={agencyQuery}
+                            onChange={(e) => setAgencyQuery(e.target.value)}
+                            placeholder="Search agencies…"
+                            data-testid="input-agency-search"
+                            aria-label="Search agencies"
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-200"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-y-auto py-1">
+                      {DEMO_MANAGING_AGENCIES.filter((a) =>
+                        a.name.toLowerCase().includes(agencyQuery.toLowerCase())
+                      ).length === 0 ? (
+                        <div className="px-4 py-6 text-center text-[13px] text-slate-500">
+                          No agencies match "{agencyQuery.trim()}"
+                        </div>
+                      ) : DEMO_MANAGING_AGENCIES.filter((a) =>
+                          a.name.toLowerCase().includes(agencyQuery.toLowerCase())
+                        ).map((a) => {
                         const active = a.id === agencyId;
                         return (
                           <button
@@ -509,6 +538,7 @@ export function UnitMobile() {
                           </button>
                         );
                       })}
+                      </div>
                     </div>
                   )}
                 </div>
