@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { AlertCircle, ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Handshake, ChevronDown, Search } from "lucide-react";
+import { AlertCircle, ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, CheckCircle2, Home as HomeIcon, HardHat, ConciergeBell, Handshake, ChevronDown, Search } from "lucide-react";
 import { LockerIcon } from "./LockerIcon";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
 import { DEMO_MANAGING_AGENCIES, isOtherAgency, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption, type LeaveKeySubMethod } from "../../../state/accessMethodCatalog";
@@ -271,7 +271,7 @@ function iconForSubMethod(key: LeaveKeySubMethod) {
   if (key === "with_someone") return <Users className="h-5 w-5" />;
   if (key === "with_parcel_locker") return <LockerIcon className="h-5 w-5" />;
   if (key === "with_taylr") return <Handshake className="h-5 w-5" />;
-  if (key === "with_building_manager") return <Building2 className="h-5 w-5" />;
+  if (key === "with_building_manager") return <HardHat className="h-5 w-5" />;
   if (key === "with_concierge") return <ConciergeBell className="h-5 w-5" />;
   return <KeyRound className="h-5 w-5" />;
 }
