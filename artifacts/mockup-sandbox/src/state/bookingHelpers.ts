@@ -22,6 +22,10 @@ import {
   resolveOtherServiceQuantities,
 } from "./bookingDerived";
 import { getBuildingById, getLiveUnits } from "./adminMockData";
+import {
+  DEMO_MANAGING_AGENCIES,
+  isOtherAgency,
+} from "./accessMethodCatalog";
 
 // ─── Pricing ───────────────────────────────────────────────────────────────
 
@@ -478,6 +482,95 @@ export const INVOICE_REFERENCE_NOTE =
 /** Helper copy under the billing email field. */
 export const BILLING_EMAIL_HELPER =
   "Leave blank to receive the invoice only at your contact email above.";
+
+// ─── Invoice destination + Bill-to (agent + invoice path) ──────────────────
+
+/** Mini demo lookup of an agency's accounts inbox. The "Other / not listed"
+ *  agency intentionally has no entry — when an agent picks Other we don't
+ *  have a default email to fall back to and the UI will rely on the
+ *  agent's contact email. */
+const DEMO_AGENCY_ACCOUNTS_EMAIL: Readonly<Record<string, string>> = {
+  "agency-001": "accounts@vantagestrata.com.au",
+  "agency-002": "accounts@cityedge.com.au",
+  "agency-003": "accounts@capitalrealty.com.au",
+  "agency-004": "accounts@harbourline.com.au",
+};
+
+/** Display name for the agency the agent is acting for. Falls back to the
+ *  free-text "Other / not listed" name if it has been provided. */
+export function agencyDisplayName(s: BookingState): string {
+  if (!s.agency_id) return "";
+  if (isOtherAgency(s.agency_id)) return s.agency_other_name.trim();
+  return DEMO_MANAGING_AGENCIES.find((a) => a.id === s.agency_id)?.name ?? "";
+}
+
+/** Default accounts email on file for the agent's selected agency. Returns
+ *  null when the agency has no email on file (e.g. "Other / not listed"). */
+export function agencyDefaultEmail(s: BookingState): string | null {
+  if (!s.agency_id) return null;
+  return DEMO_AGENCY_ACCOUNTS_EMAIL[s.agency_id] ?? null;
+}
+
+/** Email the invoice will go to — the agent's own contact email if they
+ *  provided one at Step 1, otherwise the agency's default accounts inbox.
+ *  Returns null when neither is available. */
+export function invoiceDestinationEmail(s: BookingState): string | null {
+  const contact = s.contact_email?.trim();
+  if (contact) return contact;
+  return agencyDefaultEmail(s);
+}
+
+/** Whether the invoice destination email comes from the agent's contact
+ *  field (vs. falling back to the agency default). Used to label the
+ *  destination row appropriately. */
+export function invoiceDestinationFromContact(s: BookingState): boolean {
+  return Boolean(s.contact_email?.trim());
+}
+
+/** Default "Bill to" line — the unit address, c/o the agent's name. Used
+ *  as placeholder/helper text when the agent has not entered an override. */
+export function defaultBillToLine(s: BookingState): string {
+  const u = unitLabel(s.unit_id);
+  const addr = u.line2 ? `${u.line1}, ${u.line2}` : u.line1;
+  const agent = [s.contact_first_name, s.contact_last_name]
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .join(" ");
+  return agent ? `${addr} c/o ${agent}` : addr;
+}
+
+export const INVOICE_DESTINATION_LABEL = "Invoice will be sent to";
+/** Note shown under the destination row when the contact email is missing
+ *  AND the agency has no default email on file — i.e. we genuinely don't
+ *  know where to send the invoice yet. */
+export const INVOICE_DESTINATION_MISSING_NOTE =
+  "We don't have a contact email for you yet — add one at Step 1 so we know where to send the tax invoice.";
+
+/**
+ * Explanatory note for the invoice-destination row. Returns null when the
+ * destination came from the agent's own contact email (no extra context
+ * needed). When the destination falls back to the agency default we surface
+ * the agency name; when neither exists we surface the missing-email
+ * prompt so the UI never silently shows "—".
+ */
+export function invoiceDestinationNote(s: BookingState): string | null {
+  if (invoiceDestinationFromContact(s)) return null;
+  const fallback = agencyDefaultEmail(s);
+  if (fallback) {
+    const name = agencyDisplayName(s);
+    return name
+      ? `Default accounts email on file for ${name}.`
+      : "Default accounts email on file for your agency.";
+  }
+  return INVOICE_DESTINATION_MISSING_NOTE;
+}
+export const COPY_INVOICE_TO_LABEL =
+  "Email a copy of the invoice to (optional)";
+export const COPY_INVOICE_TO_HELPER =
+  "We'll CC this address on the tax invoice — useful if billing is handled by someone else.";
+export const BILL_TO_LABEL = "Bill to (optional)";
+export const BILL_TO_HELPER =
+  "Otherwise the invoice will be made out to the unit address, c/o you.";
 
 // ─── Step 5 (Review & Pay) validation ─────────────────────────────────────
 

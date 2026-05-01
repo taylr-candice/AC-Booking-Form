@@ -20,10 +20,17 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
-  BILLING_EMAIL_HELPER,
+  BILL_TO_HELPER,
+  BILL_TO_LABEL,
   CANCELLATION_CONTACT_EMAIL,
   computeBookingTotal,
   COORDINATION_NOTE,
+  COPY_INVOICE_TO_HELPER,
+  COPY_INVOICE_TO_LABEL,
+  defaultBillToLine,
+  INVOICE_DESTINATION_LABEL,
+  invoiceDestinationEmail,
+  invoiceDestinationNote,
   INVOICE_LABEL,
   INVOICE_PREPAYMENT_BODY,
   INVOICE_PREPAYMENT_TITLE,
@@ -260,31 +267,71 @@ export function PayMobile() {
               </div>
             </div>
             <div className="space-y-3">
-              <div className="space-y-1">
-                <label htmlFor="billing-email-mobile" className="text-[12px] font-medium text-slate-700">
-                  Billing email{" "}
-                  <span className="font-normal text-slate-500">(if different to the email above)</span>
-                </label>
-                <input
-                  id="billing-email-mobile"
-                  type="email"
-                  inputMode="email"
-                  placeholder={session.contact_email || "accounts@youragency.com.au"}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] outline-none focus:border-slate-400"
-                  data-testid="input-billing-email-mobile"
-                />
-                <p className="text-[11px] text-slate-500">{BILLING_EMAIL_HELPER}</p>
+              {/* Invoice destination (read-only) */}
+              <div
+                className="rounded-xl border border-slate-200 bg-white p-3"
+                data-testid="block-invoice-destination-mobile"
+              >
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  {INVOICE_DESTINATION_LABEL}
+                </div>
+                <div
+                  className="mt-0.5 text-[13px] font-semibold text-slate-900"
+                  data-testid="text-invoice-destination-mobile"
+                >
+                  {invoiceDestinationEmail(session) ?? "—"}
+                </div>
+                {invoiceDestinationNote(session) && (
+                  <p
+                    className="mt-1 text-[11px] leading-relaxed text-slate-500"
+                    data-testid="text-invoice-destination-note-mobile"
+                  >
+                    {invoiceDestinationNote(session)}
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
-                <label htmlFor="po-ref-mobile" className="text-[12px] font-medium text-slate-700">
-                  Purchase order / reference (optional)
+                <label
+                  htmlFor="copy-invoice-mobile"
+                  className="text-[12px] font-medium text-slate-700"
+                >
+                  {COPY_INVOICE_TO_LABEL}
                 </label>
                 <input
-                  id="po-ref-mobile"
-                  type="text"
-                  placeholder="e.g. PO-12345"
+                  id="copy-invoice-mobile"
+                  type="email"
+                  inputMode="email"
+                  placeholder="finance@example.com"
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] outline-none focus:border-slate-400"
+                  data-testid="input-copy-invoice-mobile"
                 />
+                <p className="text-[11px] text-slate-500">
+                  {COPY_INVOICE_TO_HELPER}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="bill-to-mobile"
+                  className="text-[12px] font-medium text-slate-700"
+                >
+                  {BILL_TO_LABEL}
+                </label>
+                <input
+                  id="bill-to-mobile"
+                  type="text"
+                  placeholder="e.g. Owner's name"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] outline-none focus:border-slate-400"
+                  data-testid="input-bill-to-mobile"
+                />
+                <p
+                  className="text-[11px] leading-relaxed text-slate-500"
+                  data-testid="text-bill-to-default-mobile"
+                >
+                  {BILL_TO_HELPER}
+                  <span className="mt-0.5 block text-slate-400">
+                    Default: {defaultBillToLine(session)}
+                  </span>
+                </p>
               </div>
             </div>
             <div

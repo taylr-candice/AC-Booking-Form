@@ -8,10 +8,17 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
-  BILLING_EMAIL_HELPER,
+  BILL_TO_HELPER,
+  BILL_TO_LABEL,
   CANCELLATION_CONTACT_EMAIL,
   computeBookingTotal,
   COORDINATION_NOTE,
+  COPY_INVOICE_TO_HELPER,
+  COPY_INVOICE_TO_LABEL,
+  defaultBillToLine,
+  INVOICE_DESTINATION_LABEL,
+  invoiceDestinationEmail,
+  invoiceDestinationNote,
   INVOICE_LABEL,
   INVOICE_PREPAYMENT_BODY,
   INVOICE_PREPAYMENT_TITLE,
@@ -224,30 +231,70 @@ export function PayDesktop() {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <label htmlFor="billing-email-desktop" className="text-sm font-medium text-slate-700">
-                        Billing email{" "}
-                        <span className="font-normal text-slate-500">(if different to the email above)</span>
-                      </label>
-                      <input
-                        id="billing-email-desktop"
-                        type="email"
-                        placeholder={session.contact_email || "accounts@youragency.com.au"}
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
-                        data-testid="input-billing-email-desktop"
-                      />
-                      <p className="text-xs text-slate-500">{BILLING_EMAIL_HELPER}</p>
+                    {/* Invoice destination (read-only) */}
+                    <div
+                      className="rounded-xl border border-slate-200 bg-white p-4"
+                      data-testid="block-invoice-destination-desktop"
+                    >
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        {INVOICE_DESTINATION_LABEL}
+                      </div>
+                      <div
+                        className="mt-1 text-sm font-semibold text-slate-900"
+                        data-testid="text-invoice-destination-desktop"
+                      >
+                        {invoiceDestinationEmail(session) ?? "—"}
+                      </div>
+                      {invoiceDestinationNote(session) && (
+                        <p
+                          className="mt-1 text-xs leading-relaxed text-slate-500"
+                          data-testid="text-invoice-destination-note-desktop"
+                        >
+                          {invoiceDestinationNote(session)}
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
-                      <label htmlFor="po-ref-desktop" className="text-sm font-medium text-slate-700">
-                        Purchase order / reference (optional)
+                      <label
+                        htmlFor="copy-invoice-desktop"
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        {COPY_INVOICE_TO_LABEL}
                       </label>
                       <input
-                        id="po-ref-desktop"
-                        type="text"
-                        placeholder="e.g. PO-12345"
+                        id="copy-invoice-desktop"
+                        type="email"
+                        placeholder="finance@example.com"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
+                        data-testid="input-copy-invoice-desktop"
                       />
+                      <p className="text-xs text-slate-500">
+                        {COPY_INVOICE_TO_HELPER}
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="bill-to-desktop"
+                        className="text-sm font-medium text-slate-700"
+                      >
+                        {BILL_TO_LABEL}
+                      </label>
+                      <input
+                        id="bill-to-desktop"
+                        type="text"
+                        placeholder="e.g. Owner's name"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
+                        data-testid="input-bill-to-desktop"
+                      />
+                      <p
+                        className="text-xs leading-relaxed text-slate-500"
+                        data-testid="text-bill-to-default-desktop"
+                      >
+                        {BILL_TO_HELPER}
+                        <span className="mt-0.5 block text-slate-400">
+                          Default: {defaultBillToLine(session)}
+                        </span>
+                      </p>
                     </div>
                   </div>
                   <div
