@@ -29,6 +29,10 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { isPastDate } from "../../../state/bookingHelpers";
 import {
+  bookingActions,
+  useBookingSelector,
+} from "../../../state/bookingSession";
+import {
   getLiveBookingsVersion,
   subscribeLiveBookings,
 } from "../../../state/adminMockData";
@@ -62,7 +66,14 @@ export function useCustomerSlotPicker(
   unitId: string | null,
   jobMinutes: number,
 ): CustomerSlotPicker {
-  const [selected, setSelected] = useState<string | null>(null);
+  // Hydrate local state from the session so navigating back to the
+  // slot picker (component remount) preserves the customer's pick
+  // instead of clobbering the schedule via the mirror-effect below.
+  // Only read on first render; after mount the local state owns the
+  // selection. The validity-check effect below will prune the
+  // hydrated id if it no longer fits the current rollout.
+  const initialSlot = useBookingSelector((s) => s.service_slot);
+  const [selected, setSelected] = useState<string | null>(() => initialSlot);
 
   const slotData = useMemo(
     () => resolveCustomerSlotData(unitId, jobMinutes),
@@ -97,6 +108,26 @@ export function useCustomerSlotPicker(
       .some((s) => s.id === selected && s.status === "available");
     if (!stillValid) setSelected(null);
   }, [selected, visibleDays]);
+
+  // Resolve the date that owns the currently-selected slot id. Needed
+  // both for the consumer (UI summary lines) and to push the schedule
+  // tuple back into the booking session so downstream gating
+  // (`isPayStepEnabled`) can see it.
+  const selectedDate = useMemo<string | null>(() => {
+    if (!selected) return null;
+    const day = visibleDays.find((d) =>
+      dayWindows(d).some((w) => w.id === selected),
+    );
+    return day?.date ?? null;
+  }, [selected, visibleDays]);
+
+  // Mirror the local pick into the booking session so Step 5 / Pay
+  // can light up the Continue button. The local state inside this
+  // hook is the source of truth while the customer is on the slot
+  // picker; the session copy is what every other step reads.
+  useEffect(() => {
+    bookingActions.setSchedule(selectedDate, selected ?? null);
+  }, [selectedDate, selected]);
 
   return {
     rollout: slotData.rollout,
