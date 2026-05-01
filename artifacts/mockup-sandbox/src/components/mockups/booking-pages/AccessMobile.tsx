@@ -11,6 +11,7 @@ import {
   Home,
   Package,
   PackageOpen,
+  Vault,
   Hand,
   HousePlus,
   CheckCircle2,
@@ -375,7 +376,7 @@ function iconForMethod(m: AccessMethod) {
 
 function iconForSubMethod(key: LeaveKeySubMethod) {
   if (key === "with_someone") return <Users className="h-5 w-5" />;
-  if (key === "with_parcel_locker") return <Package className="h-5 w-5" />;
+  if (key === "with_parcel_locker") return <Vault className="h-5 w-5" />;
   if (key === "with_taylr") return <Handshake className="h-5 w-5" />;
   if (key === "with_building_manager") return <Building2 className="h-5 w-5" />;
   if (key === "with_concierge") return <ConciergeBell className="h-5 w-5" />;
