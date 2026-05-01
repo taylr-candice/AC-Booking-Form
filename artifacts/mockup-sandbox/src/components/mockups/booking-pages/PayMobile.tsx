@@ -260,7 +260,7 @@ export function PayMobile() {
 
         {method === "invoice" && isAgent && (
           <div
-            className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4"
+            className="mb-8"
             data-testid="block-invoice-mobile"
           >
             <div
@@ -280,10 +280,10 @@ export function PayMobile() {
                 </button>
               </p>
             </div>
-            <div className="space-y-2">
+            <div className="divide-y divide-slate-100">
               {/* Bill to — unit address + attention line */}
               <div
-                className="rounded-xl border border-slate-200 bg-white p-3"
+                className="py-1"
                 data-testid="block-invoice-destination-mobile"
               >
                 <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2">
@@ -331,7 +331,6 @@ export function PayMobile() {
 
               {/* Send to another party toggle */}
               <div
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white"
                 data-testid="block-send-to-another-mobile"
               >
                 <button
@@ -342,7 +341,7 @@ export function PayMobile() {
                     }
                     setSendToAnother((v) => !v);
                   }}
-                  className="flex w-full items-center justify-between px-3 py-3"
+                  className="flex w-full items-center justify-between py-2.5"
                   data-testid="toggle-send-to-another-mobile"
                 >
                   <span className="text-[13px] font-medium text-slate-900">
@@ -359,7 +358,7 @@ export function PayMobile() {
                   </span>
                 </button>
                 {sendToAnother && (
-                  <div className="border-t border-slate-100 px-3 pb-3 pt-2">
+                  <div className="pb-3 pt-1">
                     <label
                       htmlFor="send-to-another-email-mobile"
                       className="mb-1 block text-[11px] font-medium text-slate-500"

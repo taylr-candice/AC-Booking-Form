@@ -250,7 +250,6 @@ export function PayDesktop() {
               )}
               {method === "invoice" && isAgent && (
                 <div
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-6 animate-in fade-in duration-300"
                   data-testid="block-invoice-desktop"
                 >
                   <div
@@ -270,10 +269,10 @@ export function PayDesktop() {
                       </button>
                     </p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="divide-y divide-slate-100">
                     {/* Bill to — unit address + attention line */}
                     <div
-                      className="rounded-xl border border-slate-200 bg-white p-4"
+                      className="py-1"
                       data-testid="block-invoice-destination-desktop"
                     >
                       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2.5">
@@ -321,7 +320,6 @@ export function PayDesktop() {
 
                     {/* Send to another party toggle */}
                     <div
-                      className="overflow-hidden rounded-xl border border-slate-200 bg-white"
                       data-testid="block-send-to-another-desktop"
                     >
                       <button
@@ -332,7 +330,7 @@ export function PayDesktop() {
                           }
                           setSendToAnother((v) => !v);
                         }}
-                        className="flex w-full items-center justify-between px-4 py-3"
+                        className="flex w-full items-center justify-between py-2.5"
                         data-testid="toggle-send-to-another-desktop"
                       >
                         <span className="text-sm font-medium text-slate-900">
@@ -349,7 +347,7 @@ export function PayDesktop() {
                         </span>
                       </button>
                       {sendToAnother && (
-                        <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+                        <div className="pb-4 pt-1">
                           <label
                             htmlFor="send-to-another-email-desktop"
                             className="mb-1.5 block text-xs font-medium text-slate-500"
