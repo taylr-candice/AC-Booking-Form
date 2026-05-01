@@ -342,12 +342,10 @@ export function UnitMobile() {
                             {u.lot} · {u.building}
                           </div>
                         </div>
-                        {active && (
-                          <CheckCircle2
-                            className="mt-0.5 h-5 w-5 shrink-0"
-                            style={{ color: BRAND }}
-                          />
-                        )}
+                        <CheckCircle2
+                          className="mt-0.5 h-5 w-5 shrink-0"
+                          style={{ color: active ? BRAND : "transparent" }}
+                        />
                       </button>
                     );
                   })
@@ -454,12 +452,10 @@ export function UnitMobile() {
                                 {a.name}
                               </div>
                             </div>
-                            {active && (
-                              <CheckCircle2
-                                className="mt-0.5 h-5 w-5 shrink-0"
-                                style={{ color: BRAND }}
-                              />
-                            )}
+                            <CheckCircle2
+                              className="mt-0.5 h-5 w-5 shrink-0"
+                              style={{ color: active ? BRAND : "transparent" }}
+                            />
                           </button>
                         );
                       })}
@@ -657,9 +653,7 @@ function RoleCard({
           {description}
         </span>
       </span>
-      {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: "#ffffff" }} />
-      )}
+      <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
     </button>
   );
 }

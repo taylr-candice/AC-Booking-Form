@@ -357,12 +357,10 @@ export function UnitDesktop() {
                                 </div>
                               </div>
                             </div>
-                            {active && (
-                              <CheckCircle2
-                                className="mt-2 h-5 w-5 shrink-0"
-                                style={{ color: BRAND }}
-                              />
-                            )}
+                            <CheckCircle2
+                              className="mt-2 h-5 w-5 shrink-0"
+                              style={{ color: active ? BRAND : "transparent" }}
+                            />
                           </button>
                         );
                       })
@@ -479,12 +477,10 @@ export function UnitDesktop() {
                                     </div>
                                   </div>
                                 </div>
-                                {active && (
-                                  <CheckCircle2
-                                    className="mt-1 h-5 w-5 shrink-0"
-                                    style={{ color: BRAND }}
-                                  />
-                                )}
+                                <CheckCircle2
+                                  className="mt-1 h-5 w-5 shrink-0"
+                                  style={{ color: active ? BRAND : "transparent" }}
+                                />
                               </button>
                             );
                           })}

@@ -267,9 +267,7 @@ function ResidenceCard({
           {subtitle}
         </span>
       </span>
-      {selected && (
-        <CheckCircle2 className="h-5 w-5" style={{ color: "#ffffff" }} />
-      )}
+      <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
     </button>
   );
 }
@@ -325,9 +323,7 @@ function AccessCard({
           {option.subtitle}
         </span>
       </span>
-      {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: "#ffffff" }} />
-      )}
+      <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
     </button>
   );
 }
@@ -607,9 +603,7 @@ function ReturnMethodCard({
           {subtitle}
         </span>
       </span>
-      {selected && (
-        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: "#ffffff" }} />
-      )}
+      <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
     </button>
   );
 }
