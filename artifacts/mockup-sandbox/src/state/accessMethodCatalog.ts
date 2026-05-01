@@ -129,12 +129,13 @@ export function getLeaveKeySubOptions(
       label: "Parcel Locker",
       subtitle: "We'll send you instructions",
     });
+  } else {
+    opts.push({
+      key: "with_taylr",
+      label: "With Taylr",
+      subtitle: "We'll arrange a time",
+    });
   }
-  opts.push({
-    key: "with_taylr",
-    label: "With Taylr",
-    subtitle: "We'll arrange a time",
-  });
   if (features.has_building_manager) {
     opts.push({
       key: "with_building_manager",
