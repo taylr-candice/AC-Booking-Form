@@ -2,10 +2,12 @@ import { Check, X } from "lucide-react";
 import { useModalA11y } from "../../../hooks/use-modal-a11y";
 
 const BRAND = "#ED017F";
-// Iconographic "no" colour for the cross badge on the "do not count"
-// image. Not used as a UI state anywhere else in the customer flow —
-// purely a visual signal so customers can tell at a glance which
-// image is the correct thing to look for.
+// Iconographic do/don't badge colours used only inside this modal so
+// customers can tell at a glance which image is the correct thing
+// to look for. They are NOT used as UI state colours anywhere else
+// in the customer flow — pairing universal-semantic green ("yes")
+// with red ("no") keeps the verdict unambiguous.
+const YES_GREEN = "#16A34A";
 const NO_RED = "#DC2626";
 
 export type ExampleVariant = "split-indoor" | "ducted-filter";
@@ -158,7 +160,7 @@ export function AcExampleModal({
                     className="absolute left-2 top-2 grid h-9 w-9 place-items-center rounded-full text-white shadow-md ring-2 ring-white"
                     style={{
                       backgroundColor:
-                        section.kind === "dont" ? NO_RED : BRAND,
+                        section.kind === "dont" ? NO_RED : YES_GREEN,
                     }}
                   >
                     {section.kind === "dont" ? (
