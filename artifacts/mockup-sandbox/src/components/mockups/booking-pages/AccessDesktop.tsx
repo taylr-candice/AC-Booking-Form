@@ -458,7 +458,7 @@ function TenantsSection({ api }: { api: ReturnType<typeof useTenants> }) {
       <h2 className="text-base font-semibold mb-4" style={{ color: BRAND }}>Tenant details</h2>
       <div className="space-y-4">
         {api.tenants.map((t, idx) => (
-          <div key={t.id} className="relative rounded-2xl border border-slate-200 bg-white p-5">
+          <div key={t.id} className={idx > 0 ? "pt-4 border-t border-slate-100" : ""}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">Tenant {idx + 1}</h3>
               {api.tenants.length > 1 && (

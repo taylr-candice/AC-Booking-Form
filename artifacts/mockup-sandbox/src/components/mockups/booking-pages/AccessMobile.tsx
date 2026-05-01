@@ -629,49 +629,53 @@ function TenantsSection({
         <p className="text-xs text-slate-500 mt-1">We'll contact each tenant to arrange a suitable window.</p>
       </div>
       {tenants.map((t, idx) => (
-        <div key={t.id} className="relative rounded-xl border border-slate-200 bg-slate-50 p-4">
-          {tenants.length > 1 && (
-            <button
-              type="button"
-              aria-label={`Remove tenant ${idx + 1}`}
-              onClick={() => remove(idx)}
-              className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
-              data-testid={`button-remove-tenant-${idx}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
-          <div className="mb-3 text-sm font-medium text-slate-700">Tenant {idx + 1}</div>
-          <div className="grid grid-cols-2 gap-3">
+        <div key={t.id} className={idx > 0 ? "pt-4 border-t border-slate-100" : ""}>
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">Tenant {idx + 1}</span>
+            {tenants.length > 1 && (
+              <button
+                type="button"
+                aria-label={`Remove tenant ${idx + 1}`}
+                onClick={() => remove(idx)}
+                className="text-slate-400 hover:text-slate-600"
+                data-testid={`button-remove-tenant-${idx}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                placeholder="First name"
+                value={t.first}
+                onChange={(e) => update(idx, { first: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                data-testid={`input-tenant-first-${idx}`}
+              />
+              <input
+                placeholder="Last name"
+                value={t.last}
+                onChange={(e) => update(idx, { last: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                data-testid={`input-tenant-last-${idx}`}
+              />
+            </div>
             <input
-              placeholder="First name"
-              value={t.first}
-              onChange={(e) => update(idx, { first: e.target.value })}
+              placeholder="Email"
+              value={t.email}
+              onChange={(e) => update(idx, { email: e.target.value })}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-              data-testid={`input-tenant-first-${idx}`}
+              data-testid={`input-tenant-email-${idx}`}
             />
             <input
-              placeholder="Last name"
-              value={t.last}
-              onChange={(e) => update(idx, { last: e.target.value })}
+              placeholder="Mobile"
+              value={t.phone}
+              onChange={(e) => update(idx, { phone: e.target.value })}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-              data-testid={`input-tenant-last-${idx}`}
+              data-testid={`input-tenant-phone-${idx}`}
             />
           </div>
-          <input
-            placeholder="Email"
-            value={t.email}
-            onChange={(e) => update(idx, { email: e.target.value })}
-            className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-            data-testid={`input-tenant-email-${idx}`}
-          />
-          <input
-            placeholder="Mobile"
-            value={t.phone}
-            onChange={(e) => update(idx, { phone: e.target.value })}
-            className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
-            data-testid={`input-tenant-phone-${idx}`}
-          />
         </div>
       ))}
       <button
