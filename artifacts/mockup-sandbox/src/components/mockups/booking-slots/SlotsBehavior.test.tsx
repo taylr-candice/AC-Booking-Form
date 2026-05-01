@@ -484,6 +484,139 @@ describe.each(VARIANTS)("$name slot picker", ({
     });
   });
 
+  describe("Next available smart-suggestion card (Task #241 follow-up)", () => {
+    it("hides itself when no slot is available (huge job — every window full)", () => {
+      // Huge job (315m) is bigger than every seeded window, so
+      // findNextAvailable returns null and the card + the "Or choose
+      // another day" sub-label both stay out of the DOM.
+      applyScenario("owner", {
+        label: "huge",
+        systems: 7,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+
+      const { queryByTestId } = render(<Component />);
+      const suffix =
+        name === "SlotsMobile"
+          ? "mobile"
+          : name === "SlotsMobileLite"
+            ? "mobile-lite"
+            : "desktop";
+      expect(queryByTestId(`next-available-card-${suffix}`)).toBeNull();
+      expect(
+        queryByTestId(`label-choose-another-day-${suffix}`),
+      ).toBeNull();
+    });
+
+    it("appears above the day picker, exposes the soonest day+window, and one-tap selects day + window + acks the cancellation terms", () => {
+      // Tiny job → every seeded window is bookable, so the card has
+      // a real "next available" pair to render.
+      applyScenario("owner", {
+        label: "tiny",
+        systems: 1,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+
+      const { container, getByTestId } = render(<Component />);
+
+      // Suffix lookup so we can hit the right testIds per variant.
+      const suffix =
+        name === "SlotsMobile"
+          ? "mobile"
+          : name === "SlotsMobileLite"
+            ? "mobile-lite"
+            : "desktop";
+
+      // Card renders above the day picker — verify both exist and
+      // the card is positioned earlier in document order than the
+      // day grid container.
+      const card = getByTestId(`next-available-card-${suffix}`);
+      const dayGrid = getByTestId(`customer-days-${suffix}`);
+      expect(card).not.toBeNull();
+      expect(dayGrid).not.toBeNull();
+      expect(
+        card.compareDocumentPosition(dayGrid) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+
+      // Cancellation ack starts unticked, no slot selected, and the
+      // docked Confirm is therefore disabled.
+      const ack = getByTestId(
+        CANCELLATION_ACK_TESTID_BY_VARIANT[name],
+      ) as HTMLInputElement;
+      const confirm = getByTestId(
+        CONTINUE_TESTID_BY_VARIANT[name],
+      ) as HTMLButtonElement;
+      expect(ack.checked).toBe(false);
+      expect(confirm.disabled).toBe(true);
+      expect(
+        container.querySelectorAll(
+          `button[data-testid^="${slotTestidPrefix}"][aria-pressed="true"]`,
+        ).length,
+      ).toBe(0);
+
+      // Tap the shortcut.
+      const book = getByTestId(`button-book-next-available-${suffix}`);
+      fireEvent.click(book);
+
+      // After one tap: a window slot is selected (aria-pressed=true),
+      // the cancellation terms are acked, and the docked Confirm is
+      // now enabled — the customer has nothing else to tick before
+      // they can move forward.
+      const pressed = container.querySelectorAll<HTMLButtonElement>(
+        `button[data-testid^="${slotTestidPrefix}"][aria-pressed="true"]`,
+      );
+      expect(pressed.length).toBe(1);
+      expect(ack.checked).toBe(true);
+      expect(confirm.disabled).toBe(false);
+    });
+
+    it("renders click-wrap consent microcopy in the same card as the CTA, and the View terms link opens the cancellation modal", () => {
+      // Tiny job → card is renderable, so we can assert its consent
+      // affordances. This guards the legal click-wrap from accidental
+      // removal or layout separation in future refactors.
+      applyScenario("owner", {
+        label: "tiny",
+        systems: 1,
+        additional: 0,
+        ac_discrepancy: null,
+      });
+
+      const { getByTestId, queryByTestId } = render(<Component />);
+      const suffix =
+        name === "SlotsMobile"
+          ? "mobile"
+          : name === "SlotsMobileLite"
+            ? "mobile-lite"
+            : "desktop";
+
+      // Consent line is present and lives inside the same card
+      // container as the Book CTA — so a customer cannot miss it
+      // visually before tapping.
+      const card = getByTestId(`next-available-card-${suffix}`);
+      const consent = getByTestId(`next-available-consent-${suffix}`);
+      const book = getByTestId(`button-book-next-available-${suffix}`);
+      expect(card.contains(consent)).toBe(true);
+      expect(card.contains(book)).toBe(true);
+      expect(consent.textContent ?? "").toMatch(
+        /By tapping.*Book this time.*cancellation and rescheduling terms/,
+      );
+
+      // View terms is a real button (keyboard + screen-reader
+      // reachable, not inert text) and opens the cancellation modal,
+      // so the customer can read the policy before tapping the CTA.
+      expect(queryByTestId("modal-cancellation-terms")).toBeNull();
+      const viewTerms = getByTestId(
+        `button-view-next-available-terms-${suffix}`,
+      );
+      expect(viewTerms.tagName).toBe("BUTTON");
+      fireEvent.click(viewTerms);
+      expect(queryByTestId("modal-cancellation-terms")).not.toBeNull();
+    });
+  });
+
   describe("legacy reason text never appears on enabled tiles", () => {
     it("never renders the legacy reason text on enabled tiles either", () => {
       // A small job (45m) fits every seeded window, so every revealed

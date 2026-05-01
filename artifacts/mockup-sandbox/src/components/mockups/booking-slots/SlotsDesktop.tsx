@@ -19,11 +19,12 @@ import {
   unitCity,
 } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
-import { type CustomerSlot } from "./customerSlotData";
+import { findNextAvailable, type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
+import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
 
@@ -57,6 +58,21 @@ export function SlotsDesktop() {
     () => visibleDays.find((d) => d.date === selectedDate) ?? null,
     [visibleDays, selectedDate],
   );
+
+  // Smart "Next available" suggestion + one-tap handler. The card
+  // sits above the day picker and lets the customer book the soonest
+  // window in a single tap (selects day, selects window, ack terms).
+  const nextAvailable = useMemo(
+    () => findNextAvailable(visibleDays),
+    [visibleDays],
+  );
+  const pickSlotOneTap = (iso: string, slotId: string) => {
+    setSelectedDate(iso);
+    setSelectedSlotId(slotId);
+    if (!cancellationAck) {
+      bookingActions.setCancellationAcknowledged(true);
+    }
+  };
 
   useEffect(() => {
     if (selectedDate && !activeDay) {
@@ -161,10 +177,31 @@ export function SlotsDesktop() {
 
             {rollout && !lockedByOther && (
               <>
-                {/* Full-month calendar with per-day availability dots
-                    — Su–Sa grid, prev/next month nav, and a glanceable
-                    three-segment indicator (one micro-dot per window)
-                    so the customer can scan an entire month at once. */}
+                {/* Smart "Next available" suggestion — sits above the
+                    day picker so the customer sees the soonest
+                    bookable window first. Tapping the card selects
+                    the day, selects the window, and ack's the
+                    cancellation terms in one action. */}
+                {nextAvailable && (
+                  <NextAvailableCard
+                    day={nextAvailable.day}
+                    slot={nextAvailable.slot}
+                    onPick={pickSlotOneTap}
+                    onViewTerms={() => setTermsOpen(true)}
+                    size="regular"
+                    testIdSuffix="desktop"
+                  />
+                )}
+
+                {nextAvailable && (
+                  <div
+                    className="mt-5 mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                    data-testid="label-choose-another-day-desktop"
+                  >
+                    Or choose another day
+                  </div>
+                )}
+
                 <CustomerAvailableDays
                   days={visibleDays}
                   selectedDate={selectedDate}

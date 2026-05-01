@@ -203,6 +203,41 @@ export function dayHasAvailable(day: CustomerDay): boolean {
   return dayWindows(day).some((s) => s.status === "available");
 }
 
+/**
+ * Returns the soonest `(day, slot)` pair the customer could book —
+ * i.e. the first available window on the first available day in the
+ * (already past-filtered) `visibleDays` list.
+ *
+ * Powers the "Next available" smart-suggestion card that sits above
+ * the day picker. The card is the customer's one-tap shortcut: it
+ * shows the date / window / time, and tapping it selects the day,
+ * selects the window, and acknowledges the cancellation terms in a
+ * single action.
+ *
+ * Returns `null` when no day in the rollout has any available window
+ * — in that case the smart-suggestion card hides itself and the
+ * customer falls back to the day picker (which will itself be empty
+ * or fully muted).
+ */
+export function findNextAvailable(
+  days: ReadonlyArray<CustomerDay>,
+): { day: CustomerDay; slot: CustomerSlot } | null {
+  for (const day of days) {
+    const slot = dayWindows(day).find((s) => s.status === "available");
+    if (slot) return { day, slot };
+  }
+  return null;
+}
+
+/** Display label for a window — used by the next-available card and
+ *  any other surface that needs to render the window name in body
+ *  copy ("Friday 1 May · Afternoon"). */
+export function windowDisplayLabel(window: CustomerSlot["window"]): string {
+  if (window === "morning") return "Morning";
+  if (window === "afternoon") return "Afternoon";
+  return "Evening";
+}
+
 /** Short, human-friendly label for an access method, used by the
  *  slot picker's "Access: <label> · Change" recap line. Returns a
  *  generic "I'll be there" when access hasn't been picked yet so the

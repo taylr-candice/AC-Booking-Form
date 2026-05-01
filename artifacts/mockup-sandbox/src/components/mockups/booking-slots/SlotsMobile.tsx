@@ -17,11 +17,12 @@ import {
 } from "../../../state/bookingSession";
 import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
-import { type CustomerSlot } from "./customerSlotData";
+import { findNextAvailable, type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
+import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
 
@@ -54,6 +55,25 @@ export function SlotsMobile() {
     () => visibleDays.find((d) => d.date === selectedDate) ?? null,
     [visibleDays, selectedDate],
   );
+
+  // Smart "Next available" suggestion — the soonest day+window the
+  // customer could book. Drives the one-tap shortcut card above the
+  // day picker; hides itself when nothing is available.
+  const nextAvailable = useMemo(
+    () => findNextAvailable(visibleDays),
+    [visibleDays],
+  );
+
+  // One-tap handler shared by the NextAvailableCard: select the day,
+  // select the window, and ack the cancellation terms in a single
+  // action so the customer has nothing else to remember to tick.
+  const pickSlotOneTap = (iso: string, slotId: string) => {
+    setSelectedDate(iso);
+    setSelectedSlotId(slotId);
+    if (!cancellationAck) {
+      bookingActions.setCancellationAcknowledged(true);
+    }
+  };
 
   // If the active day is no longer in view (rolled past, etc.), clear it.
   useEffect(() => {
@@ -164,10 +184,35 @@ export function SlotsMobile() {
           </div>
         ) : (
           <>
-            {/* Full-month calendar — Su–Sa grid with per-day
-                availability indicators (one micro-dot per window).
-                Replaces the previous flat 4-col day strip so the
-                customer can scan an entire month at a glance. */}
+            {/* Smart "Next available" suggestion — sits above the
+                day picker as a one-tap shortcut to the soonest
+                available window. Quiet pink-50 card so it reads
+                as a hint, not a hero banner. */}
+            {nextAvailable && (
+              <div className="mt-1">
+                <NextAvailableCard
+                  day={nextAvailable.day}
+                  slot={nextAvailable.slot}
+                  onPick={pickSlotOneTap}
+                  onViewTerms={() => setTermsOpen(true)}
+                  size="compact"
+                  testIdSuffix="mobile"
+                />
+              </div>
+            )}
+
+            {/* "Or choose another day" — the secondary path: customer
+                browses the available-day strip if the next-available
+                shortcut isn't the one they want. */}
+            {nextAvailable && (
+              <div
+                className="mt-3 mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                data-testid="label-choose-another-day-mobile"
+              >
+                Or choose another day
+              </div>
+            )}
+
             <CustomerAvailableDays
               days={visibleDays}
               selectedDate={selectedDate}

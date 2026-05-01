@@ -17,11 +17,12 @@ import {
 } from "../../../state/bookingSession";
 import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
-import { type CustomerSlot } from "./customerSlotData";
+import { findNextAvailable, type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
+import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
 
@@ -51,6 +52,21 @@ export function SlotsMobileLite() {
     () => visibleDays.find((d) => d.date === selectedDate) ?? null,
     [visibleDays, selectedDate],
   );
+
+  // Smart "Next available" suggestion + one-tap handler — see
+  // SlotsMobile for the design rationale; identical wiring here so
+  // every customer-facing slot picker keeps the same shortcut.
+  const nextAvailable = useMemo(
+    () => findNextAvailable(visibleDays),
+    [visibleDays],
+  );
+  const pickSlotOneTap = (iso: string, slotId: string) => {
+    setSelectedDate(iso);
+    setSelectedSlotId(slotId);
+    if (!cancellationAck) {
+      bookingActions.setCancellationAcknowledged(true);
+    }
+  };
 
   useEffect(() => {
     if (selectedDate && !activeDay) {
@@ -156,8 +172,28 @@ export function SlotsMobileLite() {
           </div>
         ) : (
           <>
-            {/* Full-month calendar — Su–Sa grid with per-day
-                availability indicators (one micro-dot per window). */}
+            {nextAvailable && (
+              <div className="mt-1">
+                <NextAvailableCard
+                  day={nextAvailable.day}
+                  slot={nextAvailable.slot}
+                  onPick={pickSlotOneTap}
+                  onViewTerms={() => setTermsOpen(true)}
+                  size="compact"
+                  testIdSuffix="mobile-lite"
+                />
+              </div>
+            )}
+
+            {nextAvailable && (
+              <div
+                className="mt-3 mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                data-testid="label-choose-another-day-mobile-lite"
+              >
+                Or choose another day
+              </div>
+            )}
+
             <CustomerAvailableDays
               days={visibleDays}
               selectedDate={selectedDate}
