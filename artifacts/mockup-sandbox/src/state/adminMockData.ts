@@ -3631,10 +3631,10 @@ const RL_ANZAC_DAYS: RolloutDay[] = [
   makeSlotCountDay("2026-04-29", 5, 5, 5),
   makeSlotCountDay("2026-04-30", 5, 5, 5),
   makeSlotCountDay("2026-05-01", 5, 5, 3),
-  makeSlotCountDay("2026-05-04", 5, 4, 5),
+  makeSlotCountDay("2026-05-04", 5, 4, 5, { evening: { booked: 0 } }),
   makeSlotCountDay("2026-05-05", 5, 2, 5),
-  makeSlotCountDay("2026-05-06", 5, 0, 4),
-  makeSlotCountDay("2026-05-07", 5, 0, 0),
+  makeSlotCountDay("2026-05-06", 5, 0, 4, { evening: { booked: 0 } }),
+  makeSlotCountDay("2026-05-07", 5, 0, 0, { evening: { booked: 0 } }),
   makeSlotCountDay("2026-05-08", 5, 0, 0),
 ];
 
