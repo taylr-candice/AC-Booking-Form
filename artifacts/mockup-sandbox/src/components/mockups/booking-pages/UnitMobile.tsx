@@ -635,9 +635,9 @@ function RoleCard({
     >
       <span
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-          selected ? "text-white" : "bg-slate-100 text-slate-700"
+          selected ? "bg-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
