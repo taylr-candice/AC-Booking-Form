@@ -243,13 +243,15 @@ export function SlotsMobile() {
                     />
                   )}
                 </div>
+              </div>
+            )}
 
-                {selectedSlotId && (
-                  <SlotsAccessNotesDisclosure
-                    size="compact"
-                    testIdSuffix="mobile"
-                  />
-                )}
+            {selectedSlotId && (
+              <div className="mt-3">
+                <SlotsAccessNotesDisclosure
+                  size="compact"
+                  testIdSuffix="mobile"
+                />
               </div>
             )}
           </>

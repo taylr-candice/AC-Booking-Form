@@ -245,13 +245,15 @@ export function SlotsDesktop() {
                         />
                       )}
                     </div>
+                  </div>
+                )}
 
-                    {selectedSlotId && (
-                      <SlotsAccessNotesDisclosure
-                        size="regular"
-                        testIdSuffix="desktop"
-                      />
-                    )}
+                {selectedSlotId && (
+                  <div className="mt-4">
+                    <SlotsAccessNotesDisclosure
+                      size="regular"
+                      testIdSuffix="desktop"
+                    />
                   </div>
                 )}
               </>
