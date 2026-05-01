@@ -55,6 +55,7 @@ function baseState(overrides: Partial<BookingState> = {}): BookingState {
     num_additional_indoor: 0,
     primary_residence: null,
     access_method: null,
+    leave_key_sub_method: null,
     key_holder_name: "",
     key_holder_phone: "",
     key_collection_location: "",
@@ -167,6 +168,9 @@ describe("isStep5Valid — leave-key family", () => {
         role: "owner",
         primary_residence: residence,
         access_method: method,
+        // Must choose a sub-option; "with_someone" is the attended path that
+        // also requires key-holder contact details.
+        leave_key_sub_method: "with_someone",
         key_holder_name: "Alex Smith",
         key_holder_phone: "0400 000 000",
       });

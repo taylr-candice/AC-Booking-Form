@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
-import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, signatureVariantFor, isStep5Valid, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
 const BRAND = "#ED017F";
@@ -13,6 +13,7 @@ export function AccessDesktop() {
   const role = session.role;
   const residence = session.primary_residence;
   const access = session.access_method;
+  const leaveKeySub = session.leave_key_sub_method;
   const opts = getAccessOptions(role, residence);
   const tenants = useTenants(isTenantMethod(access));
   const valid = isStep5Valid(session);
@@ -75,11 +76,11 @@ export function AccessDesktop() {
                   <AgentTenantCoordinationSection access={access} />
                 )}
                 {(() => { const n = infoNoteFor(access); return n ? <InfoBanner title={n.title} body={n.body} /> : null; })()}
-                {isLeaveKeyMethod(access) && <KeyHolderSection />}
+                {isLeaveKeyMethod(access) && <LeaveKeySubMethodSection />}
                 {isCollectReturnMethod(access) && <CollectReturnSection />}
                 {isManagingAgentMethod(access) && <ManagingAgencySection />}
                 {isTenantMethod(access) && <TenantsSection api={tenants} />}
-                {(() => { const s = signatureVariantFor(access); return s ? <SignatureSection title={s.title} body={s.body} /> : null; })()}
+                {(() => { const s = signatureVariantFor(access, leaveKeySub); return s ? <SignatureSection title={s.title} body={s.body} /> : null; })()}
 
               </>
             )}
@@ -334,30 +335,77 @@ function InfoBanner({ title, body }: { title: string; body: string }) {
   );
 }
 
-function KeyHolderSection() {
-  const name = useBookingSelector((s) => s.key_holder_name);
-  const phone = useBookingSelector((s) => s.key_holder_phone);
+function LeaveKeySubMethodSection() {
+  const features = useBuildingFeatures();
+  const subOptions = getLeaveKeySubOptions(features);
+  const sub = useBookingSelector((s) => s.leave_key_sub_method);
+  const keyHolderName = useBookingSelector((s) => s.key_holder_name);
+  const keyHolderPhone = useBookingSelector((s) => s.key_holder_phone);
+  const note = infoNoteForLeaveKeySub(sub);
+
   return (
-    <div className="mb-8">
-      <h2 className="text-base font-semibold mb-4" style={{ color: BRAND }}>Key holder details</h2>
-      <div className="grid grid-cols-2 gap-4">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => bookingActions.setKeyHolder({ key_holder_name: e.target.value })}
-          placeholder="Key holder full name"
-          data-testid="input-key-holder-name"
-          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
-        />
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => bookingActions.setKeyHolder({ key_holder_phone: e.target.value })}
-          placeholder="Key holder mobile"
-          data-testid="input-key-holder-phone"
-          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
-        />
+    <div className="mb-8 space-y-5">
+      <h2 className="text-base font-semibold" style={{ color: BRAND }}>
+        How will the key be left?
+      </h2>
+
+      {/* Sub-option cards */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {subOptions.map((opt: LeaveKeySubOption) => {
+          const selected = sub === opt.key;
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => bookingActions.setLeaveKeySubMethod(opt.key)}
+              className="flex items-center gap-3 rounded-2xl border p-4 text-left transition"
+              style={selected ? { background: SELECTED_BG, borderColor: "transparent" } : { borderColor: "#E2E8F0" }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold ${selected ? "text-white" : "text-slate-900"}`}>
+                  {opt.label}
+                </p>
+                <p className={`text-xs mt-0.5 ${selected ? "text-white/80" : "text-slate-500"}`}>
+                  {opt.subtitle}
+                </p>
+              </div>
+              <CheckCircle2
+                size={18}
+                className="shrink-0"
+                style={{ color: selected ? "white" : "transparent" }}
+              />
+            </button>
+          );
+        })}
       </div>
+
+      {/* Contextual info note */}
+      {note && <InfoBanner title={note.title} body={note.body} />}
+
+      {/* Key holder inputs — only for "with someone" */}
+      {sub === "with_someone" && (
+        <div>
+          <p className="text-sm font-medium text-slate-700 mb-3">Key holder contact</p>
+          <div className="grid grid-cols-2 gap-4">
+            <input
+              type="text"
+              value={keyHolderName}
+              onChange={(e) => bookingActions.setKeyHolder({ key_holder_name: e.target.value })}
+              placeholder="Key holder full name"
+              data-testid="input-key-holder-name"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+            />
+            <input
+              type="tel"
+              value={keyHolderPhone}
+              onChange={(e) => bookingActions.setKeyHolder({ key_holder_phone: e.target.value })}
+              placeholder="Key holder mobile"
+              data-testid="input-key-holder-phone"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

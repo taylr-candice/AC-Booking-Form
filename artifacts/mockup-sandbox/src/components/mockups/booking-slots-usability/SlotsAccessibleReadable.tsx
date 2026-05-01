@@ -69,7 +69,8 @@ export function SlotsAccessibleReadable() {
   const isUnsure = session.ac_discrepancy?.customer.type === "unsure";
 
   const accessMethod = session.access_method;
-  const unattended = isUnattendedAccessMethod(accessMethod);
+  const leaveKeySub = session.leave_key_sub_method;
+  const unattended = isUnattendedAccessMethod(accessMethod, leaveKeySub);
   const selfAttended = isBeThereMethod(accessMethod);
   const accessMode = unattended
     ? "unattended"

@@ -9,10 +9,13 @@ import {
   bookingActions,
   useBookingSelector,
   type AccessMethod,
+  type LeaveKeySubMethod,
   type PrimaryResidence,
   type Role,
   type Tenant,
 } from "./bookingSession";
+
+export type { LeaveKeySubMethod };
 
 export type AccessOption = {
   key: AccessMethod;
@@ -20,26 +23,26 @@ export type AccessOption = {
   subtitle: string;
 };
 
+// Parcel-locker options are no longer top-level cards — they appear as a
+// sub-option under the "Leave Key" card when the building has a Taylr locker.
+
 export const OWNER_LIVE_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_live_at_unit",        label: "I'll be at the unit",                subtitle: "I'll meet the technician at the property" },
-  { key: "owner_live_leave_key",      label: "I'll leave a key with someone",      subtitle: "Tell us who has the key" },
-  { key: "owner_live_parcel_locker",  label: "Leave a key in the parcel locker",   subtitle: "We'll send a drop code before your service" },
-  { key: "owner_live_collect",        label: "Please collect and return my key",   subtitle: "Taylr collects, services, then returns" },
+  { key: "owner_live_at_unit",   label: "I'll be at the unit",              subtitle: "I'll meet the technician at the property" },
+  { key: "owner_live_leave_key", label: "Leave a key",                      subtitle: "Choose how the tech gets access" },
+  { key: "owner_live_collect",   label: "Please collect and return my key", subtitle: "Taylr collects, services, then returns" },
 ];
 
 export const OWNER_LEASED_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_leased_be_there",      label: "I'll be there to provide access",   subtitle: "I'll meet the technician at the property" },
-  { key: "owner_leased_tenant",        label: "Arrange with tenant",               subtitle: "We'll contact your tenant to coordinate" },
-  { key: "owner_leased_agent",         label: "Arrange with agent",                subtitle: "Your managing agent will coordinate access" },
-  { key: "owner_leased_leave_key",     label: "I'll leave a key with someone",     subtitle: "Tell us who has the key" },
-  { key: "owner_leased_parcel_locker", label: "Leave a key in the parcel locker",  subtitle: "We'll send a drop code before your service" },
+  { key: "owner_leased_be_there",  label: "I'll be there to provide access", subtitle: "I'll meet the technician at the property" },
+  { key: "owner_leased_tenant",    label: "Arrange with tenant",             subtitle: "We'll contact your tenant to coordinate" },
+  { key: "owner_leased_agent",     label: "Arrange with agent",              subtitle: "Your managing agent will coordinate access" },
+  { key: "owner_leased_leave_key", label: "Leave a key",                     subtitle: "Choose how the tech gets access" },
 ];
 
 export const OWNER_VACANT_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_vacant_be_there",      label: "I'll be there to provide access",   subtitle: "I'll meet the technician at the property" },
-  { key: "owner_vacant_leave_key",     label: "I'll leave a key with someone",     subtitle: "e.g. concierge, neighbour, building manager" },
-  { key: "owner_vacant_parcel_locker", label: "Leave a key in the parcel locker",  subtitle: "We'll send a drop code before your service" },
-  { key: "owner_vacant_collect",       label: "Please collect and return my key",  subtitle: "Taylr collects, services, then returns" },
+  { key: "owner_vacant_be_there",  label: "I'll be there to provide access", subtitle: "I'll meet the technician at the property" },
+  { key: "owner_vacant_leave_key", label: "Leave a key",                     subtitle: "Choose how the tech gets access" },
+  { key: "owner_vacant_collect",   label: "Please collect and return my key", subtitle: "Taylr collects, services, then returns" },
 ];
 
 // For agents we present a single "Tenants will provide access" card. Once
@@ -64,6 +67,104 @@ export function getAccessOptions(
   return [];
 }
 
+// ─── Building feature flags (drives leave-key sub-options) ───────────────────
+
+/** Feature flags recorded against a building.  In production these come
+ *  from the buildings table.  In the mockup, `DEMO_BUILDING_FEATURES`
+ *  enables every option so the full UI can be explored. */
+export type BuildingFeatures = {
+  /** A Taylr-managed parcel locker is installed on-site. */
+  has_parcel_locker: boolean;
+  /** There is a manned concierge desk on-site. */
+  has_concierge: boolean;
+  /** Human-readable hours string shown as the sub-option subtitle,
+   *  e.g. `"Mon–Fri 8am–8pm"`.  Null if `has_concierge` is false. */
+  concierge_hours: string | null;
+  /** There is a full-time building manager on-site. */
+  has_building_manager: boolean;
+  /** Human-readable hours string, e.g. `"Mon–Fri 7am–7pm"`.
+   *  Null if `has_building_manager` is false. */
+  building_manager_hours: string | null;
+};
+
+/** Demo building used throughout the mockup — all optional features enabled. */
+export const DEMO_BUILDING_FEATURES: BuildingFeatures = {
+  has_parcel_locker: true,
+  has_concierge: true,
+  concierge_hours: "Mon–Fri 8am–8pm",
+  has_building_manager: true,
+  building_manager_hours: "Mon–Fri 7am–7pm",
+};
+
+/** Returns the demo building features.  In a real app this would be an
+ *  async lookup keyed to the unit's building id. */
+export function useBuildingFeatures(): BuildingFeatures {
+  return DEMO_BUILDING_FEATURES;
+}
+
+// ─── Leave-key sub-options ───────────────────────────────────────────────────
+
+export type LeaveKeySubOption = {
+  key: LeaveKeySubMethod;
+  label: string;
+  subtitle: string;
+};
+
+/** Returns the ordered list of leave-key sub-options available for this
+ *  building.  "With someone" and "With Taylr" are always present; the
+ *  remaining three depend on building feature flags. */
+export function getLeaveKeySubOptions(
+  features: BuildingFeatures,
+): readonly LeaveKeySubOption[] {
+  const opts: LeaveKeySubOption[] = [
+    {
+      key: "with_someone",
+      label: "With someone",
+      subtitle: "e.g. neighbour, friend, or family member on the day",
+    },
+  ];
+  if (features.has_parcel_locker) {
+    opts.push({
+      key: "with_parcel_locker",
+      label: "In the parcel locker",
+      subtitle: "We'll send a unique drop code 24 h before your service",
+    });
+  }
+  opts.push({
+    key: "with_taylr",
+    label: "With Taylr",
+    subtitle: "We'll arrange a time to collect from you before the service",
+  });
+  if (features.has_building_manager) {
+    opts.push({
+      key: "with_building_manager",
+      label: "With the building manager",
+      subtitle: features.building_manager_hours ?? "During business hours",
+    });
+  }
+  if (features.has_concierge) {
+    opts.push({
+      key: "with_concierge",
+      label: "With concierge",
+      subtitle: features.concierge_hours ?? "During concierge hours",
+    });
+  }
+  return opts;
+}
+
+/** True for leave-key sub-methods where the technician accesses the unit
+ *  unattended — i.e. everyone except "with_someone". */
+export function isUnattendedLeaveKeySub(
+  sub: LeaveKeySubMethod | null,
+): boolean {
+  return (
+    sub === "with_parcel_locker" ||
+    sub === "with_taylr" ||
+    sub === "with_building_manager" ||
+    sub === "with_concierge"
+  );
+}
+
 // ─── Predicates ─────────────────────────────────────────────────────────────
 
 export function isLeaveKeyMethod(m: AccessMethod | null): boolean {
@@ -74,6 +175,10 @@ export function isLeaveKeyMethod(m: AccessMethod | null): boolean {
   );
 }
 
+/** Kept for backward-compat with existing tests and `accessOnTheDayDescription`.
+ *  Parcel locker is no longer a top-level access card — it is now a
+ *  sub-option under Leave Key — so this predicate should not be used for
+ *  new UI gating logic; use `isUnattendedLeaveKeySub` instead. */
 export function isParcelLockerMethod(m: AccessMethod | null): boolean {
   return (
     m === "owner_live_parcel_locker" ||
@@ -98,12 +203,18 @@ export function isBeThereMethod(m: AccessMethod | null): boolean {
 }
 
 /** Methods where no one needs to be on-site during the service window —
- *  the customer authorises Taylr to access the unit unattended. Used by
- *  the slot picker to swap the "be available for the entire window"
- *  warning for the lighter "you're authorising us to access the unit"
- *  framing, and to suppress the "Change access method" nudge for
- *  customers who already picked a convenient option. */
-export function isUnattendedAccessMethod(m: AccessMethod | null): boolean {
+ *  the customer authorises Taylr to access the unit unattended.
+ *
+ *  For leave-key methods the result depends on the sub-option: only
+ *  `with_someone` is attended; all other sub-options (parcel locker,
+ *  with Taylr, building manager, concierge) are unattended.  Pass
+ *  `leaveKeySub` when calling for a leave-key method; omit (or pass
+ *  null) for all other methods. */
+export function isUnattendedAccessMethod(
+  m: AccessMethod | null,
+  leaveKeySub?: LeaveKeySubMethod | null,
+): boolean {
+  if (isLeaveKeyMethod(m)) return isUnattendedLeaveKeySub(leaveKeySub ?? null);
   return (
     isParcelLockerMethod(m) ||
     isCollectReturnMethod(m) ||
@@ -116,21 +227,27 @@ export function isUnattendedAccessMethod(m: AccessMethod | null): boolean {
  *  the wording always references the right person:
  *
  *    - `"self"`        → the customer themselves (be-there options)
- *    - `"key_holder"`  → the nominated key holder (leave-key options)
- *    - `"tenant"`      → the tenant (only `agent_tenant_self`, where
- *                         the agent picks the slot and tells the tenant)
+ *    - `"key_holder"`  → the nominated key holder (leave-key + with_someone)
+ *    - `"tenant"`      → the tenant (only `agent_tenant_self`)
  *
- *  Returns `null` for unattended methods (parcel locker, collect &
- *  return, agency trade key) and for methods that never reach the
- *  slot picker at all (managing-agent + tenant coordination flows
- *  skip Step 5). */
+ *  Returns `null` for unattended methods and for methods that never reach
+ *  the slot picker (managing-agent + tenant coordination flows skip
+ *  Step 5).  For leave-key methods, also pass the chosen sub-option. */
 export type AttendedParty = "self" | "key_holder" | "tenant";
 
 export function attendedPartyFor(
   m: AccessMethod | null,
+  leaveKeySub?: LeaveKeySubMethod | null,
 ): AttendedParty | null {
   if (isBeThereMethod(m)) return "self";
-  if (isLeaveKeyMethod(m)) return "key_holder";
+  if (isLeaveKeyMethod(m)) {
+    // Only "with someone" is attended; sub-option not yet chosen → treat
+    // as attended (key_holder) so the banner copy stays sensible.
+    if (leaveKeySub === null || leaveKeySub === undefined || leaveKeySub === "with_someone") {
+      return "key_holder";
+    }
+    return null; // unattended sub-methods
+  }
   if (m === "agent_tenant_self") return "tenant";
   return null;
 }
@@ -215,14 +332,27 @@ export const SIG_TENANT = `By signing below I authorise Taylr to contact the ten
 
 export const SIG_PARCEL_LOCKER = `By signing below I authorise Taylr to retrieve the key from the nominated parcel locker, use it to access the unit at the address provided, perform the booked service, and return the key to the parcel locker afterwards. I confirm I am authorised to grant this access and that the unit's occupants (where applicable) have been made aware that essential air-conditioning maintenance access may occur unattended during the booked service window.`;
 
+export const SIG_LEAVE_KEY_UNATTENDED = `By signing below I authorise Taylr to collect the key as arranged and use it to access the unit at the nominated address, perform the booked service, and secure the key afterwards. I confirm I have the right to grant this unattended access and that any occupants (where applicable) have been made aware that essential air-conditioning maintenance may occur unattended during the booked service window.`;
+
 export type SignatureVariant = {
   title: string;
   body: string;
 };
 
+/** Returns the signature block required for the given access method.
+ *  For leave-key methods, also pass the chosen `leaveKeySub` so the
+ *  function can determine whether unattended access is being authorised. */
 export function signatureVariantFor(
   method: AccessMethod | null,
+  leaveKeySub?: LeaveKeySubMethod | null,
 ): SignatureVariant | null {
+  // Leave-key: only unattended sub-methods require a signature.
+  if (isLeaveKeyMethod(method)) {
+    if (isUnattendedLeaveKeySub(leaveKeySub ?? null)) {
+      return { title: "Access authorisation", body: SIG_LEAVE_KEY_UNATTENDED };
+    }
+    return null;
+  }
   switch (method) {
     case "owner_live_collect":
     case "owner_vacant_collect":
@@ -250,20 +380,8 @@ export type InfoNote = {
 
 export function infoNoteFor(method: AccessMethod | null): InfoNote | null {
   switch (method) {
-    case "owner_live_leave_key":
-    case "owner_leased_leave_key":
-    case "owner_vacant_leave_key":
-      return {
-        title: "Leaving a key",
-        body: "Leave the key with someone reachable on the day. We'll text the key holder when the technician is on the way and again once we've left.",
-      };
-    case "owner_live_parcel_locker":
-    case "owner_leased_parcel_locker":
-    case "owner_vacant_parcel_locker":
-      return {
-        title: "You'll receive a drop code",
-        body: "We'll email you a unique parcel-locker code 24 hours before your service window. Place the key in the locker before the technician arrives.",
-      };
+    // Leave-key notes are now surfaced inline inside LeaveKeySubMethodSection
+    // (one note per sub-option) rather than as a generic top-level banner.
     case "owner_live_collect":
     case "owner_vacant_collect":
       return {
@@ -285,6 +403,44 @@ export function infoNoteFor(method: AccessMethod | null): InfoNote | null {
       return {
         title: "Collect & return your agency trade key",
         body: "Taylr collects the trade key from your agency office before the service window, performs the service, and returns the key to your office afterwards. A chain-of-custody record is kept and shared with you on completion — a super convenient option that doesn't require anyone to be on-site.",
+      };
+    default:
+      return null;
+  }
+}
+
+/** Contextual info note shown inside the LeaveKeySubMethodSection once the
+ *  user has chosen a sub-option.  Returns null for sub-methods that are
+ *  self-explanatory (building manager, concierge — the subtitle carries
+ *  the hours and that is enough context). */
+export function infoNoteForLeaveKeySub(
+  sub: LeaveKeySubMethod | null,
+): InfoNote | null {
+  switch (sub) {
+    case "with_someone":
+      return {
+        title: "Key holder on the day",
+        body: "The person you nominate must be reachable on the day. We'll text them when the technician is on the way and again once we've finished.",
+      };
+    case "with_parcel_locker":
+      return {
+        title: "You'll receive a drop code",
+        body: "We'll email you a unique parcel-locker code 24 hours before your service window. Place the key in the locker before the technician arrives — we'll return it the same way.",
+      };
+    case "with_taylr":
+      return {
+        title: "We'll co-ordinate collection",
+        body: "After you confirm, our team will reach out to arrange a time to collect the key from you at the property — typically the day before your service window.",
+      };
+    case "with_building_manager":
+      return {
+        title: "Leave it with your building manager",
+        body: "Drop the key at the building manager's office during their business hours. We'll collect it before the service window and return it the same day.",
+      };
+    case "with_concierge":
+      return {
+        title: "Leave it at the concierge desk",
+        body: "Drop the key at the concierge desk during concierge hours. We'll collect it before the service window and return it to the desk the same day.",
       };
     default:
       return null;
@@ -336,21 +492,31 @@ export function isStep5Valid(s: BookingState): boolean {
   const inAgentTenantPair =
     s.role === "agent" &&
     (s.access_method === "agent_tenant_self" || s.access_method === "agent_tenant_taylr");
-  if (!inOptions && !inAgentTenantPair) return false;
+  // Legacy parcel-locker methods are no longer shown as top-level cards but
+  // remain valid endpoints for stored booking state (backward compat).
+  const isLegacyParcelLocker = isParcelLockerMethod(s.access_method);
+  if (!inOptions && !inAgentTenantPair && !isLegacyParcelLocker) return false;
 
   // Layer C
   if (isLeaveKeyMethod(s.access_method)) {
-    return (
-      s.key_holder_name.trim().length > 0 &&
-      s.key_holder_phone.trim().length > 0
-    );
+    // Must have chosen a sub-option.
+    if (!s.leave_key_sub_method) return false;
+
+    if (s.leave_key_sub_method === "with_someone") {
+      // Attended — needs key holder contact details.
+      return (
+        s.key_holder_name.trim().length > 0 &&
+        s.key_holder_phone.trim().length > 0
+      );
+    }
+
+    // All unattended sub-options require the access-authorisation signature.
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
   }
 
+  // Legacy parcel-locker access methods (no longer shown as top-level cards
+  // but kept here so any stored state remains valid).
   if (isParcelLockerMethod(s.access_method)) {
-    // Parcel-locker methods are unattended — the customer authorises Taylr
-    // to retrieve the key, access the unit, and return the key. The
-    // signature lives on the access step so the slot picker doesn't need
-    // to add a separate checkbox down the line.
     return s.signature_acknowledged && s.signature_name.trim().length > 0;
   }
 

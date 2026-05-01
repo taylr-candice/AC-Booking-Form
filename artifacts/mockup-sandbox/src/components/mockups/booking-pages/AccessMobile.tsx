@@ -29,10 +29,15 @@ import {
   isManagingAgentMethod,
   isTenantMethod,
   infoNoteFor,
+  infoNoteForLeaveKeySub,
   signatureVariantFor,
   isStep5Valid,
   useTenants,
+  useBuildingFeatures,
+  getLeaveKeySubOptions,
+  isUnattendedLeaveKeySub,
   type AccessOption,
+  type LeaveKeySubOption,
 } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
@@ -45,6 +50,7 @@ export function AccessMobile() {
   const role = session.role;
   const residence = session.primary_residence;
   const access = session.access_method;
+  const leaveKeySub = session.leave_key_sub_method;
   const opts = getAccessOptions(role, residence);
   const tenants = useTenants(isTenantMethod(access));
   const valid = isStep5Valid(session);
@@ -119,11 +125,11 @@ export function AccessMobile() {
               <AgentTenantCoordinationSection access={access} />
             )}
             {(() => { const n = infoNoteFor(access); return n ? <InfoBanner title={n.title} body={n.body} /> : null; })()}
-            {isLeaveKeyMethod(access) && <KeyHolderSection />}
+            {isLeaveKeyMethod(access) && <LeaveKeySubMethodSection />}
             {isCollectReturnMethod(access) && <CollectReturnSection />}
             {isManagingAgentMethod(access) && <ManagingAgencySection />}
             {isTenantMethod(access) && <TenantsSection api={tenants} />}
-            {(() => { const s = signatureVariantFor(access); return s ? <SignatureSection title={s.title} body={s.body} /> : null; })()}
+            {(() => { const s = signatureVariantFor(access, leaveKeySub); return s ? <SignatureSection title={s.title} body={s.body} /> : null; })()}
 
           </>
         )}
@@ -479,30 +485,75 @@ function InfoBanner({ title, body }: { title: string; body: string }) {
   );
 }
 
-function KeyHolderSection() {
-  const name = useBookingSelector((s) => s.key_holder_name);
-  const phone = useBookingSelector((s) => s.key_holder_phone);
+function LeaveKeySubMethodSection() {
+  const features = useBuildingFeatures();
+  const subOptions = getLeaveKeySubOptions(features);
+  const sub = useBookingSelector((s) => s.leave_key_sub_method);
+  const keyHolderName = useBookingSelector((s) => s.key_holder_name);
+  const keyHolderPhone = useBookingSelector((s) => s.key_holder_phone);
+  const note = infoNoteForLeaveKeySub(sub);
+
   return (
-    <div className="mb-6">
-      <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>Key holder details</h2>
-      <div className="space-y-3">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => bookingActions.setKeyHolder({ key_holder_name: e.target.value })}
-          placeholder="Key holder full name"
-          data-testid="input-key-holder-name"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
-        />
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => bookingActions.setKeyHolder({ key_holder_phone: e.target.value })}
-          placeholder="Key holder mobile"
-          data-testid="input-key-holder-phone"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
-        />
+    <div className="mb-6 space-y-4">
+      <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>
+        How will the key be left?
+      </h2>
+
+      {/* Sub-option cards */}
+      <div className="space-y-2">
+        {subOptions.map((opt: LeaveKeySubOption) => {
+          const selected = sub === opt.key;
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => bookingActions.setLeaveKeySubMethod(opt.key)}
+              className="flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition"
+              style={selected ? { background: SELECTED_BG, borderColor: "transparent" } : { borderColor: "#E2E8F0" }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className={`text-[14px] font-semibold ${selected ? "text-white" : "text-slate-900"}`}>
+                  {opt.label}
+                </p>
+                <p className={`text-[12px] mt-0.5 ${selected ? "text-white/80" : "text-slate-500"}`}>
+                  {opt.subtitle}
+                </p>
+              </div>
+              <CheckCircle2
+                size={18}
+                className="shrink-0"
+                style={{ color: selected ? "white" : "transparent" }}
+              />
+            </button>
+          );
+        })}
       </div>
+
+      {/* Contextual info note for the chosen sub-option */}
+      {note && <InfoBanner title={note.title} body={note.body} />}
+
+      {/* Key holder inputs — only for "with someone" */}
+      {sub === "with_someone" && (
+        <div className="space-y-3">
+          <p className="text-[13px] font-medium text-slate-700">Key holder contact</p>
+          <input
+            type="text"
+            value={keyHolderName}
+            onChange={(e) => bookingActions.setKeyHolder({ key_holder_name: e.target.value })}
+            placeholder="Key holder full name"
+            data-testid="input-key-holder-name"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+          />
+          <input
+            type="tel"
+            value={keyHolderPhone}
+            onChange={(e) => bookingActions.setKeyHolder({ key_holder_phone: e.target.value })}
+            placeholder="Key holder mobile"
+            data-testid="input-key-holder-phone"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+          />
+        </div>
+      )}
     </div>
   );
 }

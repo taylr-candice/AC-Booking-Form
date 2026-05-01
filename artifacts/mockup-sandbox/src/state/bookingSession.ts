@@ -60,6 +60,25 @@ export type AccessMethod =
 
 export type ReturnMethod = "locker" | "hand_delivery";
 
+/** How the key is left when the top-level access method is any
+ *  `owner_*_leave_key` variant.  Sub-options are displayed after the
+ *  customer selects the Leave Key card; the set that appears is driven
+ *  by building feature flags (see `accessMethodCatalog`).
+ *
+ *  - `with_someone`          — always available; attended (key holder on-site)
+ *  - `with_parcel_locker`    — only if building has a Taylr parcel locker; unattended
+ *  - `with_taylr`            — always available; Taylr collects the key from the
+ *                              owner before the service window; unattended
+ *  - `with_building_manager` — only if building has a full-time building manager; unattended
+ *  - `with_concierge`        — only if building has an on-site concierge; unattended
+ */
+export type LeaveKeySubMethod =
+  | "with_someone"
+  | "with_parcel_locker"
+  | "with_taylr"
+  | "with_building_manager"
+  | "with_concierge";
+
 export type Tenant = {
   first: string;
   last: string;
@@ -165,6 +184,9 @@ export type BookingState = {
   // Step 3 — primary residence + access method + follow-ups
   primary_residence: PrimaryResidence | null;
   access_method: AccessMethod | null;
+  /** Set when `access_method` is any `owner_*_leave_key` variant.
+   *  Cleared (→ null) whenever `access_method` changes. */
+  leave_key_sub_method: LeaveKeySubMethod | null;
   key_holder_name: string;
   key_holder_phone: string;
   key_collection_location: string;
@@ -350,6 +372,7 @@ const INITIAL_STATE: BookingState = {
   ac_override_active: false,
   primary_residence: null,
   access_method: null,
+  leave_key_sub_method: null,
   key_holder_name: "",
   key_holder_phone: "",
   key_collection_location: "",
@@ -627,6 +650,7 @@ export function getBookingSession(): BookingState {
 function clearAccessFollowUps(s: BookingState): BookingState {
   return {
     ...s,
+    leave_key_sub_method: null,
     key_holder_name: "",
     key_holder_phone: "",
     key_collection_location: "",
@@ -1055,6 +1079,18 @@ export const bookingActions = {
       }
       return next;
     });
+  },
+  setLeaveKeySubMethod(method: LeaveKeySubMethod | null) {
+    setState((s) => ({
+      ...s,
+      leave_key_sub_method: method,
+      // Switching sub-method clears key-holder details and signature so
+      // stale data from a previous sub-selection doesn't carry over.
+      key_holder_name: "",
+      key_holder_phone: "",
+      signature_acknowledged: false,
+      signature_name: "",
+    }));
   },
   setKeyHolder(fields: Partial<Pick<BookingState, "key_holder_name" | "key_holder_phone">>) {
     setState((s) => ({ ...s, ...fields }));
