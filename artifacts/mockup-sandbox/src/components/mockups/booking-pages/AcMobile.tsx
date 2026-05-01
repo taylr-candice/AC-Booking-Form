@@ -492,14 +492,14 @@ function FullConfigView({
           />
         )}
 
-        {/* Price block — base + per-extras + total. In the type-level
-            "unsure" state we deliberately drop the type-specific
-            qualifier ("1 outdoor + 1 indoor unit per system") even
-            when `acTypeFromUnit` would resolve `knownType` to a real
-            type — the customer told us they're unsure, so the
-            qualifier "Default — confirmed on the day" is the honest
-            read (Task #102). The count-level unsure state keeps the
-            type-specific qualifier because the type IS known. */}
+        {/* Price block — base + per-extras + total. The base service
+            row carries no inline per-system qualifier when the AC type
+            is known, because the "Each system includes" block higher
+            up already lists what one $179 service covers. The
+            type-level "unsure" state still gets the honest "Default
+            — confirmed on the day" line under the base row (Task #102)
+            even when `acTypeFromUnit` would resolve `knownType` to a
+            real type, because the customer told us they're unsure. */}
         {!needsTypePick && (
           <div className="mt-6 space-y-4">
             <OtherServicesSection variant="mobile" />

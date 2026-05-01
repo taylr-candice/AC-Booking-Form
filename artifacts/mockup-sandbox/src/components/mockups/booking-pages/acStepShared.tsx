@@ -134,13 +134,6 @@ export function formatSystemsIncludes(type: KnownType): string[] {
   return ["1 outdoor unit", "1 indoor unit / return-air grille"];
 }
 
-/** Short qualifier shown next to the base price line in the price
- *  breakdown — explains what one $179 service covers. */
-export function baseLineQualifier(type: KnownType): string {
-  if (type === "split") return "1 outdoor + 1 indoor unit per system";
-  return "1 outdoor + 1 indoor / return-air grille per system";
-}
-
 /** Acknowledgment copy adapts to the customer's effective AC type. */
 export function buildAck(type: AcType) {
   const noun = type === "ducted" ? "return-air grilles" : "indoor units";
@@ -465,13 +458,14 @@ export function useAcStep({
 
 /** Transparent price breakdown shown in both on-file (mobile uses
  *  dense padding) and full-configuration modes. Renders the base
- *  service line with a short qualifier explaining what one $179
- *  service covers, an optional per-extras line, and a Total row.
+ *  service line, an optional per-extras line, and a Total row.
  *
  *  When `knownType` is `null` the customer is in the type-level
- *  "unsure" state — we show the default 1 × $179 base line with a
- *  generic "confirmed on the day" qualifier instead of the
- *  type-specific "1 outdoor + 1 indoor unit per system" line. */
+ *  "unsure" state — the base 1 × $179 line gets a "Default —
+ *  confirmed on the day" qualifier underneath. When the AC type is
+ *  known there's no inline qualifier, because the "Each system
+ *  includes" block higher up already explains what one $179 service
+ *  covers. */
 export function PriceBlock({
   systems,
   additional,
@@ -500,9 +494,11 @@ export function PriceBlock({
     0,
   );
   const total = base + extras + othersTotal;
-  const qualifier = knownType
-    ? baseLineQualifier(knownType)
-    : "Default — confirmed on the day";
+  // Only the "unsure" mode (no AC type yet) gets a qualifier line under
+  // the base service row. Once a known type is picked, the per-system
+  // inclusions are already spelled out by the "Each system includes"
+  // block higher in the step, so a duplicate qualifier here is noise.
+  const qualifier = knownType ? null : "Default — confirmed on the day";
   const addonNoun =
     knownType === "ducted" ? "extra return-air grille" : "extra indoor unit";
   const addonNounPlural =
@@ -544,9 +540,11 @@ export function PriceBlock({
                 service{systems === 1 ? "" : "s"}
               </span>
             </p>
-            <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">
-              {qualifier}
-            </p>
+            {qualifier && (
+              <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">
+                {qualifier}
+              </p>
+            )}
           </div>
           <span className="tabular-nums text-slate-900 font-medium shrink-0">
             ${base}
