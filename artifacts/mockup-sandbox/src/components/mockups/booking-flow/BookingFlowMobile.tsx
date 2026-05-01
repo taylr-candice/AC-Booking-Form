@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { Check } from "lucide-react";
 import {
   bookingActions,
   getBookingSession,
@@ -11,6 +12,8 @@ import {
   visibleSteps,
 } from "../../../state/bookingDerived";
 import { BookingFlowConfirmation } from "./BookingFlowConfirmation";
+
+const BRAND = "#ED017F";
 
 const NAV_FORWARD = new Set([
   "button-continue",
@@ -175,15 +178,48 @@ export function BookingFlowMobile() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Inter']">
-      {/* Step indicator — quiet left-aligned text instead of a pink
-          progress bar so the booking screen doesn't open with a wash
-          of brand colour. */}
-      <div className="border-b border-slate-200 bg-white px-4 py-3">
-        <div
-          className="text-[11px] font-medium uppercase tracking-wide text-slate-400"
-          data-testid={`step-indicator-${active}`}
-        >
-          Step {Math.max(visible.indexOf(active), 0) + 1} of {visible.length}
+      {/* Step indicator — compact pink dots so the brand colour reads
+          as quiet progress, not a heavy progress bar. Each dot is
+          tappable and jumps the flow to that step via goToStep. */}
+      <div
+        className="border-b border-slate-200 bg-white px-4 py-2.5"
+        data-testid={`step-indicator-${active}`}
+      >
+        <div className="flex items-center">
+          {visible.map((stepId, idx) => {
+            const isActive = stepId === active;
+            const activePos = visible.indexOf(active);
+            const isComplete = activePos !== -1 && idx < activePos;
+            const filled = isActive || isComplete;
+            return (
+              <div key={stepId} className="contents">
+                <button
+                  type="button"
+                  onClick={() => bookingActions.goToStep(stepId)}
+                  aria-label={`Step ${idx + 1}`}
+                  data-testid={`step-dot-${stepId}`}
+                  className={`grid h-4 w-4 shrink-0 place-items-center rounded-full text-[8px] font-semibold leading-none transition ${
+                    filled ? "text-white" : "bg-slate-200 text-slate-500"
+                  }`}
+                  style={filled ? { backgroundColor: BRAND } : undefined}
+                >
+                  {isComplete ? (
+                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                  ) : (
+                    idx + 1
+                  )}
+                </button>
+                {idx < visible.length - 1 && (
+                  <div
+                    className="mx-1 h-px flex-1 rounded-full"
+                    style={{
+                      backgroundColor: isComplete ? BRAND : "#E2E8F0",
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
