@@ -3,8 +3,8 @@ import { Moon, Sun, Sunrise } from "lucide-react";
 
 import { dayWindows, type CustomerDay, type CustomerSlot } from "./customerSlotData";
 
-const SELECTED_PINK_BG = "#ED017F";
-const SELECTED_PINK_TEXT = "#FFFFFF";
+const SELECTED_PINK_BG = "#FCE7F3";
+const SELECTED_PINK_TEXT = "#0F172A";
 const SELECTED_PINK_BORDER = "#ED017F";
 
 function isoToday(): string {
@@ -186,7 +186,7 @@ export function CustomerAvailableDays({
             );
           }
 
-          const iconColor = isSelected ? "rgba(255,255,255,0.95)" : "#ED017F";
+          const iconColor = "#ED017F";
 
           return (
             <button

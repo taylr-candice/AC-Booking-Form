@@ -25,8 +25,8 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
-const SELECTED_PINK_BG = "#ED017F";
-const SELECTED_PINK_TEXT = "#FFFFFF";
+const SELECTED_PINK_BG = "#FCE7F3";
+const SELECTED_PINK_TEXT = "#0F172A";
 const SELECTED_PINK_BORDER = "#ED017F";
 
 type Slot = CustomerSlot;
@@ -339,15 +339,13 @@ function SlotCard({
           style={
             disabled
               ? undefined
-              : isSelected
-                ? { color: SELECTED_PINK_TEXT }
-                : { color: BRAND }
+              : { color: BRAND }
           }
         >
           {icon}
         </div>
         {isSelected && (
-          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: SELECTED_PINK_TEXT }} />
+          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: BRAND }} />
         )}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
