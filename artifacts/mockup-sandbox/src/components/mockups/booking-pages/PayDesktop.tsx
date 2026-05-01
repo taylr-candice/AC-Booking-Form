@@ -366,12 +366,6 @@ export function PayDesktop() {
                             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:bg-white"
                             data-testid="input-send-to-another-email-desktop"
                           />
-                          {session.contact_email.trim() &&
-                            anotherEmail === session.contact_email.trim() && (
-                              <p className="mt-1.5 text-xs text-slate-400">
-                                Pre-filled from your contact details at Step 1.
-                              </p>
-                            )}
                         </div>
                       )}
                     </div>
