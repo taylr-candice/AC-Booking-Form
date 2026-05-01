@@ -5,7 +5,6 @@ import {
   Sunrise,
   Sun,
   Moon,
-  Pencil,
   CheckCircle2,
   Lock,
 } from "lucide-react";
@@ -97,13 +96,10 @@ export function SlotsMobileLite() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
-        <div className="mb-2 mt-1 flex items-center justify-between">
+        <div className="mb-2 mt-1">
           <h2 className="text-[15px] font-semibold text-slate-900">
             Available windows
           </h2>
-          <button type="button" aria-label="Edit" className="rounded p-1 text-slate-500 hover:text-slate-900">
-            <Pencil className="h-4 w-4" />
-          </button>
         </div>
 
         {/* Top-of-page notification: explains the slot is a window
