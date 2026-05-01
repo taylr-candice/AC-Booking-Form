@@ -27,9 +27,8 @@ export type AccessOption = {
 // sub-option under the "Leave Key" card when the building has a Taylr locker.
 
 export const OWNER_LIVE_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_live_at_unit",   label: "I'll be there",       subtitle: "To let the technician into the property" },
-  { key: "owner_live_leave_key", label: "I'll leave a key",    subtitle: "For Taylr to access" },
-  { key: "owner_live_collect",   label: "Collect & return my key", subtitle: "Taylr collects, services, then returns" },
+  { key: "owner_live_at_unit",   label: "I'll be there",    subtitle: "To let the technician into the property" },
+  { key: "owner_live_leave_key", label: "I'll leave a key", subtitle: "For Taylr to access" },
 ];
 
 export const OWNER_LEASED_OPTIONS: readonly AccessOption[] = [

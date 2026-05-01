@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   HardHat,
   ConciergeBell,
-  Handshake,
   ChevronDown,
   Search,
 } from "lucide-react";
@@ -387,7 +386,7 @@ function iconForMethod(m: AccessMethod) {
 function iconForSubMethod(key: LeaveKeySubMethod) {
   if (key === "with_someone") return <Users className="h-5 w-5" />;
   if (key === "with_parcel_locker") return <LockerIcon className="h-5 w-5" />;
-  if (key === "with_taylr") return <Handshake className="h-5 w-5" />;
+  if (key === "with_taylr") return <Hand className="h-5 w-5" />;
   if (key === "with_building_manager") return <HardHat className="h-5 w-5" />;
   if (key === "with_concierge") return <ConciergeBell className="h-5 w-5" />;
   return <KeyRound className="h-5 w-5" />;
