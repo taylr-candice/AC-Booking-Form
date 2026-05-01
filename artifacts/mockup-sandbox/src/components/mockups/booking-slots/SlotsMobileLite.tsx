@@ -21,7 +21,7 @@ import { type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
-import { CustomerMonthCalendar } from "./CustomerMonthCalendar";
+import { CustomerAvailableDays } from "./CustomerAvailableDays";
 
 const BRAND = "#ED017F";
 
@@ -158,7 +158,7 @@ export function SlotsMobileLite() {
           <>
             {/* Full-month calendar — Su–Sa grid with per-day
                 availability indicators (one micro-dot per window). */}
-            <CustomerMonthCalendar
+            <CustomerAvailableDays
               days={visibleDays}
               selectedDate={selectedDate}
               onSelect={(iso) => {

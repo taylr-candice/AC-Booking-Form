@@ -21,7 +21,7 @@ import { type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
-import { CustomerMonthCalendar } from "./CustomerMonthCalendar";
+import { CustomerAvailableDays } from "./CustomerAvailableDays";
 
 const BRAND = "#ED017F";
 
@@ -168,7 +168,7 @@ export function SlotsMobile() {
                 availability indicators (one micro-dot per window).
                 Replaces the previous flat 4-col day strip so the
                 customer can scan an entire month at a glance. */}
-            <CustomerMonthCalendar
+            <CustomerAvailableDays
               days={visibleDays}
               selectedDate={selectedDate}
               onSelect={(iso) => {

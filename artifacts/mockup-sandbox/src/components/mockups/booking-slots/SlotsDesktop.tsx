@@ -23,7 +23,7 @@ import { type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
-import { CustomerMonthCalendar } from "./CustomerMonthCalendar";
+import { CustomerAvailableDays } from "./CustomerAvailableDays";
 
 const BRAND = "#ED017F";
 
@@ -165,7 +165,7 @@ export function SlotsDesktop() {
                     — Su–Sa grid, prev/next month nav, and a glanceable
                     three-segment indicator (one micro-dot per window)
                     so the customer can scan an entire month at once. */}
-                <CustomerMonthCalendar
+                <CustomerAvailableDays
                   days={visibleDays}
                   selectedDate={selectedDate}
                   onSelect={(iso) => {
