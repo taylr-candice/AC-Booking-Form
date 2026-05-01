@@ -560,85 +560,90 @@ export function UnitDesktop() {
                   </div>
                 )}
 
-                <div>
-                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                    Your contact details
-                  </h2>
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label htmlFor="step1-first-desktop" className="text-sm font-medium text-slate-700">First name</label>
-                        <input
-                          id="step1-first-desktop"
-                          type="text"
-                          value={firstName}
-                          onChange={(e) => bookingActions.setContact({ contact_first_name: e.target.value })}
-                          onBlur={() => markTouched("firstName")}
-                          aria-invalid={showErr("firstName")}
-                          aria-describedby={showErr("firstName") ? errorIds.firstName : undefined}
-                          className={inputClassFor(showErr("firstName"))}
-                          style={errorStyle(showErr("firstName"))}
-                          data-testid="input-firstname"
-                        />
-                        {showErr("firstName") && <FieldError id={errorIds.firstName} message={errors.firstName} />}
+                {/* Contact details: always shown for owners; for agents, only
+                    revealed after an agency is picked so the form progresses
+                    logically — role → agency → contact. */}
+                {(!isAgent || agencyId) && (
+                  <div>
+                    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      Your contact details
+                    </h2>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label htmlFor="step1-first-desktop" className="text-sm font-medium text-slate-700">First name</label>
+                          <input
+                            id="step1-first-desktop"
+                            type="text"
+                            value={firstName}
+                            onChange={(e) => bookingActions.setContact({ contact_first_name: e.target.value })}
+                            onBlur={() => markTouched("firstName")}
+                            aria-invalid={showErr("firstName")}
+                            aria-describedby={showErr("firstName") ? errorIds.firstName : undefined}
+                            className={inputClassFor(showErr("firstName"))}
+                            style={errorStyle(showErr("firstName"))}
+                            data-testid="input-firstname"
+                          />
+                          {showErr("firstName") && <FieldError id={errorIds.firstName} message={errors.firstName} />}
+                        </div>
+                        <div className="space-y-2">
+                          <label htmlFor="step1-last-desktop" className="text-sm font-medium text-slate-700">Last name</label>
+                          <input
+                            id="step1-last-desktop"
+                            type="text"
+                            value={lastName}
+                            onChange={(e) => bookingActions.setContact({ contact_last_name: e.target.value })}
+                            onBlur={() => markTouched("lastName")}
+                            aria-invalid={showErr("lastName")}
+                            aria-describedby={showErr("lastName") ? errorIds.lastName : undefined}
+                            className={inputClassFor(showErr("lastName"))}
+                            style={errorStyle(showErr("lastName"))}
+                            data-testid="input-lastname"
+                          />
+                          {showErr("lastName") && <FieldError id={errorIds.lastName} message={errors.lastName} />}
+                        </div>
                       </div>
+
                       <div className="space-y-2">
-                        <label htmlFor="step1-last-desktop" className="text-sm font-medium text-slate-700">Last name</label>
+                        <label htmlFor="step1-email-desktop" className="text-sm font-medium text-slate-700">Email address</label>
                         <input
-                          id="step1-last-desktop"
-                          type="text"
-                          value={lastName}
-                          onChange={(e) => bookingActions.setContact({ contact_last_name: e.target.value })}
-                          onBlur={() => markTouched("lastName")}
-                          aria-invalid={showErr("lastName")}
-                          aria-describedby={showErr("lastName") ? errorIds.lastName : undefined}
-                          className={inputClassFor(showErr("lastName"))}
-                          style={errorStyle(showErr("lastName"))}
-                          data-testid="input-lastname"
+                          id="step1-email-desktop"
+                          type="email"
+                          inputMode="email"
+                          autoComplete="email"
+                          value={email}
+                          onChange={(e) => bookingActions.setContact({ contact_email: e.target.value })}
+                          onBlur={() => markTouched("email")}
+                          aria-invalid={showErr("email")}
+                          aria-describedby={showErr("email") ? errorIds.email : undefined}
+                          className={inputClassFor(showErr("email"))}
+                          style={errorStyle(showErr("email"))}
+                          data-testid="input-email"
                         />
-                        {showErr("lastName") && <FieldError id={errorIds.lastName} message={errors.lastName} />}
+                        {showErr("email") && <FieldError id={errorIds.email} message={errors.email} />}
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <label htmlFor="step1-email-desktop" className="text-sm font-medium text-slate-700">Email address</label>
-                      <input
-                        id="step1-email-desktop"
-                        type="email"
-                        inputMode="email"
-                        autoComplete="email"
-                        value={email}
-                        onChange={(e) => bookingActions.setContact({ contact_email: e.target.value })}
-                        onBlur={() => markTouched("email")}
-                        aria-invalid={showErr("email")}
-                        aria-describedby={showErr("email") ? errorIds.email : undefined}
-                        className={inputClassFor(showErr("email"))}
-                        style={errorStyle(showErr("email"))}
-                        data-testid="input-email"
-                      />
-                      {showErr("email") && <FieldError id={errorIds.email} message={errors.email} />}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label htmlFor="step1-mobile-desktop" className="text-sm font-medium text-slate-700">Mobile number</label>
-                      <input
-                        id="step1-mobile-desktop"
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        value={mobile}
-                        onChange={(e) => bookingActions.setContact({ contact_phone: e.target.value })}
-                        onBlur={() => markTouched("mobile")}
-                        aria-invalid={showErr("mobile")}
-                        aria-describedby={showErr("mobile") ? errorIds.mobile : undefined}
-                        className={inputClassFor(showErr("mobile"))}
-                        style={errorStyle(showErr("mobile"))}
-                        data-testid="input-mobile"
-                      />
-                      {showErr("mobile") && <FieldError id={errorIds.mobile} message={errors.mobile} />}
+                      <div className="space-y-2">
+                        <label htmlFor="step1-mobile-desktop" className="text-sm font-medium text-slate-700">Mobile number</label>
+                        <input
+                          id="step1-mobile-desktop"
+                          type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          value={mobile}
+                          onChange={(e) => bookingActions.setContact({ contact_phone: e.target.value })}
+                          onBlur={() => markTouched("mobile")}
+                          aria-invalid={showErr("mobile")}
+                          aria-describedby={showErr("mobile") ? errorIds.mobile : undefined}
+                          className={inputClassFor(showErr("mobile"))}
+                          style={errorStyle(showErr("mobile"))}
+                          data-testid="input-mobile"
+                        />
+                        {showErr("mobile") && <FieldError id={errorIds.mobile} message={errors.mobile} />}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>

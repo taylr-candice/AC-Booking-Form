@@ -398,6 +398,78 @@ const INITIAL_STATE: BookingState = {
 
 const isBrowser = typeof window !== "undefined";
 
+// ─── Agent prefill (localStorage) ───────────────────────────────────────────
+//
+// When an agent completes a booking we snapshot their identity (role, agency,
+// contact details) to `localStorage` so that the *next* time they open the
+// flow — even in a new tab or after closing the browser — their details are
+// pre-populated on Step 1. The per-session `sessionStorage` blob already
+// carries identity forward inside `bookAnother()` for same-tab flows; the
+// `localStorage` prefill covers the cross-session / cross-tab case.
+//
+// Only agent identity is saved — owners don't benefit from this (their unit
+// is the rare, personal thing, not their role / contact), and we never carry
+// forward unit, AC details, access method, or any other booking-specific data.
+
+const AGENT_PREFILL_KEY = "taylr.agentPrefill.v1";
+
+type AgentPrefill = {
+  role: "agent";
+  agency_id: string | null;
+  agency_other_name: string;
+  contact_first_name: string;
+  contact_last_name: string;
+  contact_email: string;
+  contact_phone: string;
+};
+
+function saveAgentPrefill(s: BookingState): void {
+  if (!isBrowser || s.role !== "agent") return;
+  try {
+    const blob: AgentPrefill = {
+      role: "agent",
+      agency_id: s.agency_id,
+      agency_other_name: s.agency_other_name,
+      contact_first_name: s.contact_first_name,
+      contact_last_name: s.contact_last_name,
+      contact_email: s.contact_email,
+      contact_phone: s.contact_phone,
+    };
+    window.localStorage.setItem(AGENT_PREFILL_KEY, JSON.stringify(blob));
+  } catch {
+    /* quota / private-browsing — ignore */
+  }
+}
+
+function loadAgentPrefill(): Partial<BookingState> {
+  if (!isBrowser) return {};
+  try {
+    const raw = window.localStorage.getItem(AGENT_PREFILL_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw) as Partial<AgentPrefill>;
+    if (p.role !== "agent") return {};
+    return {
+      role: "agent" as Role,
+      agency_id:
+        p.agency_id === null || typeof p.agency_id === "string"
+          ? (p.agency_id ?? null)
+          : null,
+      agency_other_name:
+        typeof p.agency_other_name === "string" ? p.agency_other_name : "",
+      contact_first_name:
+        typeof p.contact_first_name === "string" ? p.contact_first_name : "",
+      contact_last_name:
+        typeof p.contact_last_name === "string" ? p.contact_last_name : "",
+      contact_email:
+        typeof p.contact_email === "string" ? p.contact_email : "",
+      contact_phone:
+        typeof p.contact_phone === "string" ? p.contact_phone : "",
+    };
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Schema version stamped on every persisted blob this module writes.
  *
@@ -558,7 +630,20 @@ function otherServiceQuantitiesEqual(
 function readFromStorage(): BookingState {
   if (!isBrowser) return INITIAL_STATE;
   try {
-    return migratePersistedSession(window.sessionStorage.getItem(STORAGE_KEY));
+    const persisted = migratePersistedSession(
+      window.sessionStorage.getItem(STORAGE_KEY),
+    );
+    // If the session is completely fresh (no role picked yet), overlay any
+    // saved agent prefill so returning agents see their identity pre-populated
+    // on Step 1 — role, agency, and contact details all filled in — without
+    // having to re-enter them for every new booking from a new tab/session.
+    if (persisted.role === null) {
+      const prefill = loadAgentPrefill();
+      if (Object.keys(prefill).length > 0) {
+        return { ...persisted, ...prefill };
+      }
+    }
+    return persisted;
   } catch {
     // sessionStorage access can throw in some sandboxed contexts.
     return INITIAL_STATE;
@@ -1169,6 +1254,13 @@ export const bookingActions = {
       // "ok" — same.
       return { ...s, submitted: true, reference };
     });
+    // After a successful submission, persist agent identity to localStorage
+    // so it pre-populates Step 1 the next time this agent opens the booking
+    // flow in a new tab or browser session (cross-session prefill).
+    // `state` is already updated by `setState` above, so we read it here.
+    if (state.submitted && state.role === "agent") {
+      saveAgentPrefill(state);
+    }
   },
 
   /** Spec §9 row "Payment cancelled": flag the booking as cancelled at
