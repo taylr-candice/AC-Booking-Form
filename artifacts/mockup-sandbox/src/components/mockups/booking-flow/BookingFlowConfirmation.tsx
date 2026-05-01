@@ -5,9 +5,11 @@
  *
  * Four variants, mirroring the standalone `BookingForm` terminal
  * screens plus the new "Unit unavailable" rejection path:
- *   - Scheduled: "Booking confirmed" — shows the chosen slot.
- *   - Coordination: "Payment received" — explains who Taylr will
- *     contact next (tenant / managing agent) instead of a slot.
+ *   - Scheduled: "Thank you for your order" — shows the chosen slot
+ *     and the auto-generated order number front-and-centre.
+ *   - Coordination: "Thank you for your order" — explains who Taylr
+ *     will contact next (tenant / managing agent) instead of a slot,
+ *     with the same prominent order-number block.
  *   - Cancelled: "Payment cancelled" — confirms no payment was taken
  *     and offers a "Try again" CTA back to Step 5 (spec §9 row
  *     "Payment cancelled").
@@ -202,7 +204,7 @@ export function BookingFlowConfirmation() {
 
     case "coordination":
       icon = <CheckCircle2 className="h-7 w-7 text-[#ED017F]" />;
-      title = "Payment received";
+      title = "Thank you for your order";
       body = (
         <>
           Thanks! We&apos;ll now contact{" "}
@@ -230,7 +232,7 @@ export function BookingFlowConfirmation() {
     case "scheduled":
     default:
       icon = <CheckCircle2 className="h-7 w-7 text-[#ED017F]" />;
-      title = "Booking confirmed";
+      title = "Thank you for your order";
       body = (
         <>
           Thanks! Your AC service is scheduled for{" "}
@@ -284,28 +286,33 @@ export function BookingFlowConfirmation() {
             {icon}
           </div>
           <h1
-            className="mt-4 text-xl font-semibold text-slate-900"
+            className="mt-4 text-2xl font-semibold text-slate-900"
             data-testid="text-terminal-title"
           >
             {title}
           </h1>
-          <div
-            className="mt-2 text-sm text-slate-600"
-            data-testid="text-terminal-body"
-          >
-            {body}
-          </div>
           {showReference && (
-            <div className="mt-5 inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              <span>Reference</span>
+            <div
+              className="mx-auto mt-4 inline-flex flex-col items-center gap-1 rounded-xl border border-pink-200 bg-pink-50/60 px-5 py-3"
+              data-testid="block-order-reference"
+            >
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-pink-600">
+                Order number
+              </span>
               <span
-                className="font-mono font-semibold text-slate-900"
+                className="font-mono text-lg font-bold text-slate-900"
                 data-testid="text-reference"
               >
                 {session.reference}
               </span>
             </div>
           )}
+          <div
+            className="mt-4 text-sm text-slate-600"
+            data-testid="text-terminal-body"
+          >
+            {body}
+          </div>
           <div className="mt-6 flex justify-center">{cta}</div>
         </div>
       </main>

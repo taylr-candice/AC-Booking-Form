@@ -20,13 +20,10 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
-  BILL_TO_HELPER,
-  BILL_TO_LABEL,
   computeBookingTotal,
   COORDINATION_NOTE,
   COPY_INVOICE_TO_HELPER,
   COPY_INVOICE_TO_LABEL,
-  defaultBillToLine,
   INVOICE_DESTINATION_LABEL,
   invoiceDestinationEmail,
   invoiceDestinationNote,
@@ -309,30 +306,6 @@ export function PayMobile() {
                 />
                 <p className="text-[11px] text-slate-500">
                   {COPY_INVOICE_TO_HELPER}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="bill-to-mobile"
-                  className="text-[12px] font-medium text-slate-700"
-                >
-                  {BILL_TO_LABEL}
-                </label>
-                <input
-                  id="bill-to-mobile"
-                  type="text"
-                  placeholder="e.g. Owner's name"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] outline-none focus:border-slate-400"
-                  data-testid="input-bill-to-mobile"
-                />
-                <p
-                  className="text-[11px] leading-relaxed text-slate-500"
-                  data-testid="text-bill-to-default-mobile"
-                >
-                  {BILL_TO_HELPER}
-                  <span className="mt-0.5 block text-slate-400">
-                    Default: {defaultBillToLine(session)}
-                  </span>
                 </p>
               </div>
             </div>

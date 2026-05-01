@@ -470,20 +470,16 @@ export const INVOICE_PREPAYMENT_BODY =
   "we don't invoice agents after the work is completed.";
 
 /**
- * Note shown under the billing email/PO inputs in the invoice block —
- * explains what happens on submission (order created with pending payment
- * status, tax invoice auto-emailed).
+ * Note shown under the invoice destination + copy-invoice inputs —
+ * explains what happens on submission (order created with pending
+ * payment status, tax invoice auto-emailed).
  */
 export const INVOICE_REFERENCE_NOTE =
   "On submission we'll create your booking with a pending payment status and " +
-  "email a tax invoice to your contact email — and to the billing email above " +
-  "if it's different — for payment.";
+  "email a tax invoice to the destination above — plus the copy address if you've added one — " +
+  "for payment.";
 
-/** Helper copy under the billing email field. */
-export const BILLING_EMAIL_HELPER =
-  "Leave blank to receive the invoice only at your contact email above.";
-
-// ─── Invoice destination + Bill-to (agent + invoice path) ──────────────────
+// ─── Invoice destination (agent + invoice path) ────────────────────────────
 
 /** Mini demo lookup of an agency's accounts inbox. The "Other / not listed"
  *  agency intentionally has no entry — when an agent picks Other we don't
@@ -527,18 +523,6 @@ export function invoiceDestinationFromContact(s: BookingState): boolean {
   return Boolean(s.contact_email?.trim());
 }
 
-/** Default "Bill to" line — the unit address, c/o the agent's name. Used
- *  as placeholder/helper text when the agent has not entered an override. */
-export function defaultBillToLine(s: BookingState): string {
-  const u = unitLabel(s.unit_id);
-  const addr = u.line2 ? `${u.line1}, ${u.line2}` : u.line1;
-  const agent = [s.contact_first_name, s.contact_last_name]
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .join(" ");
-  return agent ? `${addr} c/o ${agent}` : addr;
-}
-
 export const INVOICE_DESTINATION_LABEL = "Invoice will be sent to";
 /** Note shown under the destination row when the contact email is missing
  *  AND the agency has no default email on file — i.e. we genuinely don't
@@ -568,9 +552,6 @@ export const COPY_INVOICE_TO_LABEL =
   "Email a copy of the invoice to (optional)";
 export const COPY_INVOICE_TO_HELPER =
   "We'll CC this address on the tax invoice — useful if billing is handled by someone else.";
-export const BILL_TO_LABEL = "Bill to (optional)";
-export const BILL_TO_HELPER =
-  "Otherwise the invoice will be made out to the unit address, c/o you.";
 
 // ─── Step 5 (Review & Pay) validation ─────────────────────────────────────
 

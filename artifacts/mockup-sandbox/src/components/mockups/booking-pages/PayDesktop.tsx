@@ -8,13 +8,10 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
-  BILL_TO_HELPER,
-  BILL_TO_LABEL,
   computeBookingTotal,
   COORDINATION_NOTE,
   COPY_INVOICE_TO_HELPER,
   COPY_INVOICE_TO_LABEL,
-  defaultBillToLine,
   INVOICE_DESTINATION_LABEL,
   invoiceDestinationEmail,
   invoiceDestinationNote,
@@ -269,30 +266,6 @@ export function PayDesktop() {
                       />
                       <p className="text-xs text-slate-500">
                         {COPY_INVOICE_TO_HELPER}
-                      </p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="bill-to-desktop"
-                        className="text-sm font-medium text-slate-700"
-                      >
-                        {BILL_TO_LABEL}
-                      </label>
-                      <input
-                        id="bill-to-desktop"
-                        type="text"
-                        placeholder="e.g. Owner's name"
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
-                        data-testid="input-bill-to-desktop"
-                      />
-                      <p
-                        className="text-xs leading-relaxed text-slate-500"
-                        data-testid="text-bill-to-default-desktop"
-                      >
-                        {BILL_TO_HELPER}
-                        <span className="mt-0.5 block text-slate-400">
-                          Default: {defaultBillToLine(session)}
-                        </span>
                       </p>
                     </div>
                   </div>
