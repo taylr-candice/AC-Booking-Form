@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Building2, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText, X } from "lucide-react";
+import { ArrowRight, MapPin, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText, X } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
@@ -8,11 +8,9 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
-  agencyDefaultEmail,
   agencyDisplayName,
   computeBookingTotal,
   COORDINATION_NOTE,
-  INVOICE_DESTINATION_LABEL,
   INVOICE_LABEL,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
@@ -257,38 +255,47 @@ export function PayDesktop() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    {/* Primary invoice recipient — always the agency */}
+                    {/* Bill to — unit address + attention line */}
                     <div
                       className="rounded-xl border border-slate-200 bg-white p-4"
                       data-testid="block-invoice-destination-desktop"
                     >
                       <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2.5">
-                        {INVOICE_DESTINATION_LABEL}
+                        Bill to
                       </div>
-                      {agencyDisplayName(session) ? (
+                      {session.unit_id ? (
                         <div className="flex items-start gap-3">
                           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100">
-                            <Building2 className="h-4 w-4 text-slate-600" />
+                            <MapPin className="h-4 w-4 text-slate-600" />
                           </div>
                           <div>
                             <div
                               className="text-sm font-semibold text-slate-900 leading-tight"
-                              data-testid="text-agency-name-desktop"
+                              data-testid="text-bill-to-address-line1-desktop"
                             >
-                              {agencyDisplayName(session)}
+                              {unit.line1}
                             </div>
-                            {agencyDefaultEmail(session) ? (
+                            {unit.line2 && (
                               <div
                                 className="mt-0.5 text-xs text-slate-500"
-                                data-testid="text-agency-email-desktop"
+                                data-testid="text-bill-to-address-line2-desktop"
                               >
-                                E: {agencyDefaultEmail(session)}
-                              </div>
-                            ) : (
-                              <div className="mt-0.5 text-xs text-slate-400">
-                                Billing email loaded from our records.
+                                {unit.line2}
                               </div>
                             )}
+                            <div
+                              className="mt-1.5 text-xs text-slate-500"
+                              data-testid="text-bill-to-attn-desktop"
+                            >
+                              Attn:{" "}
+                              <span className="font-medium text-slate-700">
+                                {session.role === "agent"
+                                  ? agencyDisplayName(session) || "—"
+                                  : [session.contact_first_name, session.contact_last_name]
+                                      .filter(Boolean)
+                                      .join(" ") || "—"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ) : (

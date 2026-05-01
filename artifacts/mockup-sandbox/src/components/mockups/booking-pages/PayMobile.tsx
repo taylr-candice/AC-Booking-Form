@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Building2,
+  MapPin,
   CreditCard,
   FileText,
   CheckCircle2,
@@ -22,11 +22,9 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
-  agencyDefaultEmail,
   agencyDisplayName,
   computeBookingTotal,
   COORDINATION_NOTE,
-  INVOICE_DESTINATION_LABEL,
   INVOICE_LABEL,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
@@ -266,38 +264,47 @@ export function PayMobile() {
               </p>
             </div>
             <div className="space-y-2">
-              {/* Primary invoice recipient — always the agency */}
+              {/* Bill to — unit address + attention line */}
               <div
                 className="rounded-xl border border-slate-200 bg-white p-3"
                 data-testid="block-invoice-destination-mobile"
               >
                 <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2">
-                  {INVOICE_DESTINATION_LABEL}
+                  Bill to
                 </div>
-                {agencyDisplayName(session) ? (
+                {session.unit_id ? (
                   <div className="flex items-start gap-2.5">
                     <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100">
-                      <Building2 className="h-4 w-4 text-slate-600" />
+                      <MapPin className="h-4 w-4 text-slate-600" />
                     </div>
                     <div>
                       <div
                         className="text-[13px] font-semibold text-slate-900 leading-tight"
-                        data-testid="text-agency-name-mobile"
+                        data-testid="text-bill-to-address-line1-mobile"
                       >
-                        {agencyDisplayName(session)}
+                        {unit.line1}
                       </div>
-                      {agencyDefaultEmail(session) ? (
+                      {unit.line2 && (
                         <div
                           className="mt-0.5 text-[12px] text-slate-500"
-                          data-testid="text-agency-email-mobile"
+                          data-testid="text-bill-to-address-line2-mobile"
                         >
-                          E: {agencyDefaultEmail(session)}
-                        </div>
-                      ) : (
-                        <div className="mt-0.5 text-[11.5px] text-slate-400">
-                          Billing email loaded from our records.
+                          {unit.line2}
                         </div>
                       )}
+                      <div
+                        className="mt-1.5 text-[11.5px] text-slate-500"
+                        data-testid="text-bill-to-attn-mobile"
+                      >
+                        Attn:{" "}
+                        <span className="font-medium text-slate-700">
+                          {session.role === "agent"
+                            ? agencyDisplayName(session) || "—"
+                            : [session.contact_first_name, session.contact_last_name]
+                                .filter(Boolean)
+                                .join(" ") || "—"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : (
