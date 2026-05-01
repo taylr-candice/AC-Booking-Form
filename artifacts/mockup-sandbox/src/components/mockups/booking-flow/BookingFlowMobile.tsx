@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-import { Check } from "lucide-react";
 import {
   bookingActions,
   getBookingSession,
@@ -77,8 +76,6 @@ export function BookingFlowMobile() {
   const submitted = useBookingSelector((s) => s.submitted);
   const paymentCancelled = useBookingSelector((s) => s.payment_cancelled);
   const unitUnavailable = useBookingSelector((s) => s.unit_unavailable);
-  const visible = visibleSteps({ access_method: accessMethod });
-
   const current = STEPS.find((s) => s.id === active) ?? STEPS[0];
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const listenerRef = useRef<{ doc: Document; handler: (e: Event) => void } | null>(null);
@@ -182,51 +179,6 @@ export function BookingFlowMobile() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Inter']">
-      {/* Step indicator — compact pink dots so the brand colour reads
-          as quiet progress, not a heavy progress bar. Each dot is
-          tappable and jumps the flow to that step via goToStep. */}
-      <div
-        className="border-b border-slate-200 bg-white px-4 py-2.5"
-        data-testid={`step-indicator-${active}`}
-      >
-        <div className="flex items-center">
-          {visible.map((stepId, idx) => {
-            const isActive = stepId === active;
-            const activePos = visible.indexOf(active);
-            const isComplete = activePos !== -1 && idx < activePos;
-            const filled = isActive || isComplete;
-            return (
-              <div key={stepId} className="contents">
-                <button
-                  type="button"
-                  onClick={() => bookingActions.goToStep(stepId)}
-                  aria-label={`Step ${idx + 1}`}
-                  data-testid={`step-dot-${stepId}`}
-                  className={`grid h-4 w-4 shrink-0 place-items-center rounded-full text-[8px] font-semibold leading-none transition ${
-                    filled ? "text-white" : "bg-slate-200 text-slate-500"
-                  }`}
-                  style={filled ? { backgroundColor: BRAND } : undefined}
-                >
-                  {isComplete ? (
-                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
-                  ) : (
-                    idx + 1
-                  )}
-                </button>
-                {idx < visible.length - 1 && (
-                  <div
-                    className="mx-1 h-px flex-1 rounded-full"
-                    style={{
-                      backgroundColor: isComplete ? BRAND : "#E2E8F0",
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Step viewport */}
       <div className="relative flex-1 overflow-hidden bg-white">
         <iframe
