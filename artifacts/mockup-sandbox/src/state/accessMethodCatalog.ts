@@ -126,19 +126,19 @@ export function getLeaveKeySubOptions(
   if (features.has_parcel_locker) {
     opts.push({
       key: "with_parcel_locker",
-      label: "In the Taylr Locker",
-      subtitle: "Pls send me a drop code",
+      label: "Parcel Locker",
+      subtitle: "We'll send you instructions",
     });
   }
   opts.push({
     key: "with_taylr",
     label: "With Taylr",
-    subtitle: "Pls collect & return",
+    subtitle: "We'll arrange a time",
   });
   if (features.has_building_manager) {
     opts.push({
       key: "with_building_manager",
-      label: "With building management",
+      label: "With Building Management",
       subtitle: "Prior to scheduled window",
     });
   }

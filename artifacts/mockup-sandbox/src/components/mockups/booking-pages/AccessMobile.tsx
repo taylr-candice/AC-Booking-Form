@@ -13,6 +13,9 @@ import {
   Hand,
   HousePlus,
   CheckCircle2,
+  Building2,
+  ConciergeBell,
+  Wrench,
 } from "lucide-react";
 import {
   bookingActions,
@@ -38,6 +41,7 @@ import {
   isUnattendedLeaveKeySub,
   type AccessOption,
   type LeaveKeySubOption,
+  type LeaveKeySubMethod,
 } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
@@ -367,6 +371,15 @@ function iconForMethod(m: AccessMethod) {
   return <Briefcase className="h-5 w-5" />;
 }
 
+function iconForSubMethod(key: LeaveKeySubMethod) {
+  if (key === "with_someone") return <Users className="h-5 w-5" />;
+  if (key === "with_parcel_locker") return <Package className="h-5 w-5" />;
+  if (key === "with_taylr") return <Wrench className="h-5 w-5" />;
+  if (key === "with_building_manager") return <Building2 className="h-5 w-5" />;
+  if (key === "with_concierge") return <ConciergeBell className="h-5 w-5" />;
+  return <KeyRound className="h-5 w-5" />;
+}
+
 function AgentTenantCoordinationSection({
   access,
 }: {
@@ -374,7 +387,7 @@ function AgentTenantCoordinationSection({
 }) {
   return (
     <div className="mb-6">
-      <h2 className="text-[15px] font-semibold mb-1 text-slate-900">
+      <h2 className="text-[17px] font-bold mb-1 text-slate-900">
         Who will coordinate?
       </h2>
       <p className="text-xs text-slate-500 mb-3">
@@ -500,22 +513,28 @@ function LeaveKeySubMethodSection() {
               key={opt.key}
               type="button"
               onClick={() => bookingActions.setLeaveKeySubMethod(opt.key)}
-              className="flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition"
-              style={selected ? { background: SELECTED_BG, borderColor: "transparent" } : { borderColor: "#E2E8F0" }}
+              className={`flex min-h-[76px] w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
+                selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+              style={selected ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG } : undefined}
             >
-              <div className="flex-1 min-w-0">
-                <p className={`text-[14px] font-semibold ${selected ? "text-white" : "text-slate-900"}`}>
+              <span
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+                  selected ? "bg-white" : "bg-slate-100 text-slate-700"
+                }`}
+                style={selected ? { color: SELECTED_ACCENT } : undefined}
+              >
+                {iconForSubMethod(opt.key)}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className={`text-[14px] font-semibold leading-tight ${selected ? "text-white" : "text-slate-900"}`}>
                   {opt.label}
-                </p>
-                <p className={`text-[12px] mt-0.5 ${selected ? "text-white/80" : "text-slate-500"}`}>
+                </span>
+                <span className={`mt-0.5 text-[12px] leading-snug ${selected ? "text-white/85" : "text-slate-500"}`}>
                   {opt.subtitle}
-                </p>
-              </div>
-              <CheckCircle2
-                size={18}
-                className="shrink-0"
-                style={{ color: selected ? "white" : "transparent" }}
-              />
+                </span>
+              </span>
+              <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
             </button>
           );
         })}
@@ -556,7 +575,7 @@ function CollectReturnSection() {
   return (
     <div className="mb-6 space-y-5">
       <div>
-        <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>Where do we collect the key?</h2>
+        <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>Where do we collect the key?</h2>
         <textarea
           value={location}
           onChange={(e) => bookingActions.setKeyCollectionLocation(e.target.value)}
@@ -566,7 +585,7 @@ function CollectReturnSection() {
         />
       </div>
       <div>
-        <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>How would you like the key returned?</h2>
+        <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>How would you like the key returned?</h2>
         <div className="space-y-3">
           <ReturnMethodCard
             selected={returnMethod === "locker"}
@@ -655,7 +674,7 @@ function ManagingAgencySection() {
   const value = useBookingSelector((s) => s.managing_agency_id);
   return (
     <div className="mb-6">
-      <h2 className="text-[15px] font-semibold mb-3" style={{ color: BRAND }}>Managing agency</h2>
+      <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>Managing agency</h2>
       <select
         value={value ?? ""}
         onChange={(e) => bookingActions.setManagingAgency(e.target.value || null)}
@@ -680,7 +699,7 @@ function TenantsSection({
   return (
     <div className="mb-6 space-y-4">
       <div>
-        <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>Tenant details</h2>
+        <h2 className="text-[17px] font-bold" style={{ color: BRAND }}>Tenant details</h2>
         <p className="text-xs text-slate-500 mt-1">We'll contact each tenant to arrange a suitable window.</p>
       </div>
       {tenants.map((t, idx) => (
@@ -761,7 +780,7 @@ function SignatureSection({
   const displayName = name || [contactFirst, contactLast].filter(Boolean).join(" ");
   return (
     <div className="mb-6 space-y-3">
-      <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>{title}</h2>
+      <h2 className="text-[17px] font-bold" style={{ color: BRAND }}>{title}</h2>
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[12px] leading-relaxed text-slate-600">
         {body}
       </div>

@@ -1,7 +1,7 @@
 import React from "react";
-import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
+import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Wrench } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
-import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption } from "../../../state/accessMethodCatalog";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption, type LeaveKeySubMethod } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
 const BRAND = "#ED017F";
@@ -257,10 +257,19 @@ function iconForMethod(m: AccessMethod) {
   return <Briefcase className="h-5 w-5" />;
 }
 
+function iconForSubMethod(key: LeaveKeySubMethod) {
+  if (key === "with_someone") return <Users className="h-5 w-5" />;
+  if (key === "with_parcel_locker") return <Package className="h-5 w-5" />;
+  if (key === "with_taylr") return <Wrench className="h-5 w-5" />;
+  if (key === "with_building_manager") return <Building2 className="h-5 w-5" />;
+  if (key === "with_concierge") return <ConciergeBell className="h-5 w-5" />;
+  return <KeyRound className="h-5 w-5" />;
+}
+
 function AgentTenantCoordinationSection({ access }: { access: AccessMethod | null }) {
   return (
     <div className="mb-8">
-      <h2 className="text-[15px] font-semibold mb-1 text-slate-900">Who will coordinate?</h2>
+      <h2 className="text-[17px] font-bold mb-1 text-slate-900">Who will coordinate?</h2>
       <p className="text-xs text-slate-500 mb-4">Let us know your preference.</p>
       <div className="grid grid-cols-2 gap-3">
         <CoordinationChoiceCard
@@ -352,22 +361,28 @@ function LeaveKeySubMethodSection() {
               key={opt.key}
               type="button"
               onClick={() => bookingActions.setLeaveKeySubMethod(opt.key)}
-              className="flex items-center gap-3 rounded-2xl border p-4 text-left transition"
-              style={selected ? { background: SELECTED_BG, borderColor: "transparent" } : { borderColor: "#E2E8F0" }}
+              className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
+                selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+              style={selected ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG } : undefined}
             >
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-semibold ${selected ? "text-white" : "text-slate-900"}`}>
+              <span
+                className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+                  selected ? "bg-white" : "bg-slate-100 text-slate-700"
+                }`}
+                style={selected ? { color: SELECTED_ACCENT } : undefined}
+              >
+                {iconForSubMethod(opt.key)}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className={`text-[14px] font-semibold leading-tight ${selected ? "text-white" : "text-slate-900"}`}>
                   {opt.label}
-                </p>
-                <p className={`text-xs mt-0.5 ${selected ? "text-white/80" : "text-slate-500"}`}>
+                </span>
+                <span className={`mt-0.5 text-[12px] leading-snug ${selected ? "text-white/85" : "text-slate-500"}`}>
                   {opt.subtitle}
-                </p>
-              </div>
-              <CheckCircle2
-                size={18}
-                className="shrink-0"
-                style={{ color: selected ? "white" : "transparent" }}
-              />
+                </span>
+              </span>
+              <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
             </button>
           );
         })}
@@ -410,7 +425,7 @@ function CollectReturnSection() {
   return (
     <div className="mb-8 space-y-6">
       <div>
-        <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>Where do we collect the key?</h2>
+        <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>Where do we collect the key?</h2>
         <textarea
           value={location}
           onChange={(e) => bookingActions.setKeyCollectionLocation(e.target.value)}
@@ -420,7 +435,7 @@ function CollectReturnSection() {
         />
       </div>
       <div>
-        <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>How would you like the key returned?</h2>
+        <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>How would you like the key returned?</h2>
         <div className="grid grid-cols-2 gap-4">
           <ReturnMethodCard
             selected={returnMethod === "locker"}
@@ -489,7 +504,7 @@ function ManagingAgencySection() {
   const agencyId = useBookingSelector((s) => s.managing_agency_id);
   return (
     <div className="mb-8">
-      <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>Who manages the property?</h2>
+      <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>Who manages the property?</h2>
       <select
         value={agencyId || ""}
         onChange={(e) => bookingActions.setManagingAgency(e.target.value)}
@@ -508,7 +523,7 @@ function ManagingAgencySection() {
 function TenantsSection({ api }: { api: ReturnType<typeof useTenants> }) {
   return (
     <div className="mb-8">
-      <h2 className="text-base font-semibold mb-4" style={{ color: BRAND }}>Tenant details</h2>
+      <h2 className="text-[17px] font-bold mb-4" style={{ color: BRAND }}>Tenant details</h2>
       <div className="space-y-4">
         {api.tenants.map((t, idx) => (
           <div key={t.id} className={idx > 0 ? "pt-4 border-t border-slate-100" : ""}>
@@ -571,7 +586,7 @@ function SignatureSection({
 
   return (
     <div className="mb-8">
-      <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>{title}</h2>
+      <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>{title}</h2>
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-6 rounded-lg bg-slate-50 p-4 text-[13px] leading-relaxed text-slate-600">
           {body}
