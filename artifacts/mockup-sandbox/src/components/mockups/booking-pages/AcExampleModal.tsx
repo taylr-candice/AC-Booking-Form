@@ -33,7 +33,10 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
     title: "What counts as an extra indoor unit?",
     sections: [
       {
-        kind: "do",
+        // No tick badge here — the split variant only shows the
+        // "correct" image (no contrasting "do not count this"
+        // example) so a verdict badge would be visual noise rather
+        // than a useful signal.
         label: "Counts as an extra indoor unit",
         imageSrc: `${ASSET_BASE}/examples/split-indoor-unit.jpg`,
         imageAlt:
@@ -141,28 +144,30 @@ export function AcExampleModal({
                   loading="lazy"
                 />
                 {/* Iconographic badge: tick = correct example,
-                    cross = "do not count this". Overlays the
-                    top-left of the image so the verdict is the
-                    first thing the eye lands on. */}
-                <div
-                  data-testid={`badge-${section.kind ?? "do"}`}
-                  aria-label={
-                    section.kind === "dont"
-                      ? "Do not count this"
-                      : "Counts as an extra"
-                  }
-                  className="absolute left-2 top-2 grid h-9 w-9 place-items-center rounded-full text-white shadow-md ring-2 ring-white"
-                  style={{
-                    backgroundColor:
-                      section.kind === "dont" ? NO_RED : BRAND,
-                  }}
-                >
-                  {section.kind === "dont" ? (
-                    <X className="h-5 w-5" strokeWidth={3} />
-                  ) : (
-                    <Check className="h-5 w-5" strokeWidth={3} />
-                  )}
-                </div>
+                    cross = "do not count this". Only rendered when
+                    `kind` is explicitly set so single-image variants
+                    (e.g. split-indoor) stay visually quiet. */}
+                {section.kind && (
+                  <div
+                    data-testid={`badge-${section.kind}`}
+                    aria-label={
+                      section.kind === "dont"
+                        ? "Do not count this"
+                        : "Counts as an extra"
+                    }
+                    className="absolute left-2 top-2 grid h-9 w-9 place-items-center rounded-full text-white shadow-md ring-2 ring-white"
+                    style={{
+                      backgroundColor:
+                        section.kind === "dont" ? NO_RED : BRAND,
+                    }}
+                  >
+                    {section.kind === "dont" ? (
+                      <X className="h-5 w-5" strokeWidth={3} />
+                    ) : (
+                      <Check className="h-5 w-5" strokeWidth={3} />
+                    )}
+                  </div>
+                )}
               </div>
               <div className="mt-3 space-y-2 text-[13px] text-slate-700 leading-relaxed">
                 {section.paragraphs.map((p, idx) => (
