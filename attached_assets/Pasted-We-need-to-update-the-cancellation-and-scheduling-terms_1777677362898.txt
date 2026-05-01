@@ -1,0 +1,94 @@
+We need to update the cancellation and scheduling terms so that they display differently depending on the stage of the booking and who is interacting with the scheduler.
+
+This form is not in a logged-in state, so we cannot explicitly identify whether the user is an owner, tenant, or agent. Instead, we will rely on booking state.
+
+----------------------------------------
+STATE A — Pre-order / General scheduling
+----------------------------------------
+
+Condition:
+- No order has been created yet
+- User is selecting a date before payment
+
+Goal:
+- Set general expectations (neutral language)
+- Do not assume who the user is
+- Avoid overly strong or owner-specific language
+
+Display this content:
+
+Title:
+Cancellation & rescheduling
+
+Body:
+You can reschedule or cancel your booking with at least 48 hours’ notice before your selected service window.
+
+Changes made within 48 hours of the scheduled service may incur a $125 cancellation fee per unit. This fee covers the technician’s allocated time.
+
+Please ensure access to the property and the air conditioning system is available at the scheduled time. If access is not possible, the service may not be completed and a cancellation fee may still apply.
+
+----------------------------------------
+STATE B — Post-order scheduling (third party access flow)
+----------------------------------------
+
+Condition:
+- An order already exists (service has been purchased)
+- User is scheduling via a link (e.g. tenant or agent coordinating access)
+
+Goal:
+- Make it clear the service is already paid
+- Create accountability for access
+- Clearly explain cancellation impact (fee applies to owner)
+
+Display this content:
+
+Title:
+Important: access & cancellation
+
+Body:
+This service has already been arranged and paid for by the property owner.
+
+Please ensure access to the property and the air conditioning system is available at the scheduled time.
+
+If the booking is cancelled or rescheduled within 48 hours of the service window, a $125 cancellation fee will apply to the owner to cover the technician’s allocated time.
+
+If access is not available on the day, the service may not be completed and the cancellation fee may still apply.
+
+If you need to make a change, please do so as early as possible.
+
+----------------------------------------
+PAYMENT PAGE (separate from scheduling page)
+----------------------------------------
+
+Condition:
+- User is proceeding to payment
+
+Goal:
+- Clearly communicate financial terms to the payer
+
+Display this content:
+
+Title:
+Cancellation terms
+
+Body:
+You can reschedule or cancel your booking with at least 48 hours’ notice before your selected service window.
+
+Changes made within 48 hours will incur a $125 cancellation fee per unit. This fee will be deducted from any refund issued.
+
+If access to the property or the air conditioning system is not available at the scheduled time, the service may not be completed and the cancellation fee may still apply.
+
+----------------------------------------
+IMPLEMENTATION NOTES
+----------------------------------------
+
+- Only show ONE version of the scheduling terms at a time (State A or State B)
+- Do not combine or duplicate messaging
+- Do not introduce long paragraphs or additional explanatory text
+- Keep formatting clean and minimal
+- Tone should be calm, neutral, and clear (not legal-heavy)
+
+The goal is to ensure:
+- Owners/agents understand financial responsibility at payment stage
+- Tenants/agents coordinating access understand behavioural expectations and consequences
+- The UI remains simple and not overwhelming
