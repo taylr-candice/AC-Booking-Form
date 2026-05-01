@@ -854,7 +854,7 @@ function TenantsSection({
   return (
     <div className="mb-6 space-y-4">
       <div>
-        <h2 className="text-[17px] font-bold" style={{ color: BRAND }}>Tenant details</h2>
+        <h2 className="text-[17px] font-bold text-slate-900">Tenant details</h2>
         <p className="text-xs text-slate-500 mt-1">We'll contact each tenant to arrange a suitable window.</p>
       </div>
       {tenants.map((t, idx) => (

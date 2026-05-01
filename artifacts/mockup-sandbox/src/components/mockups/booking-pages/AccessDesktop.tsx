@@ -672,7 +672,7 @@ function ManagingAgencySection() {
 function TenantsSection({ api }: { api: ReturnType<typeof useTenants> }) {
   return (
     <div className="mb-8">
-      <h2 className="text-[17px] font-bold mb-4" style={{ color: BRAND }}>Tenant details</h2>
+      <h2 className="text-[17px] font-bold mb-4 text-slate-900">Tenant details</h2>
       <div className="space-y-4">
         {api.tenants.map((t, idx) => (
           <div key={t.id} className={idx > 0 ? "pt-4 border-t border-slate-100" : ""}>
