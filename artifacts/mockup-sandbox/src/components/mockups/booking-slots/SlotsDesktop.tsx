@@ -27,9 +27,9 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
-const SELECTED_PINK_BG = "#ED017F";
+const SELECTED_PINK_BG = "#5FBB97";
 const SELECTED_PINK_TEXT = "#FFFFFF";
-const SELECTED_PINK_BORDER = "#ED017F";
+const SELECTED_PINK_BORDER = "#5FBB97";
 
 type Slot = CustomerSlot;
 

@@ -3,9 +3,9 @@ import { Moon, Sun, Sunrise } from "lucide-react";
 
 import { dayWindows, type CustomerDay, type CustomerSlot } from "./customerSlotData";
 
-const SELECTED_PINK_BG = "#ED017F";
+const SELECTED_PINK_BG = "#5FBB97";
 const SELECTED_PINK_TEXT = "#FFFFFF";
-const SELECTED_PINK_BORDER = "#ED017F";
+const SELECTED_PINK_BORDER = "#5FBB97";
 
 function isoToday(): string {
   const now = new Date();

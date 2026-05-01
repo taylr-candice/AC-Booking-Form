@@ -56,15 +56,17 @@ export function SlotsAccessBanner({
 
   return (
     <div
-      className={`mb-4 flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 ${padding}`}
+      className={`mb-4 flex items-start gap-2.5 rounded-lg border bg-pink-50 ${padding}`}
       data-testid={`banner-window-notice-${testIdSuffix}`}
       data-access-mode={
         showWindowHeadsUp ? "be-there" : "unattended"
       }
+      style={{ borderColor: "#FBCFE0" }}
     >
       <Info
-        className="mt-0.5 h-4 w-4 shrink-0 text-slate-500"
+        className="mt-0.5 h-4 w-4 shrink-0"
         aria-hidden="true"
+        style={{ color: BRAND }}
       />
       <div className="flex-1">
         <div className={`font-semibold text-slate-900 ${headingSize}`}>
