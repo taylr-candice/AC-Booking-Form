@@ -5,6 +5,7 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 
 const BRAND = "#ED017F";
 
@@ -63,21 +64,39 @@ export function NextAvailableCard({
           >
             Next available
           </div>
-          {/* Date first, window kind below. */}
+          {/* Window + icon first, date below. */}
           <div
-            className={`mt-0.5 font-semibold text-slate-900 ${
+            className={`mt-0.5 flex items-center gap-1.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            {weekdayLong} {day.day} {monthTitle}
+            {slot.window === "morning" && (
+              <MorningIcon
+                className={isCompact ? "h-3.5 w-3.5 shrink-0" : "h-4 w-4 shrink-0"}
+                style={{ color: BRAND }}
+              />
+            )}
+            {slot.window === "afternoon" && (
+              <AfternoonIcon
+                className={isCompact ? "h-3.5 w-3.5 shrink-0" : "h-4 w-4 shrink-0"}
+                style={{ color: BRAND }}
+              />
+            )}
+            {slot.window === "evening" && (
+              <EveningIcon
+                className={isCompact ? "h-3.5 w-3.5 shrink-0" : "h-4 w-4 shrink-0"}
+                style={{ color: BRAND }}
+              />
+            )}
+            {windowLabel} · {weekdayLong} {day.day} {monthTitle}
           </div>
           <div
             className={`text-slate-500 ${
               isCompact ? "text-[11px]" : "text-xs"
             }`}
           >
-            {windowLabel} · {slot.timeLabel}
+            {slot.timeLabel}
           </div>
         </div>
 

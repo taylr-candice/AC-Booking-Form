@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Building2,
   MapPin,
   CreditCard,
   FileText,
@@ -11,6 +12,11 @@ import {
   Clock,
   X,
 } from "lucide-react";
+import {
+  AfternoonIcon,
+  EveningIcon,
+  MorningIcon,
+} from "../booking-slots/TimeOfDayIcon";
 import {
   bookingActions,
   useBookingSelector,
@@ -25,6 +31,7 @@ import {
   agencyDisplayName,
   computeBookingTotal,
   COORDINATION_NOTE,
+  INVOICE_DESTINATION_LABEL,
   INVOICE_LABEL,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
@@ -33,7 +40,6 @@ import {
   labelForRole,
   PAY_NOW_LABEL,
   PAY_NOW_SUBLABEL,
-  scheduleDisplay,
   STRIPE_REDIRECT_NOTE,
   unitLabel,
 } from "../../../state/bookingHelpers";
@@ -54,7 +60,6 @@ export function PayMobile() {
   const total = computeBookingTotal(session);
   const isCoordination = isCoordinationFlow(session);
   const isAgent = session.role === "agent";
-  const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
   const otherServices = resolveOtherServiceQuantities(
     session.other_service_quantities ?? {},
@@ -89,6 +94,9 @@ export function PayMobile() {
           <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
             Review &amp; pay
           </div>
+          <p className="mt-1.5 text-[12.5px] text-slate-500 leading-snug">
+            Check everything looks right before payment
+          </p>
         </div>
         <button
           type="button"
@@ -151,7 +159,7 @@ export function PayMobile() {
               </span>
             </SummaryItem>
 
-            <SummaryItem label="Schedule">
+            <SummaryItem label="Service window">
               {isCoordination ? (
                 <span
                   data-testid="text-summary-schedule"
@@ -161,17 +169,26 @@ export function PayMobile() {
                   <Clock className="h-3.5 w-3.5" />
                   To be coordinated
                 </span>
+              ) : session.service_date && session.service_slot && session.service_slot !== "to_be_coordinated" ? (
+                <span
+                  data-testid="text-summary-schedule"
+                  className="inline-flex items-center gap-1.5 font-medium text-slate-900"
+                >
+                  {session.service_slot === "morning" && <MorningIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
+                  {session.service_slot === "afternoon" && <AfternoonIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
+                  {session.service_slot === "evening" && <EveningIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
+                  {formatServiceDate(session.service_date)}
+                  <span className="text-slate-500">·</span>
+                  <span className="capitalize">{session.service_slot}</span>
+                </span>
               ) : (
-                <>
-                  <span data-testid="text-summary-schedule" className="font-medium text-slate-900">
-                    {schedule.primary}
-                  </span>
-                  {schedule.secondary && (
-                    <span className="block text-xs text-slate-500">
-                      {schedule.secondary}
-                    </span>
-                  )}
-                </>
+                <span
+                  data-testid="text-summary-schedule"
+                  className="inline-flex items-center gap-1.5 text-slate-400"
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  Pending schedule
+                </span>
               )}
             </SummaryItem>
             {otherServices.length > 0 && (
@@ -472,6 +489,15 @@ export function PayMobile() {
       )}
     </div>
   );
+}
+
+function formatServiceDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map((s) => parseInt(s, 10));
+  const local = new Date(y, (m ?? 1) - 1, d ?? 1);
+  const weekday = local.toLocaleDateString("en-AU", { weekday: "long" });
+  const dayNum = local.getDate();
+  const month = local.toLocaleDateString("en-AU", { month: "long" });
+  return `${weekday} ${dayNum} ${month}`;
 }
 
 function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {

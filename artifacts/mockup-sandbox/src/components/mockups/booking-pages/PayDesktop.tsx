@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, MapPin, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText, X } from "lucide-react";
+import { ArrowRight, MapPin, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, Clock, FileText, X } from "lucide-react";
+import { AfternoonIcon, EveningIcon, MorningIcon } from "../booking-slots/TimeOfDayIcon";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
@@ -19,7 +20,6 @@ import {
   labelForRole,
   PAY_NOW_LABEL,
   PAY_NOW_SUBLABEL,
-  scheduleDisplay,
   STRIPE_REDIRECT_NOTE,
   unitLabel,
 } from "../../../state/bookingHelpers";
@@ -45,7 +45,6 @@ export function PayDesktop() {
 
   const total = computeBookingTotal(session);
   const isCoordination = isCoordinationFlow(session);
-  const schedule = scheduleDisplay(session);
   const unit = unitLabel(session.unit_id);
   const otherServices = resolveOtherServiceQuantities(
     session.other_service_quantities ?? {},
@@ -71,6 +70,9 @@ export function PayDesktop() {
           
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-900">Review & pay</h1>
+            <p className="mt-1.5 text-sm text-slate-500">
+              Check everything looks right before payment
+            </p>
           </div>
 
           <div className="flex-1 space-y-10">
@@ -97,11 +99,25 @@ export function PayDesktop() {
                 <SummaryRow label="Booker" value={<>{labelForRole(session.role)}<span className="block text-xs text-slate-500 mt-0.5">{[session.contact_first_name, session.contact_last_name].filter(Boolean).join(" ") || "—"}</span></>} />
                 <SummaryRow label="AC" value={acSummary(session)} />
                 <SummaryRow label="Access" value={<>{labelForAccessMethod(session.access_method)}{session.tenants.length > 0 && <span className="block text-xs text-slate-500 mt-0.5">{session.tenants.length} tenant(s)</span>}</>} />
-                <SummaryRow label="Slot" value={
-                  isCoordination ? "To be coordinated" : (
-                    <span className="flex items-center justify-end gap-1.5">
-                      <CheckCircle2 className="h-4 w-4" style={{ color: BRAND }} />
-                      {schedule.primary} <span className="text-slate-500 text-xs ml-1 capitalize">{schedule.secondary}</span>
+                <SummaryRow label="Service window" value={
+                  isCoordination ? (
+                    <span className="inline-flex items-center justify-end gap-1.5 font-medium" style={{ color: BRAND }}>
+                      <Clock className="h-4 w-4" />
+                      To be coordinated
+                    </span>
+                  ) : session.service_date && session.service_slot && session.service_slot !== "to_be_coordinated" ? (
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      {session.service_slot === "morning" && <MorningIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
+                      {session.service_slot === "afternoon" && <AfternoonIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
+                      {session.service_slot === "evening" && <EveningIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
+                      {formatServiceDate(session.service_date)}
+                      <span className="text-slate-400">·</span>
+                      <span className="capitalize">{session.service_slot}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center justify-end gap-1.5 text-slate-400">
+                      <Clock className="h-4 w-4" />
+                      Pending schedule
                     </span>
                   )
                 } />
@@ -473,6 +489,15 @@ export function PayDesktop() {
       )}
     </div>
   );
+}
+
+function formatServiceDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map((s) => parseInt(s, 10));
+  const local = new Date(y, (m ?? 1) - 1, d ?? 1);
+  const weekday = local.toLocaleDateString("en-AU", { weekday: "long" });
+  const dayNum = local.getDate();
+  const month = local.toLocaleDateString("en-AU", { month: "long" });
+  return `${weekday} ${dayNum} ${month}`;
 }
 
 function SummaryRow({

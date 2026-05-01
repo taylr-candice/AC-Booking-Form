@@ -1,24 +1,15 @@
-import { Sun } from "lucide-react";
 import type { CSSProperties } from "react";
 
 /**
  * Custom time-of-day icons for the customer slot picker.
  *
- *  - `MorningIcon`   — sun rising on the horizon WITH rays but no
- *    upward arrow (the arrow read as ambiguous). Outline only — the
- *    half-disc is not filled. Mirrors Lucide's `Sunrise` minus the
- *    arrow tip.
- *  - `AfternoonIcon` — Lucide's outline `Sun` (circle + rays, no
- *    fill). Re-exported here so the slot-picker imports stay
- *    consistent with `MorningIcon` / `EveningIcon`.
- *  - `EveningIcon`   — Lucide's outline `Moon` (no fill). Re-exported
- *    so every surface uses the same evening glyph and so the icon
- *    set lives in one file.
+ *  - `MorningIcon`   — sun rising on the horizon, outline, no arrow.
+ *  - `AfternoonIcon` — solid filled circle (no rays); distinct from
+ *    the morning half-disc at a glance.
+ *  - `EveningIcon`   — slim crescent moon.
  *
- * All three honour `currentColor` for both stroke and fill, so
- * callers can tint them via the usual `style.color` / `className`
- * props the slot pickers already pass to Lucide icons (drop-in
- * compatible). None of them render with a solid fill.
+ * All three honour `currentColor` so callers can tint via
+ * `style.color` / `className` (drop-in Lucide compatible).
  */
 
 type IconProps = {
@@ -67,7 +58,17 @@ export function AfternoonIcon({
   "aria-hidden": ariaHidden = true,
 }: IconProps) {
   return (
-    <Sun className={className} style={style} aria-hidden={ariaHidden} />
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+      className={className}
+      style={style}
+      aria-hidden={ariaHidden}
+    >
+      {/* Solid filled circle — peak-of-day sun, no rays. */}
+      <circle cx="12" cy="12" r="6" />
+    </svg>
   );
 }
 
