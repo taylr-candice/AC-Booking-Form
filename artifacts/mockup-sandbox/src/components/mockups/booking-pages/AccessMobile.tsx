@@ -236,8 +236,8 @@ function ResidenceCard({
       style={
         selected
           ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
+              borderColor: "#ED017F",
+              backgroundColor: "#FCE7F3",
             }
           : undefined
       }
@@ -282,8 +282,8 @@ function AccessCard({
       style={
         selected
           ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
+              borderColor: "#ED017F",
+              backgroundColor: "#FCE7F3",
             }
           : undefined
       }
@@ -409,8 +409,8 @@ function CoordinationChoiceCard({
       style={
         selected
           ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
+              borderColor: "#ED017F",
+              backgroundColor: "#FCE7F3",
             }
           : undefined
       }
@@ -544,8 +544,8 @@ function ReturnMethodCard({
       style={
         selected
           ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
+              borderColor: "#ED017F",
+              backgroundColor: "#FCE7F3",
             }
           : undefined
       }

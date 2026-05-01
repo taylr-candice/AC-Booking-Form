@@ -170,7 +170,7 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
       }`}
       style={
         selected
-          ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }
+          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
           : undefined
       }
     >
@@ -201,7 +201,7 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       }`}
       style={
         selected
-          ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }
+          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
           : undefined
       }
     >
@@ -264,7 +264,7 @@ function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { se
       className={`flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
       style={
         selected
-          ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }
+          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
           : undefined
       }
     >
@@ -367,7 +367,7 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
       className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
       style={
         selected
-          ? { borderColor: "rgba(95,187,151,0.45)", backgroundColor: "rgba(95,187,151,0.08)" }
+          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
           : undefined
       }
     >

@@ -100,8 +100,8 @@ export function PayMobile() {
           <div
             className="mb-4 mt-4 flex items-start gap-3 rounded-xl border p-3.5 text-[12.5px] leading-snug"
             style={{
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
+              borderColor: "#ED017F",
+              backgroundColor: "#FCE7F3",
               color: "#0F172A",
             }}
             data-testid="banner-coordination"
@@ -422,8 +422,8 @@ function MethodCard({
       style={
         selected
           ? {
-              borderColor: "rgba(95,187,151,0.45)",
-              backgroundColor: "rgba(95,187,151,0.08)",
+              borderColor: "#ED017F",
+              backgroundColor: "#FCE7F3",
             }
           : undefined
       }

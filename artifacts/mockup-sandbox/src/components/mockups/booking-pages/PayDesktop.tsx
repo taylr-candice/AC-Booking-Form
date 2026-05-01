@@ -72,8 +72,8 @@ export function PayDesktop() {
               <div
                 className="flex items-start gap-3 rounded-xl border p-5 text-sm leading-relaxed text-slate-700"
                 style={{
-                  borderColor: "rgba(95,187,151,0.45)",
-                  backgroundColor: "rgba(95,187,151,0.08)",
+                  borderColor: "#ED017F",
+                  backgroundColor: "#FCE7F3",
                 }}
                 data-testid="banner-coordination"
               >
@@ -138,8 +138,8 @@ export function PayDesktop() {
                   style={
                     method === "pay_now"
                       ? {
-                          borderColor: "rgba(95,187,151,0.45)",
-                          backgroundColor: "rgba(95,187,151,0.08)",
+                          borderColor: "#ED017F",
+                          backgroundColor: "#FCE7F3",
                         }
                       : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
                   }
@@ -163,8 +163,8 @@ export function PayDesktop() {
                     style={
                       method === "invoice"
                         ? {
-                            borderColor: "rgba(95,187,151,0.45)",
-                            backgroundColor: "rgba(95,187,151,0.08)",
+                            borderColor: "#ED017F",
+                            backgroundColor: "#FCE7F3",
                           }
                         : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
                     }
