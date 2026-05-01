@@ -59,10 +59,13 @@ export function AccessMobile() {
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
       {/* Page header */}
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
-        <div>
+        <div className="min-w-0 flex-1 pr-3">
           <h1 className="text-[26px] font-bold leading-tight text-slate-900">
-            Property access
+            Access
           </h1>
+          <p className="mt-1 text-[14px] leading-snug text-slate-500">
+            How will the technician access the property?
+          </p>
         </div>
         <button
           type="button"
@@ -79,19 +82,8 @@ export function AccessMobile() {
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {!role && <RoleMissingBanner />}
 
-        {role === "owner" && (
-          <PrimaryResidenceSection
-            residence={residence}
-            onPick={(r) => bookingActions.setPrimaryResidence(r)}
-          />
-        )}
-
         {(role === "agent" || (role === "owner" && residence)) && (
           <>
-            <p className="mb-3 text-[15px] leading-relaxed text-slate-600">
-              How will the technician access the property to perform the
-              service?
-            </p>
             <div className="space-y-3 mb-6">
               {opts.map((o) => {
                 // The agent's "Tenants will provide access" card represents
@@ -495,8 +487,8 @@ function LeaveKeySubMethodSection() {
 
   return (
     <div className="mb-6 space-y-4">
-      <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>
-        How will the key be left?
+      <h2 className="text-[17px] font-bold text-slate-900">
+        How will you leave a key?
       </h2>
 
       {/* Sub-option cards */}

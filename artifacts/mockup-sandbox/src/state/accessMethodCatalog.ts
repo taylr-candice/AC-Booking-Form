@@ -27,22 +27,22 @@ export type AccessOption = {
 // sub-option under the "Leave Key" card when the building has a Taylr locker.
 
 export const OWNER_LIVE_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_live_at_unit",   label: "I'll be at the unit",              subtitle: "I'll meet the technician at the property" },
-  { key: "owner_live_leave_key", label: "Leave a key",                      subtitle: "Choose how the tech gets access" },
-  { key: "owner_live_collect",   label: "Please collect and return my key", subtitle: "Taylr collects, services, then returns" },
+  { key: "owner_live_at_unit",   label: "I'll be there",       subtitle: "To let the technician into the property" },
+  { key: "owner_live_leave_key", label: "I'll leave a key",    subtitle: "For Taylr to access" },
+  { key: "owner_live_collect",   label: "Collect & return my key", subtitle: "Taylr collects, services, then returns" },
 ];
 
 export const OWNER_LEASED_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_leased_be_there",  label: "I'll be there to provide access", subtitle: "I'll meet the technician at the property" },
-  { key: "owner_leased_tenant",    label: "Arrange with tenant",             subtitle: "We'll contact your tenant to coordinate" },
-  { key: "owner_leased_agent",     label: "Arrange with agent",              subtitle: "Your managing agent will coordinate access" },
-  { key: "owner_leased_leave_key", label: "Leave a key",                     subtitle: "Choose how the tech gets access" },
+  { key: "owner_leased_be_there",  label: "I'll be there",          subtitle: "To let the technician into the property" },
+  { key: "owner_leased_tenant",    label: "Arrange with tenant(s)", subtitle: "I'll share their details" },
+  { key: "owner_leased_agent",     label: "Arrange with Agent",     subtitle: "They'll coordinate access" },
+  { key: "owner_leased_leave_key", label: "I'll leave a key",       subtitle: "For Taylr to access" },
 ];
 
 export const OWNER_VACANT_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_vacant_be_there",  label: "I'll be there to provide access", subtitle: "I'll meet the technician at the property" },
-  { key: "owner_vacant_leave_key", label: "Leave a key",                     subtitle: "Choose how the tech gets access" },
-  { key: "owner_vacant_collect",   label: "Please collect and return my key", subtitle: "Taylr collects, services, then returns" },
+  { key: "owner_vacant_be_there",  label: "I'll be there",      subtitle: "To let the technician into the property" },
+  { key: "owner_vacant_agent",     label: "Arrange with Agent", subtitle: "They'll coordinate access" },
+  { key: "owner_vacant_leave_key", label: "I'll leave a key",   subtitle: "For Taylr to access" },
 ];
 
 // For agents we present a single "Tenants will provide access" card. Once
@@ -119,34 +119,34 @@ export function getLeaveKeySubOptions(
   const opts: LeaveKeySubOption[] = [
     {
       key: "with_someone",
-      label: "With someone",
-      subtitle: "e.g. neighbour, friend, or family member on the day",
+      label: "With a 3rd party",
+      subtitle: "E.g. Neighbour, friend, family",
     },
   ];
   if (features.has_parcel_locker) {
     opts.push({
       key: "with_parcel_locker",
-      label: "In the parcel locker",
-      subtitle: "We'll send a unique drop code 24 h before your service",
+      label: "In the Taylr Locker",
+      subtitle: "Pls send me a drop code",
     });
   }
   opts.push({
     key: "with_taylr",
     label: "With Taylr",
-    subtitle: "We'll arrange a time to collect from you before the service",
+    subtitle: "Pls collect & return",
   });
   if (features.has_building_manager) {
     opts.push({
       key: "with_building_manager",
-      label: "With the building manager",
-      subtitle: features.building_manager_hours ?? "During business hours",
+      label: "With building management",
+      subtitle: "Prior to scheduled window",
     });
   }
   if (features.has_concierge) {
     opts.push({
       key: "with_concierge",
-      label: "With concierge",
-      subtitle: features.concierge_hours ?? "During concierge hours",
+      label: "With Concierge",
+      subtitle: "Prior to scheduled window",
     });
   }
   return opts;
@@ -276,7 +276,7 @@ export function isAgentTradeMethod(m: AccessMethod | null): boolean {
 }
 
 export function isManagingAgentMethod(m: AccessMethod | null): boolean {
-  return m === "owner_leased_agent";
+  return m === "owner_leased_agent" || m === "owner_vacant_agent";
 }
 
 /**
@@ -311,6 +311,7 @@ export function accessOnTheDayDescription(m: AccessMethod | null): string {
     case "agent_tenant_taylr":
       return "Tenant lets the technician in — Taylr coordinates the time";
     case "owner_leased_agent":
+    case "owner_vacant_agent":
       return "Managing agent coordinates access with the tenant";
     case "agent_tenant_self":
       return "Agent has briefed the tenant directly — tenant lets us in";

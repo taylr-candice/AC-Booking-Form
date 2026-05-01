@@ -5,6 +5,7 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+import { MorningIcon, AfternoonIcon, EveningIcon } from "./TimeOfDayIcon";
 
 const BRAND = "#ED017F";
 
@@ -14,15 +15,27 @@ function longWeekday(isoDate: string): string {
   return local.toLocaleDateString("en-AU", { weekday: "long" });
 }
 
+function WindowIcon({
+  window,
+  className,
+}: {
+  window: CustomerSlot["window"];
+  className?: string;
+}) {
+  if (window === "morning") return <MorningIcon className={className} />;
+  if (window === "afternoon") return <AfternoonIcon className={className} />;
+  return <EveningIcon className={className} />;
+}
+
 /**
  * "Next available" shortcut card. Sits above the day picker. Tapping
  * the CTA selects the day and slot via `onPick`; the customer still
  * acknowledges the cancellation terms via the docked checkbox below.
  *
- * Layout (three stacked lines, no per-window icon):
- *   Friday 1 May   ← bold black
- *   Afternoon      ← regular black
- *   1pm – 5pm      ← light grey
+ * Layout:
+ *   Next available                ← small pink uppercase label
+ *   [icon] Morning · Friday 1 May ← bold black headline (time-of-day first)
+ *   1pm – 5pm                     ← light grey time range
  */
 export function NextAvailableCard({
   day,
@@ -42,6 +55,7 @@ export function NextAvailableCard({
   const monthTitle =
     day.month.charAt(0) + day.month.slice(1).toLowerCase();
   const windowLabel = windowDisplayLabel(slot.window);
+  const iconSize = isCompact ? "h-[13px] w-[13px]" : "h-[14px] w-[14px]";
 
   return (
     <div
@@ -60,6 +74,7 @@ export function NextAvailableCard({
         />
 
         <div className="min-w-0 flex-1">
+          {/* "Next available" label */}
           <div
             className={`font-semibold uppercase tracking-wide ${
               isCompact ? "text-[10px]" : "text-[11px]"
@@ -69,26 +84,22 @@ export function NextAvailableCard({
             Next available
           </div>
 
-          {/* Line 1: date — bold black */}
+          {/* Headline: [time-of-day icon] Window · Weekday Day Month */}
           <div
-            className={`mt-0.5 font-bold text-slate-900 ${
+            className={`mt-0.5 flex items-center gap-1 font-bold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            {weekdayLong} {day.day} {monthTitle}
+            <WindowIcon window={slot.window} className={iconSize} />
+            <span>
+              {windowLabel}
+              <span className="mx-1 font-normal text-slate-400">·</span>
+              {weekdayLong} {day.day} {monthTitle}
+            </span>
           </div>
 
-          {/* Line 2: window label — regular weight, black */}
-          <div
-            className={`text-slate-900 ${
-              isCompact ? "text-[13px]" : "text-sm"
-            }`}
-          >
-            {windowLabel}
-          </div>
-
-          {/* Line 3: time range — light grey */}
+          {/* Time range — light grey */}
           <div
             className={`text-slate-500 ${
               isCompact ? "text-[11px]" : "text-xs"

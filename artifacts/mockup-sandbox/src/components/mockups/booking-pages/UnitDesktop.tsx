@@ -6,10 +6,13 @@ import {
   Building2,
   CheckCircle2,
   ChevronDown,
+  Home,
+  HousePlus,
   Search,
   User,
+  Users,
 } from "lucide-react";
-import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
+import { bookingActions, useBookingSelector, type PrimaryResidence } from "../../../state/bookingSession";
 import {
   canContinueStep1,
   validateEmail,
@@ -79,6 +82,7 @@ function errorStyle(hasError: boolean): React.CSSProperties | undefined {
 export function UnitDesktop() {
   const sessionUnitId = useBookingSelector((s) => s.unit_id);
   const role = useBookingSelector((s) => s.role);
+  const residence = useBookingSelector((s) => s.primary_residence);
   const agencyId = useBookingSelector((s) => s.agency_id);
   const agencyOtherName = useBookingSelector((s) => s.agency_other_name);
   const firstName = useBookingSelector((s) => s.contact_first_name);
@@ -397,11 +401,47 @@ export function UnitDesktop() {
                     id="agent"
                   />
                 </div>
+
+                {/* Progressive disclosure: residence type appears once Owner is selected */}
+                {role === "owner" && (
+                  <div className="mt-6">
+                    <h2 className="text-[18px] font-semibold leading-tight text-slate-900">
+                      The property is
+                    </h2>
+                    <div className="mt-3 grid grid-cols-3 gap-3">
+                      <ResidenceCard
+                        selected={residence === "live_in"}
+                        onClick={() => bookingActions.setPrimaryResidence("live_in")}
+                        icon={<Home className="h-5 w-5" />}
+                        title="My place of residence"
+                        subtitle="I live here"
+                        id="live_in"
+                      />
+                      <ResidenceCard
+                        selected={residence === "leased_out"}
+                        onClick={() => bookingActions.setPrimaryResidence("leased_out")}
+                        icon={<Users className="h-5 w-5" />}
+                        title="Leased out"
+                        subtitle="I have tenants in the unit"
+                        id="leased_out"
+                      />
+                      <ResidenceCard
+                        selected={residence === "vacant"}
+                        onClick={() => bookingActions.setPrimaryResidence("vacant")}
+                        icon={<HousePlus className="h-5 w-5" />}
+                        title="Vacant"
+                        subtitle="Between tenants or holiday home"
+                        id="vacant"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Progressive disclosure: contact + agency form appears once a role is picked. */}
-            {selected && role && (
+            {/* Progressive disclosure: contact + agency form appears once a role is picked
+                (and, for owners, once residence is also confirmed). */}
+            {selected && role && (role !== "owner" || residence) && (
               <div className="mt-10 space-y-8">
                 {isAgent && (
                   <div>
@@ -696,6 +736,64 @@ function RoleCard({
           style={{ color: "#ffffff" }}
         />
       )}
+    </button>
+  );
+}
+
+function ResidenceCard({
+  selected,
+  onClick,
+  icon,
+  title,
+  subtitle,
+  id,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  id: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={`card-residence-${id}`}
+      className={`relative flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
+        selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
+      }`}
+      style={
+        selected
+          ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG }
+          : undefined
+      }
+    >
+      <span
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+          selected ? "bg-white" : "bg-slate-100 text-slate-700"
+        }`}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
+      >
+        {icon}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span
+          className={`text-[14px] font-semibold leading-tight ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {title}
+        </span>
+        <span
+          className={`mt-0.5 text-[12px] leading-snug ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
+          {subtitle}
+        </span>
+      </span>
+      <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
     </button>
   );
 }

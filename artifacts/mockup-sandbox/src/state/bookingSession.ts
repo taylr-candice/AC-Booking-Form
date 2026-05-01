@@ -47,6 +47,7 @@ export type AccessMethod =
   | "owner_leased_parcel_locker"
   // Owner + vacant
   | "owner_vacant_be_there"
+  | "owner_vacant_agent"
   | "owner_vacant_leave_key"
   | "owner_vacant_parcel_locker"
   | "owner_vacant_collect"

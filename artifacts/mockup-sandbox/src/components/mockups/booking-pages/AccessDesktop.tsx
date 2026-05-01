@@ -27,7 +27,8 @@ export function AccessDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">How will the technician access the property?</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Access</h1>
+            <p className="mt-1 text-sm text-slate-500">How will the technician access the property to perform the service?</p>
           </div>
 
           <div className="flex-1">
@@ -43,13 +44,6 @@ export function AccessDesktop() {
                   .
                 </p>
               </div>
-            )}
-
-            {role === "owner" && (
-              <PrimaryResidenceSection
-                residence={residence}
-                onPick={(r) => bookingActions.setPrimaryResidence(r)}
-              />
             )}
 
             {(role === "agent" || (role === "owner" && residence)) && (
@@ -345,8 +339,8 @@ function LeaveKeySubMethodSection() {
 
   return (
     <div className="mb-8 space-y-5">
-      <h2 className="text-base font-semibold" style={{ color: BRAND }}>
-        How will the key be left?
+      <h2 className="text-[17px] font-bold text-slate-900">
+        How will you leave a key?
       </h2>
 
       {/* Sub-option cards */}

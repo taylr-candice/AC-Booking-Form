@@ -97,6 +97,7 @@ export function labelForAccessMethod(m: AccessMethod | null): string {
     case "owner_leased_leave_key":     return "Leaving a key";
     case "owner_leased_parcel_locker": return "Key in parcel locker";
     case "owner_vacant_be_there":      return "I'll be there (vacant)";
+    case "owner_vacant_agent":         return "Coordinated with agent (vacant)";
     case "owner_vacant_leave_key":     return "Leaving a key (vacant)";
     case "owner_vacant_parcel_locker": return "Key in parcel locker";
     case "owner_vacant_collect":       return "Collect & return (vacant)";
