@@ -155,6 +155,18 @@
     color: hsl(var(--muted-foreground));
     pointer-events: none;
   }
+
+  /* Hide scrollbar visuals while keeping scroll behaviour intact.
+     Used for touch-friendly horizontal scrollers (e.g. the customer
+     day picker on mobile) where a visible scrollbar competes with
+     the design and the swipe affordance is already obvious. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* One-shot pulse for the Call / Email / Bookings / Awaiting-coordination

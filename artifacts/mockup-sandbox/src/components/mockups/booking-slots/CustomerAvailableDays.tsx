@@ -136,7 +136,7 @@ export function CustomerAvailableDays({
   // rollout doesn't force a tall multi-row grid above the window
   // panel. Desktop gets a full-width wrapping grid.
   const containerClass = isCompact
-    ? "flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory scroll-smooth"
+    ? "flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory scroll-smooth no-scrollbar"
     : "grid grid-cols-5 gap-2.5";
 
   return (
