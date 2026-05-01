@@ -8,6 +8,7 @@ import {
   Info,
   Lock,
   Clock,
+  X,
 } from "lucide-react";
 import {
   bookingActions,
@@ -28,8 +29,6 @@ import {
   invoiceDestinationEmail,
   invoiceDestinationNote,
   INVOICE_LABEL,
-  INVOICE_PREPAYMENT_BODY,
-  INVOICE_PREPAYMENT_TITLE,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
   isPayStepEnabled,
@@ -50,6 +49,7 @@ type PayMethod = "pay_now" | "invoice";
 
 export function PayMobile() {
   const [method, setMethod] = useState<PayMethod | null>(null);
+  const [showPrepayInfo, setShowPrepayInfo] = useState(false);
   const session = useBookingSelector((s) => s);
 
   const total = computeBookingTotal(session);
@@ -247,25 +247,22 @@ export function PayMobile() {
             className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4"
             data-testid="block-invoice-mobile"
           >
-            <div className="flex items-start gap-3 mb-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white border border-slate-200 text-slate-700">
-                <FileText className="h-4 w-4" />
-              </div>
-              <div>
-                <div
-                  className="text-[13px] font-semibold mb-1"
-                  style={{ color: "#9D174D" }}
-                  data-testid="text-invoice-prepayment-title-mobile"
+            <div
+              className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
+              data-testid="block-prepay-notice-mobile"
+            >
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+              <p className="text-[12px] leading-relaxed text-slate-700">
+                Orders are cancelled if payment isn't received 48 hours before your service.{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowPrepayInfo(true)}
+                  className="font-semibold underline underline-offset-2"
+                  style={{ color: BRAND }}
                 >
-                  {INVOICE_PREPAYMENT_TITLE}
-                </div>
-                <p
-                  className="text-[12.5px] text-slate-600 leading-relaxed"
-                  data-testid="text-invoice-prepayment-body-mobile"
-                >
-                  {INVOICE_PREPAYMENT_BODY}
-                </p>
-              </div>
+                  View more
+                </button>
+              </p>
             </div>
             <div className="space-y-3">
               {/* Invoice destination (read-only) */}
@@ -370,6 +367,48 @@ export function PayMobile() {
           Simulate unit unavailable (mockup only)
         </button>
       </div>
+
+      {showPrepayInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-8"
+          onClick={() => setShowPrepayInfo(false)}
+          data-testid="modal-prepay-info-mobile"
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <h3 className="text-[15px] font-semibold text-slate-900">
+                Why do we require early payment?
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowPrepayInfo(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-[13px] leading-relaxed text-slate-600">
+              Due to the nature of our set-date offers, we've pre-negotiated
+              heavily discounted rates with our service provider subject to a
+              minimum number of services being completed at each building on the
+              day. To honour those rates, payment must be received at least 48
+              hours before your scheduled service — we're unable to invoice after
+              the work is completed.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowPrepayInfo(false)}
+              className="mt-4 w-full rounded-full py-2.5 text-[14px] font-semibold text-white"
+              style={{ backgroundColor: BRAND }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText } from "lucide-react";
+import { ArrowRight, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText, X } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
@@ -16,8 +16,6 @@ import {
   invoiceDestinationEmail,
   invoiceDestinationNote,
   INVOICE_LABEL,
-  INVOICE_PREPAYMENT_BODY,
-  INVOICE_PREPAYMENT_TITLE,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
   isPayStepEnabled,
@@ -38,6 +36,7 @@ type PayMethod = "pay_now" | "invoice";
 
 export function PayDesktop() {
   const [method, setMethod] = useState<PayMethod | null>(null);
+  const [showPrepayInfo, setShowPrepayInfo] = useState(false);
   const session = useBookingSelector((s) => s);
   const isAgent = session.role === "agent";
 
@@ -240,25 +239,22 @@ export function PayDesktop() {
                   className="rounded-xl border border-slate-200 bg-slate-50 p-6 animate-in fade-in duration-300"
                   data-testid="block-invoice-desktop"
                 >
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-white border border-slate-200 text-slate-700">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div
-                        className="text-sm font-semibold mb-1"
-                        style={{ color: "#9D174D" }}
-                        data-testid="text-invoice-prepayment-title-desktop"
+                  <div
+                    className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
+                    data-testid="block-prepay-notice-desktop"
+                  >
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+                    <p className="text-[12px] leading-relaxed text-slate-700">
+                      Orders are cancelled if payment isn't received 48 hours before your service.{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowPrepayInfo(true)}
+                        className="font-semibold underline underline-offset-2"
+                        style={{ color: BRAND }}
                       >
-                        {INVOICE_PREPAYMENT_TITLE}
-                      </div>
-                      <p
-                        className="text-sm text-slate-600 leading-relaxed"
-                        data-testid="text-invoice-prepayment-body-desktop"
-                      >
-                        {INVOICE_PREPAYMENT_BODY}
-                      </p>
-                    </div>
+                        View more
+                      </button>
+                    </p>
                   </div>
                   <div className="space-y-3">
                     {/* Invoice destination (read-only) */}
@@ -371,6 +367,48 @@ export function PayDesktop() {
 
         </div>
       </div>
+
+      {showPrepayInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6"
+          onClick={() => setShowPrepayInfo(false)}
+          data-testid="modal-prepay-info-desktop"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h3 className="text-base font-semibold text-slate-900">
+                Why do we require early payment?
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowPrepayInfo(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm leading-relaxed text-slate-600">
+              Due to the nature of our set-date offers, we've pre-negotiated
+              heavily discounted rates with our service provider subject to a
+              minimum number of services being completed at each building on the
+              day. To honour those rates, payment must be received at least 48
+              hours before your scheduled service — we're unable to invoice after
+              the work is completed.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowPrepayInfo(false)}
+              className="mt-5 w-full rounded-full py-2.5 text-sm font-semibold text-white"
+              style={{ backgroundColor: BRAND }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
