@@ -24,6 +24,13 @@ import {
   DEMO_MANAGING_AGENCIES,
   getAccessOptions,
   isAgentTenantOption,
+  isLeaveKeyMethod,
+  isCollectReturnMethod,
+  isManagingAgentMethod,
+  isTenantMethod,
+  infoNoteFor,
+  signatureVariantFor,
+  isStep5Valid,
   useTenants,
   type AccessOption,
 } from "../../../state/accessMethodCatalog";
@@ -39,7 +46,8 @@ export function AccessMobile() {
   const residence = session.primary_residence;
   const access = session.access_method;
   const opts = getAccessOptions(role, residence);
-  const valid = access !== null && (role === "agent" || residence !== null);
+  const tenants = useTenants(isTenantMethod(access));
+  const valid = isStep5Valid(session);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -106,6 +114,16 @@ export function AccessMobile() {
                 );
               })}
             </div>
+
+            {isAgentTenantOption(access) && (
+              <AgentTenantCoordinationSection access={access} />
+            )}
+            {(() => { const n = infoNoteFor(access); return n ? <InfoBanner title={n.title} body={n.body} /> : null; })()}
+            {isLeaveKeyMethod(access) && <KeyHolderSection />}
+            {isCollectReturnMethod(access) && <CollectReturnSection />}
+            {isManagingAgentMethod(access) && <ManagingAgencySection />}
+            {isTenantMethod(access) && <TenantsSection api={tenants} />}
+            {(() => { const s = signatureVariantFor(access); return s ? <SignatureSection title={s.title} body={s.body} /> : null; })()}
 
           </>
         )}

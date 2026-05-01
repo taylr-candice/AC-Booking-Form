@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
-import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, signatureVariantFor, isStep5Valid, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
 const BRAND = "#ED017F";
@@ -14,7 +14,8 @@ export function AccessDesktop() {
   const residence = session.primary_residence;
   const access = session.access_method;
   const opts = getAccessOptions(role, residence);
-  const valid = access !== null && (role === "agent" || residence !== null);
+  const tenants = useTenants(isTenantMethod(access));
+  const valid = isStep5Valid(session);
 
   const roleLabel = role === "owner" ? "Owner" : role === "agent" ? "Agent" : "—";
   const residenceLabel = residence === "live_in" ? "Live in" : residence === "leased_out" ? "Leased out" : residence === "vacant" ? "Vacant" : "—";
@@ -69,6 +70,16 @@ export function AccessDesktop() {
                     );
                   })}
                 </div>
+
+                {isAgentTenantOption(access) && (
+                  <AgentTenantCoordinationSection access={access} />
+                )}
+                {(() => { const n = infoNoteFor(access); return n ? <InfoBanner title={n.title} body={n.body} /> : null; })()}
+                {isLeaveKeyMethod(access) && <KeyHolderSection />}
+                {isCollectReturnMethod(access) && <CollectReturnSection />}
+                {isManagingAgentMethod(access) && <ManagingAgencySection />}
+                {isTenantMethod(access) && <TenantsSection api={tenants} />}
+                {(() => { const s = signatureVariantFor(access); return s ? <SignatureSection title={s.title} body={s.body} /> : null; })()}
 
               </>
             )}
