@@ -49,12 +49,17 @@ export function PayDesktop() {
     session.other_service_quantities ?? {},
   );
 
-  const payEnabled = isPayStepEnabled(session) && method !== null;
+  // Owners (non-agents) only have one option, so we auto-treat
+  // pay_now as selected and don't render the choice cards. Agents
+  // still pick between pay_now and invoice.
+  const effectiveMethod: PayMethod | null = isAgent ? method : "pay_now";
+  const payEnabled =
+    isPayStepEnabled(session) && effectiveMethod !== null;
   const ctaLabel =
-    method === "invoice"
+    effectiveMethod === "invoice"
       ? "Submit booking"
-      : method === "pay_now"
-        ? `Continue to payment $${total}`
+      : effectiveMethod === "pay_now"
+        ? "Continue to payment"
         : `Pay $${total}`;
 
   return (
@@ -127,33 +132,34 @@ export function PayDesktop() {
                 </div>
               </div>
 
-              <div className={`grid ${isAgent ? "grid-cols-2" : "grid-cols-1"} gap-3 mb-6`}>
-                {/* Pay now — everyone */}
-                <button
-                  type="button"
-                  onClick={() => setMethod("pay_now")}
-                  data-testid="card-method-pay-now"
-                  aria-pressed={method === "pay_now"}
-                  className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-5 transition"
-                  style={
-                    method === "pay_now"
-                      ? {
-                          borderColor: "#ED017F",
-                          backgroundColor: "#FCE7F3",
-                        }
-                      : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
-                  }
-                >
-                  <CreditCardIcon className="h-6 w-6 text-slate-700" />
-                  <span className="text-sm font-semibold text-slate-900">{PAY_NOW_LABEL}</span>
-                  <span className="text-[11px] font-medium text-slate-500">{PAY_NOW_SUBLABEL}</span>
-                  {method === "pay_now" && (
-                    <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: BRAND }} />
-                  )}
-                </button>
+              {/* Agents pick between Pay now and Invoice. Owners
+                  have only one option, so we skip the choice cards
+                  entirely and render the Stripe explainer below. */}
+              {isAgent && (
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setMethod("pay_now")}
+                    data-testid="card-method-pay-now"
+                    aria-pressed={method === "pay_now"}
+                    className="relative flex h-full flex-col items-center justify-center gap-2 rounded-xl border p-5 transition"
+                    style={
+                      method === "pay_now"
+                        ? {
+                            borderColor: "#ED017F",
+                            backgroundColor: "#FCE7F3",
+                          }
+                        : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
+                    }
+                  >
+                    <CreditCardIcon className="h-6 w-6 text-slate-700" />
+                    <span className="text-sm font-semibold text-slate-900">{PAY_NOW_LABEL}</span>
+                    <span className="text-[11px] font-medium text-slate-500">{PAY_NOW_SUBLABEL}</span>
+                    {method === "pay_now" && (
+                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: BRAND }} />
+                    )}
+                  </button>
 
-                {/* Invoice — agents only */}
-                {isAgent && (
                   <button
                     type="button"
                     onClick={() => setMethod("invoice")}
@@ -176,10 +182,10 @@ export function PayDesktop() {
                       <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: BRAND }} />
                     )}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
-              {method === "pay_now" && (
+              {effectiveMethod === "pay_now" && (
                 <div
                   className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-5 animate-in fade-in duration-300"
                   data-testid="block-pay-now-desktop"

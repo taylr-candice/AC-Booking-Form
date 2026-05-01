@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Pencil,
   CreditCard,
   FileText,
   CheckCircle2,
@@ -62,12 +61,17 @@ export function PayMobile() {
     if (!isAgent && method === "invoice") setMethod(null);
   }, [isAgent, method]);
 
-  const payEnabled = isPayStepEnabled(session) && method !== null;
+  // Owners (non-agents) only have one option, so we auto-treat
+  // pay_now as selected and don't render the choice cards. Agents
+  // still pick between pay_now and invoice.
+  const effectiveMethod: PayMethod | null = isAgent ? method : "pay_now";
+  const payEnabled =
+    isPayStepEnabled(session) && effectiveMethod !== null;
   const ctaLabel =
-    method === "invoice"
+    effectiveMethod === "invoice"
       ? "Submit booking"
-      : method === "pay_now"
-        ? `Continue to payment $${total}`
+      : effectiveMethod === "pay_now"
+        ? "Continue to payment"
         : `Pay $${total}`;
 
   return (
@@ -185,28 +189,6 @@ export function PayMobile() {
           </div>
         </div>
 
-        {/* Billing Details Header */}
-        <div className="mb-3 mt-6 flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>
-            Billing details
-          </h2>
-          <button type="button" aria-label="Edit" className="rounded p-1 text-slate-500 hover:text-slate-900">
-            <Pencil className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4 text-[13px] leading-relaxed text-slate-600 shadow-sm">
-          <div className="font-medium text-slate-900">
-            {[session.contact_first_name, session.contact_last_name].filter(Boolean).join(" ") || "—"}
-          </div>
-          <div>{session.contact_email || "—"}</div>
-          <div>{session.contact_phone || "—"}</div>
-          <div className="mt-2 text-slate-500">
-            Service address: {unit.line1}
-            {unit.line2 ? `, ${unit.line2}` : ""}
-          </div>
-        </div>
-
         {/* Payment Method */}
         <div className="mb-3 mt-6 flex items-center justify-between">
           <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>
@@ -214,16 +196,19 @@ export function PayMobile() {
           </h2>
         </div>
 
-        <div className="space-y-3 mb-6">
-          <MethodCard
-            selected={method === "pay_now"}
-            onClick={() => setMethod("pay_now")}
-            icon={<CreditCard className="h-5 w-5" />}
-            label={PAY_NOW_LABEL}
-            sublabel={PAY_NOW_SUBLABEL}
-            id="pay-now"
-          />
-          {isAgent && (
+        {/* Agents pick between Pay now and Invoice. Owners have
+            only one option, so we skip the choice cards entirely
+            and render the Stripe explainer below. */}
+        {isAgent && (
+          <div className="space-y-3 mb-6">
+            <MethodCard
+              selected={method === "pay_now"}
+              onClick={() => setMethod("pay_now")}
+              icon={<CreditCard className="h-5 w-5" />}
+              label={PAY_NOW_LABEL}
+              sublabel={PAY_NOW_SUBLABEL}
+              id="pay-now"
+            />
             <MethodCard
               selected={method === "invoice"}
               onClick={() => setMethod("invoice")}
@@ -232,10 +217,10 @@ export function PayMobile() {
               sublabel={INVOICE_SUBLABEL}
               id="invoice"
             />
-          )}
-        </div>
+          </div>
+        )}
 
-        {method === "pay_now" && (
+        {effectiveMethod === "pay_now" && (
           <div
             className="mb-8 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
             data-testid="block-pay-now-mobile"
