@@ -229,14 +229,14 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span
-          className={`text-[15px] font-semibold ${
+          className={`text-[14px] font-semibold ${
             selected ? "text-white" : "text-slate-900"
           }`}
         >
           {option.label}
         </span>
         <span
-          className={`mt-0.5 text-[13px] ${
+          className={`mt-0.5 text-[12px] ${
             selected ? "text-white/85" : "text-slate-500"
           }`}
         >

@@ -251,14 +251,14 @@ function ResidenceCard({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span
-          className={`text-[15px] font-semibold leading-tight ${
+          className={`text-[14px] font-semibold leading-tight ${
             selected ? "text-white" : "text-slate-900"
           }`}
         >
           {title}
         </span>
         <span
-          className={`mt-0.5 text-[12.5px] leading-snug ${
+          className={`mt-0.5 text-[12px] leading-snug ${
             selected ? "text-white/85" : "text-slate-500"
           }`}
         >
@@ -307,14 +307,14 @@ function AccessCard({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span
-          className={`text-[15px] font-semibold leading-tight ${
+          className={`text-[14px] font-semibold leading-tight ${
             selected ? "text-white" : "text-slate-900"
           }`}
         >
           {option.label}
         </span>
         <span
-          className={`mt-0.5 text-[12.5px] leading-snug ${
+          className={`mt-0.5 text-[12px] leading-snug ${
             selected ? "text-white/85" : "text-slate-500"
           }`}
         >

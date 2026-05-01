@@ -722,14 +722,14 @@ function RoleCard({
         {icon}
       </span>
       <span
-        className={`text-[15px] font-semibold leading-tight ${
+        className={`text-[14px] font-semibold leading-tight ${
           selected ? "text-white" : "text-slate-900"
         }`}
       >
         {title}
       </span>
       <span
-        className={`text-[12.5px] leading-snug ${
+        className={`text-[12px] leading-snug ${
           selected ? "text-white/85" : "text-slate-500"
         }`}
       >
