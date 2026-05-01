@@ -324,7 +324,7 @@ export function SlotsMobile() {
         </span>
       </div>
       {termsOpen && (
-        <CancellationTermsModal onClose={() => setTermsOpen(false)} />
+        <CancellationTermsModal mode="pre_order" onClose={() => setTermsOpen(false)} />
       )}
     </div>
   );

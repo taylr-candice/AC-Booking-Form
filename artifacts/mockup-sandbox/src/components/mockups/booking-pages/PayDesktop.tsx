@@ -24,6 +24,7 @@ import {
   unitLabel,
   windowFromSlotId,
 } from "../../../state/bookingHelpers";
+import { CancellationTermsModal } from "./CancellationTermsModal";
 
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
@@ -38,6 +39,7 @@ export function PayDesktop() {
   const [sendToAnother, setSendToAnother] = useState(false);
   const [anotherEmail, setAnotherEmail] = useState("");
   const [attemptedPay, setAttemptedPay] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSelector((s) => s);
   const isAgent = session.role === "agent";
 
@@ -416,6 +418,19 @@ export function PayDesktop() {
               </button>
             </span>
           </div>
+          <p className="mt-2 text-right text-[11px] text-slate-500">
+            By proceeding you agree to our{" "}
+            <button
+              type="button"
+              onClick={() => setTermsOpen(true)}
+              data-testid="button-view-cancellation-terms"
+              className="font-medium underline underline-offset-2 hover:opacity-80"
+              style={{ color: BRAND }}
+            >
+              cancellation terms
+            </button>
+            .
+          </p>
 
           {/* Mockup-only affordance for the cancelled-checkout terminal state
               (spec §9). Real Stripe integration would fire `cancelPayment()`
@@ -488,6 +503,9 @@ export function PayDesktop() {
             </button>
           </div>
         </div>
+      )}
+      {termsOpen && (
+        <CancellationTermsModal mode="payment" onClose={() => setTermsOpen(false)} />
       )}
     </div>
   );

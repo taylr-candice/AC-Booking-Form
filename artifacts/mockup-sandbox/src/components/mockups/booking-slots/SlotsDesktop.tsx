@@ -336,7 +336,7 @@ export function SlotsDesktop() {
         </div>
       </div>
       {termsOpen && (
-        <CancellationTermsModal onClose={() => setTermsOpen(false)} />
+        <CancellationTermsModal mode="pre_order" onClose={() => setTermsOpen(false)} />
       )}
     </div>
   );

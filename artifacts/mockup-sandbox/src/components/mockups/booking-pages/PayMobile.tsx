@@ -45,6 +45,7 @@ import {
   unitLabel,
   windowFromSlotId,
 } from "../../../state/bookingHelpers";
+import { CancellationTermsModal } from "./CancellationTermsModal";
 
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
@@ -59,6 +60,7 @@ export function PayMobile() {
   const [sendToAnother, setSendToAnother] = useState(false);
   const [anotherEmail, setAnotherEmail] = useState("");
   const [attemptedPay, setAttemptedPay] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSelector((s) => s);
 
   const total = computeBookingTotal(session);
@@ -402,6 +404,19 @@ export function PayMobile() {
             <span>Please select a payment method to continue.</span>
           </div>
         )}
+        <p className="mb-2.5 text-center text-[11px] text-slate-500">
+          By proceeding you agree to our{" "}
+          <button
+            type="button"
+            onClick={() => setTermsOpen(true)}
+            data-testid="button-view-cancellation-terms"
+            className="font-medium underline underline-offset-2 hover:opacity-80"
+            style={{ color: BRAND }}
+          >
+            cancellation terms
+          </button>
+          .
+        </p>
         <span
           onClickCapture={(e) => {
             if (!payEnabled) {
@@ -490,6 +505,9 @@ export function PayMobile() {
             </button>
           </div>
         </div>
+      )}
+      {termsOpen && (
+        <CancellationTermsModal mode="payment" onClose={() => setTermsOpen(false)} />
       )}
     </div>
   );

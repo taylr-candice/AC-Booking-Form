@@ -1,18 +1,82 @@
 import { X } from "lucide-react";
-import {
-  CANCELLATION_CONTACT_EMAIL,
-  CANCELLATION_POLICY_PARAGRAPHS,
-} from "../../../state/bookingHelpers";
+import { CANCELLATION_CONTACT_EMAIL } from "../../../state/bookingHelpers";
 import { useModalA11y } from "../../../hooks/use-modal-a11y";
 
 const BRAND = "#ED017F";
 
 /**
- * "View terms" modal shown from the Schedule step's cancellation ack.
- * Mirrors the visual pattern of `AcTermsModal`.
+ * Which variant of the cancellation terms to display.
+ *
+ * "pre_order"  — State A: user is selecting a service window before payment.
+ *                Neutral general expectations; no assumption about who the
+ *                user is (owner / tenant / agent).
+ *
+ * "post_order" — State B: service already paid; user arriving via a
+ *                third-party coordination link (e.g. tenant or agent
+ *                arranging access). Emphasises access accountability and
+ *                that the fee falls on the owner.
+ *
+ * "payment"    — User is proceeding to payment. Targets the payer directly
+ *                with clear financial consequences.
  */
-export function CancellationTermsModal({ onClose }: { onClose: () => void }) {
+export type CancellationTermsMode = "pre_order" | "post_order" | "payment";
+
+type Content = {
+  title: string;
+  paragraphs: string[];
+  contactVerb: string;
+};
+
+const CONTENT: Record<CancellationTermsMode, Content> = {
+  pre_order: {
+    title: "Cancellation & rescheduling",
+    paragraphs: [
+      "You can reschedule or cancel your booking with at least 48 hours' notice before your selected service window.",
+      "Changes made within 48 hours of the scheduled service may incur a $125 cancellation fee per unit. This fee covers the technician's allocated time.",
+      "Please ensure access to the property and the air conditioning system is available at the scheduled time. If access is not possible, the service may not be completed and a cancellation fee may still apply.",
+    ],
+    contactVerb: "To request a cancellation or reschedule, email us at",
+  },
+  post_order: {
+    title: "Important: access & cancellation",
+    paragraphs: [
+      "This service has already been arranged and paid for by the property owner.",
+      "Please ensure access to the property and the air conditioning system is available at the scheduled time.",
+      "If the booking is cancelled or rescheduled within 48 hours of the service window, a $125 cancellation fee will apply to the owner to cover the technician's allocated time.",
+      "If access is not available on the day, the service may not be completed and the cancellation fee may still apply.",
+      "If you need to make a change, please do so as early as possible.",
+    ],
+    contactVerb: "To request a change, email us at",
+  },
+  payment: {
+    title: "Cancellation terms",
+    paragraphs: [
+      "You can reschedule or cancel your booking with at least 48 hours' notice before your selected service window.",
+      "Changes made within 48 hours will incur a $125 cancellation fee per unit. This fee will be deducted from any refund issued.",
+      "If access to the property or the air conditioning system is not available at the scheduled time, the service may not be completed and the cancellation fee may still apply.",
+    ],
+    contactVerb: "To request a cancellation or reschedule, email us at",
+  },
+};
+
+/**
+ * "View terms" modal shown from the Schedule step and the Pay step.
+ *
+ * Pass `mode` to select which content variant renders — see
+ * `CancellationTermsMode` above for the exact conditions.
+ *
+ * Defaults to `"pre_order"` so existing call-sites that omit the prop
+ * keep their current behaviour without any changes.
+ */
+export function CancellationTermsModal({
+  onClose,
+  mode = "pre_order",
+}: {
+  onClose: () => void;
+  mode?: CancellationTermsMode;
+}) {
   const containerRef = useModalA11y<HTMLDivElement>({ onClose });
+  const { title, paragraphs, contactVerb } = CONTENT[mode];
 
   return (
     <div
@@ -40,7 +104,7 @@ export function CancellationTermsModal({ onClose }: { onClose: () => void }) {
             id="cancellation-terms-title"
             className="text-base font-semibold text-slate-900"
           >
-            Cancellation &amp; rescheduling terms
+            {title}
           </h2>
           <button
             type="button"
@@ -58,25 +122,10 @@ export function CancellationTermsModal({ onClose }: { onClose: () => void }) {
             className="space-y-3 text-[13px] text-slate-700 leading-relaxed"
             data-testid="cancellation-terms-paragraphs"
           >
-            {CANCELLATION_POLICY_PARAGRAPHS.map((p, i) => (
+            {paragraphs.map((p, i) => (
               <p key={i}>{p}</p>
             ))}
           </div>
-
-          <section className="mt-5">
-            <h3 className="text-[13px] font-semibold text-slate-900">
-              Who the fee applies to
-            </h3>
-            <p
-              className="mt-2 text-[13px] text-slate-700 leading-relaxed"
-              data-testid="cancellation-terms-liability"
-            >
-              Cancellation fees apply to the unit owner or leaseholder,
-              regardless of who books or attends the service. If you're
-              booking on someone else's behalf, please make sure they're
-              aware of these terms before you confirm the booking.
-            </p>
-          </section>
 
           <section className="mt-5">
             <h3 className="text-[13px] font-semibold text-slate-900">
@@ -86,7 +135,7 @@ export function CancellationTermsModal({ onClose }: { onClose: () => void }) {
               className="mt-2 text-[13px] text-slate-700 leading-relaxed"
               data-testid="cancellation-terms-contact"
             >
-              To request a cancellation or reschedule, email us at{" "}
+              {contactVerb}{" "}
               <a
                 href={`mailto:${CANCELLATION_CONTACT_EMAIL}`}
                 className="font-medium underline underline-offset-2"

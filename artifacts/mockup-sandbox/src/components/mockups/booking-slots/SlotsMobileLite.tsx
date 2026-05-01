@@ -294,7 +294,7 @@ export function SlotsMobileLite() {
         </span>
       </div>
       {termsOpen && (
-        <CancellationTermsModal onClose={() => setTermsOpen(false)} />
+        <CancellationTermsModal mode="post_order" onClose={() => setTermsOpen(false)} />
       )}
     </div>
   );
