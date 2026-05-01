@@ -44,9 +44,7 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
         imageAlt:
           "A white wall-mounted split AC indoor unit installed high on a living-room wall.",
         paragraphs: [
-          "Each wall-mounted indoor unit head counts as one indoor unit.",
-          "Your service already includes the number of indoor unit heads shown in the 'Includes' section.",
-          "Only add extras if the apartment has more indoor unit heads than shown there.",
+          "Each system service includes 1 indoor unit head maintenance check & filter clean. If you have more than 1 indoor unit head in your property, please add them as additional to your order.",
         ],
       },
     ],
