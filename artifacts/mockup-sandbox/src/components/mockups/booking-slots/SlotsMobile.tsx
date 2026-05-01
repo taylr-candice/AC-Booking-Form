@@ -104,8 +104,8 @@ export function SlotsMobile() {
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {/* Section header */}
         <div className="mb-2 mt-1 flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>
-            Available Slots
+          <h2 className="text-[15px] font-semibold text-slate-900">
+            Available windows
           </h2>
           <button type="button" aria-label="Edit" className="rounded p-1 text-slate-500 hover:text-slate-900">
             <Pencil className="h-4 w-4" />
