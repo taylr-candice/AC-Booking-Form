@@ -96,9 +96,25 @@ export const DEMO_BUILDING_FEATURES: BuildingFeatures = {
   building_manager_hours: "Mon–Fri 7am–7pm",
 };
 
-/** Returns the demo building features.  In a real app this would be an
- *  async lookup keyed to the unit's building id. */
-export function useBuildingFeatures(): BuildingFeatures {
+/**
+ * Demo building without a Taylr parcel locker — used for unit "u3"
+ * ("The Example · Bondi") so that the "With Taylr" leave-key option
+ * can be explored in isolation (no locker card to distract).
+ */
+export const DEMO_BUILDING_FEATURES_NO_LOCKER: BuildingFeatures = {
+  has_parcel_locker: false,
+  has_concierge: true,
+  concierge_hours: "Mon–Fri 8am–8pm",
+  has_building_manager: true,
+  building_manager_hours: "Mon–Fri 7am–7pm",
+};
+
+/** Returns the demo building features for the given unit.  In a real app
+ *  this would be an async lookup keyed to the unit's building id.
+ *  Unit "u3" resolves to a building without a Taylr parcel locker so
+ *  the no-locker flow can be previewed. */
+export function useBuildingFeatures(unitId?: string | null): BuildingFeatures {
+  if (unitId === "u3") return DEMO_BUILDING_FEATURES_NO_LOCKER;
   return DEMO_BUILDING_FEATURES;
 }
 

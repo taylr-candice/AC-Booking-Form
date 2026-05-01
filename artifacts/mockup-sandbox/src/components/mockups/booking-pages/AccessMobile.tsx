@@ -504,7 +504,8 @@ function InfoBanner({ title, body }: { title: string; body: string }) {
 }
 
 function LeaveKeySubMethodSection() {
-  const features = useBuildingFeatures();
+  const unitId = useBookingSelector((s) => s.unit_id);
+  const features = useBuildingFeatures(unitId);
   const subOptions = getLeaveKeySubOptions(features);
   const sub = useBookingSelector((s) => s.leave_key_sub_method);
   const keyHolderName = useBookingSelector((s) => s.key_holder_name);
