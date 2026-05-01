@@ -1,6 +1,5 @@
 import { ArrowRight, Sparkles } from "lucide-react";
 
-import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 import {
   windowDisplayLabel,
   type CustomerDay,
@@ -8,20 +7,6 @@ import {
 } from "./customerSlotData";
 
 const BRAND = "#ED017F";
-
-function WindowGlyph({
-  window,
-  className,
-}: {
-  window: CustomerSlot["window"];
-  className: string;
-}) {
-  if (window === "morning")
-    return <MorningIcon className={className} style={{ color: BRAND }} />;
-  if (window === "afternoon")
-    return <AfternoonIcon className={className} style={{ color: BRAND }} />;
-  return <EveningIcon className={className} style={{ color: BRAND }} />;
-}
 
 function longWeekday(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map((s) => parseInt(s, 10));
@@ -78,36 +63,21 @@ export function NextAvailableCard({
           >
             Next available
           </div>
+          {/* Date first, window kind below. */}
           <div
-            className={`mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-semibold text-slate-900 ${
+            className={`mt-0.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            {/* Time-of-day comes BEFORE the date so the customer
-                clocks the window kind first, then the calendar day
-                second. */}
-            <span className="inline-flex items-center gap-1">
-              <WindowGlyph
-                window={slot.window}
-                className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}
-              />
-              {windowLabel}
-            </span>
-            <span className="text-slate-300" aria-hidden="true">
-              ·
-            </span>
-            <span>
-              {weekdayLong} {day.day} {monthTitle}
-            </span>
+            {weekdayLong} {day.day} {monthTitle}
           </div>
           <div
-            className={`mt-0.5 text-slate-500 ${
+            className={`text-slate-500 ${
               isCompact ? "text-[11px]" : "text-xs"
             }`}
-            data-testid={`next-available-time-${testIdSuffix}`}
           >
-            {slot.timeLabel}
+            {windowLabel} · {slot.timeLabel}
           </div>
         </div>
 
