@@ -9,6 +9,7 @@
  */
 
 const BRAND = "#ED017F";
+const SELECTED_ACCENT = "#15803D";
 
 export function TermsAckRow({
   checked,
@@ -46,7 +47,7 @@ export function TermsAckRow({
           className={`mt-0.5 shrink-0 cursor-pointer rounded border-slate-300 ${
             isCompact ? "h-3.5 w-3.5" : "h-4 w-4"
           }`}
-          style={{ accentColor: BRAND }}
+          style={{ accentColor: SELECTED_ACCENT }}
           data-testid={ackTestId}
         />
         <span className={isCompact ? "text-[12px]" : "text-sm"}>{label}</span>

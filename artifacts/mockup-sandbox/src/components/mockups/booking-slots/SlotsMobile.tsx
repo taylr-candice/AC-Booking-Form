@@ -25,9 +25,9 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
-const SELECTED_PINK_BG = "#FCE7F3";
-const SELECTED_PINK_TEXT = "#0F172A";
-const SELECTED_PINK_BORDER = "#ED017F";
+const SELECTED_GREEN_BG = "#D1FAE5";
+const SELECTED_GREEN_TEXT = "#0F172A";
+const SELECTED_GREEN_BORDER = "#15803D";
 
 type Slot = CustomerSlot;
 
@@ -326,9 +326,9 @@ function SlotCard({
       style={
         isSelected
           ? {
-              borderColor: SELECTED_PINK_BORDER,
-              backgroundColor: SELECTED_PINK_BG,
-              color: SELECTED_PINK_TEXT,
+              borderColor: SELECTED_GREEN_BORDER,
+              backgroundColor: SELECTED_GREEN_BG,
+              color: SELECTED_GREEN_TEXT,
             }
           : undefined
       }
@@ -339,19 +339,19 @@ function SlotCard({
           style={
             disabled
               ? undefined
-              : { color: BRAND }
+              : { color: isSelected ? SELECTED_GREEN_BORDER : BRAND }
           }
         >
           {icon}
         </div>
         {isSelected && (
-          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: BRAND }} />
+          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: SELECTED_GREEN_BORDER }} />
         )}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
       <div
         className={`text-[10px] ${disabled ? "text-slate-400" : isSelected ? "" : "text-slate-500"}`}
-        style={isSelected ? { color: SELECTED_PINK_TEXT, opacity: 0.85 } : undefined}
+        style={isSelected ? { color: SELECTED_GREEN_TEXT, opacity: 0.85 } : undefined}
       >
         {hint}
       </div>

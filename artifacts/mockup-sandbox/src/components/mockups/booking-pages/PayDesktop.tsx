@@ -31,6 +31,8 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
+const SELECTED_BG = "#D1FAE5";
+const SELECTED_ACCENT = "#15803D";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -149,8 +151,8 @@ export function PayDesktop() {
                     style={
                       method === "pay_now"
                         ? {
-                            borderColor: "#ED017F",
-                            backgroundColor: "#FCE7F3",
+                            borderColor: SELECTED_ACCENT,
+                            backgroundColor: SELECTED_BG,
                           }
                         : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
                     }
@@ -159,7 +161,7 @@ export function PayDesktop() {
                     <span className="text-sm font-semibold text-slate-900">{PAY_NOW_LABEL}</span>
                     <span className="text-[11px] font-medium text-slate-500">{PAY_NOW_SUBLABEL}</span>
                     {method === "pay_now" && (
-                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: BRAND }} />
+                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_ACCENT }} />
                     )}
                   </button>
 
@@ -172,8 +174,8 @@ export function PayDesktop() {
                     style={
                       method === "invoice"
                         ? {
-                            borderColor: "#ED017F",
-                            backgroundColor: "#FCE7F3",
+                            borderColor: SELECTED_ACCENT,
+                            backgroundColor: SELECTED_BG,
                           }
                         : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
                     }
@@ -182,7 +184,7 @@ export function PayDesktop() {
                     <span className="text-sm font-semibold text-slate-900">{INVOICE_LABEL}</span>
                     <span className="text-[11px] font-medium text-slate-500">{INVOICE_SUBLABEL}</span>
                     {method === "invoice" && (
-                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: BRAND }} />
+                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_ACCENT }} />
                     )}
                   </button>
                 </div>

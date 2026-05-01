@@ -43,6 +43,8 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
+const SELECTED_BG = "#D1FAE5";
+const SELECTED_ACCENT = "#15803D";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -412,8 +414,8 @@ function MethodCard({
       style={
         selected
           ? {
-              borderColor: "#ED017F",
-              backgroundColor: "#FCE7F3",
+              borderColor: SELECTED_ACCENT,
+              backgroundColor: SELECTED_BG,
             }
           : undefined
       }
@@ -422,7 +424,7 @@ function MethodCard({
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -433,7 +435,7 @@ function MethodCard({
         )}
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: BRAND }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_ACCENT }} />
       )}
     </button>
   );

@@ -37,6 +37,8 @@ import {
 } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
+const SELECTED_BG = "#D1FAE5";
+const SELECTED_ACCENT = "#15803D";
 
 export function AccessMobile() {
   const session = useBookingSelector((s) => s);
@@ -236,8 +238,8 @@ function ResidenceCard({
       style={
         selected
           ? {
-              borderColor: "#ED017F",
-              backgroundColor: "#FCE7F3",
+              borderColor: SELECTED_ACCENT,
+              backgroundColor: SELECTED_BG,
             }
           : undefined
       }
@@ -246,7 +248,7 @@ function ResidenceCard({
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -255,7 +257,7 @@ function ResidenceCard({
         <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5" style={{ color: BRAND }} />
+        <CheckCircle2 className="h-5 w-5" style={{ color: SELECTED_ACCENT }} />
       )}
     </button>
   );
@@ -282,8 +284,8 @@ function AccessCard({
       style={
         selected
           ? {
-              borderColor: "#ED017F",
-              backgroundColor: "#FCE7F3",
+              borderColor: SELECTED_ACCENT,
+              backgroundColor: SELECTED_BG,
             }
           : undefined
       }
@@ -292,7 +294,7 @@ function AccessCard({
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -301,7 +303,7 @@ function AccessCard({
         <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{option.subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: BRAND }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_ACCENT }} />
       )}
     </button>
   );
@@ -409,20 +411,20 @@ function CoordinationChoiceCard({
       style={
         selected
           ? {
-              borderColor: "#ED017F",
-              backgroundColor: "#FCE7F3",
+              borderColor: SELECTED_ACCENT,
+              backgroundColor: SELECTED_BG,
             }
           : undefined
       }
     >
       <span
         className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2"
-        style={{ borderColor: selected ? BRAND : "#CBD5E1" }}
+        style={{ borderColor: selected ? SELECTED_ACCENT : "#CBD5E1" }}
       >
         {selected && (
           <span
             className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: BRAND }}
+            style={{ backgroundColor: SELECTED_ACCENT }}
           />
         )}
       </span>
@@ -544,8 +546,8 @@ function ReturnMethodCard({
       style={
         selected
           ? {
-              borderColor: "#ED017F",
-              backgroundColor: "#FCE7F3",
+              borderColor: SELECTED_ACCENT,
+              backgroundColor: SELECTED_BG,
             }
           : undefined
       }
@@ -554,7 +556,7 @@ function ReturnMethodCard({
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -563,7 +565,7 @@ function ReturnMethodCard({
         <span className="mt-0.5 text-[12px] leading-snug text-slate-500">{subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
+        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: SELECTED_ACCENT }} />
       )}
     </button>
   );
@@ -673,7 +675,7 @@ function SignatureSection({ title, body }: { title: string; body: string }) {
           type="checkbox"
           checked={agreed}
           onChange={(e) => bookingActions.setSignature({ signature_acknowledged: e.target.checked })}
-          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#ED017F] focus:ring-pink-600"
+          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#15803D] focus:ring-pink-600"
           data-testid="checkbox-signature"
         />
         <span className="text-sm text-slate-700">I have read and agree to the above</span>

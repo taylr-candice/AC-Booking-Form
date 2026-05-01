@@ -4,6 +4,8 @@ import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResi
 import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isBeThereMethod, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
+const SELECTED_BG = "#D1FAE5";
+const SELECTED_ACCENT = "#15803D";
 
 export function AccessDesktop() {
   const session = useBookingSelector((s) => s);
@@ -170,13 +172,13 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
       }`}
       style={
         selected
-          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
+          ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG }
           : undefined
       }
     >
       <span
         className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -184,7 +186,7 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
         <div className="text-[14px] font-semibold text-slate-900">{title}</div>
         <div className="mt-1 text-[11px] text-slate-500">{subtitle}</div>
       </div>
-      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: BRAND }} />}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_ACCENT }} />}
     </button>
   );
 }
@@ -201,13 +203,13 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       }`}
       style={
         selected
-          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
+          ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG }
           : undefined
       }
     >
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {iconForMethod(option.key)}
       </span>
@@ -215,7 +217,7 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
         <span className="text-[15px] font-semibold text-slate-900">{option.label}</span>
         <span className="mt-0.5 text-[13px] text-slate-500">{option.subtitle}</span>
       </span>
-      {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: BRAND }} />}
+      {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_ACCENT }} />}
     </button>
   );
 }
@@ -264,12 +266,12 @@ function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { se
       className={`flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
       style={
         selected
-          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
+          ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG }
           : undefined
       }
     >
-      <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? BRAND : "#CBD5E1" }}>
-        {selected && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: BRAND }} />}
+      <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? SELECTED_ACCENT : "#CBD5E1" }}>
+        {selected && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SELECTED_ACCENT }} />}
       </span>
       <div className="text-[14px] font-semibold text-slate-900">{title}</div>
       <div className="text-[12px] text-slate-500">{subtitle}</div>
@@ -367,13 +369,13 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
       className={`relative flex h-full flex-col items-start gap-2 rounded-2xl border p-4 text-left transition ${selected ? "" : "border-slate-200 bg-white hover:border-slate-300"}`}
       style={
         selected
-          ? { borderColor: "#ED017F", backgroundColor: "#FCE7F3" }
+          ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG }
           : undefined
       }
     >
       <span
         className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -381,7 +383,7 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
         <div className="text-[14px] font-semibold text-slate-900">{title}</div>
         <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>
       </div>
-      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: BRAND }} />}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_ACCENT }} />}
     </button>
   );
 }
@@ -472,7 +474,7 @@ function SignatureSection({ title, body }: { title: string; body: string }) {
             checked={ack}
             onChange={(e) => bookingActions.setSignature({ signature_acknowledged: e.target.checked })}
             className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
-            style={ack ? { accentColor: BRAND } : undefined}
+            style={ack ? { accentColor: SELECTED_ACCENT } : undefined}
           />
           <span className="text-sm text-slate-700">I have read and agree to the above.</span>
         </label>

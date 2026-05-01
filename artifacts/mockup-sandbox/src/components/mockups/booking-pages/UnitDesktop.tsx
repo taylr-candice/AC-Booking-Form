@@ -31,6 +31,8 @@ import {
 import { UnitAlreadyBookedModal } from "./UnitAlreadyBookedModal";
 
 const BRAND = "#ED017F";
+const SELECTED_BG = "#D1FAE5";
+const SELECTED_ACCENT = "#15803D";
 const ERROR_PURPLE = "#9747FF";
 
 const UNITS = [
@@ -664,8 +666,8 @@ function RoleCard({
       style={
         selected
           ? {
-              borderColor: "#ED017F",
-              backgroundColor: "#FCE7F3",
+              borderColor: SELECTED_ACCENT,
+              backgroundColor: SELECTED_BG,
             }
           : undefined
       }
@@ -674,7 +676,7 @@ function RoleCard({
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
           selected ? "text-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: BRAND } : undefined}
+        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -687,7 +689,7 @@ function RoleCard({
       {selected && (
         <CheckCircle2
           className="absolute right-3 top-3 h-5 w-5"
-          style={{ color: BRAND }}
+          style={{ color: SELECTED_ACCENT }}
         />
       )}
     </button>

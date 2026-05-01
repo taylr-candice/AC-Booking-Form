@@ -3,9 +3,9 @@ import { Moon, Sun, Sunrise } from "lucide-react";
 
 import { dayWindows, type CustomerDay, type CustomerSlot } from "./customerSlotData";
 
-const SELECTED_PINK_BG = "#FCE7F3";
-const SELECTED_PINK_TEXT = "#0F172A";
-const SELECTED_PINK_BORDER = "#ED017F";
+const SELECTED_GREEN_BG = "#D1FAE5";
+const SELECTED_GREEN_TEXT = "#0F172A";
+const SELECTED_GREEN_BORDER = "#15803D";
 
 function isoToday(): string {
   const now = new Date();
@@ -204,9 +204,9 @@ export function CustomerAvailableDays({
               style={
                 isSelected
                   ? {
-                      backgroundColor: SELECTED_PINK_BG,
-                      borderColor: SELECTED_PINK_BORDER,
-                      color: SELECTED_PINK_TEXT,
+                      backgroundColor: SELECTED_GREEN_BG,
+                      borderColor: SELECTED_GREEN_BORDER,
+                      color: SELECTED_GREEN_TEXT,
                     }
                   : undefined
               }
@@ -215,7 +215,7 @@ export function CustomerAvailableDays({
                 className={`${weekdaySize} font-medium uppercase tracking-wide ${
                   isSelected ? "" : "text-slate-500"
                 }`}
-                style={isSelected ? { color: SELECTED_PINK_TEXT, opacity: 0.85 } : undefined}
+                style={isSelected ? { color: SELECTED_GREEN_TEXT, opacity: 0.85 } : undefined}
               >
                 {day.weekday}
               </div>
@@ -224,7 +224,7 @@ export function CustomerAvailableDays({
                 className={`${monthSize} font-medium uppercase tracking-wide ${
                   isSelected ? "" : "text-slate-500"
                 }`}
-                style={isSelected ? { color: SELECTED_PINK_TEXT, opacity: 0.85 } : undefined}
+                style={isSelected ? { color: SELECTED_GREEN_TEXT, opacity: 0.85 } : undefined}
               >
                 {day.month}
               </div>
