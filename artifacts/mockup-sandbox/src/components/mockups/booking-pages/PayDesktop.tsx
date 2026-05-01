@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText, X } from "lucide-react";
+import { ArrowRight, Building2, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, FileText, X } from "lucide-react";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
@@ -8,13 +8,11 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
+  agencyDefaultEmail,
+  agencyDisplayName,
   computeBookingTotal,
   COORDINATION_NOTE,
-  COPY_INVOICE_TO_HELPER,
-  COPY_INVOICE_TO_LABEL,
   INVOICE_DESTINATION_LABEL,
-  invoiceDestinationEmail,
-  invoiceDestinationNote,
   INVOICE_LABEL,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
@@ -37,6 +35,8 @@ type PayMethod = "pay_now" | "invoice";
 export function PayDesktop() {
   const [method, setMethod] = useState<PayMethod | null>(null);
   const [showPrepayInfo, setShowPrepayInfo] = useState(false);
+  const [sendToAnother, setSendToAnother] = useState(false);
+  const [anotherEmail, setAnotherEmail] = useState("");
   const session = useBookingSelector((s) => s);
   const isAgent = session.role === "agent";
 
@@ -256,48 +256,103 @@ export function PayDesktop() {
                       </button>
                     </p>
                   </div>
-                  <div className="space-y-3">
-                    {/* Invoice destination (read-only) */}
+                  <div className="space-y-2">
+                    {/* Primary invoice recipient — always the agency */}
                     <div
                       className="rounded-xl border border-slate-200 bg-white p-4"
                       data-testid="block-invoice-destination-desktop"
                     >
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2.5">
                         {INVOICE_DESTINATION_LABEL}
                       </div>
-                      <div
-                        className="mt-1 text-sm font-semibold text-slate-900"
-                        data-testid="text-invoice-destination-desktop"
-                      >
-                        {invoiceDestinationEmail(session) ?? "—"}
-                      </div>
-                      {invoiceDestinationNote(session) && (
-                        <p
-                          className="mt-1 text-xs leading-relaxed text-slate-500"
-                          data-testid="text-invoice-destination-note-desktop"
-                        >
-                          {invoiceDestinationNote(session)}
-                        </p>
+                      {agencyDisplayName(session) ? (
+                        <div className="flex items-start gap-3">
+                          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100">
+                            <Building2 className="h-4 w-4 text-slate-600" />
+                          </div>
+                          <div>
+                            <div
+                              className="text-sm font-semibold text-slate-900 leading-tight"
+                              data-testid="text-agency-name-desktop"
+                            >
+                              {agencyDisplayName(session)}
+                            </div>
+                            {agencyDefaultEmail(session) ? (
+                              <div
+                                className="mt-0.5 text-xs text-slate-500"
+                                data-testid="text-agency-email-desktop"
+                              >
+                                E: {agencyDefaultEmail(session)}
+                              </div>
+                            ) : (
+                              <div className="mt-0.5 text-xs text-slate-400">
+                                Billing email loaded from our records.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-400">—</div>
                       )}
                     </div>
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="copy-invoice-desktop"
-                        className="text-sm font-medium text-slate-700"
+
+                    {/* Send to another party toggle */}
+                    <div
+                      className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                      data-testid="block-send-to-another-desktop"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!sendToAnother) {
+                            setAnotherEmail(session.contact_email.trim());
+                          }
+                          setSendToAnother((v) => !v);
+                        }}
+                        className="flex w-full items-center justify-between px-4 py-3"
+                        data-testid="toggle-send-to-another-desktop"
                       >
-                        {COPY_INVOICE_TO_LABEL}
-                      </label>
-                      <input
-                        id="copy-invoice-desktop"
-                        type="email"
-                        placeholder="finance@example.com"
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
-                        data-testid="input-copy-invoice-desktop"
-                      />
-                      <p className="text-xs text-slate-500">
-                        {COPY_INVOICE_TO_HELPER}
-                      </p>
+                        <span className="text-sm font-medium text-slate-900">
+                          Send invoice to another party
+                        </span>
+                        <span
+                          className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                          style={{ backgroundColor: sendToAnother ? BRAND : "#CBD5E1" }}
+                        >
+                          <span
+                            className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                            style={{ transform: sendToAnother ? "translateX(18px)" : "translateX(2px)" }}
+                          />
+                        </span>
+                      </button>
+                      {sendToAnother && (
+                        <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+                          <label
+                            htmlFor="send-to-another-email-desktop"
+                            className="mb-1.5 block text-xs font-medium text-slate-500"
+                          >
+                            Recipient email
+                          </label>
+                          <input
+                            id="send-to-another-email-desktop"
+                            type="email"
+                            inputMode="email"
+                            value={anotherEmail}
+                            onChange={(e) => setAnotherEmail(e.target.value)}
+                            placeholder="e.g. billing@example.com"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:bg-white"
+                            data-testid="input-send-to-another-email-desktop"
+                          />
+                          {session.contact_email.trim() &&
+                            anotherEmail === session.contact_email.trim() && (
+                              <p className="mt-1.5 text-xs text-slate-400">
+                                Pre-filled from your contact details at Step 1.
+                              </p>
+                            )}
+                        </div>
+                      )}
                     </div>
+
                   </div>
                   <div
                     className="mt-4 flex items-start gap-2 rounded-lg border border-pink-200 bg-pink-50/60 p-3"

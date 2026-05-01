@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  Building2,
   CreditCard,
   FileText,
   CheckCircle2,
@@ -21,13 +22,11 @@ import {
 import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
+  agencyDefaultEmail,
+  agencyDisplayName,
   computeBookingTotal,
   COORDINATION_NOTE,
-  COPY_INVOICE_TO_HELPER,
-  COPY_INVOICE_TO_LABEL,
   INVOICE_DESTINATION_LABEL,
-  invoiceDestinationEmail,
-  invoiceDestinationNote,
   INVOICE_LABEL,
   INVOICE_REFERENCE_NOTE,
   INVOICE_SUBLABEL,
@@ -50,6 +49,8 @@ type PayMethod = "pay_now" | "invoice";
 export function PayMobile() {
   const [method, setMethod] = useState<PayMethod | null>(null);
   const [showPrepayInfo, setShowPrepayInfo] = useState(false);
+  const [sendToAnother, setSendToAnother] = useState(false);
+  const [anotherEmail, setAnotherEmail] = useState("");
   const session = useBookingSelector((s) => s);
 
   const total = computeBookingTotal(session);
@@ -264,48 +265,101 @@ export function PayMobile() {
                 </button>
               </p>
             </div>
-            <div className="space-y-3">
-              {/* Invoice destination (read-only) */}
+            <div className="space-y-2">
+              {/* Primary invoice recipient — always the agency */}
               <div
                 className="rounded-xl border border-slate-200 bg-white p-3"
                 data-testid="block-invoice-destination-mobile"
               >
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-2">
                   {INVOICE_DESTINATION_LABEL}
                 </div>
-                <div
-                  className="mt-0.5 text-[13px] font-semibold text-slate-900"
-                  data-testid="text-invoice-destination-mobile"
-                >
-                  {invoiceDestinationEmail(session) ?? "—"}
-                </div>
-                {invoiceDestinationNote(session) && (
-                  <p
-                    className="mt-1 text-[11px] leading-relaxed text-slate-500"
-                    data-testid="text-invoice-destination-note-mobile"
-                  >
-                    {invoiceDestinationNote(session)}
-                  </p>
+                {agencyDisplayName(session) ? (
+                  <div className="flex items-start gap-2.5">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100">
+                      <Building2 className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div>
+                      <div
+                        className="text-[13px] font-semibold text-slate-900 leading-tight"
+                        data-testid="text-agency-name-mobile"
+                      >
+                        {agencyDisplayName(session)}
+                      </div>
+                      {agencyDefaultEmail(session) ? (
+                        <div
+                          className="mt-0.5 text-[12px] text-slate-500"
+                          data-testid="text-agency-email-mobile"
+                        >
+                          E: {agencyDefaultEmail(session)}
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 text-[11.5px] text-slate-400">
+                          Billing email loaded from our records.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[13px] text-slate-400">—</div>
                 )}
               </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="copy-invoice-mobile"
-                  className="text-[12px] font-medium text-slate-700"
+
+              {/* Send to another party toggle */}
+              <div
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+                data-testid="block-send-to-another-mobile"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!sendToAnother) {
+                      setAnotherEmail(session.contact_email.trim());
+                    }
+                    setSendToAnother((v) => !v);
+                  }}
+                  className="flex w-full items-center justify-between px-3 py-3"
+                  data-testid="toggle-send-to-another-mobile"
                 >
-                  {COPY_INVOICE_TO_LABEL}
-                </label>
-                <input
-                  id="copy-invoice-mobile"
-                  type="email"
-                  inputMode="email"
-                  placeholder="finance@example.com"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[14px] outline-none focus:border-slate-400"
-                  data-testid="input-copy-invoice-mobile"
-                />
-                <p className="text-[11px] text-slate-500">
-                  {COPY_INVOICE_TO_HELPER}
-                </p>
+                  <span className="text-[13px] font-medium text-slate-900">
+                    Send invoice to another party
+                  </span>
+                  <span
+                    className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200"
+                    style={{ backgroundColor: sendToAnother ? BRAND : "#CBD5E1" }}
+                  >
+                    <span
+                      className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                      style={{ transform: sendToAnother ? "translateX(18px)" : "translateX(2px)" }}
+                    />
+                  </span>
+                </button>
+                {sendToAnother && (
+                  <div className="border-t border-slate-100 px-3 pb-3 pt-2">
+                    <label
+                      htmlFor="send-to-another-email-mobile"
+                      className="mb-1 block text-[11px] font-medium text-slate-500"
+                    >
+                      Recipient email
+                    </label>
+                    <input
+                      id="send-to-another-email-mobile"
+                      type="email"
+                      inputMode="email"
+                      value={anotherEmail}
+                      onChange={(e) => setAnotherEmail(e.target.value)}
+                      placeholder="e.g. billing@example.com"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] outline-none focus:border-slate-400 focus:bg-white"
+                      data-testid="input-send-to-another-email-mobile"
+                    />
+                    {session.contact_email.trim() &&
+                      anotherEmail === session.contact_email.trim() && (
+                        <p className="mt-1.5 text-[11px] text-slate-400">
+                          Pre-filled from your contact details at Step 1.
+                        </p>
+                      )}
+                  </div>
+                )}
               </div>
             </div>
             <div

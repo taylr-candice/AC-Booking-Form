@@ -490,6 +490,7 @@ const DEMO_AGENCY_ACCOUNTS_EMAIL: Readonly<Record<string, string>> = {
   "agency-002": "accounts@cityedge.com.au",
   "agency-003": "accounts@capitalrealty.com.au",
   "agency-004": "accounts@harbourline.com.au",
+  "agency-006": "raywhite@raywhite.com",
 };
 
 /** Display name for the agency the agent is acting for. Falls back to the

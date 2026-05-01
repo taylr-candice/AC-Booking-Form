@@ -300,6 +300,7 @@ export const DEMO_MANAGING_AGENCIES: readonly AgencyOption[] = [
   { id: "agency-002", name: "City Edge Property Group" },
   { id: "agency-003", name: "Capital Realty & Co." },
   { id: "agency-004", name: "Harbourline Residential" },
+  { id: "agency-006", name: "Ray White Canberra" },
   { id: "agency-005", name: "Other / not listed" },
 ];
 
