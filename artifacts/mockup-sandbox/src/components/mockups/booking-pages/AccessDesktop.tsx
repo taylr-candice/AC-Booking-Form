@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { AlertCircle, ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Handshake, ChevronDown, Vault, Search } from "lucide-react";
+import { AlertCircle, ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Handshake, ChevronDown, Search } from "lucide-react";
+import { LockerIcon } from "./LockerIcon";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
 import { DEMO_MANAGING_AGENCIES, isOtherAgency, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption, type LeaveKeySubMethod } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
@@ -260,7 +261,7 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
 function iconForMethod(m: AccessMethod) {
   if (m === "owner_live_at_unit" || m === "owner_leased_be_there" || m === "owner_vacant_be_there" || m === "agent_be_there") return <HomeIcon className="h-5 w-5" />;
   if (m === "owner_live_leave_key" || m === "owner_leased_leave_key" || m === "owner_vacant_leave_key") return <KeyRound className="h-5 w-5" />;
-  if (m === "owner_live_parcel_locker" || m === "owner_leased_parcel_locker" || m === "owner_vacant_parcel_locker") return <Package className="h-5 w-5" />;
+  if (m === "owner_live_parcel_locker" || m === "owner_leased_parcel_locker" || m === "owner_vacant_parcel_locker") return <LockerIcon className="h-5 w-5" />;
   if (m === "owner_live_collect" || m === "owner_vacant_collect" || m === "agent_trade_key") return <Hand className="h-5 w-5" />;
   if (m === "owner_leased_tenant" || m === "agent_tenant_self" || m === "agent_tenant_taylr" || m === "agent_tenant_pending") return <Users className="h-5 w-5" />;
   return <Briefcase className="h-5 w-5" />;
@@ -268,7 +269,7 @@ function iconForMethod(m: AccessMethod) {
 
 function iconForSubMethod(key: LeaveKeySubMethod) {
   if (key === "with_someone") return <Users className="h-5 w-5" />;
-  if (key === "with_parcel_locker") return <Vault className="h-5 w-5" />;
+  if (key === "with_parcel_locker") return <LockerIcon className="h-5 w-5" />;
   if (key === "with_taylr") return <Handshake className="h-5 w-5" />;
   if (key === "with_building_manager") return <Building2 className="h-5 w-5" />;
   if (key === "with_concierge") return <ConciergeBell className="h-5 w-5" />;
@@ -449,7 +450,7 @@ function CollectReturnSection() {
           <ReturnMethodCard
             selected={returnMethod === "locker"}
             onClick={() => bookingActions.setReturnMethod("locker")}
-            icon={<PackageOpen className="h-5 w-5" />}
+            icon={<LockerIcon className="h-5 w-5" />}
             title="Onsite parcel locker"
             subtitle="Unique drop code, 24/7"
             id="locker"

@@ -10,9 +10,6 @@ import {
   Trash2,
   Plus,
   Home,
-  Package,
-  PackageOpen,
-  Vault,
   Hand,
   HousePlus,
   CheckCircle2,
@@ -22,6 +19,7 @@ import {
   ChevronDown,
   Search,
 } from "lucide-react";
+import { LockerIcon } from "./LockerIcon";
 import {
   bookingActions,
   useBookingSelector,
@@ -366,7 +364,7 @@ function iconForMethod(m: AccessMethod) {
     m === "owner_leased_parcel_locker" ||
     m === "owner_vacant_parcel_locker"
   ) {
-    return <Package className="h-5 w-5" />;
+    return <LockerIcon className="h-5 w-5" />;
   }
   if (
     m === "owner_live_collect" ||
@@ -388,7 +386,7 @@ function iconForMethod(m: AccessMethod) {
 
 function iconForSubMethod(key: LeaveKeySubMethod) {
   if (key === "with_someone") return <Users className="h-5 w-5" />;
-  if (key === "with_parcel_locker") return <Vault className="h-5 w-5" />;
+  if (key === "with_parcel_locker") return <LockerIcon className="h-5 w-5" />;
   if (key === "with_taylr") return <Handshake className="h-5 w-5" />;
   if (key === "with_building_manager") return <Building2 className="h-5 w-5" />;
   if (key === "with_concierge") return <ConciergeBell className="h-5 w-5" />;
@@ -605,7 +603,7 @@ function CollectReturnSection() {
           <ReturnMethodCard
             selected={returnMethod === "locker"}
             onClick={() => bookingActions.setReturnMethod("locker")}
-            icon={<PackageOpen className="h-5 w-5" />}
+            icon={<LockerIcon className="h-5 w-5" />}
             title="Drop in onsite parcel locker"
             subtitle="24/7 collection with a unique drop code"
             id="locker"
