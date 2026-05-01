@@ -95,7 +95,7 @@ export function SlotsMobileLite() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-6">
+      <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
         <div className="mb-2 mt-1">
           <h2 className="text-[15px] font-semibold text-slate-900">
             Available windows
