@@ -403,7 +403,7 @@ function AgentTenantCoordinationSection({
   access: AccessMethod | null;
 }) {
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+    <div className="mb-6">
       <h2 className="text-[15px] font-semibold mb-1" style={{ color: BRAND }}>
         Who will arrange the appointment with the tenant?
       </h2>

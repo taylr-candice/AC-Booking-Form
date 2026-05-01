@@ -278,7 +278,7 @@ function iconForMethod(m: AccessMethod) {
 
 function AgentTenantCoordinationSection({ access }: { access: AccessMethod | null }) {
   return (
-    <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50/60 p-6">
+    <div className="mb-8">
       <h2 className="text-[15px] font-semibold mb-1" style={{ color: BRAND }}>Who will arrange the appointment with the tenant?</h2>
       <p className="text-xs text-slate-500 mb-4">Choose who contacts the tenant to confirm the service window.</p>
       <div className="grid grid-cols-2 gap-3">
