@@ -575,7 +575,7 @@ function FullConfigView({
                 </span>
               </span>
               <div className="flex-1">
-                <p className="text-[13px] font-medium text-slate-900 leading-snug">{ack.label}</p>
+                <p className="text-[12px] text-slate-700 leading-snug">{ack.label}</p>
                 <div
                   id="ac-ack-helper-mobile"
                   className="mt-2 text-[11px] text-slate-500 leading-relaxed"
