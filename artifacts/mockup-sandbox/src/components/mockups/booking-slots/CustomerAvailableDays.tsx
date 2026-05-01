@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { CloudSun, Moon, Sun } from "lucide-react";
+import { Moon, Sun, Sunrise } from "lucide-react";
 
 import { dayWindows, type CustomerDay, type CustomerSlot } from "./customerSlotData";
 
@@ -16,10 +16,17 @@ function isoToday(): string {
 
 /**
  * Tiny weather/celestial glyph paired with each available window.
- * Morning = sun, afternoon = sun-behind-cloud, evening = moon. The
- * glyph row is the calendar's distinct Taylr touch — each available
- * date card shows a "sneak peek" of which windows are still open
- * before the customer commits to opening that day's slots.
+ * Mirrors the window-card icons inside the slot panel below so the
+ * customer can connect "the sneak peek glyph" to "the window I'll
+ * pick on the next screen":
+ *   morning   → Sunrise (horizon arrow up + rays)
+ *   afternoon → Sun     (filled centre with rays)
+ *   evening   → Moon    (filled crescent)
+ *
+ * The afternoon and evening glyphs use `fill="currentColor"` so the
+ * sun's centre and the moon's crescent read as solid shapes — they
+ * pop at the small size used in the day card grid where outline-only
+ * lucide strokes were too faint.
  */
 function WindowIcon({
   window,
@@ -30,10 +37,25 @@ function WindowIcon({
   className: string;
   style?: React.CSSProperties;
 }) {
-  if (window === "morning") return <Sun aria-hidden className={className} style={style} />;
+  if (window === "morning")
+    return <Sunrise aria-hidden className={className} style={style} />;
   if (window === "afternoon")
-    return <CloudSun aria-hidden className={className} style={style} />;
-  return <Moon aria-hidden className={className} style={style} />;
+    return (
+      <Sun
+        aria-hidden
+        className={className}
+        style={style}
+        fill="currentColor"
+      />
+    );
+  return (
+    <Moon
+      aria-hidden
+      className={className}
+      style={style}
+      fill="currentColor"
+    />
+  );
 }
 
 function windowSrLabel(window: CustomerSlot["window"]): string {
@@ -107,7 +129,7 @@ export function CustomerAvailableDays({
   const weekdaySize = isCompact ? "text-[10px]" : "text-[11px]";
   const daySize = isCompact ? "text-xl" : "text-2xl";
   const monthSize = isCompact ? "text-[10px]" : "text-[11px]";
-  const iconSize = isCompact ? "h-3.5 w-3.5" : "h-4 w-4";
+  const iconSize = isCompact ? "h-4 w-4" : "h-[18px] w-[18px]";
 
   // On compact viewports, render a horizontal scroller so a long
   // rollout doesn't force a tall multi-row grid above the window
