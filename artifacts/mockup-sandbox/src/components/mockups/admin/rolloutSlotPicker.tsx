@@ -22,6 +22,7 @@ import {
   Fragment,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { Check, ChevronLeft, ChevronRight, Clock, Hash } from "lucide-react";
@@ -212,22 +213,35 @@ export function RolloutMonthCalendar({
   // becomes set after a window is also picked.
   const [clickedDay, setClickedDay] = useState<string | null>(null);
 
-  // Effective focused day: if the parent has a picked date, that wins
-  // (the panel always reflects the current selection). Otherwise the
-  // user's last-clicked day from the calendar grid.
-  const focusedDate = pickedDate ?? clickedDay;
+  // Effective focused day: the user's most recent click on the
+  // calendar wins, so that even in reschedule mode (where the parent
+  // hands us a `pickedDate` for the current booking) clicking a
+  // different day cell swaps the visible window panel to that day.
+  // When `pickedDate` changes externally (e.g. the parent loads a
+  // different booking, or undo restores the original) we clear
+  // `clickedDay` so the new `pickedDate` takes over again — see the
+  // effect below.
+  const focusedDate = clickedDay ?? pickedDate;
   const focusedDay = focusedDate ? dayByIso.get(focusedDate) ?? null : null;
 
-  // Follow the parent's `pickedDate` across month boundaries — e.g.
-  // the reschedule modal opens with `pickedDate` set to a date in the
-  // booking's current month, but the admin then changes their mind
-  // and the parent advances to a date in another month before the
-  // modal re-mounts.
+  // When the parent hands us a *different* `pickedDate` (open
+  // reschedule for another booking, undo restoring the original, etc.)
+  // we (a) clear the user's pending day click so the new pickedDate
+  // wins focus and (b) snap the visible month to that date's month.
+  // Critically this effect must depend only on `pickedDate` — if it
+  // also depended on `visibleMonth` it would undo user navigation by
+  // snapping back to the picked-date's month every time the admin
+  // pressed prev/next.
+  const prevPickedDateRef = useRef(pickedDate);
   useEffect(() => {
-    if (pickedDate && monthKey(pickedDate) !== visibleMonth) {
-      setVisibleMonth(monthKey(pickedDate));
+    if (prevPickedDateRef.current !== pickedDate) {
+      setClickedDay(null);
+      if (pickedDate) {
+        setVisibleMonth(monthKey(pickedDate));
+      }
+      prevPickedDateRef.current = pickedDate;
     }
-  }, [pickedDate, visibleMonth]);
+  }, [pickedDate]);
 
   const cells = buildMonthMatrix(visibleMonth);
   const canPrev = monthsCovered.some((m) => m < visibleMonth);
