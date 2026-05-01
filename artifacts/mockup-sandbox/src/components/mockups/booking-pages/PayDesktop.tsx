@@ -144,7 +144,7 @@ export function PayDesktop() {
             {/* Payment Method */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold" style={{ color: BRAND }}>Payment details</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Payment details</h2>
                 <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                   <Lock className="h-3.5 w-3.5" /> Secure
                 </div>

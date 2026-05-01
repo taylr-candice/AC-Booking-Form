@@ -215,7 +215,7 @@ export function PayMobile() {
 
         {/* Payment Method */}
         <div className="mb-3 mt-6 flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>
+          <h2 className="text-[15px] font-semibold text-slate-900">
             Payment details
           </h2>
         </div>
