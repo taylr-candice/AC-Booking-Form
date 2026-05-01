@@ -25,9 +25,9 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
-const SELECTED_PINK_BG = "#5FBB97";
+const SELECTED_PINK_BG = "#ED017F";
 const SELECTED_PINK_TEXT = "#FFFFFF";
-const SELECTED_PINK_BORDER = "#5FBB97";
+const SELECTED_PINK_BORDER = "#ED017F";
 
 type Slot = CustomerSlot;
 
@@ -330,8 +330,14 @@ function SlotCard({
     >
       <div className="flex w-full items-center justify-between">
         <div
-          className={disabled ? "text-slate-400" : isSelected ? "" : "text-slate-900"}
-          style={isSelected ? { color: SELECTED_PINK_TEXT } : undefined}
+          className={disabled ? "text-slate-400" : ""}
+          style={
+            disabled
+              ? undefined
+              : isSelected
+                ? { color: SELECTED_PINK_TEXT }
+                : { color: BRAND }
+          }
         >
           {icon}
         </div>
