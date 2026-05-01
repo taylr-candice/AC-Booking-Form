@@ -25,6 +25,7 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
+const SELECTED_GREEN = "#5FBB97";
 
 type Slot = CustomerSlot;
 
@@ -60,9 +61,6 @@ export function SlotsMobileLite() {
   const pickSlotOneTap = (iso: string, slotId: string) => {
     setSelectedDate(iso);
     setSelectedSlotId(slotId);
-    if (!cancellationAck) {
-      bookingActions.setCancellationAcknowledged(true);
-    }
   };
 
   useEffect(() => {
@@ -175,7 +173,6 @@ export function SlotsMobileLite() {
                   day={nextAvailable.day}
                   slot={nextAvailable.slot}
                   onPick={pickSlotOneTap}
-                  onViewTerms={() => setTermsOpen(true)}
                   size="compact"
                   testIdSuffix="mobile-lite"
                 />
@@ -310,12 +307,12 @@ function SlotCard({
       }`}
       style={
         isSelected
-          ? { borderColor: BRAND, backgroundColor: BRAND }
+          ? { borderColor: SELECTED_GREEN, backgroundColor: SELECTED_GREEN }
           : undefined
       }
     >
       <div className="flex w-full items-center justify-between">
-        <div className={disabled ? "text-slate-400" : isSelected ? "text-white" : "text-slate-500"}>
+        <div className={disabled ? "text-slate-400" : isSelected ? "text-white" : "text-slate-900"}>
           {icon}
         </div>
         {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}

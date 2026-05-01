@@ -43,23 +43,20 @@ function longWeekday(isoDate: string): string {
 }
 
 /**
- * One-tap "Next available" shortcut card. Sits above the day picker.
- * Tapping the CTA selects the day, selects the slot, and acks the
- * cancellation terms via `onPick`. The visible click-wrap microcopy
- * + `onViewTerms` modal preserve informed consent.
+ * "Next available" shortcut card. Sits above the day picker. Tapping
+ * the CTA selects the day and slot via `onPick`; the customer still
+ * acknowledges the cancellation terms via the docked checkbox below.
  */
 export function NextAvailableCard({
   day,
   slot,
   onPick,
-  onViewTerms,
   size = "compact",
   testIdSuffix,
 }: {
   day: CustomerDay;
   slot: CustomerSlot;
   onPick: (iso: string, slotId: string) => void;
-  onViewTerms: () => void;
   size?: "compact" | "regular";
   testIdSuffix: string;
 }) {
@@ -137,26 +134,6 @@ export function NextAvailableCard({
         >
           Book this time
           <ArrowRight className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
-        </button>
-      </div>
-
-      <div
-        className={`mt-2 text-slate-500 ${
-          isCompact ? "text-[10.5px] leading-snug" : "text-[11px] leading-snug"
-        }`}
-        data-testid={`next-available-consent-${testIdSuffix}`}
-      >
-        By tapping{" "}
-        <span className="font-medium text-slate-600">Book this time</span> you
-        accept the cancellation and rescheduling terms.{" "}
-        <button
-          type="button"
-          onClick={onViewTerms}
-          data-testid={`button-view-next-available-terms-${testIdSuffix}`}
-          className="font-medium underline underline-offset-2 hover:opacity-80"
-          style={{ color: BRAND }}
-        >
-          View terms
         </button>
       </div>
     </div>

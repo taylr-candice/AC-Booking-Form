@@ -507,7 +507,7 @@ describe.each(VARIANTS)("$name slot picker", ({
       ).toBeNull();
     });
 
-    it("renders above the day picker and one-tap selects day + window + acks the terms", () => {
+    it("renders above the day picker and tapping it selects day + window (terms still need to be ticked at the bottom)", () => {
       applyScenario("owner", {
         label: "tiny",
         systems: 1,
@@ -539,36 +539,12 @@ describe.each(VARIANTS)("$name slot picker", ({
         `button[data-testid^="${slotTestidPrefix}"][aria-pressed="true"]`,
       );
       expect(pressed.length).toBe(1);
+      expect(ack.checked).toBe(false);
+      expect(confirm.disabled).toBe(true);
+
+      fireEvent.click(ack);
       expect(ack.checked).toBe(true);
       expect(confirm.disabled).toBe(false);
-    });
-
-    it("renders click-wrap consent in the card and View terms opens the modal", () => {
-      applyScenario("owner", {
-        label: "tiny",
-        systems: 1,
-        additional: 0,
-        ac_discrepancy: null,
-      });
-
-      const { getByTestId, queryByTestId } = render(<Component />);
-
-      const card = getByTestId(`next-available-card-${suffix}`);
-      const consent = getByTestId(`next-available-consent-${suffix}`);
-      const book = getByTestId(`button-book-next-available-${suffix}`);
-      expect(card.contains(consent)).toBe(true);
-      expect(card.contains(book)).toBe(true);
-      expect(consent.textContent ?? "").toMatch(
-        /By tapping.*Book this time.*cancellation and rescheduling terms/,
-      );
-
-      expect(queryByTestId("modal-cancellation-terms")).toBeNull();
-      const viewTerms = getByTestId(
-        `button-view-next-available-terms-${suffix}`,
-      );
-      expect(viewTerms.tagName).toBe("BUTTON");
-      fireEvent.click(viewTerms);
-      expect(queryByTestId("modal-cancellation-terms")).not.toBeNull();
     });
   });
 

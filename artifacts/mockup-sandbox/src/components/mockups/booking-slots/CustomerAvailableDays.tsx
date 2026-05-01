@@ -3,8 +3,7 @@ import { Moon, Sun, Sunrise } from "lucide-react";
 
 import { dayWindows, type CustomerDay, type CustomerSlot } from "./customerSlotData";
 
-const BRAND = "#ED017F";
-const BRAND_SOFT = "#FCE7F0";
+const SELECTED_GREEN = "#5FBB97";
 
 function isoToday(): string {
   const now = new Date();
@@ -186,7 +185,7 @@ export function CustomerAvailableDays({
             );
           }
 
-          const iconColor = isSelected ? "rgba(255,255,255,0.95)" : BRAND;
+          const iconColor = isSelected ? "rgba(255,255,255,0.95)" : "#0F172A";
 
           return (
             <button
@@ -199,11 +198,11 @@ export function CustomerAvailableDays({
               className={`${cardBase} ${cardSize} ${isCompact ? "snap-start" : ""} ${
                 isSelected
                   ? "text-white shadow-sm"
-                  : "border-slate-200 bg-white text-slate-900 hover:border-pink-300 hover:bg-pink-50"
+                  : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50"
               }`}
               style={
                 isSelected
-                  ? { backgroundColor: BRAND, borderColor: BRAND }
+                  ? { backgroundColor: SELECTED_GREEN, borderColor: SELECTED_GREEN }
                   : undefined
               }
             >
@@ -242,7 +241,7 @@ export function CustomerAvailableDays({
               {isToday && !isSelected && (
                 <span
                   className="pointer-events-none absolute inset-1 rounded-lg"
-                  style={{ boxShadow: `inset 0 0 0 1px ${BRAND_SOFT}` }}
+                  style={{ boxShadow: `inset 0 0 0 1px #CBD5E1` }}
                   aria-hidden="true"
                 />
               )}
