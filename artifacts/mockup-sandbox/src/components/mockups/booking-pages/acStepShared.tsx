@@ -502,8 +502,7 @@ export function PriceBlock({
           data-testid="text-price-anchor"
         >
           Each AC system is ${SYSTEM_PRICE}, so your total reflects the number
-          of systems on-site, plus ${ADDON_PRICE} for each extra unit beyond
-          what's included.
+          of systems on-site, plus ${ADDON_PRICE} for extra indoor units.
         </p>
       </div>
       <div className="space-y-2 text-sm text-slate-600">
