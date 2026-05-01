@@ -3582,7 +3582,7 @@ const RL_ASPEN_DAYS: RolloutDay[] = [
   makeTimeBudgetDay("2026-05-02", 120,   0),
   makeTimeBudgetDay("2026-05-04",   0,  60, { evening: { booked: 0 } }),
   makeTimeBudgetDay("2026-05-05", MORNING_WINDOW_MIN,  30),
-  makeTimeBudgetDay("2026-05-06", 105, 240),
+  makeTimeBudgetDay("2026-05-06", 105, 240, { evening: { booked: 0 } }),
   makeTimeBudgetDay("2026-05-07",   0, AFTERNOON_WINDOW_MIN),
   makeTimeBudgetDay("2026-05-08",  60,  90, { evening: { booked: 0 } }),
   makeTimeBudgetDay("2026-05-09", 150, AFTERNOON_WINDOW_MIN),

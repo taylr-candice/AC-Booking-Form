@@ -67,8 +67,10 @@ export function AfternoonIcon({
       aria-hidden={ariaHidden}
     >
       {/* Solid filled circle — distinct from the morning half-disc
-          and the evening crescent at a glance. No rays. */}
-      <circle cx="12" cy="12" r="5" />
+          and the evening crescent at a glance. No rays.
+          r=7 gives a 14-unit diameter in the 24-unit viewBox so it
+          reads at the same visual weight as the other icons. */}
+      <circle cx="12" cy="12" r="7" />
     </svg>
   );
 }
