@@ -3,7 +3,9 @@ import { Moon, Sun, Sunrise } from "lucide-react";
 
 import { dayWindows, type CustomerDay, type CustomerSlot } from "./customerSlotData";
 
-const SELECTED_GREEN = "#5FBB97";
+const SELECTED_PINK_BG = "#FCE7F3";
+const SELECTED_PINK_TEXT = "#9D0153";
+const SELECTED_PINK_BORDER = "#ED017F";
 
 function isoToday(): string {
   const now = new Date();
@@ -197,27 +199,33 @@ export function CustomerAvailableDays({
               aria-label={`${day.weekday} ${day.day} ${day.month} — ${availableWindows.length} window${availableWindows.length === 1 ? "" : "s"} available`}
               className={`${cardBase} ${cardSize} ${isCompact ? "snap-start" : ""} ${
                 isSelected
-                  ? "text-white shadow-sm"
+                  ? "shadow-sm"
                   : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50"
               }`}
               style={
                 isSelected
-                  ? { backgroundColor: SELECTED_GREEN, borderColor: SELECTED_GREEN }
+                  ? {
+                      backgroundColor: SELECTED_PINK_BG,
+                      borderColor: SELECTED_PINK_BORDER,
+                      color: SELECTED_PINK_TEXT,
+                    }
                   : undefined
               }
             >
               <div
                 className={`${weekdaySize} font-medium uppercase tracking-wide ${
-                  isSelected ? "text-white/85" : "text-slate-500"
+                  isSelected ? "" : "text-slate-500"
                 }`}
+                style={isSelected ? { color: SELECTED_PINK_TEXT, opacity: 0.85 } : undefined}
               >
                 {day.weekday}
               </div>
               <div className={`${daySize} font-bold leading-tight`}>{day.day}</div>
               <div
                 className={`${monthSize} font-medium uppercase tracking-wide ${
-                  isSelected ? "text-white/85" : "text-slate-500"
+                  isSelected ? "" : "text-slate-500"
                 }`}
+                style={isSelected ? { color: SELECTED_PINK_TEXT, opacity: 0.85 } : undefined}
               >
                 {day.month}
               </div>

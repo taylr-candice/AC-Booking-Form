@@ -25,7 +25,9 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN = "#5FBB97";
+const SELECTED_PINK_BG = "#FCE7F3";
+const SELECTED_PINK_TEXT = "#9D0153";
+const SELECTED_PINK_BORDER = "#ED017F";
 
 type Slot = CustomerSlot;
 
@@ -302,23 +304,37 @@ function SlotCard({
         disabled
           ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
           : isSelected
-            ? "text-white shadow-sm"
+            ? "shadow-sm"
             : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
       }`}
       style={
         isSelected
-          ? { borderColor: SELECTED_GREEN, backgroundColor: SELECTED_GREEN }
+          ? {
+              borderColor: SELECTED_PINK_BORDER,
+              backgroundColor: SELECTED_PINK_BG,
+              color: SELECTED_PINK_TEXT,
+            }
           : undefined
       }
     >
       <div className="flex w-full items-center justify-between">
-        <div className={disabled ? "text-slate-400" : isSelected ? "text-white" : "text-slate-900"}>
+        <div
+          className={disabled ? "text-slate-400" : isSelected ? "" : "text-slate-900"}
+          style={isSelected ? { color: SELECTED_PINK_TEXT } : undefined}
+        >
           {icon}
         </div>
-        {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
+        {isSelected && (
+          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: SELECTED_PINK_TEXT }} />
+        )}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>
-      <div className={`text-[10px] ${disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"}`}>{hint}</div>
+      <div
+        className={`text-[10px] ${disabled ? "text-slate-400" : isSelected ? "" : "text-slate-500"}`}
+        style={isSelected ? { color: SELECTED_PINK_TEXT, opacity: 0.85 } : undefined}
+      >
+        {hint}
+      </div>
     </button>
   );
 }
