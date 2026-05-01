@@ -226,9 +226,23 @@ describe("AwaitingCoordinationView · bulk template picker per-day drill-down (T
       (t) => t.name === voicemailLabel,
     )!;
 
-    // Zero-count bar stays inert (a span, not a button).
+    // Zero-count bar stays inert (a span, not a button). The
+    // sparkline rolls a 7-day window anchored on today's UTC midnight,
+    // so we pick the leftmost bucket (today − 6 days) to be sure it's
+    // in the rendered window and is not touched by any of the seeded
+    // bookings (which target Apr 28/29).
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const todayUtc = new Date();
+    const leftmostUtc = new Date(
+      Date.UTC(
+        todayUtc.getUTCFullYear(),
+        todayUtc.getUTCMonth(),
+        todayUtc.getUTCDate(),
+      ) - 6 * ONE_DAY_MS,
+    );
+    const leftmostIso = leftmostUtc.toISOString().slice(0, 10);
     const zeroBar = screen.getByTestId(
-      `call-template-usage-sparkline-bar-bulk-${voicemailTpl.id}-2026-04-24`,
+      `call-template-usage-sparkline-bar-bulk-${voicemailTpl.id}-${leftmostIso}`,
     );
     expect(zeroBar.tagName).toBe("SPAN");
     expect(zeroBar.getAttribute("data-interactive")).toBe("false");
