@@ -516,10 +516,14 @@ function ManagingAgencySection() {
   const otherContact = useBookingSelector((s) => s.managing_other_contact);
   const otherEmail = useBookingSelector((s) => s.managing_other_email);
   const otherPhone = useBookingSelector((s) => s.managing_other_phone);
+  const agentContact = useBookingSelector((s) => s.managing_agent_contact);
+  const agentEmail = useBookingSelector((s) => s.managing_agent_email);
+  const agentPhone = useBookingSelector((s) => s.managing_agent_phone);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const selected = DEMO_MANAGING_AGENCIES.find((a) => a.id === agencyId);
   const showOtherForm = isOtherAgency(agencyId);
+  const showKnownAgencyContact = agencyId !== null && !isOtherAgency(agencyId);
 
   useEffect(() => {
     if (!open) setQuery("");
@@ -606,6 +610,62 @@ function ManagingAgencySection() {
           </div>
         )}
       </div>
+
+      {/* Optional agent contact override — shown for any known agency selection */}
+      {showKnownAgencyContact && (
+        <div className="mt-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <p className="text-[14px] font-semibold text-slate-700">Agency contact</p>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Optional
+            </span>
+          </div>
+          <p className="text-[13px] text-slate-500 -mt-2">
+            In case the default contact for {selected?.name} isn't the right person for this job.
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Contact name
+            </label>
+            <input
+              type="text"
+              value={agentContact}
+              onChange={(e) => bookingActions.setManagingAgentContact({ managing_agent_contact: e.target.value })}
+              placeholder="e.g. Jane Smith"
+              data-testid="input-managing-agent-contact"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                Email
+              </label>
+              <input
+                type="email"
+                value={agentEmail}
+                onChange={(e) => bookingActions.setManagingAgentContact({ managing_agent_email: e.target.value })}
+                placeholder="agent@example.com"
+                data-testid="input-managing-agent-email"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={agentPhone}
+                onChange={(e) => bookingActions.setManagingAgentContact({ managing_agent_phone: e.target.value })}
+                placeholder="04xx xxx xxx"
+                data-testid="input-managing-agent-phone"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Extra fields — only shown when "Other / not listed" is selected */}
       {showOtherForm && (

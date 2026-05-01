@@ -199,6 +199,11 @@ export type BookingState = {
   managing_other_contact: string;
   managing_other_email: string;
   managing_other_phone: string;
+  /** Optional override contact shown for any known agency selection.
+   *  Cleared automatically when the agency changes. */
+  managing_agent_contact: string;
+  managing_agent_email: string;
+  managing_agent_phone: string;
   tenants: Tenant[];
   signature_acknowledged: boolean;
   signature_name: string;
@@ -389,6 +394,9 @@ const INITIAL_STATE: BookingState = {
   managing_other_contact: "",
   managing_other_email: "",
   managing_other_phone: "",
+  managing_agent_contact: "",
+  managing_agent_email: "",
+  managing_agent_phone: "",
   tenants: [],
   signature_acknowledged: false,
   signature_name: "",
@@ -756,6 +764,9 @@ function clearAccessFollowUps(s: BookingState): BookingState {
     managing_other_contact: "",
     managing_other_email: "",
     managing_other_phone: "",
+    managing_agent_contact: "",
+    managing_agent_email: "",
+    managing_agent_phone: "",
     tenants: [],
     signature_acknowledged: false,
     signature_name: "",
@@ -1211,12 +1222,21 @@ export const bookingActions = {
       managing_other_contact: isOther ? s.managing_other_contact : "",
       managing_other_email: isOther ? s.managing_other_email : "",
       managing_other_phone: isOther ? s.managing_other_phone : "",
+      // Always clear the optional agent contact override when the agency changes.
+      managing_agent_contact: "",
+      managing_agent_email: "",
+      managing_agent_phone: "",
     }));
   },
   setManagingOtherDetails(
     fields: Partial<
       Pick<BookingState, "managing_other_company" | "managing_other_contact" | "managing_other_email" | "managing_other_phone">
     >,
+  ) {
+    setState((s) => ({ ...s, ...fields }));
+  },
+  setManagingAgentContact(
+    fields: Partial<Pick<BookingState, "managing_agent_contact" | "managing_agent_email" | "managing_agent_phone">>,
   ) {
     setState((s) => ({ ...s, ...fields }));
   },
