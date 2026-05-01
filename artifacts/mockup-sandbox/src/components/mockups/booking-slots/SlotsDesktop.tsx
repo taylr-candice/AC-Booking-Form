@@ -23,6 +23,7 @@ import { findNextAvailable, type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
+import { SlotsAccessNotesDisclosure } from "./SlotsAccessNotesDisclosure";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
@@ -245,6 +246,12 @@ export function SlotsDesktop() {
                       )}
                     </div>
 
+                    {selectedSlotId && (
+                      <SlotsAccessNotesDisclosure
+                        size="regular"
+                        testIdSuffix="desktop"
+                      />
+                    )}
                   </div>
                 )}
               </>
