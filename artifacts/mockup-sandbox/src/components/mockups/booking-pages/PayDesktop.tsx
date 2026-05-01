@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ArrowRight, MapPin, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, Clock, FileText, X } from "lucide-react";
+import { AlertCircle, ArrowRight, MapPin, Lock, CreditCard as CreditCardIcon, Info, CheckCircle2, Clock, FileText, X } from "lucide-react";
 import { AfternoonIcon, EveningIcon, MorningIcon } from "../booking-slots/TimeOfDayIcon";
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
@@ -27,6 +27,7 @@ import {
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
 const SELECTED_ACCENT = "#7BC9A8";
+const ERROR_PURPLE = "#9747FF";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -35,6 +36,7 @@ export function PayDesktop() {
   const [showPrepayInfo, setShowPrepayInfo] = useState(false);
   const [sendToAnother, setSendToAnother] = useState(false);
   const [anotherEmail, setAnotherEmail] = useState("");
+  const [attemptedPay, setAttemptedPay] = useState(false);
   const session = useBookingSelector((s) => s);
   const isAgent = session.role === "agent";
 
@@ -383,19 +385,35 @@ export function PayDesktop() {
             >
               ← Back
             </button>
-            <button
-              type="button"
-              data-testid="button-pay"
-              disabled={!payEnabled}
-              onClick={() => bookingActions.submitBooking()}
-              className={`flex items-center gap-2 rounded-full px-8 py-3.5 text-base font-bold text-white shadow-md transition ${
-                payEnabled ? "hover:opacity-90 hover:shadow-lg" : "opacity-50 cursor-not-allowed"
-              }`}
-              style={{ backgroundColor: BRAND }}
+            {attemptedPay && !payEnabled && (
+              <div
+                className="mr-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-medium"
+                style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Please select a payment method.</span>
+              </div>
+            )}
+            <span
+              onClickCapture={(e) => {
+                if (!payEnabled) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setAttemptedPay(true);
+                }
+              }}
             >
-              {ctaLabel}
-              <ArrowRight className="h-5 w-5" />
-            </button>
+              <button
+                type="button"
+                data-testid="button-pay"
+                onClick={() => bookingActions.submitBooking()}
+                className="flex items-center gap-2 rounded-full px-8 py-3.5 text-base font-bold text-white shadow-md transition hover:opacity-90 hover:shadow-lg"
+                style={{ backgroundColor: BRAND }}
+              >
+                {ctaLabel}
+                <ArrowRight className="h-5 w-5" />
+              </button>
+            </span>
           </div>
 
           {/* Mockup-only affordance for the cancelled-checkout terminal state

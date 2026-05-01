@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
@@ -29,6 +30,7 @@ const SELECTED_GREEN_BG = "#7BC9A8";
 // active, "in use" choice rather than a neutral card.
 const SELECTED_GREEN_TEXT = "#ffffff";
 const SELECTED_GREEN_BORDER = "#7BC9A8";
+const ERROR_PURPLE = "#9747FF";
 
 type Slot = CustomerSlot;
 
@@ -287,9 +289,22 @@ export function SlotsMobile() {
             flow doesn't advance. The button is only truly disabled
             when there's nothing to confirm yet (no slot picked, or
             the slot is already locked by another booking). */}
+        {attemptedConfirm && !selectedSlotId && !lockedByOther && (
+          <div
+            className="mb-3 flex items-start gap-2 rounded-xl border p-3 text-[12px] font-medium"
+            style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
+          >
+            <AlertCircle className="h-4 w-4 mt-px shrink-0" />
+            <span>Please select a service window to continue.</span>
+          </div>
+        )}
         <span
           onClickCapture={(e) => {
-            if (!cancellationAck) {
+            if (!selectedSlotId && !lockedByOther) {
+              e.stopPropagation();
+              e.preventDefault();
+              setAttemptedConfirm(true);
+            } else if (!cancellationAck) {
               e.stopPropagation();
               e.preventDefault();
               setAttemptedConfirm(true);
@@ -298,12 +313,9 @@ export function SlotsMobile() {
         >
           <button
             type="button"
-            disabled={!selectedSlotId || !!lockedByOther}
-            aria-disabled={!canConfirm}
+            disabled={!!lockedByOther}
             data-testid="button-continue-mobile"
-            className={`mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50 ${
-              canConfirm ? "" : "opacity-50"
-            }`}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: BRAND }}
           >
             Confirm

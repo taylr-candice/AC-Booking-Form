@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Users,
@@ -53,6 +54,7 @@ import { PinkAckCheckbox } from "./PinkAckCheckbox";
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
 const SELECTED_ACCENT = "#7BC9A8";
+const ERROR_PURPLE = "#9747FF";
 
 export function AccessMobile() {
   const session = useBookingSelector((s) => s);
@@ -63,6 +65,7 @@ export function AccessMobile() {
   const opts = getAccessOptions(role, residence);
   const tenants = useTenants(isTenantMethod(access));
   const valid = isStep5Valid(session);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -139,21 +142,28 @@ export function AccessMobile() {
       {/* Docked CTA — intercepted in capture phase so the flow does not
           advance when no access method is selected yet. */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
+        {attemptedSubmit && !access && (
+          <div
+            className="mb-3 flex items-start gap-2 rounded-xl border p-3 text-[12px] font-medium"
+            style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
+          >
+            <AlertCircle className="h-4 w-4 mt-px shrink-0" />
+            <span>Please select an access method to continue.</span>
+          </div>
+        )}
         <span
           onClickCapture={(e) => {
             if (!valid) {
               e.stopPropagation();
               e.preventDefault();
+              setAttemptedSubmit(true);
             }
           }}
         >
           <button
             type="button"
             data-testid="button-continue"
-            aria-disabled={!valid}
-            className={`flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition ${
-              valid ? "" : "opacity-50"
-            }`}
+            className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
             style={{ backgroundColor: BRAND }}
           >
             Continue

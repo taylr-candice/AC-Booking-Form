@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   ArrowRight,
   CheckCircle2,
   Clock,
@@ -32,6 +33,7 @@ const SELECTED_GREEN_BG = "#7BC9A8";
 // active, "in use" choice rather than a neutral card.
 const SELECTED_GREEN_TEXT = "#ffffff";
 const SELECTED_GREEN_BORDER = "#7BC9A8";
+const ERROR_PURPLE = "#9747FF";
 
 type Slot = CustomerSlot;
 
@@ -297,9 +299,22 @@ export function SlotsDesktop() {
             {/* See SlotsMobile.tsx for why we keep the button enabled
                 without the ack and intercept the click in capture
                 phase to surface the invalid styling. */}
+            {attemptedConfirm && !selectedSlotId && !lockedByOther && (
+              <div
+                className="mr-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-medium"
+                style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Please select a service window.</span>
+              </div>
+            )}
             <span
               onClickCapture={(e) => {
-                if (!cancellationAck) {
+                if (!selectedSlotId && !lockedByOther) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setAttemptedConfirm(true);
+                } else if (!cancellationAck) {
                   e.stopPropagation();
                   e.preventDefault();
                   setAttemptedConfirm(true);
@@ -308,12 +323,9 @@ export function SlotsDesktop() {
             >
               <button
                 type="button"
-                disabled={!selectedSlotId || !!lockedByOther}
-                aria-disabled={!canConfirm}
+                disabled={!!lockedByOther}
                 data-testid="button-continue-desktop"
-                className={`flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90 ${
-                  canConfirm ? "" : "opacity-50"
-                }`}
+                className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
                 style={{ backgroundColor: BRAND }}
               >
                 Confirm

@@ -99,6 +99,7 @@ export function UnitMobile() {
 
   const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
+  const [attemptedContinue, setAttemptedContinue] = useState(false);
   const [query, setQuery] = useState("");
   const [agencyOpen, setAgencyOpen] = useState(false);
   // When a customer taps a unit that already has a paid/confirmed
@@ -228,6 +229,8 @@ export function UnitMobile() {
     touched[field] && !!errors[field];
   const markTouched = (field: keyof typeof touched) =>
     setTouched((t) => ({ ...t, [field]: true }));
+  const markAllTouched = () =>
+    setTouched({ agency: true, agencyOther: true, firstName: true, lastName: true, email: true, mobile: true });
   const errorIds = {
     agency: "step1-agency-mobile-error",
     agencyOther: "step1-agency-other-mobile-error",
@@ -289,6 +292,13 @@ export function UnitMobile() {
               className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
             />
           </button>
+
+          {attemptedContinue && !selectedId && (
+            <div className="mt-2 flex items-start gap-1.5 text-[12px] font-medium" style={{ color: ERROR_PURPLE }}>
+              <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" aria-hidden="true" />
+              <span>Please select a property to continue</span>
+            </div>
+          )}
 
           {open && (
             <div className="absolute inset-x-0 top-full z-20 mt-2 flex max-h-[420px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
@@ -621,16 +631,26 @@ export function UnitMobile() {
       </div>
 
       <div className="border-t border-slate-100 bg-white px-5 py-3">
-        <button
-          type="button"
-          disabled={!canContinue}
-          data-testid="button-continue"
-          className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
-          style={{ backgroundColor: BRAND }}
+        <span
+          onClickCapture={(e) => {
+            if (!canContinue) {
+              e.stopPropagation();
+              e.preventDefault();
+              setAttemptedContinue(true);
+              markAllTouched();
+            }
+          }}
         >
-          Continue
-          <ArrowRight className="h-4 w-4" />
-        </button>
+          <button
+            type="button"
+            data-testid="button-continue"
+            className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+            style={{ backgroundColor: BRAND }}
+          >
+            Continue
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </span>
       </div>
 
       <UnitAlreadyBookedModal

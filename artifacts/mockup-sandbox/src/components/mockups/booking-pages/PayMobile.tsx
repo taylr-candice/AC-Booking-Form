@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -47,6 +48,7 @@ import {
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
 const SELECTED_ACCENT = "#7BC9A8";
+const ERROR_PURPLE = "#9747FF";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -55,6 +57,7 @@ export function PayMobile() {
   const [showPrepayInfo, setShowPrepayInfo] = useState(false);
   const [sendToAnother, setSendToAnother] = useState(false);
   const [anotherEmail, setAnotherEmail] = useState("");
+  const [attemptedPay, setAttemptedPay] = useState(false);
   const session = useBookingSelector((s) => s);
 
   const total = computeBookingTotal(session);
@@ -389,19 +392,35 @@ export function PayMobile() {
 
       {/* Docked CTA */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
-        <button
-          type="button"
-          data-testid="button-pay"
-          disabled={!payEnabled}
-          onClick={() => bookingActions.submitBooking()}
-          className={`flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold text-white shadow-sm transition ${
-            payEnabled ? "hover:opacity-90" : "opacity-50 cursor-not-allowed"
-          }`}
-          style={{ backgroundColor: BRAND }}
+        {attemptedPay && !payEnabled && (
+          <div
+            className="mb-3 flex items-start gap-2 rounded-xl border p-3 text-[12px] font-medium"
+            style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
+          >
+            <AlertCircle className="h-4 w-4 mt-px shrink-0" />
+            <span>Please select a payment method to continue.</span>
+          </div>
+        )}
+        <span
+          onClickCapture={(e) => {
+            if (!payEnabled) {
+              e.stopPropagation();
+              e.preventDefault();
+              setAttemptedPay(true);
+            }
+          }}
         >
-          {ctaLabel}
-          <ArrowRight className="h-4 w-4" />
-        </button>
+          <button
+            type="button"
+            data-testid="button-pay"
+            onClick={() => bookingActions.submitBooking()}
+            className="flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold text-white shadow-sm transition hover:opacity-90"
+            style={{ backgroundColor: BRAND }}
+          >
+            {ctaLabel}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </span>
         {/* Mockup-only affordance for the cancelled-checkout terminal state
             (spec §9). Real Stripe integration would fire `cancelPayment()`
             on the redirect callback; this button stands in for that path

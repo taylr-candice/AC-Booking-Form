@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -204,6 +205,7 @@ function FullConfigView({
 }) {
   const ac = useAcStep({ unitId, mode, acTypeFromUnit, recorded });
   const selectedOtherServices = useSelectedOtherServices();
+  const [attemptedContinue, setAttemptedContinue] = useState(false);
   const {
     override,
     notSureCount,
@@ -578,16 +580,29 @@ function FullConfigView({
             >
               ← Back
             </button>
+            {attemptedContinue && needsTypePick && (
+              <div
+                className="mr-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-medium"
+                style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Please select your AC type above.</span>
+              </div>
+            )}
             <span
-              onMouseDown={() => {
-                if (!confirmed && !needsTypePick) setTouched(true);
+              onClickCapture={(e) => {
+                if (needsTypePick || !confirmed) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setAttemptedContinue(true);
+                  if (!needsTypePick) setTouched(true);
+                }
               }}
             >
               <button
                 type="button"
-                disabled={needsTypePick || !confirmed}
                 data-testid="button-continue"
-                className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
+                className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
                 style={{ backgroundColor: BRAND }}
               >
                 Continue

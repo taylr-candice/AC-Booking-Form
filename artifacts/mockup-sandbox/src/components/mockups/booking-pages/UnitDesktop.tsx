@@ -93,6 +93,7 @@ export function UnitDesktop() {
   const [selectedId, setSelectedId] = useState<string | null>(sessionUnitId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [attemptedContinue, setAttemptedContinue] = useState(false);
   const [agencyOpen, setAgencyOpen] = useState(false);
   // When a customer clicks a unit that already has a paid/confirmed
   // service booked, we show a generic "this unit is already booked,
@@ -244,6 +245,8 @@ export function UnitDesktop() {
     touched[field] && !!errors[field];
   const markTouched = (field: keyof typeof touched) =>
     setTouched((t) => ({ ...t, [field]: true }));
+  const markAllTouched = () =>
+    setTouched({ agency: true, agencyOther: true, firstName: true, lastName: true, email: true, mobile: true });
   const errorIds = {
     agency: "step1-agency-desktop-error",
     agencyOther: "step1-agency-other-desktop-error",
@@ -298,6 +301,13 @@ export function UnitDesktop() {
                   className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
                 />
               </button>
+
+              {attemptedContinue && !selectedId && (
+                <div className="mt-2 flex items-start gap-1.5 text-[12px] font-medium" style={{ color: ERROR_PURPLE }}>
+                  <AlertCircle className="h-3.5 w-3.5 mt-px shrink-0" aria-hidden="true" />
+                  <span>Please select a property to continue</span>
+                </div>
+              )}
 
               {open && (
                 <div className="absolute inset-x-0 top-full z-20 mt-2 flex max-h-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
@@ -656,16 +666,26 @@ export function UnitDesktop() {
             >
               ← Back
             </button>
-            <button
-              type="button"
-              disabled={!canContinue}
-              data-testid="button-continue"
-              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
-              style={{ backgroundColor: BRAND }}
+            <span
+              onClickCapture={(e) => {
+                if (!canContinue) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setAttemptedContinue(true);
+                  markAllTouched();
+                }
+              }}
             >
-              Continue
-              <ArrowRight className="h-4 w-4" />
-            </button>
+              <button
+                type="button"
+                data-testid="button-continue"
+                className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+                style={{ backgroundColor: BRAND }}
+              >
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </span>
           </div>
 
         </div>

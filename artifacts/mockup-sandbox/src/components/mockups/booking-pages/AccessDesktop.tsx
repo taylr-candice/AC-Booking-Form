@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Handshake, ChevronDown, Vault, Search } from "lucide-react";
+import { AlertCircle, ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Handshake, ChevronDown, Vault, Search } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
 import { DEMO_MANAGING_AGENCIES, isOtherAgency, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption, type LeaveKeySubMethod } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
@@ -7,6 +7,7 @@ import { PinkAckCheckbox } from "./PinkAckCheckbox";
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
 const SELECTED_ACCENT = "#7BC9A8";
+const ERROR_PURPLE = "#9747FF";
 
 export function AccessDesktop() {
   const session = useBookingSelector((s) => s);
@@ -17,6 +18,7 @@ export function AccessDesktop() {
   const opts = getAccessOptions(role, residence);
   const tenants = useTenants(isTenantMethod(access));
   const valid = isStep5Valid(session);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const roleLabel = role === "owner" ? "Owner" : role === "agent" ? "Agent" : "—";
   const residenceLabel = residence === "live_in" ? "Live in" : residence === "leased_out" ? "Leased out" : residence === "vacant" ? "Vacant" : "—";
@@ -88,21 +90,28 @@ export function AccessDesktop() {
             >
               ← Back
             </button>
+            {attemptedSubmit && !access && (
+              <div
+                className="mr-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-medium"
+                style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Please select an access method.</span>
+              </div>
+            )}
             <span
               onClickCapture={(e) => {
                 if (!valid) {
                   e.stopPropagation();
                   e.preventDefault();
+                  setAttemptedSubmit(true);
                 }
               }}
             >
               <button
                 type="button"
-                aria-disabled={!valid}
                 data-testid="button-continue"
-                className={`flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 ${
-                  valid ? "" : "opacity-50"
-                }`}
+                className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
                 style={{ backgroundColor: BRAND }}
               >
                 Continue
