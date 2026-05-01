@@ -22,6 +22,7 @@ import {
   PAY_NOW_SUBLABEL,
   STRIPE_REDIRECT_NOTE,
   unitLabel,
+  windowFromSlotId,
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
@@ -109,12 +110,12 @@ export function PayDesktop() {
                     </span>
                   ) : session.service_date && session.service_slot && session.service_slot !== "to_be_coordinated" ? (
                     <span className="inline-flex items-center justify-end gap-1.5">
-                      {session.service_slot === "morning" && <MorningIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
-                      {session.service_slot === "afternoon" && <AfternoonIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
-                      {session.service_slot === "evening" && <EveningIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
+                      {windowFromSlotId(session.service_slot) === "morning" && <MorningIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
+                      {windowFromSlotId(session.service_slot) === "afternoon" && <AfternoonIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
+                      {windowFromSlotId(session.service_slot) === "evening" && <EveningIcon className="h-4 w-4 shrink-0" style={{ color: BRAND }} />}
                       {formatServiceDate(session.service_date)}
                       <span className="text-slate-400">·</span>
-                      <span className="capitalize">{session.service_slot}</span>
+                      <span className="capitalize">{windowFromSlotId(session.service_slot) ?? session.service_slot}</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center justify-end gap-1.5 text-slate-400">

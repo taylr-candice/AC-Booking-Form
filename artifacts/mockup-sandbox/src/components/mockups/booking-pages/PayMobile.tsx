@@ -43,6 +43,7 @@ import {
   PAY_NOW_SUBLABEL,
   STRIPE_REDIRECT_NOTE,
   unitLabel,
+  windowFromSlotId,
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
@@ -177,12 +178,12 @@ export function PayMobile() {
                   data-testid="text-summary-schedule"
                   className="inline-flex items-center gap-1.5 font-medium text-slate-900"
                 >
-                  {session.service_slot === "morning" && <MorningIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
-                  {session.service_slot === "afternoon" && <AfternoonIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
-                  {session.service_slot === "evening" && <EveningIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
+                  {windowFromSlotId(session.service_slot) === "morning" && <MorningIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
+                  {windowFromSlotId(session.service_slot) === "afternoon" && <AfternoonIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
+                  {windowFromSlotId(session.service_slot) === "evening" && <EveningIcon className="h-3.5 w-3.5 shrink-0" style={{ color: BRAND }} />}
                   {formatServiceDate(session.service_date)}
                   <span className="text-slate-500">·</span>
-                  <span className="capitalize">{session.service_slot}</span>
+                  <span className="capitalize">{windowFromSlotId(session.service_slot) ?? session.service_slot}</span>
                 </span>
               ) : (
                 <span

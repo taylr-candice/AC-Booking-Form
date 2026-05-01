@@ -382,6 +382,26 @@ export function acSummary(
 }
 
 /**
+ * Decode a service_slot value into a human-readable window name.
+ *
+ * `service_slot` stores the raw rollout slot id (e.g. `"20260501-am"`,
+ * `"20260501-pm"`).  The slot picker also falls back to writing bare
+ * window names (`"morning"` / `"afternoon"` / `"evening"`) in some
+ * test setups, so this handles both forms.
+ */
+export function windowFromSlotId(
+  slotId: string | null,
+): "morning" | "afternoon" | "evening" | null {
+  if (!slotId || slotId === "to_be_coordinated") return null;
+  if (slotId === "morning" || slotId === "afternoon" || slotId === "evening")
+    return slotId;
+  if (slotId.endsWith("-am")) return "morning";
+  if (slotId.endsWith("-pm")) return "afternoon";
+  if (slotId.endsWith("-eve")) return "evening";
+  return null;
+}
+
+/**
  * How the schedule should be displayed at Step 5 (Review & Pay).
  *
  * Coordination flows return `{ primary: "To be coordinated" }` regardless
@@ -396,9 +416,9 @@ export function scheduleDisplay(
   if (!s.service_date) {
     return { primary: "—" };
   }
-  const slot = s.service_slot ?? "";
-  const slotLabel = slot
-    ? `${slot.charAt(0).toUpperCase()}${slot.slice(1)} window`
+  const win = windowFromSlotId(s.service_slot ?? null);
+  const slotLabel = win
+    ? `${win.charAt(0).toUpperCase()}${win.slice(1)}`
     : undefined;
   return { primary: s.service_date, secondary: slotLabel };
 }
