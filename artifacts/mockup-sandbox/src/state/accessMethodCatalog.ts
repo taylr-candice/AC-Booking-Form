@@ -496,7 +496,11 @@ export function isStep5Valid(s: BookingState): boolean {
   // Legacy parcel-locker methods are no longer shown as top-level cards but
   // remain valid endpoints for stored booking state (backward compat).
   const isLegacyParcelLocker = isParcelLockerMethod(s.access_method);
-  if (!inOptions && !inAgentTenantPair && !isLegacyParcelLocker) return false;
+  // `owner_vacant_collect` was replaced by `owner_vacant_agent` in the
+  // OWNER_VACANT_OPTIONS catalog but remains a valid stored-state method
+  // (backward compat — existing sessions may still carry it).
+  const isLegacyVacantCollect = s.access_method === "owner_vacant_collect";
+  if (!inOptions && !inAgentTenantPair && !isLegacyParcelLocker && !isLegacyVacantCollect) return false;
 
   // Layer C
   if (isLeaveKeyMethod(s.access_method)) {
