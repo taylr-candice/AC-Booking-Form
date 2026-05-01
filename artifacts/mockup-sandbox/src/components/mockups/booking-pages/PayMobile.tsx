@@ -22,7 +22,6 @@ import {
   acSummary,
   BILL_TO_HELPER,
   BILL_TO_LABEL,
-  CANCELLATION_CONTACT_EMAIL,
   computeBookingTotal,
   COORDINATION_NOTE,
   COPY_INVOICE_TO_HELPER,
@@ -348,23 +347,6 @@ export function PayMobile() {
             </div>
           </div>
         )}
-
-        {/* Single support-email line — the full cancellation policy
-            lives behind the Schedule-step ack. */}
-        <p
-          className="mb-4 px-1 text-[12px] leading-relaxed text-slate-500"
-          data-testid="cancellation-contact-mobile"
-        >
-          To request a change or cancellation, email{" "}
-          <a
-            href={`mailto:${CANCELLATION_CONTACT_EMAIL}`}
-            className="font-semibold underline underline-offset-2"
-            style={{ color: "#A30058" }}
-          >
-            {CANCELLATION_CONTACT_EMAIL}
-          </a>
-          .
-        </p>
 
         <div className="flex justify-center mb-2">
           <div className="text-[10px] text-slate-400 font-medium">Ref: TLR-742019</div>

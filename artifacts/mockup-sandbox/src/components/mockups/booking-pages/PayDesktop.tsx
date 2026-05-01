@@ -10,7 +10,6 @@ import {
   acSummary,
   BILL_TO_HELPER,
   BILL_TO_LABEL,
-  CANCELLATION_CONTACT_EMAIL,
   computeBookingTotal,
   COORDINATION_NOTE,
   COPY_INVOICE_TO_HELPER,
@@ -309,23 +308,6 @@ export function PayDesktop() {
                 </div>
               )}
             </div>
-
-            {/* Single support-email line — the full cancellation
-                policy lives behind the Schedule-step ack. */}
-            <p
-              className="text-sm text-slate-500"
-              data-testid="cancellation-contact-desktop"
-            >
-              To request a change or cancellation, email{" "}
-              <a
-                href={`mailto:${CANCELLATION_CONTACT_EMAIL}`}
-                className="font-semibold underline underline-offset-2"
-                style={{ color: "#A30058" }}
-              >
-                {CANCELLATION_CONTACT_EMAIL}
-              </a>
-              .
-            </p>
 
           </div>
 
