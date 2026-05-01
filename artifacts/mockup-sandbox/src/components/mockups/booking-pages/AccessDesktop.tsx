@@ -1,5 +1,5 @@
-import React from "react";
-import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Wrench } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon, Building2, ConciergeBell, Wrench, ChevronDown } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
 import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption, type LeaveKeySubMethod } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
@@ -502,20 +502,55 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
 
 function ManagingAgencySection() {
   const agencyId = useBookingSelector((s) => s.managing_agency_id);
+  const [open, setOpen] = useState(false);
+  const selected = DEMO_MANAGING_AGENCIES.find((a) => a.id === agencyId);
   return (
     <div className="mb-8">
-      <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>Who manages the property?</h2>
-      <select
-        value={agencyId || ""}
-        onChange={(e) => bookingActions.setManagingAgency(e.target.value)}
-        data-testid="select-managing-agency"
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
-      >
-        <option value="" disabled>Select an agency...</option>
-        {DEMO_MANAGING_AGENCIES.map((a) => (
-          <option key={a.id} value={a.id}>{a.name}</option>
-        ))}
-      </select>
+      <h2 className="text-[17px] font-bold mb-3 text-slate-900">Managing agency</h2>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          data-testid="select-managing-agency"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-left shadow-sm transition hover:border-slate-400"
+        >
+          <div className="min-w-0 flex-1">
+            {selected ? (
+              <span className="truncate text-[15px] font-semibold text-slate-900">{selected.name}</span>
+            ) : (
+              <span className="text-[15px] text-slate-400">Select an agency…</span>
+            )}
+          </div>
+          <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && (
+          <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+            {DEMO_MANAGING_AGENCIES.map((a) => {
+              const active = a.id === agencyId;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    bookingActions.setManagingAgency(a.id);
+                    setOpen(false);
+                  }}
+                  data-testid={`dropdown-managing-agency-${a.id}`}
+                  className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${active ? "bg-pink-50" : "hover:bg-slate-50"}`}
+                >
+                  <span className={`truncate text-[14px] font-semibold ${active ? "text-pink-700" : "text-slate-900"}`}>
+                    {a.name}
+                  </span>
+                  <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: active ? BRAND : "transparent" }} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
