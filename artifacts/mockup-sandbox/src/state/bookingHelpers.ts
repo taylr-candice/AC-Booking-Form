@@ -475,9 +475,8 @@ export const INVOICE_PREPAYMENT_BODY =
  * payment status, tax invoice auto-emailed).
  */
 export const INVOICE_REFERENCE_NOTE =
-  "On submission we'll create your booking with a pending payment status and " +
-  "email a tax invoice to the destination above — plus the copy address if you've added one — " +
-  "for payment.";
+  "On submission we'll create your booking with a pending payment status and email a copy of the invoice. " +
+  "Orders are cancelled if payment isn't received 48 hours before the scheduled service.";
 
 // ─── Invoice destination (agent + invoice path) ────────────────────────────
 

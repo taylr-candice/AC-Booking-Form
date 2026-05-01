@@ -263,23 +263,6 @@ export function PayMobile() {
             className="mb-8"
             data-testid="block-invoice-mobile"
           >
-            <div
-              className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
-              data-testid="block-prepay-notice-mobile"
-            >
-              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
-              <p className="text-[12px] leading-relaxed text-slate-700">
-                Orders are cancelled if payment isn't received 48 hours before your service.{" "}
-                <button
-                  type="button"
-                  onClick={() => setShowPrepayInfo(true)}
-                  className="font-semibold underline underline-offset-2"
-                  style={{ color: BRAND }}
-                >
-                  View more
-                </button>
-              </p>
-            </div>
             <div className="divide-y divide-slate-100">
               {/* Bill to — unit address + attention line */}
               <div
@@ -385,7 +368,15 @@ export function PayMobile() {
             >
               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: BRAND }} />
               <p className="text-[11.5px] leading-relaxed text-slate-700">
-                {INVOICE_REFERENCE_NOTE}
+                {INVOICE_REFERENCE_NOTE}{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowPrepayInfo(true)}
+                  className="font-semibold underline underline-offset-2 hover:opacity-80"
+                  style={{ color: BRAND }}
+                >
+                  View more
+                </button>
               </p>
             </div>
           </div>
