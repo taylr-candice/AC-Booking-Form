@@ -151,7 +151,6 @@ export function CustomerAvailableDays({
             (w) => w.status === "available",
           );
           const isAvailable = availableWindows.length > 0;
-          const isToday = day.date === todayIso;
           const isSelected = selectedDate === day.date && isAvailable;
 
           // Booked / closed / fully-unavailable future day: muted card,
@@ -246,13 +245,6 @@ export function CustomerAvailableDays({
                   />
                 ))}
               </div>
-              {isToday && !isSelected && (
-                <span
-                  className="pointer-events-none absolute inset-1 rounded-lg"
-                  style={{ boxShadow: `inset 0 0 0 1px #CBD5E1` }}
-                  aria-hidden="true"
-                />
-              )}
             </button>
           );
         })}

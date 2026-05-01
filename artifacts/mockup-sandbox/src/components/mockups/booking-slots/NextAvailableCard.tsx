@@ -69,7 +69,9 @@ export function NextAvailableCard({
   return (
     <div
       data-testid={`next-available-card-${testIdSuffix}`}
-      className={isCompact ? "px-1 py-1" : "px-1 py-1.5"}
+      className={`rounded-xl border border-slate-200 bg-white ${
+        isCompact ? "px-3 py-2.5" : "px-4 py-3"
+      }`}
     >
       <div className="flex items-center gap-3">
         <Sparkles
