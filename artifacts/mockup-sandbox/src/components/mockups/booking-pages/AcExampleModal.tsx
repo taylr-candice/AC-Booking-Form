@@ -61,9 +61,7 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
         imageAlt:
           "A large white ceiling return-air grille, typical of a ducted AC system.",
         paragraphs: [
-          "Each return air grille has a filter and requires servicing.",
-          "Each $179 service includes 1 x return-air grilles. If you have more than 1 in your property, please add them as additional to your order.",
-          "Only add extras if the apartment has more large return-air grilles than shown there.",
+          "The service includes 1 x return-air grille maintenance check + filter clean. If you have more than 1 in your property, please add them as additional to your order.",
         ],
       },
       {
