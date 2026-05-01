@@ -282,10 +282,10 @@ function FullConfigView({
                       {knownType && (
                         <div className="mt-2" data-testid="block-includes">
                           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                            Includes
+                            Each system includes
                           </p>
                           <ul className="mt-1 space-y-0.5">
-                            {formatSystemsIncludes(knownType, displaySystems).map((b) => (
+                            {formatSystemsIncludes(knownType).map((b) => (
                               <li
                                 key={b}
                                 className="flex items-center gap-1.5 text-xs text-slate-600"

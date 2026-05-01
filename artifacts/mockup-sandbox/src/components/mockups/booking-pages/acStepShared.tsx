@@ -124,21 +124,14 @@ export const PREFILL_DEFAULTS: Record<
 
 // ─── Pure copy helpers ─────────────────────────────────────────────────────
 
-export function formatSystemsIncludes(
-  type: KnownType,
-  systems: number,
-): string[] {
+/** Per-system inclusions, always singular.
+ *  The surrounding label reads "Each system includes" so the count
+ *  scales naturally — no more 1/2-system pluralisation branching. */
+export function formatSystemsIncludes(type: KnownType): string[] {
   if (type === "split") {
-    const outdoor = systems === 1 ? "outdoor unit" : "outdoor units";
-    const indoor = systems === 1 ? "indoor unit head" : "indoor unit heads";
-    return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
+    return ["1 outdoor unit", "1 indoor unit head"];
   }
-  const outdoor = systems === 1 ? "outdoor unit" : "outdoor units";
-  const indoor =
-    systems === 1
-      ? "indoor unit / return-air grille"
-      : "indoor units / return-air grilles";
-  return [`${systems} ${outdoor}`, `${systems} ${indoor}`];
+  return ["1 outdoor unit", "1 indoor unit / return-air grille"];
 }
 
 /** Short qualifier shown next to the base price line in the price
