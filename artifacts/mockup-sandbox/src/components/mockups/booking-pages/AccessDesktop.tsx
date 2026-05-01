@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
-import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, isAgentTenantOption, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
 const BRAND = "#ED017F";
@@ -14,11 +14,7 @@ export function AccessDesktop() {
   const residence = session.primary_residence;
   const access = session.access_method;
   const opts = getAccessOptions(role, residence);
-  const tenantsApi = useTenants(isTenantMethod(access));
-  const valid = isStep5Valid(session);
-  const note = infoNoteFor(access);
-  const sig = signatureVariantFor(access);
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const valid = access !== null && (role === "agent" || residence !== null);
 
   const roleLabel = role === "owner" ? "Owner" : role === "agent" ? "Agent" : "—";
   const residenceLabel = residence === "live_in" ? "Live in" : residence === "leased_out" ? "Leased out" : residence === "vacant" ? "Vacant" : "—";
@@ -74,22 +70,6 @@ export function AccessDesktop() {
                   })}
                 </div>
 
-                {role === "agent" && isAgentTenantOption(access) && (
-                  <AgentTenantCoordinationSection access={access} />
-                )}
-
-                {note && <InfoBanner title={note.title} body={note.body} />}
-                {isLeaveKeyMethod(access) && <KeyHolderSection />}
-                {isCollectReturnMethod(access) && <CollectReturnSection />}
-                {isManagingAgentMethod(access) && <ManagingAgencySection />}
-                {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
-                {sig && (
-                  <SignatureSection
-                    title={sig.title}
-                    body={sig.body}
-                    attemptedSubmit={attemptedSubmit}
-                  />
-                )}
               </>
             )}
           </div>
@@ -102,16 +82,11 @@ export function AccessDesktop() {
             >
               ← Back
             </button>
-            {/* See AccessMobile.tsx for why we keep the button enabled
-                without `valid` and intercept the click in capture
-                phase to surface the invalid styling on the signature
-                ack. */}
             <span
               onClickCapture={(e) => {
                 if (!valid) {
                   e.stopPropagation();
                   e.preventDefault();
-                  setAttemptedSubmit(true);
                 }
               }}
             >
@@ -198,8 +173,8 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
       }
     >
       <span
-        className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
+        className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-white" : "bg-slate-100 text-slate-700"}`}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -241,8 +216,8 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       }
     >
       <span
-        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
+        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "bg-white" : "bg-slate-100 text-slate-700"}`}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
       >
         {iconForMethod(option.key)}
       </span>
@@ -431,8 +406,8 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
       }
     >
       <span
-        className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "text-white" : "bg-slate-100 text-slate-700"}`}
-        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
+        className={`grid h-10 w-10 place-items-center rounded-xl ${selected ? "bg-white" : "bg-slate-100 text-slate-700"}`}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>

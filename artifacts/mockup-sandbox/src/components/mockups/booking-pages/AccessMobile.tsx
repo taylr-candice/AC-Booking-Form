@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,14 +23,7 @@ import {
 import {
   DEMO_MANAGING_AGENCIES,
   getAccessOptions,
-  infoNoteFor,
   isAgentTenantOption,
-  isCollectReturnMethod,
-  isLeaveKeyMethod,
-  isManagingAgentMethod,
-  isStep5Valid,
-  isTenantMethod,
-  signatureVariantFor,
   useTenants,
   type AccessOption,
 } from "../../../state/accessMethodCatalog";
@@ -47,20 +39,7 @@ export function AccessMobile() {
   const residence = session.primary_residence;
   const access = session.access_method;
   const opts = getAccessOptions(role, residence);
-
-  // Tenants are sourced from the store so cascade clears (role/residence/
-  // access_method changes) properly empty the list. The hook auto-seeds when
-  // entering a tenant flow with an empty store and provides stable React keys.
-  const tenantsApi = useTenants(isTenantMethod(access));
-
-  const valid = isStep5Valid(session);
-  const note = infoNoteFor(access);
-  const sig = signatureVariantFor(access);
-
-  // Tracks whether the customer has tried to advance past Continue. The
-  // SignatureSection uses this so the ack only flips into the pink-style
-  // invalid state once they attempt to proceed without ticking it.
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const valid = access !== null && (role === "agent" || residence !== null);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -128,39 +107,18 @@ export function AccessMobile() {
               })}
             </div>
 
-            {role === "agent" && isAgentTenantOption(access) && (
-              <AgentTenantCoordinationSection access={access} />
-            )}
-
-            {note && <InfoBanner title={note.title} body={note.body} />}
-
-            {isLeaveKeyMethod(access) && <KeyHolderSection />}
-            {isCollectReturnMethod(access) && <CollectReturnSection />}
-            {isManagingAgentMethod(access) && <ManagingAgencySection />}
-            {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
-            {sig && (
-              <SignatureSection
-                title={sig.title}
-                body={sig.body}
-                attemptedSubmit={attemptedSubmit}
-              />
-            )}
           </>
         )}
       </div>
 
-      {/* Docked CTA — kept enabled even when invalid so the user can
-          tap it and see which field needs attention (notably the pink
-          signature ack). The click is swallowed in capture phase
-          before `BookingFlowMobile`'s document-level NAV_FORWARD
-          handler sees it, so the flow doesn't actually advance. */}
+      {/* Docked CTA — intercepted in capture phase so the flow does not
+          advance when no access method is selected yet. */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
         <span
           onClickCapture={(e) => {
             if (!valid) {
               e.stopPropagation();
               e.preventDefault();
-              setAttemptedSubmit(true);
             }
           }}
         >
@@ -269,9 +227,9 @@ function ResidenceCard({
     >
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
-          selected ? "text-white" : "bg-slate-100 text-slate-700"
+          selected ? "bg-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -327,9 +285,9 @@ function AccessCard({
     >
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
-          selected ? "text-white" : "bg-slate-100 text-slate-700"
+          selected ? "bg-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
@@ -609,9 +567,9 @@ function ReturnMethodCard({
     >
       <span
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-          selected ? "text-white" : "bg-slate-100 text-slate-700"
+          selected ? "bg-white" : "bg-slate-100 text-slate-700"
         }`}
-        style={selected ? { backgroundColor: SELECTED_ACCENT } : undefined}
+        style={selected ? { color: SELECTED_ACCENT } : undefined}
       >
         {icon}
       </span>
