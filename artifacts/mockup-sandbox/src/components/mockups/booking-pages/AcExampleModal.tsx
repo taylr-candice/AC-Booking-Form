@@ -1,11 +1,20 @@
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useModalA11y } from "../../../hooks/use-modal-a11y";
 
 const BRAND = "#ED017F";
+// Iconographic "no" colour for the cross badge on the "do not count"
+// image. Not used as a UI state anywhere else in the customer flow —
+// purely a visual signal so customers can tell at a glance which
+// image is the correct thing to look for.
+const NO_RED = "#DC2626";
 
 export type ExampleVariant = "split-indoor" | "ducted-filter";
 
 type Section = {
+  /** Drives the corner badge over the image: a brand-pink tick for
+   *  the correct example, a red cross for the "do not count this"
+   *  example. Defaults to "do" when omitted. */
+  kind?: "do" | "dont";
   label?: string;
   imageSrc: string;
   imageAlt: string;
@@ -24,6 +33,8 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
     title: "What counts as an extra indoor unit?",
     sections: [
       {
+        kind: "do",
+        label: "Counts as an extra indoor unit",
         imageSrc: `${ASSET_BASE}/examples/split-indoor-unit.jpg`,
         imageAlt:
           "A white wall-mounted split AC indoor unit installed high on a living-room wall.",
@@ -39,6 +50,7 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
     title: "What counts as an extra return-air grille?",
     sections: [
       {
+        kind: "do",
         label: "Counts as an extra return-air grille",
         imageSrc: `${ASSET_BASE}/examples/ducted-return-grille.jpg`,
         imageAlt:
@@ -50,6 +62,7 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
         ],
       },
       {
+        kind: "dont",
         label: "Do NOT count these",
         imageSrc: `${ASSET_BASE}/examples/small-ceiling-vents.png`,
         imageAlt: "Two small ceiling supply-air vents in a white plaster ceiling.",
@@ -120,13 +133,36 @@ export function AcExampleModal({
                   {section.label}
                 </p>
               )}
-              <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+              <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                 <img
                   src={section.imageSrc}
                   alt={section.imageAlt}
                   className="aspect-[4/3] w-full object-cover"
                   loading="lazy"
                 />
+                {/* Iconographic badge: tick = correct example,
+                    cross = "do not count this". Overlays the
+                    top-left of the image so the verdict is the
+                    first thing the eye lands on. */}
+                <div
+                  data-testid={`badge-${section.kind ?? "do"}`}
+                  aria-label={
+                    section.kind === "dont"
+                      ? "Do not count this"
+                      : "Counts as an extra"
+                  }
+                  className="absolute left-2 top-2 grid h-9 w-9 place-items-center rounded-full text-white shadow-md ring-2 ring-white"
+                  style={{
+                    backgroundColor:
+                      section.kind === "dont" ? NO_RED : BRAND,
+                  }}
+                >
+                  {section.kind === "dont" ? (
+                    <X className="h-5 w-5" strokeWidth={3} />
+                  ) : (
+                    <Check className="h-5 w-5" strokeWidth={3} />
+                  )}
+                </div>
               </div>
               <div className="mt-3 space-y-2 text-[13px] text-slate-700 leading-relaxed">
                 {section.paragraphs.map((p, idx) => (
