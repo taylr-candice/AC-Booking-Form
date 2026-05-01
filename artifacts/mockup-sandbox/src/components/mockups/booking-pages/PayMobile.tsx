@@ -190,9 +190,12 @@ export function PayMobile() {
               </div>
             )}
           </div>
-          <div className="bg-slate-900 px-4 py-3 text-white flex justify-between items-center">
-            <span className="font-medium">Total (incl. GST)</span>
-            <span data-testid="text-total" className="text-lg font-bold">${total}</span>
+          <div className="border-t border-pink-200 bg-pink-50/40 px-4 py-3 flex items-center justify-between">
+            <div>
+              <div className="text-[13px] font-semibold text-slate-900">Total amount</div>
+              <div className="text-[11px] text-slate-500">Includes GST</div>
+            </div>
+            <div data-testid="text-total" className="text-2xl font-bold text-slate-900">${total}</div>
           </div>
         </div>
 
