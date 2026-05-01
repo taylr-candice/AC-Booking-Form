@@ -51,13 +51,13 @@ const VARIANTS: Record<ExampleVariant, Variant> = {
     sections: [
       {
         kind: "do",
-        label: "Counts as an extra return-air grille",
+        label: "Image example of an return-air grille",
         imageSrc: `${ASSET_BASE}/examples/ducted-return-grille.jpg`,
         imageAlt:
           "A large white ceiling return-air grille, typical of a ducted AC system.",
         paragraphs: [
-          "Each large return-air grille in the ceiling counts as one.",
-          "Your service already includes the number of return-air grilles shown in the 'Includes' section.",
+          "Each return air grille has a filter and requires servicing.",
+          "Each $179 service includes 1 x return-air grilles. If you have more than 1 in your property, please add them as additional to your order.",
           "Only add extras if the apartment has more large return-air grilles than shown there.",
         ],
       },
