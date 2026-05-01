@@ -1,4 +1,4 @@
-import { Info, Pencil } from "lucide-react";
+import { Info } from "lucide-react";
 
 import { isBeThereMethod } from "../../../state/accessMethodCatalog";
 import { type AccessMethod } from "../../../state/bookingSession";
@@ -105,15 +105,6 @@ export function SlotsAccessBanner({
             {showWindowHeadsUp
               ? "Change access method"
               : "Change access"}
-          </button>
-          <button
-            type="button"
-            aria-label="Edit access method"
-            data-testid={`button-edit-access-${testIdSuffix}`}
-            className="-my-1 rounded p-1 hover:opacity-80"
-            style={{ color: BRAND }}
-          >
-            <Pencil className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
