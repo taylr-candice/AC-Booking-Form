@@ -59,9 +59,6 @@ export function SlotsDesktop() {
     [visibleDays, selectedDate],
   );
 
-  // Smart "Next available" suggestion + one-tap handler. The card
-  // sits above the day picker and lets the customer book the soonest
-  // window in a single tap (selects day, selects window, ack terms).
   const nextAvailable = useMemo(
     () => findNextAvailable(visibleDays),
     [visibleDays],
@@ -177,11 +174,6 @@ export function SlotsDesktop() {
 
             {rollout && !lockedByOther && (
               <>
-                {/* Smart "Next available" suggestion — sits above the
-                    day picker so the customer sees the soonest
-                    bookable window first. Tapping the card selects
-                    the day, selects the window, and ack's the
-                    cancellation terms in one action. */}
                 {nextAvailable && (
                   <NextAvailableCard
                     day={nextAvailable.day}

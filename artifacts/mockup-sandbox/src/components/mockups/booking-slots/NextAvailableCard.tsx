@@ -8,11 +8,6 @@ import {
 
 const BRAND = "#ED017F";
 
-/**
- * Lucide glyph used in the smart-suggestion card body — same mapping
- * the day-card sneak peek and the slot panel windows use, so the
- * customer sees the *same* morning/afternoon/evening icon end-to-end.
- */
 function WindowGlyph({
   window,
   className,
@@ -41,51 +36,17 @@ function WindowGlyph({
   );
 }
 
-/** Long weekday name derived from the day's ISO date — the rollout
- *  carries a short uppercase label ("FRI") which is the right thing
- *  for tight day cards but reads awkwardly in the suggestion card's
- *  sentence. We derive "Friday" locally so the suggestion reads as
- *  natural body copy without requiring a schema change. */
 function longWeekday(isoDate: string): string {
-  // ISO `YYYY-MM-DD` parses as UTC midnight which can land on the
-  // previous day in negative-UTC zones. Splitting and constructing
-  // a local Date pins the weekday to the calendar day the rollout
-  // intended.
   const [y, m, d] = isoDate.split("-").map((s) => parseInt(s, 10));
   const local = new Date(y, (m ?? 1) - 1, d ?? 1);
   return local.toLocaleDateString("en-AU", { weekday: "long" });
 }
 
 /**
- * Smart "Next available" suggestion card.
- *
- * Sits at the top of the scheduler — *above* the day picker — and
- * gives the customer a one-tap shortcut to book the soonest available
- * window. The intent (per UX direction) is a small, friendly hint
- * card, not a loud hero banner: pink-50 background + pink-100 border
- * so it whispers rather than shouts, with the brand-pink "Book this
- * time" CTA carrying the action weight.
- *
- * Tapping the CTA does everything in one step:
- *   1. selects the day  (picker highlights it + reveals the window panel)
- *   2. selects the window slot  (window card lights up brand pink)
- *   3. acknowledges the cancellation terms  (so the docked Confirm
- *      becomes enabled and the customer can move forward without
- *      hunting for the checkbox)
- *
- * To keep the third step legally honest (we are not silently ticking
- * a consent box for the customer), the CTA carries explicit
- * click-wrap microcopy directly beneath it: "By tapping Book this
- * time you accept the cancellation terms · View terms". The View
- * terms link opens the same `CancellationTermsModal` the docked ack
- * row uses, so the customer can review the same words before they
- * tap. This mirrors the Stripe/Uber/Klarna pattern where the consent
- * is bound to the action button rather than to a separate hidden
- * checkbox.
- *
- * Returns `null` when there is no available window — the suggestion
- * card simply hides itself and the customer falls back to the (also
- * empty) day picker / no-rollout banner upstream.
+ * One-tap "Next available" shortcut card. Sits above the day picker.
+ * Tapping the CTA selects the day, selects the slot, and acks the
+ * cancellation terms via `onPick`. The visible click-wrap microcopy
+ * + `onViewTerms` modal preserve informed consent.
  */
 export function NextAvailableCard({
   day,
@@ -97,13 +58,7 @@ export function NextAvailableCard({
 }: {
   day: CustomerDay;
   slot: CustomerSlot;
-  /** Called with the picked day's ISO + the slot id. The host wires
-   *  this to setSelectedDate + setSelectedSlotId + ack-terms so the
-   *  one-tap promise holds end-to-end — see `pickSlotOneTap` in each
-   *  picker. */
   onPick: (iso: string, slotId: string) => void;
-  /** Opens the cancellation-terms modal so the customer can read
-   *  what the click-wrap line below the CTA references. */
   onViewTerms: () => void;
   size?: "compact" | "regular";
   testIdSuffix: string;
@@ -123,8 +78,6 @@ export function NextAvailableCard({
       style={{ borderColor: "#FBCFE0" }}
     >
       <div className="flex items-center gap-3">
-        {/* Sparkles glyph leads the eye to the suggestion — small,
-            brand-pink, no chunky tinted disc. */}
         <Sparkles
           aria-hidden
           className={
@@ -187,10 +140,6 @@ export function NextAvailableCard({
         </button>
       </div>
 
-      {/* Click-wrap consent line — sits beneath the CTA so the user
-          sees the consent they're giving by tapping. The "View terms"
-          link opens the same modal the docked ack row uses, so the
-          customer can read the policy before tapping. */}
       <div
         className={`mt-2 text-slate-500 ${
           isCompact ? "text-[10.5px] leading-snug" : "text-[11px] leading-snug"

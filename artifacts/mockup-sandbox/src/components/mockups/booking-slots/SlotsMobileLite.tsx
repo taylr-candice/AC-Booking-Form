@@ -53,9 +53,6 @@ export function SlotsMobileLite() {
     [visibleDays, selectedDate],
   );
 
-  // Smart "Next available" suggestion + one-tap handler — see
-  // SlotsMobile for the design rationale; identical wiring here so
-  // every customer-facing slot picker keeps the same shortcut.
   const nextAvailable = useMemo(
     () => findNextAvailable(visibleDays),
     [visibleDays],
