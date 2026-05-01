@@ -193,6 +193,12 @@ export type BookingState = {
   key_collection_location: string;
   return_method: ReturnMethod | null;
   managing_agency_id: string | null;
+  /** Fields populated when the user selects "Other / not listed" for the
+   *  managing agency. Cleared automatically when a real agency is chosen. */
+  managing_other_company: string;
+  managing_other_contact: string;
+  managing_other_email: string;
+  managing_other_phone: string;
   tenants: Tenant[];
   signature_acknowledged: boolean;
   signature_name: string;
@@ -379,6 +385,10 @@ const INITIAL_STATE: BookingState = {
   key_collection_location: "",
   return_method: null,
   managing_agency_id: null,
+  managing_other_company: "",
+  managing_other_contact: "",
+  managing_other_email: "",
+  managing_other_phone: "",
   tenants: [],
   signature_acknowledged: false,
   signature_name: "",
@@ -742,6 +752,10 @@ function clearAccessFollowUps(s: BookingState): BookingState {
     key_collection_location: "",
     return_method: null,
     managing_agency_id: null,
+    managing_other_company: "",
+    managing_other_contact: "",
+    managing_other_email: "",
+    managing_other_phone: "",
     tenants: [],
     signature_acknowledged: false,
     signature_name: "",
@@ -1188,7 +1202,23 @@ export const bookingActions = {
     setState((s) => ({ ...s, return_method: method }));
   },
   setManagingAgency(agency_id: string | null) {
-    setState((s) => ({ ...s, managing_agency_id: agency_id }));
+    const isOther = agency_id === OTHER_AGENCY_ID_INTERNAL;
+    setState((s) => ({
+      ...s,
+      managing_agency_id: agency_id,
+      // Clear the free-text "Other" details when the user picks a real agency.
+      managing_other_company: isOther ? s.managing_other_company : "",
+      managing_other_contact: isOther ? s.managing_other_contact : "",
+      managing_other_email: isOther ? s.managing_other_email : "",
+      managing_other_phone: isOther ? s.managing_other_phone : "",
+    }));
+  },
+  setManagingOtherDetails(
+    fields: Partial<
+      Pick<BookingState, "managing_other_company" | "managing_other_contact" | "managing_other_email" | "managing_other_phone">
+    >,
+  ) {
+    setState((s) => ({ ...s, ...fields }));
   },
   setTenants(tenants: Tenant[]) {
     setState((s) => ({ ...s, tenants }));

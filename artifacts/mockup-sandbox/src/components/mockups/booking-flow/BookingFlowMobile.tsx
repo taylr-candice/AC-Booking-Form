@@ -135,13 +135,14 @@ export function BookingFlowMobile() {
         bookingActions.editAcFromSlotPicker();
       } else if (
         id === TESTID_CHANGE_ACCESS ||
-        id.startsWith(`${TESTID_CHANGE_ACCESS}-`)
+        id.startsWith(`${TESTID_CHANGE_ACCESS}-`) ||
+        id.startsWith("button-edit-access-")
       ) {
-        // Slot-picker → access-step edit jump. The `startsWith` branch
-        // accepts the suffixed testid emitted by `SlotsAccessBanner`
-        // (`button-change-access-mobile` / `button-change-access-mobile-lite`
-        // / etc.) so the "Change access method" link in the banner
-        // triggers the same return-to-aware navigation.
+        // Slot-picker → access-step edit jump. The `startsWith` branches
+        // accept the suffixed testids emitted by `SlotsAccessBanner`
+        // (`button-change-access-mobile`, `button-edit-access-mobile`, etc.)
+        // so both "Change access method" and "Edit access" links in the
+        // banner trigger the same return-to-aware navigation.
         const fresh = getBookingSession();
         if (NAV_GOTO_RETURN_FROM.has(fresh.current_step)) {
           bookingActions.setReturnTo(fresh.current_step);

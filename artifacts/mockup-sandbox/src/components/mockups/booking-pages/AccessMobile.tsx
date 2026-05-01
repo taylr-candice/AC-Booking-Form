@@ -29,6 +29,7 @@ import {
 } from "../../../state/bookingSession";
 import {
   DEMO_MANAGING_AGENCIES,
+  isOtherAgency,
   getAccessOptions,
   isAgentTenantOption,
   isLeaveKeyMethod,
@@ -676,9 +677,14 @@ function ReturnMethodCard({
 
 function ManagingAgencySection() {
   const value = useBookingSelector((s) => s.managing_agency_id);
+  const otherCompany = useBookingSelector((s) => s.managing_other_company);
+  const otherContact = useBookingSelector((s) => s.managing_other_contact);
+  const otherEmail = useBookingSelector((s) => s.managing_other_email);
+  const otherPhone = useBookingSelector((s) => s.managing_other_phone);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const selected = DEMO_MANAGING_AGENCIES.find((a) => a.id === value);
+  const showOtherForm = isOtherAgency(value);
 
   useEffect(() => {
     if (!open) setQuery("");
@@ -765,6 +771,66 @@ function ManagingAgencySection() {
           </div>
         )}
       </div>
+
+      {/* Extra fields — only shown when "Other / not listed" is selected */}
+      {showOtherForm && (
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Agency company name
+            </label>
+            <input
+              type="text"
+              value={otherCompany}
+              onChange={(e) => bookingActions.setManagingOtherDetails({ managing_other_company: e.target.value })}
+              placeholder="e.g. Smith & Partners Real Estate"
+              data-testid="input-managing-other-company"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Contact name
+            </label>
+            <input
+              type="text"
+              value={otherContact}
+              onChange={(e) => bookingActions.setManagingOtherDetails({ managing_other_contact: e.target.value })}
+              placeholder="e.g. Jane Smith"
+              data-testid="input-managing-other-contact"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                Email
+              </label>
+              <input
+                type="email"
+                value={otherEmail}
+                onChange={(e) => bookingActions.setManagingOtherDetails({ managing_other_email: e.target.value })}
+                placeholder="agent@example.com"
+                data-testid="input-managing-other-email"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={otherPhone}
+                onChange={(e) => bookingActions.setManagingOtherDetails({ managing_other_phone: e.target.value })}
+                placeholder="04xx xxx xxx"
+                data-testid="input-managing-other-phone"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
