@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
-import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isBeThereMethod, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
+import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
 const SELECTED_BG = "#D1FAE5";
@@ -82,9 +82,6 @@ export function AccessDesktop() {
                 {isManagingAgentMethod(access) && <ManagingAgencySection />}
                 {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
                 {sig && <SignatureSection title={sig.title} body={sig.body} />}
-                {/* Notes are only useful for be-there methods — otherwise
-                    the customer isn't on-site to hand off context. */}
-                {isBeThereMethod(access) && <NotesSection />}
               </>
             )}
           </div>
@@ -498,17 +495,3 @@ function SignatureSection({ title, body }: { title: string; body: string }) {
   );
 }
 
-function NotesSection() {
-  const notes = useBookingSelector((s) => s.access_notes);
-  return (
-    <div className="mb-8">
-      <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>Additional access notes (optional)</h2>
-      <textarea
-        value={notes}
-        onChange={(e) => bookingActions.setAccessNotes(e.target.value)}
-        placeholder="e.g. Park in visitor spot 12, gate code is 4529#"
-        className="w-full min-h-[100px] rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition resize-none"
-      />
-    </div>
-  );
-}

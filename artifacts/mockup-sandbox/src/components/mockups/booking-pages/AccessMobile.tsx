@@ -26,7 +26,6 @@ import {
   infoNoteFor,
   isAgentTenantOption,
   isCollectReturnMethod,
-  isBeThereMethod,
   isLeaveKeyMethod,
   isManagingAgentMethod,
   isStep5Valid,
@@ -133,11 +132,6 @@ export function AccessMobile() {
             {isManagingAgentMethod(access) && <ManagingAgencySection />}
             {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
             {sig && <SignatureSection title={sig.title} body={sig.body} />}
-
-            {/* Notes are only useful for be-there methods — otherwise
-                the customer isn't on-site to hand off context to the
-                technician. */}
-            {isBeThereMethod(access) && <NotesSection />}
           </>
         )}
       </div>
@@ -694,22 +688,6 @@ function SignatureSection({ title, body }: { title: string; body: string }) {
       <div className="text-xs text-slate-500">
         Date: {new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
       </div>
-    </div>
-  );
-}
-
-function NotesSection() {
-  const value = useBookingSelector((s) => s.access_notes);
-  return (
-    <div className="mt-6 space-y-2">
-      <label className="text-sm font-medium text-slate-700">Additional access notes (optional)</label>
-      <textarea
-        value={value}
-        onChange={(e) => bookingActions.setAccessNotes(e.target.value)}
-        placeholder="Any extra instructions for the technician…"
-        data-testid="input-access-notes"
-        className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-slate-400 min-h-[100px] resize-none"
-      />
     </div>
   );
 }
