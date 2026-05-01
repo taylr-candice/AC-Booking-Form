@@ -475,15 +475,6 @@ function FullConfigView({
           </div>
         )}
 
-        {liveDiscrepancy && (
-          <p
-            data-testid="text-discrepancy-note"
-            className="mt-3 text-[11px] text-slate-500"
-          >
-            We’ll update our records based on your booking.
-          </p>
-        )}
-
         {isUnsureMode && (
           <UnsureMergedCard
             contextLine={
