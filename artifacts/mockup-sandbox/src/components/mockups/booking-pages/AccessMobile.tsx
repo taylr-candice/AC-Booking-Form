@@ -816,34 +816,40 @@ function SignatureSection({
   const contactLast = useBookingSelector((s) => s.contact_last_name);
   const displayName = name || [contactFirst, contactLast].filter(Boolean).join(" ");
   return (
-    <div className="mb-6 space-y-3">
-      <h2 className="text-[17px] font-bold" style={{ color: BRAND }}>{title}</h2>
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[12px] leading-relaxed text-slate-600">
-        {body}
-      </div>
-      <PinkAckCheckbox
-        checked={agreed}
-        onChange={(next) =>
-          bookingActions.setSignature({ signature_acknowledged: next })
-        }
-        invalid={attemptedSubmit && !agreed}
-        errorText="Please confirm you have read and agree to continue."
-        testId="checkbox-signature"
-        label="I have read and agree to the above"
-      />
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-slate-700">Your full name (typed signature)</label>
-        <input
-          type="text"
-          value={displayName}
-          onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
-          placeholder="e.g. Candice Miller"
-          data-testid="input-signature-name"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
-        />
-      </div>
-      <div className="text-xs text-slate-500">
-        Date Signed: {new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+    <div className="mb-6">
+      <h2 className="text-[17px] font-bold text-slate-900 mb-3">{title}</h2>
+      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        {/* Authorisation body text */}
+        <div className="bg-slate-50 px-4 py-4 text-[12px] leading-relaxed text-slate-600 border-b border-slate-200">
+          {body}
+        </div>
+        {/* Checkbox + signature + date — visually joined to the body */}
+        <div className="px-4 py-4 space-y-4">
+          <PinkAckCheckbox
+            checked={agreed}
+            onChange={(next) =>
+              bookingActions.setSignature({ signature_acknowledged: next })
+            }
+            invalid={attemptedSubmit && !agreed}
+            errorText="Please confirm you have read and agree to continue."
+            testId="checkbox-signature"
+            label="I have read and agree to the above"
+          />
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Your full name (typed signature)</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
+              placeholder="e.g. Candice Miller"
+              data-testid="input-signature-name"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+            />
+          </div>
+          <div className="text-[11px] text-slate-400">
+            Date signed: {new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+          </div>
+        </div>
       </div>
     </div>
   );

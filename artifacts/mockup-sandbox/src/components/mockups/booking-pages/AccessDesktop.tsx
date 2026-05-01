@@ -621,12 +621,17 @@ function SignatureSection({
 
   return (
     <div className="mb-8">
-      <h2 className="text-[17px] font-bold mb-3" style={{ color: BRAND }}>{title}</h2>
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-6 rounded-lg bg-slate-50 p-4 text-[13px] leading-relaxed text-slate-600">
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+        {/* Card header — title sits inside the card so the whole block reads as one unit */}
+        <div className="px-6 pt-5 pb-4 border-b border-slate-200">
+          <h2 className="text-[17px] font-bold text-slate-900">{title}</h2>
+        </div>
+        {/* Authorisation body text */}
+        <div className="bg-slate-50 px-6 py-4 text-[13px] leading-relaxed text-slate-600 border-b border-slate-200">
           {body}
         </div>
-        <div className="mb-6">
+        {/* Checkbox + name + date — same card, no visual gap */}
+        <div className="px-6 py-5 space-y-5">
           <PinkAckCheckbox
             checked={ack}
             onChange={(next) =>
@@ -637,20 +642,20 @@ function SignatureSection({
             testId="checkbox-signature"
             label="I have read and agree to the above."
           />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Your full name (typed signature)</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date Signed</label>
-            <div className="flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">{today}</div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Your full name (typed signature)</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date Signed</label>
+              <div className="flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">{today}</div>
+            </div>
           </div>
         </div>
       </div>
