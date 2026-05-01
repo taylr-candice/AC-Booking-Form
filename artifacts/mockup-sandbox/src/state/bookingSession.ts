@@ -788,6 +788,52 @@ const BE_THERE_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set<AccessMethod>
   "agent_be_there",
 ]);
 
+/** Leave-key methods — require leave_key_sub_method + sub-specific follow-ups.
+ *  Mirrored from `isLeaveKeyMethod` in accessMethodCatalog; inlined to keep
+ *  this module dependency-free. */
+const LEAVE_KEY_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set<AccessMethod>([
+  "owner_live_leave_key",
+  "owner_leased_leave_key",
+  "owner_vacant_leave_key",
+]);
+
+/** Collect-and-return methods — require key_collection_location + return_method
+ *  + signature acknowledgement.  Mirrored from `isCollectReturnMethod`. */
+const COLLECT_RETURN_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set<AccessMethod>([
+  "owner_live_collect",
+  "owner_vacant_collect",
+]);
+
+/** Managing-agent methods — require managing_agency_id.
+ *  Mirrored from `isManagingAgentMethod`. */
+const MANAGING_AGENT_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set<AccessMethod>([
+  "owner_leased_agent",
+  "owner_vacant_agent",
+]);
+
+/** Agent-trade-key method — requires signature only.
+ *  Mirrored from `isAgentTradeMethod`. */
+const AGENT_TRADE_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set<AccessMethod>([
+  "agent_trade_key",
+]);
+
+/** Tenant coordination methods that are already sub-resolved (not pending).
+ *  Require tenants list + signature. */
+const TENANT_COORD_ACCESS_METHODS: ReadonlySet<AccessMethod> = new Set<AccessMethod>([
+  "agent_tenant_self",
+  "agent_tenant_taylr",
+]);
+
+// ---------------------------------------------------------------------------
+// Mockup auto-seed constants
+// Must stay in sync with DEMO_MANAGING_AGENCIES[0] in accessMethodCatalog.ts.
+// ---------------------------------------------------------------------------
+const DEMO_FIRST_AGENCY_ID = "agency-001";
+const DEMO_KEY_HOLDER_NAME = "John Smith";
+const DEMO_KEY_HOLDER_PHONE = "0412 345 678";
+const DEMO_KEY_COLLECTION_LOCATION = "Level 1 lobby, near mailboxes";
+const DEMO_SIGNATURE_NAME = "Demo User";
+
 /** Clear everything that depends on the role (spec §13.3 row "Role"). */
 function clearRoleDownstream(s: BookingState): BookingState {
   return clearAccessFollowUps({
@@ -1188,20 +1234,64 @@ export const bookingActions = {
       if (isCoordination && next.current_step === 4) {
         next.current_step = 5;
       }
+      // Mockup auto-seed: pre-populate the required sub-fields for the
+      // newly selected method so the Access step passes validation
+      // immediately.  The user can still inspect and change every seeded
+      // value in the UI — this only ensures the Continue button is
+      // unblocked from the first card tap, matching the tenant section's
+      // TENANT_SEED pattern.
+      if (access_method) {
+        if (LEAVE_KEY_ACCESS_METHODS.has(access_method)) {
+          // Default to "with_someone" — always present regardless of
+          // building features.  Provide a demo key-holder so the step
+          // is valid right away; the user can pick a different sub-option.
+          next.leave_key_sub_method = "with_someone";
+          next.key_holder_name = DEMO_KEY_HOLDER_NAME;
+          next.key_holder_phone = DEMO_KEY_HOLDER_PHONE;
+        } else if (COLLECT_RETURN_ACCESS_METHODS.has(access_method)) {
+          next.key_collection_location = DEMO_KEY_COLLECTION_LOCATION;
+          next.return_method = "locker";
+          next.signature_acknowledged = true;
+          next.signature_name = DEMO_SIGNATURE_NAME;
+        } else if (MANAGING_AGENT_ACCESS_METHODS.has(access_method)) {
+          next.managing_agency_id = DEMO_FIRST_AGENCY_ID;
+        } else if (AGENT_TRADE_ACCESS_METHODS.has(access_method)) {
+          next.signature_acknowledged = true;
+          next.signature_name = DEMO_SIGNATURE_NAME;
+        } else if (TENANT_COORD_ACCESS_METHODS.has(access_method)) {
+          next.signature_acknowledged = true;
+          next.signature_name = DEMO_SIGNATURE_NAME;
+        }
+      }
       return next;
     });
   },
   setLeaveKeySubMethod(method: LeaveKeySubMethod | null) {
-    setState((s) => ({
-      ...s,
-      leave_key_sub_method: method,
-      // Switching sub-method clears key-holder details and signature so
-      // stale data from a previous sub-selection doesn't carry over.
-      key_holder_name: "",
-      key_holder_phone: "",
-      signature_acknowledged: false,
-      signature_name: "",
-    }));
+    setState((s) => {
+      const next: BookingState = {
+        ...s,
+        leave_key_sub_method: method,
+        // Switching sub-method clears key-holder details and signature so
+        // stale data from a previous sub-selection doesn't carry over.
+        key_holder_name: "",
+        key_holder_phone: "",
+        signature_acknowledged: false,
+        signature_name: "",
+      };
+      // Mockup auto-seed: re-populate required fields for the newly chosen
+      // sub-option so Continue stays unblocked after every card switch.
+      if (method === "with_someone") {
+        next.key_holder_name = DEMO_KEY_HOLDER_NAME;
+        next.key_holder_phone = DEMO_KEY_HOLDER_PHONE;
+      } else if (method !== null) {
+        // All other sub-options (with_taylr, with_parcel_locker,
+        // with_building_manager, with_concierge) are unattended and
+        // require a signature acknowledgement.
+        next.signature_acknowledged = true;
+        next.signature_name = DEMO_SIGNATURE_NAME;
+      }
+      return next;
+    });
   },
   setKeyHolder(fields: Partial<Pick<BookingState, "key_holder_name" | "key_holder_phone">>) {
     setState((s) => ({ ...s, ...fields }));
