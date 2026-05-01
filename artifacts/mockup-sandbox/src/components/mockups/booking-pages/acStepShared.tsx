@@ -72,7 +72,6 @@ export type Copy = {
   systemsUnitSingular: string;
   systemsUnitPlural: string;
   addonLabel: string;
-  addonHelper: string[];
   addonUnitSingular: string;
   addonUnitPlural: string;
 };
@@ -92,9 +91,6 @@ export const COPY: Record<KnownType, Copy> = {
     systemsUnitSingular: "ducted service",
     systemsUnitPlural: "ducted services",
     addonLabel: "Extra return-air grilles",
-    addonHelper: [
-      "If your apartment has more return-air grilles than shown above, add the extras here.",
-    ],
     addonUnitSingular: "extra return-air grille",
     addonUnitPlural: "extra return-air grilles",
   },
@@ -106,9 +102,6 @@ export const COPY: Record<KnownType, Copy> = {
     systemsUnitSingular: "split service",
     systemsUnitPlural: "split services",
     addonLabel: "Extra indoor units",
-    addonHelper: [
-      "If your apartment has more indoor unit heads than shown above, add the extras here.",
-    ],
     addonUnitSingular: "extra indoor unit",
     addonUnitPlural: "extra indoor units",
   },
@@ -141,21 +134,6 @@ export function buildAck(type: AcType) {
     label: `I understand the price may be adjusted, and a follow-up visit or rebook may be required, if the number of systems or ${noun} on-site is different from what I booked.`,
     error: `Please confirm you understand the price may be adjusted (and a follow-up visit may be required) if the booked number of systems or ${noun} doesn't match what's on-site.`,
   };
-}
-
-/** Helper / addon-explainer text shown under the extras stepper.
- *  Ducted gets a slightly different sentence because the inclusions
- *  cover both indoor units and return-air grilles. */
-export function getAddonHelperLines(
-  effectiveType: AcType,
-  copy: Copy,
-): string[] {
-  if (effectiveType === "ducted") {
-    return [
-      "If your apartment has more indoor unit / return-air grilles than shown in the inclusions above, add the extras here.",
-    ];
-  }
-  return copy.addonHelper;
 }
 
 // ─── On-file sync hook ────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  Eye,
   Info,
   Minus,
   Plus,
@@ -25,7 +26,6 @@ import {
   BRAND,
   ERROR_PURPLE,
   formatSystemsIncludes,
-  getAddonHelperLines,
   type KnownType,
   OtherServicesSection,
   PriceBlock,
@@ -386,7 +386,7 @@ function FullConfigView({
                     }
                     className="-m-2 grid h-9 w-9 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                   >
-                    <Info className="h-3.5 w-3.5" />
+                    <Eye className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 <p className="text-xs font-medium shrink-0" style={{ color: BRAND }}>
@@ -448,9 +448,25 @@ function FullConfigView({
                       className="mt-2 space-y-1.5 text-[11px] text-slate-500"
                       data-testid="text-extras-helper"
                     >
-                      {getAddonHelperLines(effectiveType, copy).map((p, i) => (
-                        <p key={i}>{p}</p>
-                      ))}
+                      <p>
+                        If your apartment has additional{" "}
+                        {effectiveType === "ducted"
+                          ? "return-air grilles"
+                          : "indoor units"}{" "}
+                        than what is included in the standard service selected
+                        above, add them here. Unsure how to check?{" "}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExampleModal(exampleVariantForType)
+                          }
+                          data-testid="link-take-a-look"
+                          className="font-medium underline underline-offset-2 hover:opacity-80"
+                          style={{ color: BRAND }}
+                        >
+                          take a look
+                        </button>
+                      </p>
                     </div>
                   </>
                 );
