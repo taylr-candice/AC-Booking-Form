@@ -17,19 +17,15 @@ import {
 } from "../../../state/bookingSession";
 import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
-import {
-  dayHasAvailable,
-  type CustomerDay,
-  type CustomerSlot,
-} from "./customerSlotData";
+import { type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
+import { CustomerMonthCalendar } from "./CustomerMonthCalendar";
 
 const BRAND = "#ED017F";
 
 type Slot = CustomerSlot;
-type Day = CustomerDay;
 
 export function SlotsMobileLite() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -160,19 +156,18 @@ export function SlotsMobileLite() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-4 gap-2">
-              {visibleDays.map((d) => (
-                <DayCard
-                  key={d.date}
-                  day={d}
-                  selected={d.date === selectedDate}
-                  onClick={() => {
-                    setSelectedDate(d.date);
-                    setSelectedSlotId(null);
-                  }}
-                />
-              ))}
-            </div>
+            {/* Full-month calendar — Su–Sa grid with per-day
+                availability indicators (one micro-dot per window). */}
+            <CustomerMonthCalendar
+              days={visibleDays}
+              selectedDate={selectedDate}
+              onSelect={(iso) => {
+                setSelectedDate(iso);
+                setSelectedSlotId(null);
+              }}
+              size="compact"
+              testIdSuffix="mobile-lite"
+            />
 
             {activeDay && (
               <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
@@ -213,14 +208,6 @@ export function SlotsMobileLite() {
 
               </div>
             )}
-
-            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-[11px] text-slate-500">
-              None of these work? Call us on{" "}
-              <span className="font-medium" style={{ color: BRAND }}>
-                1300 TAYLR
-              </span>{" "}
-              and we'll look at options outside your area's regular run.
-            </div>
           </>
         )}
       </div>
@@ -257,57 +244,6 @@ export function SlotsMobileLite() {
         <CancellationTermsModal onClose={() => setTermsOpen(false)} />
       )}
     </div>
-  );
-}
-
-function DayCard({
-  day,
-  selected,
-  onClick,
-}: {
-  day: Day;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const hasAvailable = dayHasAvailable(day);
-  const disabled = !hasAvailable;
-  const isSelected = selected && hasAvailable;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      data-testid={`day-card-${day.date}`}
-      aria-pressed={isSelected}
-      className={`flex flex-col items-center justify-center rounded-xl border py-2 transition ${
-        disabled
-          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-          : isSelected
-            ? "text-white shadow-sm"
-            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-      }`}
-      style={
-        isSelected
-          ? { borderColor: BRAND, backgroundColor: BRAND }
-          : undefined
-      }
-    >
-      <div
-        className={`text-[10px] font-medium uppercase tracking-wide ${
-          disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"
-        }`}
-      >
-        {day.weekday}
-      </div>
-      <div className="text-lg font-bold leading-tight">{day.day}</div>
-      <div
-        className={`text-[10px] ${
-          disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"
-        }`}
-      >
-        {day.month}
-      </div>
-    </button>
   );
 }
 

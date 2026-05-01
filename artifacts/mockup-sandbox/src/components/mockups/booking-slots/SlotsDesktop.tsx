@@ -4,8 +4,6 @@ import {
   Sunrise,
   Sun,
   Moon,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
   Clock,
   Lock,
@@ -21,23 +19,18 @@ import {
   unitCity,
 } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
-import {
-  dayHasAvailable,
-  type CustomerDay,
-  type CustomerSlot,
-} from "./customerSlotData";
+import { type CustomerSlot } from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
+import { CustomerMonthCalendar } from "./CustomerMonthCalendar";
 
 const BRAND = "#ED017F";
 
 type Slot = CustomerSlot;
-type Day = CustomerDay;
 
 export function SlotsDesktop() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [weekIdx, setWeekIdx] = useState(0);
   const [termsOpen, setTermsOpen] = useState(false);
   const session = useBookingSession();
   const cancellationAck = session.cancellation_acknowledged;
@@ -60,18 +53,6 @@ export function SlotsDesktop() {
     setSelected: setSelectedSlotId,
   } = useCustomerSlotPicker(session.unit_id, jobMinutes);
 
-  // Paginate by 6-day weeks so wide rollouts (the demo runs 12+ days)
-  // don't overflow the 6-up grid. Mirrors the previous picker rhythm.
-  const weeks = useMemo(() => {
-    const out: Day[][] = [];
-    for (let i = 0; i < visibleDays.length; i += 6) {
-      out.push(visibleDays.slice(i, i + 6));
-    }
-    return out;
-  }, [visibleDays]);
-
-  const week = weeks[weekIdx] ?? [];
-
   const activeDay = useMemo(
     () => visibleDays.find((d) => d.date === selectedDate) ?? null,
     [visibleDays, selectedDate],
@@ -83,13 +64,6 @@ export function SlotsDesktop() {
       setSelectedSlotId(null);
     }
   }, [selectedDate, activeDay, setSelectedSlotId]);
-
-  const monthLabel = useMemo(() => {
-    if (!week.length) return "";
-    const first = week[0].month;
-    const last = week[week.length - 1].month;
-    return first === last ? first : `${first} – ${last}`;
-  }, [week]);
 
   const canConfirm =
     !!selectedSlotId && !lockedByOther && cancellationAck;
@@ -187,45 +161,20 @@ export function SlotsDesktop() {
 
             {rollout && !lockedByOther && (
               <>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">{monthLabel} 2026</span>
-                    <span className="text-xs text-slate-400">· Week {weekIdx + 1} of {weeks.length}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      disabled={weekIdx === 0}
-                      onClick={() => setWeekIdx(Math.max(0, weekIdx - 1))}
-                      className="grid h-8 w-8 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={weekIdx >= weeks.length - 1}
-                      onClick={() => setWeekIdx(Math.min(weeks.length - 1, weekIdx + 1))}
-                      className="grid h-8 w-8 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Day grid — 6 per row on desktop. */}
-                <div className="grid grid-cols-6 gap-3">
-                  {week.map((d) => (
-                    <DayCard
-                      key={d.date}
-                      day={d}
-                      selected={d.date === selectedDate}
-                      onClick={() => {
-                        setSelectedDate(d.date);
-                        setSelectedSlotId(null);
-                      }}
-                    />
-                  ))}
-                </div>
+                {/* Full-month calendar with per-day availability dots
+                    — Su–Sa grid, prev/next month nav, and a glanceable
+                    three-segment indicator (one micro-dot per window)
+                    so the customer can scan an entire month at once. */}
+                <CustomerMonthCalendar
+                  days={visibleDays}
+                  selectedDate={selectedDate}
+                  onSelect={(iso) => {
+                    setSelectedDate(iso);
+                    setSelectedSlotId(null);
+                  }}
+                  size="regular"
+                  testIdSuffix="desktop"
+                />
 
                 {activeDay && (
                   <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
@@ -319,57 +268,6 @@ export function SlotsDesktop() {
         <CancellationTermsModal onClose={() => setTermsOpen(false)} />
       )}
     </div>
-  );
-}
-
-function DayCard({
-  day,
-  selected,
-  onClick,
-}: {
-  day: Day;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  const hasAvailable = dayHasAvailable(day);
-  const disabled = !hasAvailable;
-  const isSelected = selected && hasAvailable;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      data-testid={`day-card-${day.date}`}
-      aria-pressed={isSelected}
-      className={`flex h-[68px] w-full flex-col items-center justify-center rounded-xl border transition ${
-        disabled
-          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-          : isSelected
-            ? "text-white shadow-sm"
-            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:shadow-sm"
-      }`}
-      style={
-        isSelected
-          ? { borderColor: BRAND, backgroundColor: BRAND }
-          : undefined
-      }
-    >
-      <div
-        className={`text-[10px] font-medium uppercase tracking-wide ${
-          disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"
-        }`}
-      >
-        {day.weekday}
-      </div>
-      <div className="text-xl font-bold leading-tight">{day.day}</div>
-      <div
-        className={`text-[10px] font-medium uppercase tracking-wide ${
-          disabled ? "text-slate-400" : isSelected ? "text-white/85" : "text-slate-500"
-        }`}
-      >
-        {day.month}
-      </div>
-    </button>
   );
 }
 

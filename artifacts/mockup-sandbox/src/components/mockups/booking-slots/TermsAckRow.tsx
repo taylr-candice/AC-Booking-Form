@@ -1,10 +1,11 @@
 /**
  * Reusable "ack with summary + View terms link" panel used on the
  * Schedule step. Tickbox + summary label, with a "View terms" link
- * that opens a focused modal. The whole component lives on the
- * brand pink (#ED017F) — ticked rows shift to a soft pink wash and
- * pink border, the checkbox accent is brand pink in both states,
- * and the "View terms" link is brand pink.
+ * that opens a focused modal. The container is intentionally neutral
+ * (white background, slate hairline border) — only the checkbox accent
+ * and the "View terms" link carry the brand pink, so a checked state
+ * doesn't flood the page with a coloured wash that competes with the
+ * primary CTA.
  */
 
 const BRAND = "#ED017F";
@@ -29,19 +30,12 @@ export function TermsAckRow({
   size?: "compact" | "regular";
 }) {
   const isCompact = size === "compact";
-  const containerStyle = checked
-    ? {
-        borderColor: "rgba(237,1,127,0.40)",
-        backgroundColor: "rgba(237,1,127,0.06)",
-      }
-    : undefined;
 
   return (
     <div
-      className={`flex items-start justify-between gap-3 rounded-lg border ${
-        checked ? "" : "border-slate-200 bg-slate-50"
-      } ${isCompact ? "px-3 py-2" : "px-3 py-2.5"}`}
-      style={containerStyle}
+      className={`flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white ${
+        isCompact ? "px-3 py-2" : "px-3 py-2.5"
+      }`}
       data-testid={rowTestId}
     >
       <label className="flex flex-1 cursor-pointer items-start gap-2 text-slate-700">

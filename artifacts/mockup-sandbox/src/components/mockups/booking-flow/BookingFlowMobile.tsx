@@ -210,9 +210,7 @@ export function BookingFlowMobile() {
                   <div
                     className="mx-1 h-0.5 flex-1 rounded-full"
                     style={{
-                      backgroundColor: isComplete
-                        ? "rgba(95,187,151,0.45)"
-                        : "#E2E8F0",
+                      backgroundColor: isComplete ? BRAND : "#E2E8F0",
                     }}
                   />
                 )}
