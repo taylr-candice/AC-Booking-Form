@@ -254,8 +254,8 @@ function iconForMethod(m: AccessMethod) {
 function AgentTenantCoordinationSection({ access }: { access: AccessMethod | null }) {
   return (
     <div className="mb-8">
-      <h2 className="text-[15px] font-semibold mb-1" style={{ color: BRAND }}>Who will arrange the appointment with the tenant?</h2>
-      <p className="text-xs text-slate-500 mb-4">Choose who contacts the tenant to confirm the service window.</p>
+      <h2 className="text-[15px] font-semibold mb-1 text-slate-900">Who will coordinate?</h2>
+      <p className="text-xs text-slate-500 mb-4">Let us know your preference.</p>
       <div className="grid grid-cols-2 gap-3">
         <CoordinationChoiceCard
           selected={access === "agent_tenant_self"}
@@ -511,6 +511,9 @@ function SignatureSection({
 }) {
   const ack = useBookingSelector((s) => s.signature_acknowledged);
   const name = useBookingSelector((s) => s.signature_name);
+  const contactFirst = useBookingSelector((s) => s.contact_first_name);
+  const contactLast = useBookingSelector((s) => s.contact_last_name);
+  const displayName = name || [contactFirst, contactLast].filter(Boolean).join(" ");
   const today = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 
   return (
@@ -537,13 +540,13 @@ function SignatureSection({
             <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Your full name (typed signature)</label>
             <input
               type="text"
-              value={name}
+              value={displayName}
               onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date</label>
+            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date Signed</label>
             <div className="flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">{today}</div>
           </div>
         </div>

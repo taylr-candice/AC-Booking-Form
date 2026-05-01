@@ -274,7 +274,7 @@ export function infoNoteFor(method: AccessMethod | null): InfoNote | null {
     case "agent_tenant_taylr":
       return {
         title: "Tenant details required",
-        body: "We'll send each tenant an authorisation letter and arrange a suitable window directly with them. The booking moves to a coordination state — we'll confirm the appointment time once secured.",
+        body: "We'll send each tenant an authorisation letter and arrange a suitable window directly with them.",
       };
     case "agent_tenant_self":
       return {

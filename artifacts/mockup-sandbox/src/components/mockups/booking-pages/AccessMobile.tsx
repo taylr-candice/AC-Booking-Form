@@ -362,11 +362,11 @@ function AgentTenantCoordinationSection({
 }) {
   return (
     <div className="mb-6">
-      <h2 className="text-[15px] font-semibold mb-1" style={{ color: BRAND }}>
-        Who will arrange the appointment with the tenant?
+      <h2 className="text-[15px] font-semibold mb-1 text-slate-900">
+        Who will coordinate?
       </h2>
       <p className="text-xs text-slate-500 mb-3">
-        Choose who contacts the tenant to confirm the service window.
+        Let us know your preference.
       </p>
       <div className="space-y-2.5">
         <CoordinationChoiceCard
@@ -697,6 +697,9 @@ function SignatureSection({
 }) {
   const agreed = useBookingSelector((s) => s.signature_acknowledged);
   const name = useBookingSelector((s) => s.signature_name);
+  const contactFirst = useBookingSelector((s) => s.contact_first_name);
+  const contactLast = useBookingSelector((s) => s.contact_last_name);
+  const displayName = name || [contactFirst, contactLast].filter(Boolean).join(" ");
   return (
     <div className="mb-6 space-y-3">
       <h2 className="text-[15px] font-semibold" style={{ color: BRAND }}>{title}</h2>
@@ -717,7 +720,7 @@ function SignatureSection({
         <label className="text-sm font-medium text-slate-700">Your full name (typed signature)</label>
         <input
           type="text"
-          value={name}
+          value={displayName}
           onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
           placeholder="e.g. Candice Miller"
           data-testid="input-signature-name"
@@ -725,7 +728,7 @@ function SignatureSection({
         />
       </div>
       <div className="text-xs text-slate-500">
-        Date: {new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+        Date Signed: {new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
       </div>
     </div>
   );
