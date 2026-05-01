@@ -723,7 +723,7 @@ function ResidenceCard({
       type="button"
       onClick={onClick}
       data-testid={`card-residence-${id}`}
-      className={`relative flex min-h-[72px] w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
+      className={`relative flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
       style={
@@ -733,7 +733,7 @@ function ResidenceCard({
       }
     >
       <span
-        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
           selected ? "bg-white" : "bg-slate-100 text-slate-700"
         }`}
         style={selected ? { color: SELECTED_ACCENT } : undefined}

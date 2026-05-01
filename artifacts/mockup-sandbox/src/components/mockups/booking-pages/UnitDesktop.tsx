@@ -765,7 +765,7 @@ function ResidenceCard({
       type="button"
       onClick={onClick}
       data-testid={`card-residence-${id}`}
-      className={`relative flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
+      className={`relative flex w-full items-center gap-3 rounded-xl border p-4 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
       style={
