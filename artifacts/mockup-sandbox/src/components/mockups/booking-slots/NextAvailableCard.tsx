@@ -64,7 +64,7 @@ export function NextAvailableCard({
           >
             Next available
           </div>
-          {/* Window + icon first, date below. */}
+          {/* Time-of-day + icon on first line, date on second, time on third. */}
           <div
             className={`mt-0.5 flex items-center gap-1.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
@@ -89,7 +89,14 @@ export function NextAvailableCard({
                 style={{ color: BRAND }}
               />
             )}
-            {windowLabel} · {weekdayLong} {day.day} {monthTitle}
+            {windowLabel}
+          </div>
+          <div
+            className={`text-slate-600 ${
+              isCompact ? "text-[11px]" : "text-xs"
+            }`}
+          >
+            {weekdayLong} {day.day} {monthTitle}
           </div>
           <div
             className={`text-slate-500 ${
