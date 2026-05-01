@@ -43,8 +43,8 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
-const SELECTED_BG = "#D1FAE5";
-const SELECTED_ACCENT = "#15803D";
+const SELECTED_BG = "#7BC9A8";
+const SELECTED_ACCENT = "#7BC9A8";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -84,7 +84,7 @@ export function PayMobile() {
       {/* Page header */}
       <div className="flex items-start justify-between bg-white px-5 pb-4 pt-5">
         <div>
-          <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
+          <h1 className="text-[26px] font-bold leading-tight text-slate-900">
             Check out
           </h1>
           <div className="mt-0.5 text-xs font-semibold tracking-wide uppercase text-slate-500">
@@ -435,7 +435,7 @@ function MethodCard({
         )}
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_ACCENT }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: "#ffffff" }} />
       )}
     </button>
   );

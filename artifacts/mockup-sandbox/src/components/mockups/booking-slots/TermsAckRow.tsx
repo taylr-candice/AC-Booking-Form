@@ -9,7 +9,7 @@
  */
 
 const BRAND = "#ED017F";
-const SELECTED_ACCENT = "#15803D";
+const SELECTED_ACCENT = "#7BC9A8";
 
 export function TermsAckRow({
   checked,

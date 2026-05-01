@@ -4,8 +4,8 @@ import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResi
 import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
-const SELECTED_BG = "#D1FAE5";
-const SELECTED_ACCENT = "#15803D";
+const SELECTED_BG = "#7BC9A8";
+const SELECTED_ACCENT = "#7BC9A8";
 
 export function AccessDesktop() {
   const session = useBookingSelector((s) => s);
@@ -27,7 +27,7 @@ export function AccessDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-slate-900">How will the technician access the property?</h1>
+            <h1 className="text-2xl font-bold text-slate-900">How will the technician access the property?</h1>
           </div>
 
           <div className="flex-1">
@@ -183,7 +183,7 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
         <div className="text-[14px] font-semibold text-slate-900">{title}</div>
         <div className="mt-1 text-[11px] text-slate-500">{subtitle}</div>
       </div>
-      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_ACCENT }} />}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: "#ffffff" }} />}
     </button>
   );
 }
@@ -214,7 +214,7 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
         <span className="text-[15px] font-semibold text-slate-900">{option.label}</span>
         <span className="mt-0.5 text-[13px] text-slate-500">{option.subtitle}</span>
       </span>
-      {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_ACCENT }} />}
+      {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: "#ffffff" }} />}
     </button>
   );
 }
@@ -267,8 +267,8 @@ function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { se
           : undefined
       }
     >
-      <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? SELECTED_ACCENT : "#CBD5E1" }}>
-        {selected && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SELECTED_ACCENT }} />}
+      <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? "#ffffff" : "#CBD5E1" }}>
+        {selected && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#ffffff" }} />}
       </span>
       <div className="text-[14px] font-semibold text-slate-900">{title}</div>
       <div className="text-[12px] text-slate-500">{subtitle}</div>
@@ -380,7 +380,7 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
         <div className="text-[14px] font-semibold text-slate-900">{title}</div>
         <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>
       </div>
-      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: SELECTED_ACCENT }} />}
+      {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: "#ffffff" }} />}
     </button>
   );
 }

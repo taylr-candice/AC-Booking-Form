@@ -100,7 +100,7 @@ function OnFileView({
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
       <div className="flex items-start justify-between px-5 pb-3 pt-5">
         <div className="pr-3">
-          <h1 className="text-[22px] font-semibold leading-tight text-slate-900">
+          <h1 className="text-[22px] font-bold leading-tight text-slate-900">
             Confirm the AC setup
           </h1>
         </div>
@@ -253,7 +253,7 @@ function FullConfigView({
       <div className="flex items-start justify-between px-5 pb-3 pt-5">
         <div className="pr-3">
           {!isUnsureMode && (
-            <h1 className="text-[22px] font-semibold leading-tight text-slate-900">{heading}</h1>
+            <h1 className="text-[22px] font-bold leading-tight text-slate-900">{heading}</h1>
           )}
         </div>
         <button

@@ -31,8 +31,8 @@ import {
 } from "../../../state/bookingHelpers";
 
 const BRAND = "#ED017F";
-const SELECTED_BG = "#D1FAE5";
-const SELECTED_ACCENT = "#15803D";
+const SELECTED_BG = "#7BC9A8";
+const SELECTED_ACCENT = "#7BC9A8";
 
 type PayMethod = "pay_now" | "invoice";
 
@@ -73,7 +73,7 @@ export function PayDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-slate-900">Review & pay</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Review & pay</h1>
           </div>
 
           <div className="flex-1 space-y-10">
@@ -161,7 +161,7 @@ export function PayDesktop() {
                     <span className="text-sm font-semibold text-slate-900">{PAY_NOW_LABEL}</span>
                     <span className="text-[11px] font-medium text-slate-500">{PAY_NOW_SUBLABEL}</span>
                     {method === "pay_now" && (
-                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_ACCENT }} />
+                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: "#ffffff" }} />
                     )}
                   </button>
 
@@ -184,7 +184,7 @@ export function PayDesktop() {
                     <span className="text-sm font-semibold text-slate-900">{INVOICE_LABEL}</span>
                     <span className="text-[11px] font-medium text-slate-500">{INVOICE_SUBLABEL}</span>
                     {method === "invoice" && (
-                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: SELECTED_ACCENT }} />
+                      <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: "#ffffff" }} />
                     )}
                   </button>
                 </div>

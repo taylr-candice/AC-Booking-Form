@@ -25,9 +25,9 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN_BG = "#D1FAE5";
+const SELECTED_GREEN_BG = "#7BC9A8";
 const SELECTED_GREEN_TEXT = "#0F172A";
-const SELECTED_GREEN_BORDER = "#15803D";
+const SELECTED_GREEN_BORDER = "#7BC9A8";
 
 type Slot = CustomerSlot;
 
@@ -84,7 +84,7 @@ export function SlotsMobile() {
       {/* Page header */}
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
         <div>
-          <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
+          <h1 className="text-[26px] font-bold leading-tight text-slate-900">
             Schedule
           </h1>
           <div className="mt-0.5 text-xs text-slate-500">Pick a service slot</div>
@@ -339,13 +339,13 @@ function SlotCard({
           style={
             disabled
               ? undefined
-              : { color: isSelected ? SELECTED_GREEN_BORDER : BRAND }
+              : { color: isSelected ? "#ffffff" : BRAND }
           }
         >
           {icon}
         </div>
         {isSelected && (
-          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: SELECTED_GREEN_BORDER }} />
+          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#ffffff" }} />
         )}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>

@@ -28,9 +28,9 @@ import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
-const SELECTED_GREEN_BG = "#D1FAE5";
+const SELECTED_GREEN_BG = "#7BC9A8";
 const SELECTED_GREEN_TEXT = "#0F172A";
-const SELECTED_GREEN_BORDER = "#15803D";
+const SELECTED_GREEN_BORDER = "#7BC9A8";
 
 type Slot = CustomerSlot;
 
@@ -88,7 +88,7 @@ export function SlotsDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           <div className="mb-6 flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-900">Schedule your service</h1>
+              <h1 className="text-2xl font-bold text-slate-900">Schedule your service</h1>
               <p className="text-sm text-slate-500 mt-2">
                 Pick an arrival window that works for you.
               </p>
@@ -352,13 +352,13 @@ function DesktopSlotCard({
           style={
             disabled
               ? undefined
-              : { color: isSelected ? SELECTED_GREEN_BORDER : BRAND }
+              : { color: isSelected ? "#ffffff" : BRAND }
           }
         >
           {icon}
         </div>
         {isSelected && (
-          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: SELECTED_GREEN_BORDER }} />
+          <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#ffffff" }} />
         )}
       </div>
       <div className="text-[13px] font-semibold">{label}</div>

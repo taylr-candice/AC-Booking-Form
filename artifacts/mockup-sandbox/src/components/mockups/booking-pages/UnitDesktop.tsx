@@ -31,8 +31,8 @@ import {
 import { UnitAlreadyBookedModal } from "./UnitAlreadyBookedModal";
 
 const BRAND = "#ED017F";
-const SELECTED_BG = "#D1FAE5";
-const SELECTED_ACCENT = "#15803D";
+const SELECTED_BG = "#7BC9A8";
+const SELECTED_ACCENT = "#7BC9A8";
 const ERROR_PURPLE = "#9747FF";
 
 const UNITS = [
@@ -257,7 +257,7 @@ export function UnitDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
 
           <div className="mb-8">
-            <h1 className="text-2xl font-semibold text-slate-900">Select the property</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Select the property</h1>
             <p className="text-sm text-slate-500 mt-2">For which the service will take place</p>
           </div>
 
@@ -689,7 +689,7 @@ function RoleCard({
       {selected && (
         <CheckCircle2
           className="absolute right-3 top-3 h-5 w-5"
-          style={{ color: SELECTED_ACCENT }}
+          style={{ color: "#ffffff" }}
         />
       )}
     </button>

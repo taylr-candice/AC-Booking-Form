@@ -36,8 +36,8 @@ import {
 } from "../../../state/accessMethodCatalog";
 
 const BRAND = "#ED017F";
-const SELECTED_BG = "#D1FAE5";
-const SELECTED_ACCENT = "#15803D";
+const SELECTED_BG = "#7BC9A8";
+const SELECTED_ACCENT = "#7BC9A8";
 
 export function AccessMobile() {
   const session = useBookingSelector((s) => s);
@@ -60,7 +60,7 @@ export function AccessMobile() {
       {/* Page header */}
       <div className="flex items-start justify-between px-5 pb-4 pt-5">
         <div>
-          <h1 className="text-[26px] font-semibold leading-tight text-slate-900">
+          <h1 className="text-[26px] font-bold leading-tight text-slate-900">
             Property access
           </h1>
         </div>
@@ -251,7 +251,7 @@ function ResidenceCard({
         <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5" style={{ color: SELECTED_ACCENT }} />
+        <CheckCircle2 className="h-5 w-5" style={{ color: "#ffffff" }} />
       )}
     </button>
   );
@@ -297,7 +297,7 @@ function AccessCard({
         <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{option.subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: SELECTED_ACCENT }} />
+        <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: "#ffffff" }} />
       )}
     </button>
   );
@@ -413,12 +413,12 @@ function CoordinationChoiceCard({
     >
       <span
         className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2"
-        style={{ borderColor: selected ? SELECTED_ACCENT : "#CBD5E1" }}
+        style={{ borderColor: selected ? "#ffffff" : "#CBD5E1" }}
       >
         {selected && (
           <span
             className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: SELECTED_ACCENT }}
+            style={{ backgroundColor: "#ffffff" }}
           />
         )}
       </span>
@@ -559,7 +559,7 @@ function ReturnMethodCard({
         <span className="mt-0.5 text-[12px] leading-snug text-slate-500">{subtitle}</span>
       </span>
       {selected && (
-        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: SELECTED_ACCENT }} />
+        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: "#ffffff" }} />
       )}
     </button>
   );
@@ -669,7 +669,7 @@ function SignatureSection({ title, body }: { title: string; body: string }) {
           type="checkbox"
           checked={agreed}
           onChange={(e) => bookingActions.setSignature({ signature_acknowledged: e.target.checked })}
-          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#15803D] focus:ring-pink-600"
+          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#7BC9A8] focus:ring-pink-600"
           data-testid="checkbox-signature"
         />
         <span className="text-sm text-slate-700">I have read and agree to the above</span>
