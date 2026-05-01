@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react";
+import { Sun } from "lucide-react";
 import type { CSSProperties } from "react";
 
 /**
@@ -77,6 +77,25 @@ export function EveningIcon({
   "aria-hidden": ariaHidden = true,
 }: IconProps) {
   return (
-    <Moon className={className} style={style} aria-hidden={ariaHidden} />
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      style={style}
+      aria-hidden={ariaHidden}
+    >
+      {/*
+       * Slim crescent moon. Same outer arc as Lucide Moon (radius 9,
+       * large-arc, clockwise from (21,12) back to (12,3)) but the
+       * inner cutout arc uses a larger radius (7.5 vs Lucide's 6) so
+       * the inner edge curves more gently and the crescent is visibly
+       * narrower without losing its recognisable moon shape.
+       */}
+      <path d="M12 3a7.5 7.5 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
   );
 }
