@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
-  Sunrise,
-  Sun,
-  Moon,
   CheckCircle2,
   Clock,
   Lock,
 } from "lucide-react";
+
+import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import {
@@ -29,7 +28,9 @@ import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN_BG = "#7BC9A8";
-const SELECTED_GREEN_TEXT = "#0F172A";
+// White text on the green selected fill so it reads as a clearly
+// active, "in use" choice rather than a neutral card.
+const SELECTED_GREEN_TEXT = "#ffffff";
 const SELECTED_GREEN_BORDER = "#7BC9A8";
 
 type Slot = CustomerSlot;
@@ -37,6 +38,7 @@ type Slot = CustomerSlot;
 export function SlotsDesktop() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [attemptedConfirm, setAttemptedConfirm] = useState(false);
   const session = useBookingSession();
   const cancellationAck = session.cancellation_acknowledged;
   const jobMinutes = getBookingDurationMinutes(session);
@@ -187,10 +189,10 @@ export function SlotsDesktop() {
 
                 {nextAvailable && (
                   <div
-                    className="mt-5 mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                    className="mt-6 mb-3 text-[20px] font-bold text-slate-900"
                     data-testid="label-choose-another-day-desktop"
                   >
-                    Or choose another day
+                    Choose a day
                   </div>
                 )}
 
@@ -206,15 +208,17 @@ export function SlotsDesktop() {
                 />
 
                 {activeDay && (
-                  <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="mb-3 text-sm font-medium text-slate-600">
-                      {activeDay.weekday} {activeDay.day} {activeDay.month} ·
-                      pick a window
+                  <div className="mt-6">
+                    <div
+                      className="mb-3 text-[20px] font-bold text-slate-900"
+                      data-testid="label-pick-a-window-desktop"
+                    >
+                      Pick a window
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       <DesktopSlotCard
                         slot={activeDay.morning}
-                        icon={<Sunrise className="h-4 w-4" />}
+                        icon={<MorningIcon className="h-4 w-4" />}
                         label="Morning"
                         hint={activeDay.morning.timeLabel}
                         selected={selectedSlotId === activeDay.morning.id}
@@ -224,7 +228,7 @@ export function SlotsDesktop() {
                       />
                       <DesktopSlotCard
                         slot={activeDay.afternoon}
-                        icon={<Sun className="h-4 w-4" />}
+                        icon={<AfternoonIcon className="h-4 w-4" />}
                         label="Afternoon"
                         hint={activeDay.afternoon.timeLabel}
                         selected={selectedSlotId === activeDay.afternoon.id}
@@ -235,7 +239,7 @@ export function SlotsDesktop() {
                       {activeDay.evening && (
                         <DesktopSlotCard
                           slot={activeDay.evening}
-                          icon={<Moon className="h-4 w-4" />}
+                          icon={<EveningIcon className="h-4 w-4" />}
                           label="Evening"
                           hint={activeDay.evening.timeLabel}
                           selected={selectedSlotId === activeDay.evening.id}
@@ -268,15 +272,17 @@ export function SlotsDesktop() {
           <div className="mt-8 space-y-2">
             <TermsAckRow
               checked={cancellationAck}
-              onChange={(next) =>
-                bookingActions.setCancellationAcknowledged(next)
-              }
+              onChange={(next) => {
+                bookingActions.setCancellationAcknowledged(next);
+                if (next) setAttemptedConfirm(false);
+              }}
               label={CANCELLATION_ACK_LABEL}
               onViewTerms={() => setTermsOpen(true)}
               ackTestId="checkbox-cancellation-ack-desktop"
               rowTestId="cancellation-ack-row-desktop"
               viewTermsTestId="button-view-cancellation-terms-desktop"
-              size="regular"
+              invalid={attemptedConfirm && !cancellationAck}
+              errorText="Please confirm the cancellation policy to continue."
             />
           </div>
 
@@ -288,16 +294,32 @@ export function SlotsDesktop() {
             >
               ← Back
             </button>
-            <button
-              type="button"
-              disabled={!canConfirm}
-              data-testid="button-continue-desktop"
-              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
-              style={{ backgroundColor: BRAND }}
+            {/* See SlotsMobile.tsx for why we keep the button enabled
+                without the ack and intercept the click in capture
+                phase to surface the invalid styling. */}
+            <span
+              onClickCapture={(e) => {
+                if (!cancellationAck) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setAttemptedConfirm(true);
+                }
+              }}
             >
-              Confirm
-              <ArrowRight className="h-4 w-4" />
-            </button>
+              <button
+                type="button"
+                disabled={!selectedSlotId || !!lockedByOther}
+                aria-disabled={!canConfirm}
+                data-testid="button-continue-desktop"
+                className={`flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90 ${
+                  canConfirm ? "" : "opacity-50"
+                }`}
+                style={{ backgroundColor: BRAND }}
+              >
+                Confirm
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </span>
           </div>
         </div>
       </div>

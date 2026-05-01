@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -34,6 +35,7 @@ import {
   useTenants,
   type AccessOption,
 } from "../../../state/accessMethodCatalog";
+import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
@@ -54,6 +56,11 @@ export function AccessMobile() {
   const valid = isStep5Valid(session);
   const note = infoNoteFor(access);
   const sig = signatureVariantFor(access);
+
+  // Tracks whether the customer has tried to advance past Continue. The
+  // SignatureSection uses this so the ack only flips into the pink-style
+  // invalid state once they attempt to proceed without ticking it.
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -131,23 +138,45 @@ export function AccessMobile() {
             {isCollectReturnMethod(access) && <CollectReturnSection />}
             {isManagingAgentMethod(access) && <ManagingAgencySection />}
             {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
-            {sig && <SignatureSection title={sig.title} body={sig.body} />}
+            {sig && (
+              <SignatureSection
+                title={sig.title}
+                body={sig.body}
+                attemptedSubmit={attemptedSubmit}
+              />
+            )}
           </>
         )}
       </div>
 
-      {/* Docked CTA */}
+      {/* Docked CTA — kept enabled even when invalid so the user can
+          tap it and see which field needs attention (notably the pink
+          signature ack). The click is swallowed in capture phase
+          before `BookingFlowMobile`'s document-level NAV_FORWARD
+          handler sees it, so the flow doesn't actually advance. */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
-        <button
-          type="button"
-          data-testid="button-continue"
-          disabled={!valid}
-          className="flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ backgroundColor: BRAND }}
+        <span
+          onClickCapture={(e) => {
+            if (!valid) {
+              e.stopPropagation();
+              e.preventDefault();
+              setAttemptedSubmit(true);
+            }
+          }}
         >
-          Continue
-          <ArrowRight className="h-4 w-4" />
-        </button>
+          <button
+            type="button"
+            data-testid="button-continue"
+            aria-disabled={!valid}
+            className={`flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition ${
+              valid ? "" : "opacity-50"
+            }`}
+            style={{ backgroundColor: BRAND }}
+          >
+            Continue
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </span>
       </div>
     </div>
   );
@@ -247,8 +276,20 @@ function ResidenceCard({
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-semibold leading-tight text-slate-900">{title}</span>
-        <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{subtitle}</span>
+        <span
+          className={`text-[15px] font-semibold leading-tight ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {title}
+        </span>
+        <span
+          className={`mt-0.5 text-[12.5px] leading-snug ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
+          {subtitle}
+        </span>
       </span>
       {selected && (
         <CheckCircle2 className="h-5 w-5" style={{ color: "#ffffff" }} />
@@ -293,8 +334,20 @@ function AccessCard({
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-semibold leading-tight text-slate-900">{option.label}</span>
-        <span className="mt-0.5 text-[12.5px] leading-snug text-slate-500">{option.subtitle}</span>
+        <span
+          className={`text-[15px] font-semibold leading-tight ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {option.label}
+        </span>
+        <span
+          className={`mt-0.5 text-[12.5px] leading-snug ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
+          {option.subtitle}
+        </span>
       </span>
       {selected && (
         <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: "#ffffff" }} />
@@ -423,10 +476,18 @@ function CoordinationChoiceCard({
         )}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[14px] font-semibold leading-tight text-slate-900">
+        <span
+          className={`text-[14px] font-semibold leading-tight ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
           {title}
         </span>
-        <span className="mt-0.5 text-[12px] leading-snug text-slate-500">
+        <span
+          className={`mt-0.5 text-[12px] leading-snug ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
           {subtitle}
         </span>
       </span>
@@ -555,8 +616,20 @@ function ReturnMethodCard({
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[14px] font-semibold leading-tight text-slate-900">{title}</span>
-        <span className="mt-0.5 text-[12px] leading-snug text-slate-500">{subtitle}</span>
+        <span
+          className={`text-[14px] font-semibold leading-tight ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {title}
+        </span>
+        <span
+          className={`mt-0.5 text-[12px] leading-snug ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
+          {subtitle}
+        </span>
       </span>
       {selected && (
         <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: "#ffffff" }} />
@@ -655,7 +728,15 @@ function TenantsSection({
   );
 }
 
-function SignatureSection({ title, body }: { title: string; body: string }) {
+function SignatureSection({
+  title,
+  body,
+  attemptedSubmit = false,
+}: {
+  title: string;
+  body: string;
+  attemptedSubmit?: boolean;
+}) {
   const agreed = useBookingSelector((s) => s.signature_acknowledged);
   const name = useBookingSelector((s) => s.signature_name);
   return (
@@ -664,16 +745,16 @@ function SignatureSection({ title, body }: { title: string; body: string }) {
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[12px] leading-relaxed text-slate-600">
         {body}
       </div>
-      <label className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          checked={agreed}
-          onChange={(e) => bookingActions.setSignature({ signature_acknowledged: e.target.checked })}
-          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#7BC9A8] focus:ring-pink-600"
-          data-testid="checkbox-signature"
-        />
-        <span className="text-sm text-slate-700">I have read and agree to the above</span>
-      </label>
+      <PinkAckCheckbox
+        checked={agreed}
+        onChange={(next) =>
+          bookingActions.setSignature({ signature_acknowledged: next })
+        }
+        invalid={attemptedSubmit && !agreed}
+        errorText="Please confirm you have read and agree to continue."
+        testId="checkbox-signature"
+        label="I have read and agree to the above"
+      />
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-slate-700">Your full name (typed signature)</label>
         <input

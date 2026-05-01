@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { ArrowRight, Users, Briefcase, KeyRound, Info, Trash2, Plus, Hand, HousePlus, Package, PackageOpen, CheckCircle2, Home as HomeIcon } from "lucide-react";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
 import { DEMO_MANAGING_AGENCIES, getAccessOptions, infoNoteFor, isAgentTenantOption, isCollectReturnMethod, isLeaveKeyMethod, isManagingAgentMethod, isStep5Valid, isTenantMethod, signatureVariantFor, useTenants, type AccessOption } from "../../../state/accessMethodCatalog";
+import { PinkAckCheckbox } from "./PinkAckCheckbox";
 
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
@@ -17,6 +18,7 @@ export function AccessDesktop() {
   const valid = isStep5Valid(session);
   const note = infoNoteFor(access);
   const sig = signatureVariantFor(access);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   const roleLabel = role === "owner" ? "Owner" : role === "agent" ? "Agent" : "—";
   const residenceLabel = residence === "live_in" ? "Live in" : residence === "leased_out" ? "Leased out" : residence === "vacant" ? "Vacant" : "—";
@@ -81,7 +83,13 @@ export function AccessDesktop() {
                 {isCollectReturnMethod(access) && <CollectReturnSection />}
                 {isManagingAgentMethod(access) && <ManagingAgencySection />}
                 {isTenantMethod(access) && <TenantsSection api={tenantsApi} />}
-                {sig && <SignatureSection title={sig.title} body={sig.body} />}
+                {sig && (
+                  <SignatureSection
+                    title={sig.title}
+                    body={sig.body}
+                    attemptedSubmit={attemptedSubmit}
+                  />
+                )}
               </>
             )}
           </div>
@@ -94,16 +102,32 @@ export function AccessDesktop() {
             >
               ← Back
             </button>
-            <button
-              type="button"
-              disabled={!valid}
-              data-testid="button-continue"
-              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
-              style={{ backgroundColor: BRAND }}
+            {/* See AccessMobile.tsx for why we keep the button enabled
+                without `valid` and intercept the click in capture
+                phase to surface the invalid styling on the signature
+                ack. */}
+            <span
+              onClickCapture={(e) => {
+                if (!valid) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setAttemptedSubmit(true);
+                }
+              }}
             >
-              Continue
-              <ArrowRight className="h-4 w-4" />
-            </button>
+              <button
+                type="button"
+                aria-disabled={!valid}
+                data-testid="button-continue"
+                className={`flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 ${
+                  valid ? "" : "opacity-50"
+                }`}
+                style={{ backgroundColor: BRAND }}
+              >
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </span>
           </div>
 
         </div>
@@ -180,8 +204,20 @@ function ResidenceCard({ selected, onClick, icon, title, subtitle, id }: { selec
         {icon}
       </span>
       <div>
-        <div className="text-[14px] font-semibold text-slate-900">{title}</div>
-        <div className="mt-1 text-[11px] text-slate-500">{subtitle}</div>
+        <div
+          className={`text-[14px] font-semibold ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {title}
+        </div>
+        <div
+          className={`mt-1 text-[11px] ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
+          {subtitle}
+        </div>
       </div>
       {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: "#ffffff" }} />}
     </button>
@@ -211,8 +247,20 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
         {iconForMethod(option.key)}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-semibold text-slate-900">{option.label}</span>
-        <span className="mt-0.5 text-[13px] text-slate-500">{option.subtitle}</span>
+        <span
+          className={`text-[15px] font-semibold ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {option.label}
+        </span>
+        <span
+          className={`mt-0.5 text-[13px] ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
+          {option.subtitle}
+        </span>
       </span>
       {selected && <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: "#ffffff" }} />}
     </button>
@@ -270,8 +318,20 @@ function CoordinationChoiceCard({ selected, onClick, title, subtitle, id }: { se
       <span className="grid h-5 w-5 place-items-center rounded-full border-2" style={{ borderColor: selected ? "#ffffff" : "#CBD5E1" }}>
         {selected && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#ffffff" }} />}
       </span>
-      <div className="text-[14px] font-semibold text-slate-900">{title}</div>
-      <div className="text-[12px] text-slate-500">{subtitle}</div>
+      <div
+        className={`text-[14px] font-semibold ${
+          selected ? "text-white" : "text-slate-900"
+        }`}
+      >
+        {title}
+      </div>
+      <div
+        className={`text-[12px] ${
+          selected ? "text-white/85" : "text-slate-500"
+        }`}
+      >
+        {subtitle}
+      </div>
     </button>
   );
 }
@@ -377,8 +437,20 @@ function ReturnMethodCard({ selected, onClick, icon, title, subtitle, id }: { se
         {icon}
       </span>
       <div>
-        <div className="text-[14px] font-semibold text-slate-900">{title}</div>
-        <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>
+        <div
+          className={`text-[14px] font-semibold ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {title}
+        </div>
+        <div
+          className={`mt-0.5 text-xs ${
+            selected ? "text-white/85" : "text-slate-500"
+          }`}
+        >
+          {subtitle}
+        </div>
       </div>
       {selected && <CheckCircle2 className="absolute right-3 top-3 h-5 w-5" style={{ color: "#ffffff" }} />}
     </button>
@@ -453,11 +525,19 @@ function TenantsSection({ api }: { api: ReturnType<typeof useTenants> }) {
   );
 }
 
-function SignatureSection({ title, body }: { title: string; body: string }) {
+function SignatureSection({
+  title,
+  body,
+  attemptedSubmit = false,
+}: {
+  title: string;
+  body: string;
+  attemptedSubmit?: boolean;
+}) {
   const ack = useBookingSelector((s) => s.signature_acknowledged);
   const name = useBookingSelector((s) => s.signature_name);
   const today = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
-  
+
   return (
     <div className="mb-8">
       <h2 className="text-base font-semibold mb-3" style={{ color: BRAND }}>{title}</h2>
@@ -465,16 +545,18 @@ function SignatureSection({ title, body }: { title: string; body: string }) {
         <div className="mb-6 rounded-lg bg-slate-50 p-4 text-[13px] leading-relaxed text-slate-600">
           {body}
         </div>
-        <label className="flex cursor-pointer items-start gap-3 mb-6">
-          <input
-            type="checkbox"
+        <div className="mb-6">
+          <PinkAckCheckbox
             checked={ack}
-            onChange={(e) => bookingActions.setSignature({ signature_acknowledged: e.target.checked })}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
-            style={ack ? { accentColor: SELECTED_ACCENT } : undefined}
+            onChange={(next) =>
+              bookingActions.setSignature({ signature_acknowledged: next })
+            }
+            invalid={attemptedSubmit && !ack}
+            errorText="Please confirm you have read and agree to continue."
+            testId="checkbox-signature"
+            label="I have read and agree to the above."
           />
-          <span className="text-sm text-slate-700">I have read and agree to the above.</span>
-        </label>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Your full name (typed signature)</label>

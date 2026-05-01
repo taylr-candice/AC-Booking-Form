@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Moon, Sun, Sunrise } from "lucide-react";
 
 import { dayWindows, type CustomerDay, type CustomerSlot } from "./customerSlotData";
+import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 
 const SELECTED_GREEN_BG = "#7BC9A8";
-const SELECTED_GREEN_TEXT = "#0F172A";
+// White on the green selected fill so the day card reads as a clearly
+// in-use choice — matches the slot picker window cards.
+const SELECTED_GREEN_TEXT = "#ffffff";
 const SELECTED_GREEN_BORDER = "#7BC9A8";
 
 function isoToday(): string {
@@ -20,14 +22,15 @@ function isoToday(): string {
  * Mirrors the window-card icons inside the slot panel below so the
  * customer can connect "the sneak peek glyph" to "the window I'll
  * pick on the next screen":
- *   morning   → Sunrise (horizon arrow up + rays)
- *   afternoon → Sun     (filled centre with rays)
- *   evening   → Moon    (filled crescent)
+ *   morning   → MorningIcon   (outline half-sun on horizon, with rays)
+ *   afternoon → AfternoonIcon (outline sun — circle + rays)
+ *   evening   → EveningIcon   (outline crescent moon)
  *
- * The afternoon and evening glyphs use `fill="currentColor"` so the
- * sun's centre and the moon's crescent read as solid shapes — they
- * pop at the small size used in the day card grid where outline-only
- * lucide strokes were too faint.
+ * All three glyphs come from the shared `TimeOfDayIcon` module so the
+ * iconography stays consistent with the slot window cards and the
+ * NextAvailableCard. All three glyphs are outline-only (no fill) and
+ * pick up `currentColor` so they tint pink on the default white card
+ * and white on the selected green card.
  */
 function WindowIcon({
   window,
@@ -39,24 +42,10 @@ function WindowIcon({
   style?: React.CSSProperties;
 }) {
   if (window === "morning")
-    return <Sunrise aria-hidden className={className} style={style} />;
+    return <MorningIcon aria-hidden className={className} style={style} />;
   if (window === "afternoon")
-    return (
-      <Sun
-        aria-hidden
-        className={className}
-        style={style}
-        fill="currentColor"
-      />
-    );
-  return (
-    <Moon
-      aria-hidden
-      className={className}
-      style={style}
-      fill="currentColor"
-    />
-  );
+    return <AfternoonIcon aria-hidden className={className} style={style} />;
+  return <EveningIcon aria-hidden className={className} style={style} />;
 }
 
 function windowSrLabel(window: CustomerSlot["window"]): string {
@@ -186,7 +175,10 @@ export function CustomerAvailableDays({
             );
           }
 
-          const iconColor = "#ED017F";
+          // Pink on the default white card; white when the day is
+          // selected (green pill) so the glyph stays readable on the
+          // green background.
+          const iconColor = isSelected ? SELECTED_GREEN_TEXT : "#ED017F";
 
           return (
             <button

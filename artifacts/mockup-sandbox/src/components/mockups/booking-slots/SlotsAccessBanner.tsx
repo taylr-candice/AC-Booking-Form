@@ -70,7 +70,7 @@ export function SlotsAccessBanner({
       />
       <div className="flex-1">
         <div className={`font-semibold text-slate-900 ${headingSize}`}>
-          This is a window, not a set time
+          These are windows, not set times
         </div>
         <div
           className={`mt-1 leading-relaxed text-slate-700 ${bodySize}`}
@@ -92,11 +92,9 @@ export function SlotsAccessBanner({
         <div
           className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 ${linkSize}`}
         >
-          <span className="text-slate-500">
+          <span className="text-slate-900">
             Access:{" "}
-            <span className="font-medium text-slate-900">
-              {recapLabel}
-            </span>
+            <span className="font-medium">{recapLabel}</span>
           </span>
           <button
             type="button"

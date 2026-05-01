@@ -429,9 +429,21 @@ function MethodCard({
         {icon}
       </span>
       <span className="flex-1">
-        <span className="block font-semibold text-slate-900">{label}</span>
+        <span
+          className={`block font-semibold ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {label}
+        </span>
         {sublabel && (
-          <span className="block text-[11.5px] font-medium text-slate-500">{sublabel}</span>
+          <span
+            className={`block text-[11.5px] font-medium ${
+              selected ? "text-white/85" : "text-slate-500"
+            }`}
+          >
+            {sublabel}
+          </span>
         )}
       </span>
       {selected && (

@@ -157,9 +157,25 @@ export function PayDesktop() {
                         : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
                     }
                   >
-                    <CreditCardIcon className="h-6 w-6 text-slate-700" />
-                    <span className="text-sm font-semibold text-slate-900">{PAY_NOW_LABEL}</span>
-                    <span className="text-[11px] font-medium text-slate-500">{PAY_NOW_SUBLABEL}</span>
+                    <CreditCardIcon
+                      className={`h-6 w-6 ${
+                        method === "pay_now" ? "text-white" : "text-slate-700"
+                      }`}
+                    />
+                    <span
+                      className={`text-sm font-semibold ${
+                        method === "pay_now" ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {PAY_NOW_LABEL}
+                    </span>
+                    <span
+                      className={`text-[11px] font-medium ${
+                        method === "pay_now" ? "text-white/85" : "text-slate-500"
+                      }`}
+                    >
+                      {PAY_NOW_SUBLABEL}
+                    </span>
                     {method === "pay_now" && (
                       <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: "#ffffff" }} />
                     )}
@@ -180,9 +196,25 @@ export function PayDesktop() {
                         : { borderColor: "#E2E8F0", backgroundColor: "#FFFFFF" }
                     }
                   >
-                    <FileText className="h-6 w-6 text-slate-700" />
-                    <span className="text-sm font-semibold text-slate-900">{INVOICE_LABEL}</span>
-                    <span className="text-[11px] font-medium text-slate-500">{INVOICE_SUBLABEL}</span>
+                    <FileText
+                      className={`h-6 w-6 ${
+                        method === "invoice" ? "text-white" : "text-slate-700"
+                      }`}
+                    />
+                    <span
+                      className={`text-sm font-semibold ${
+                        method === "invoice" ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {INVOICE_LABEL}
+                    </span>
+                    <span
+                      className={`text-[11px] font-medium ${
+                        method === "invoice" ? "text-white/85" : "text-slate-500"
+                      }`}
+                    >
+                      {INVOICE_SUBLABEL}
+                    </span>
                     {method === "invoice" && (
                       <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" style={{ color: "#ffffff" }} />
                     )}

@@ -283,7 +283,7 @@ describe.each(VARIANTS)("$name slot picker", ({
     it("for be-there access methods: shows the be-there heads-up copy with a Change-access link, and the be-there ack checkbox is gone — only the cancellation ack gates Confirm", () => {
       // owner_live_at_unit is a be-there method. After the redesign
       // there's no checkbox above Confirm to tick — instead the
-      // banner at the top reads "This is a window, not a set time"
+      // banner at the top reads "These are windows, not set times"
       // and asks the customer to be available for the entire window,
       // with an inline "Change access method" prompt for those who
       // want to switch to a key-holder / lockbox method after
@@ -305,7 +305,7 @@ describe.each(VARIANTS)("$name slot picker", ({
       const banner = getByTestId(BANNER_TESTID_BY_VARIANT[name]);
       expect(banner.getAttribute("data-access-mode")).toBe("be-there");
       expect(banner.textContent ?? "").toContain(
-        "This is a window, not a set time",
+        "These are windows, not set times",
       );
       expect(banner.textContent ?? "").toContain(
         "available for the entire window",
@@ -346,8 +346,13 @@ describe.each(VARIANTS)("$name slot picker", ({
       fireEvent.click(firstSlot!);
 
       // Slot picked but cancellation ack still untouched — Confirm
-      // is the gated step.
-      expect(continueBtn.disabled).toBe(true);
+      // is the gated step. Note: Confirm is now `aria-disabled` (not
+      // natively `disabled`) when only the ack is missing so a
+      // tap can surface the invalid styling on the ack row; the
+      // BookingFlow wrapper still ignores the click via the
+      // capture-phase swallow inside SlotsMobile/Desktop.
+      expect(continueBtn.disabled).toBe(false);
+      expect(continueBtn.getAttribute("aria-disabled")).toBe("true");
 
       const cancellationAck = getByTestId(
         CANCELLATION_ACK_TESTID_BY_VARIANT[name],
@@ -357,6 +362,7 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(cancellationAck.checked).toBe(true);
 
       expect(continueBtn.disabled).toBe(false);
+      expect(continueBtn.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("for non-be-there access methods: shows the unattended-mode copy in the banner, and the cancellation ack alone gates Confirm", () => {
@@ -377,7 +383,7 @@ describe.each(VARIANTS)("$name slot picker", ({
       const banner = getByTestId(BANNER_TESTID_BY_VARIANT[name]);
       expect(banner.getAttribute("data-access-mode")).toBe("unattended");
       expect(banner.textContent ?? "").toContain(
-        "This is a window, not a set time",
+        "These are windows, not set times",
       );
       expect(banner.textContent ?? "").not.toContain(
         "available for the entire window",
@@ -400,8 +406,10 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(firstSlot).not.toBeNull();
       fireEvent.click(firstSlot!);
 
-      // Cancellation ack alone still gates Confirm.
-      expect(continueBtn.disabled).toBe(true);
+      // Cancellation ack alone still gates Confirm. Same `aria-disabled`
+      // contract as the be-there branch above.
+      expect(continueBtn.disabled).toBe(false);
+      expect(continueBtn.getAttribute("aria-disabled")).toBe("true");
 
       const cancellationAck = getByTestId(
         CANCELLATION_ACK_TESTID_BY_VARIANT[name],
@@ -409,6 +417,7 @@ describe.each(VARIANTS)("$name slot picker", ({
       fireEvent.click(cancellationAck);
 
       expect(continueBtn.disabled).toBe(false);
+      expect(continueBtn.getAttribute("aria-disabled")).toBe("false");
     });
   });
 
@@ -531,6 +540,7 @@ describe.each(VARIANTS)("$name slot picker", ({
         CONTINUE_TESTID_BY_VARIANT[name],
       ) as HTMLButtonElement;
       expect(ack.checked).toBe(false);
+      // No slot picked yet → Confirm is natively disabled.
       expect(confirm.disabled).toBe(true);
 
       fireEvent.click(getByTestId(`button-book-next-available-${suffix}`));
@@ -540,11 +550,16 @@ describe.each(VARIANTS)("$name slot picker", ({
       );
       expect(pressed.length).toBe(1);
       expect(ack.checked).toBe(false);
-      expect(confirm.disabled).toBe(true);
+      // Slot now picked but ack still untouched — Confirm is no
+      // longer natively disabled (so a tap can surface the invalid
+      // ack styling) but its `aria-disabled` flag stays true.
+      expect(confirm.disabled).toBe(false);
+      expect(confirm.getAttribute("aria-disabled")).toBe("true");
 
       fireEvent.click(ack);
       expect(ack.checked).toBe(true);
       expect(confirm.disabled).toBe(false);
+      expect(confirm.getAttribute("aria-disabled")).toBe("false");
     });
   });
 

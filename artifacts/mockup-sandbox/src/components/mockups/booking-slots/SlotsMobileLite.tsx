@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Sunrise,
-  Sun,
-  Moon,
   CheckCircle2,
   Lock,
 } from "lucide-react";
+
+import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 
 import { getBookingDurationMinutes } from "../../../state/bookingDerived";
 import {
@@ -26,7 +25,9 @@ import { NextAvailableCard } from "./NextAvailableCard";
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN_BG = "#7BC9A8";
-const SELECTED_GREEN_TEXT = "#0F172A";
+// White text on the green selected fill so it reads as a clearly
+// active, "in use" choice rather than a neutral card.
+const SELECTED_GREEN_TEXT = "#ffffff";
 const SELECTED_GREEN_BORDER = "#7BC9A8";
 
 type Slot = CustomerSlot;
@@ -34,6 +35,7 @@ type Slot = CustomerSlot;
 export function SlotsMobileLite() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [attemptedConfirm, setAttemptedConfirm] = useState(false);
   const session = useBookingSession();
   const cancellationAck = session.cancellation_acknowledged;
   const jobMinutes = getBookingDurationMinutes(session);
@@ -82,7 +84,7 @@ export function SlotsMobileLite() {
           <h1 className="text-[26px] font-bold leading-tight text-slate-900">
             Schedule
           </h1>
-          <div className="mt-0.5 text-xs text-slate-500">Pick a service slot</div>
+          <div className="mt-0.5 text-xs text-slate-500">Pick a service window</div>
         </div>
         <button
           type="button"
@@ -96,12 +98,6 @@ export function SlotsMobileLite() {
       </div>
 
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
-        <div className="mb-2 mt-1">
-          <h2 className="text-[15px] font-semibold text-slate-900">
-            Available windows
-          </h2>
-        </div>
-
         {/* Top-of-page notification: explains the slot is a window
             (not a fixed time), with an inline Change-access prompt
             for be-there methods. */}
@@ -180,10 +176,10 @@ export function SlotsMobileLite() {
 
             {nextAvailable && (
               <div
-                className="mt-3 mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                className="mt-4 mb-2 text-[18px] font-bold text-slate-900"
                 data-testid="label-choose-another-day-mobile-lite"
               >
-                Or choose another day
+                Choose a day
               </div>
             )}
 
@@ -199,15 +195,17 @@ export function SlotsMobileLite() {
             />
 
             {activeDay && (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                <div className="mb-2 text-[12px] font-medium text-slate-500">
-                  {activeDay.weekday} {activeDay.day} {activeDay.month} ·
-                  pick a window
+              <div className="mt-5">
+                <div
+                  className="mb-2 text-[18px] font-bold text-slate-900"
+                  data-testid="label-pick-a-window-mobile-lite"
+                >
+                  Pick a window
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <SlotCard
                     slot={activeDay.morning}
-                    icon={<Sunrise className="h-4 w-4" />}
+                    icon={<MorningIcon className="h-4 w-4" />}
                     label="Morning"
                     hint={activeDay.morning.timeLabel}
                     selected={selectedSlotId === activeDay.morning.id}
@@ -215,7 +213,7 @@ export function SlotsMobileLite() {
                   />
                   <SlotCard
                     slot={activeDay.afternoon}
-                    icon={<Sun className="h-4 w-4" />}
+                    icon={<AfternoonIcon className="h-4 w-4" />}
                     label="Afternoon"
                     hint={activeDay.afternoon.timeLabel}
                     selected={selectedSlotId === activeDay.afternoon.id}
@@ -224,7 +222,7 @@ export function SlotsMobileLite() {
                   {activeDay.evening && (
                     <SlotCard
                       slot={activeDay.evening}
-                      icon={<Moon className="h-4 w-4" />}
+                      icon={<EveningIcon className="h-4 w-4" />}
                       label="Evening"
                       hint={activeDay.evening.timeLabel}
                       selected={selectedSlotId === activeDay.evening.id}
@@ -256,26 +254,44 @@ export function SlotsMobileLite() {
       <div className="border-t border-slate-100 bg-white px-5 py-3">
         <TermsAckRow
           checked={cancellationAck}
-          onChange={(next) =>
-            bookingActions.setCancellationAcknowledged(next)
-          }
+          onChange={(next) => {
+            bookingActions.setCancellationAcknowledged(next);
+            if (next) setAttemptedConfirm(false);
+          }}
           label={CANCELLATION_ACK_LABEL}
           onViewTerms={() => setTermsOpen(true)}
           ackTestId="checkbox-cancellation-ack-mobile-lite"
           rowTestId="cancellation-ack-row-mobile-lite"
           viewTermsTestId="button-view-cancellation-terms-mobile-lite"
-          size="compact"
+          invalid={attemptedConfirm && !cancellationAck}
+          errorText="Please confirm the cancellation policy to continue."
         />
-        <button
-          type="button"
-          disabled={!canConfirm}
-          data-testid="button-continue-mobile"
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
-          style={{ backgroundColor: BRAND }}
+        {/* See SlotsMobile.tsx for why we keep the button enabled
+            without the ack and intercept the click in capture phase
+            to surface the invalid styling. */}
+        <span
+          onClickCapture={(e) => {
+            if (!cancellationAck) {
+              e.stopPropagation();
+              e.preventDefault();
+              setAttemptedConfirm(true);
+            }
+          }}
         >
-          Confirm
-          <ArrowRight className="h-4 w-4" />
-        </button>
+          <button
+            type="button"
+            disabled={!selectedSlotId || !!lockedByOther}
+            aria-disabled={!canConfirm}
+            data-testid="button-continue-mobile"
+            className={`mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50 ${
+              canConfirm ? "" : "opacity-50"
+            }`}
+            style={{ backgroundColor: BRAND }}
+          >
+            Confirm
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </span>
       </div>
       {termsOpen && (
         <CancellationTermsModal onClose={() => setTermsOpen(false)} />

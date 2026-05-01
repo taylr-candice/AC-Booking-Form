@@ -680,10 +680,18 @@ function RoleCard({
       >
         {icon}
       </span>
-      <span className="text-[15px] font-semibold leading-tight text-slate-900">
+      <span
+        className={`text-[15px] font-semibold leading-tight ${
+          selected ? "text-white" : "text-slate-900"
+        }`}
+      >
         {title}
       </span>
-      <span className="text-[12.5px] leading-snug text-slate-500">
+      <span
+        className={`text-[12.5px] leading-snug ${
+          selected ? "text-white/85" : "text-slate-500"
+        }`}
+      >
         {description}
       </span>
       {selected && (

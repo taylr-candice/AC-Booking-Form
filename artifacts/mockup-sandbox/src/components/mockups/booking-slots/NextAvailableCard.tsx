@@ -1,5 +1,6 @@
-import { ArrowRight, Moon, Sparkles, Sun, Sunrise } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 
+import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 import {
   windowDisplayLabel,
   type CustomerDay,
@@ -16,24 +17,10 @@ function WindowGlyph({
   className: string;
 }) {
   if (window === "morning")
-    return <Sunrise aria-hidden className={className} style={{ color: BRAND }} />;
+    return <MorningIcon className={className} style={{ color: BRAND }} />;
   if (window === "afternoon")
-    return (
-      <Sun
-        aria-hidden
-        className={className}
-        style={{ color: BRAND }}
-        fill="currentColor"
-      />
-    );
-  return (
-    <Moon
-      aria-hidden
-      className={className}
-      style={{ color: BRAND }}
-      fill="currentColor"
-    />
-  );
+    return <AfternoonIcon className={className} style={{ color: BRAND }} />;
+  return <EveningIcon className={className} style={{ color: BRAND }} />;
 }
 
 function longWeekday(isoDate: string): string {
@@ -97,18 +84,21 @@ export function NextAvailableCard({
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            <span>
-              {weekdayLong} {day.day} {monthTitle}
-            </span>
-            <span className="text-slate-300" aria-hidden="true">
-              ·
-            </span>
+            {/* Time-of-day comes BEFORE the date so the customer
+                clocks the window kind first, then the calendar day
+                second. */}
             <span className="inline-flex items-center gap-1">
               <WindowGlyph
                 window={slot.window}
                 className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}
               />
               {windowLabel}
+            </span>
+            <span className="text-slate-300" aria-hidden="true">
+              ·
+            </span>
+            <span>
+              {weekdayLong} {day.day} {monthTitle}
             </span>
           </div>
           <div
@@ -125,13 +115,13 @@ export function NextAvailableCard({
           type="button"
           onClick={() => onPick(day.date, slot.id)}
           data-testid={`button-book-next-available-${testIdSuffix}`}
-          aria-label={`Book ${weekdayLong} ${day.day} ${monthTitle} ${windowLabel} ${slot.timeLabel}`}
+          aria-label={`Book ${windowLabel} window on ${weekdayLong} ${day.day} ${monthTitle} (${slot.timeLabel})`}
           className={`shrink-0 inline-flex items-center gap-1.5 rounded-full font-semibold text-white shadow-sm transition hover:opacity-90 ${
             isCompact ? "px-3 py-2 text-[12px]" : "px-4 py-2 text-[13px]"
           }`}
           style={{ backgroundColor: BRAND }}
         >
-          Book this time
+          Book window
           <ArrowRight className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         </button>
       </div>

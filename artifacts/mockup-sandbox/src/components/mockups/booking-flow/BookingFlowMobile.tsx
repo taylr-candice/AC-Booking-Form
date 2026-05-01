@@ -136,11 +136,21 @@ export function BookingFlowMobile() {
           bookingActions.setReturnTo(fresh.current_step);
         }
         bookingActions.editAcFromSlotPicker();
-      } else if (id === TESTID_CHANGE_ACCESS) {
+      } else if (
+        id === TESTID_CHANGE_ACCESS ||
+        id.startsWith(`${TESTID_CHANGE_ACCESS}-`) ||
+        id.startsWith("button-edit-access-")
+      ) {
         // Slot-picker → access-step edit jump. Same shape as the AC
         // edit jump but with no contextual banner on the destination
         // step (the access page already explains itself), so we just
         // stash the return-to hint and navigate.
+        //
+        // The two `startsWith` branches accept the suffixed testids
+        // emitted by `SlotsAccessBanner` (`button-change-access-mobile`
+        // / `button-edit-access-mobile-lite` / etc.) so both the
+        // "Change access method" link AND the pencil edit affordance
+        // in the banner trigger the same return-to-aware navigation.
         const fresh = getBookingSession();
         if (NAV_GOTO_RETURN_FROM.has(fresh.current_step)) {
           bookingActions.setReturnTo(fresh.current_step);
