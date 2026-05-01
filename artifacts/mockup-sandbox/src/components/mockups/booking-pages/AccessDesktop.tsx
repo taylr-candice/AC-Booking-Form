@@ -77,7 +77,7 @@ export function AccessDesktop() {
                 {isCollectReturnMethod(access) && <CollectReturnSection />}
                 {isManagingAgentMethod(access) && <ManagingAgencySection />}
                 {isTenantMethod(access) && <TenantsSection api={tenants} />}
-                {(() => { const s = signatureVariantFor(access, leaveKeySub); return s ? <SignatureSection title={s.title} body={s.body} /> : null; })()}
+                {(() => { const s = signatureVariantFor(access, leaveKeySub); return s ? <SignatureSection title={s.title} body={s.body} attemptedSubmit={attemptedSubmit} /> : null; })()}
 
               </>
             )}
