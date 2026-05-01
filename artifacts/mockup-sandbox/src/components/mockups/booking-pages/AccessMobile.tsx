@@ -86,7 +86,7 @@ export function AccessMobile() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-5 pb-6">
+      <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
         {!role && <RoleMissingBanner />}
 
         {(role === "agent" || (role === "owner" && residence)) && (
@@ -258,14 +258,14 @@ function ResidenceCard({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span
-          className={`text-[14px] font-semibold leading-tight ${
+          className={`truncate text-[14px] font-semibold leading-tight ${
             selected ? "text-white" : "text-slate-900"
           }`}
         >
           {title}
         </span>
         <span
-          className={`mt-0.5 text-[12px] leading-snug ${
+          className={`truncate mt-0.5 text-[12px] leading-snug ${
             selected ? "text-white/85" : "text-slate-500"
           }`}
         >
@@ -314,14 +314,14 @@ function AccessCard({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span
-          className={`text-[14px] font-semibold leading-tight ${
+          className={`truncate text-[14px] font-semibold leading-tight ${
             selected ? "text-white" : "text-slate-900"
           }`}
         >
           {option.label}
         </span>
         <span
-          className={`mt-0.5 text-[12px] leading-snug ${
+          className={`truncate mt-0.5 text-[12px] leading-snug ${
             selected ? "text-white/85" : "text-slate-500"
           }`}
         >
@@ -463,14 +463,14 @@ function CoordinationChoiceCard({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span
-          className={`text-[14px] font-semibold leading-tight ${
+          className={`truncate text-[14px] font-semibold leading-tight ${
             selected ? "text-white" : "text-slate-900"
           }`}
         >
           {title}
         </span>
         <span
-          className={`mt-0.5 text-[12px] leading-snug ${
+          className={`truncate mt-0.5 text-[12px] leading-snug ${
             selected ? "text-white/85" : "text-slate-500"
           }`}
         >
@@ -530,10 +530,10 @@ function LeaveKeySubMethodSection() {
                 {iconForSubMethod(opt.key)}
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className={`text-[14px] font-semibold leading-tight ${selected ? "text-white" : "text-slate-900"}`}>
+                <span className={`truncate text-[14px] font-semibold leading-tight ${selected ? "text-white" : "text-slate-900"}`}>
                   {opt.label}
                 </span>
-                <span className={`mt-0.5 text-[12px] leading-snug ${selected ? "text-white/85" : "text-slate-500"}`}>
+                <span className={`truncate mt-0.5 text-[12px] leading-snug ${selected ? "text-white/85" : "text-slate-500"}`}>
                   {opt.subtitle}
                 </span>
               </span>
