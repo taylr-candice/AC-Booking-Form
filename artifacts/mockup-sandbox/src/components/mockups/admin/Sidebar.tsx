@@ -13,6 +13,7 @@ import {
   Home,
   Mail,
   Phone,
+  RotateCcw,
   Snowflake,
   Users,
   Wrench,
@@ -39,6 +40,7 @@ export function Sidebar({
   activeView,
   onNav,
   badges,
+  onResetDemo,
 }: {
   activeView: ViewId;
   onNav: (id: ViewId) => void;
@@ -49,6 +51,9 @@ export function Sidebar({
    * where the dashboard banner lives.
    */
   badges?: Partial<Record<ViewId, number>>;
+  /** Called when the "Reset demo" button is pressed. Clears proto-store
+   * bookings / rollout overrides and resets AdminApp state. */
+  onResetDemo?: () => void;
 }) {
   return (
     <aside className="flex w-60 flex-col border-r border-slate-200 bg-white">
@@ -111,6 +116,16 @@ export function Sidebar({
             <div className="text-[11px] text-slate-500">Operations lead</div>
           </div>
         </div>
+        {onResetDemo && (
+          <button
+            type="button"
+            onClick={onResetDemo}
+            className="mt-3 flex w-full items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-[11px] font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset demo
+          </button>
+        )}
       </div>
     </aside>
   );

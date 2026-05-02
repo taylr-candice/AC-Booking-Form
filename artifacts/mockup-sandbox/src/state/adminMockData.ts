@@ -4041,6 +4041,56 @@ export function getRolloutsForBuilding(buildingId: string): AdminRollout[] {
   return rollouts.filter((r) => r.buildingId === buildingId);
 }
 
+// ─── Rollouts reactivity ──────────────────────────────────────────────────────
+//
+// Customer-side slot pickers call `resolveCustomerSlotData` which reads the
+// module-level `rollouts` variable directly.  When an admin opens a day in the
+// RolloutScheduleEditor (same iframe), the variable mutates but other iframes
+// don't know.  protoStore.ts bridges the gap via localStorage + BroadcastChannel:
+// it calls `setRolloutsState` on every cross-iframe update which bumps
+// `rolloutsVersion` and fires all subscribers so `useSyncExternalStore` in
+// `useCustomerSlotPicker` re-runs `resolveCustomerSlotData` and the picker
+// renders the newly-opened windows immediately.
+
+let rolloutsVersion = 0;
+const rolloutsListeners = new Set<() => void>();
+
+export function notifyRolloutsChanged(): void {
+  rolloutsVersion += 1;
+  for (const fn of rolloutsListeners) fn();
+}
+export function subscribeRollouts(listener: () => void): () => void {
+  rolloutsListeners.add(listener);
+  return () => {
+    rolloutsListeners.delete(listener);
+  };
+}
+export function getRolloutsVersion(): number {
+  return rolloutsVersion;
+}
+/** Replace the in-memory rollouts store and notify all subscribers.
+ *  Called by protoStore when a cross-iframe BroadcastChannel message
+ *  arrives so customer-facing iframes pick up admin changes instantly. */
+export function setRolloutsState(next: AdminRollout[]): void {
+  rollouts = next;
+  notifyRolloutsChanged();
+}
+/** Reset to the seed rollouts (used by the "Reset prototype" button).
+ *  The module-scope `cloneRollout` is private, so we rebuild from
+ *  `SEEDED_ROLLOUTS` the same way the initial assignment does. */
+export function resetRolloutsToSeed(): void {
+  rollouts = SEEDED_ROLLOUTS.map((r) => ({
+    ...r,
+    days: r.days.map((d) => ({
+      ...d,
+      morning: { ...d.morning },
+      afternoon: { ...d.afternoon },
+      ...(d.evening ? { evening: { ...d.evening } } : {}),
+    })),
+  }));
+  notifyRolloutsChanged();
+}
+
 /**
  * Resolve which rollout a customer is booking against given the
  * (service, unit) pair from their session. Returns the rollout for the

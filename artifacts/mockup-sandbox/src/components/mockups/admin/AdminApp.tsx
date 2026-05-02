@@ -83,6 +83,11 @@ import {
 import { writeLiveOtherServices } from "@/state/liveOtherServices";
 import { writeLiveAcCaps } from "@/state/liveAcServices";
 import { setUniquenessGuard, useBookingSession } from "@/state/bookingSession";
+import {
+  clearProtoStore,
+  getProtoBookings,
+  subscribeProtoBookings,
+} from "@/state/protoStore";
 
 import { AgentsView } from "./AgentsView";
 import {
@@ -500,8 +505,13 @@ export function AdminApp() {
   // for the demo session).
   const [units, setUnits] = useState<AdminUnit[]>([...SEEDED_UNITS]);
   const [agents, setAgents] = useState<AdminAgent[]>([...SEEDED_AGENTS]);
-  const [seededBookings, setSeededBookings] =
-    useState<AdminBooking[]>([...SEEDED_BOOKINGS]);
+  const [seededBookings, setSeededBookings] = useState<AdminBooking[]>(() => {
+    const proto = getProtoBookings();
+    if (proto.length === 0) return [...SEEDED_BOOKINGS];
+    const seededIds = new Set(SEEDED_BOOKINGS.map((b) => b.id));
+    const newOnes = proto.filter((b) => !seededIds.has(b.id));
+    return newOnes.length > 0 ? [...newOnes, ...SEEDED_BOOKINGS] : [...SEEDED_BOOKINGS];
+  });
 
   // Bumped on every rollout mutation so any view reading from the
   // module-level rollouts store re-renders. We keep the rollout list in
@@ -515,6 +525,20 @@ export function AdminApp() {
     // someone else" lock and unit-availability badges re-evaluate.
     notifyLiveBookingsChanged();
   }
+
+  // Prepend any bookings completed in the customer-flow iframes when
+  // they're persisted via protoStore (both on same-iframe and cross-
+  // iframe writes via BroadcastChannel).
+  useEffect(() => {
+    return subscribeProtoBookings(() => {
+      const proto = getProtoBookings();
+      setSeededBookings((prev) => {
+        const existingIds = new Set(prev.map((b) => b.id));
+        const newOnes = proto.filter((b) => !existingIds.has(b.id));
+        return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
+      });
+    });
+  }, []);
 
   // Live customer booking pulled from sessionStorage.
   const session = useBookingSession();
@@ -2253,7 +2277,15 @@ export function AdminApp() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-['Inter'] text-slate-900">
-      <Sidebar activeView={view} onNav={handleNav} badges={sidebarBadges} />
+      <Sidebar
+        activeView={view}
+        onNav={handleNav}
+        badges={sidebarBadges}
+        onResetDemo={() => {
+          clearProtoStore();
+          setSeededBookings([...SEEDED_BOOKINGS]);
+        }}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar
           view={view}

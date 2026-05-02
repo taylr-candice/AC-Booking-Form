@@ -25,6 +25,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { persistRolloutsToStore } from "@/state/protoStore";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -129,6 +130,7 @@ export function RolloutScheduleEditor({
   function applyAndRefresh(action: () => void) {
     action();
     bumpRefreshKey();
+    persistRolloutsToStore();
   }
 
   function toggleDay(day: RolloutDay) {
@@ -175,11 +177,13 @@ export function RolloutScheduleEditor({
     const added = addRolloutEveningWindow(rollout!.id, isoDate);
     if (!added) return;
     bumpRefreshKey();
+    persistRolloutsToStore();
     setUndoToast({
       label: "Evening window added.",
       undo: () => {
         removeRolloutEveningWindow(rollout!.id, isoDate);
         bumpRefreshKey();
+        persistRolloutsToStore();
         setUndoToast(null);
       },
     });
@@ -250,6 +254,7 @@ export function RolloutScheduleEditor({
       return;
     }
     bumpRefreshKey();
+    persistRolloutsToStore();
     setUndoToast({
       label: `Released ${flipped.length} window${flipped.length === 1 ? "" : "s"}.`,
       undo: () => {
@@ -266,6 +271,7 @@ export function RolloutScheduleEditor({
         }
         popLatestReleaseAuditEvent(rollout!.id);
         bumpRefreshKey();
+        persistRolloutsToStore();
         setUndoToast(null);
       },
     });
@@ -309,6 +315,7 @@ export function RolloutScheduleEditor({
     const result = resetRolloutSlotUtilization(rollout!.id, isoDate, window);
     if (!result) return;
     bumpRefreshKey();
+    persistRolloutsToStore();
     setConfirmReset(null);
     setUndoToast({
       label: "Utilization reset.",

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ComponentType } from "react";
+import { initProtoStore } from "./state/protoStore";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
 
@@ -161,6 +162,12 @@ function FramedPreview({ previewPath, frame }: { previewPath: string; frame: str
 }
 
 function App() {
+  // Initialise the cross-iframe prototype sync layer once per iframe
+  // mount.  Reads any rollout overrides persisted by the admin and
+  // subscribes to BroadcastChannel messages so this iframe stays in
+  // sync without a page refresh.
+  useEffect(() => initProtoStore(), []);
+
   const previewPath = getPreviewPath();
   const frame = new URLSearchParams(window.location.search).get("frame");
 

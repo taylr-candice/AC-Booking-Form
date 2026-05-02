@@ -34,7 +34,9 @@ import {
 } from "../../../state/bookingSession";
 import {
   getLiveBookingsVersion,
+  getRolloutsVersion,
   subscribeLiveBookings,
+  subscribeRollouts,
 } from "../../../state/adminMockData";
 import {
   alreadyScheduledByOther,
@@ -76,9 +78,20 @@ export function useCustomerSlotPicker(
   const initialSlot = useBookingSelector((s) => s.service_slot);
   const [selected, setSelected] = useState<string | null>(() => initialSlot);
 
+  // Re-run `resolveCustomerSlotData` whenever an admin opens / closes a
+  // day in RolloutScheduleEditor (same iframe) or when protoStore applies
+  // a cross-iframe rollout update from BroadcastChannel.  Must be
+  // declared before `slotData` so the dep array reference is live.
+  const rolloutsVersion = useSyncExternalStore(
+    subscribeRollouts,
+    getRolloutsVersion,
+    getRolloutsVersion,
+  );
+
   const slotData = useMemo(
     () => resolveCustomerSlotData(unitId, jobMinutes),
-    [unitId, jobMinutes],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [unitId, jobMinutes, rolloutsVersion],
   );
 
   // Bump on any cancel / reschedule / supersede in the admin shell so

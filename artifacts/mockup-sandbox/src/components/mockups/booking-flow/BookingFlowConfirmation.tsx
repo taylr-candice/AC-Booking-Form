@@ -41,7 +41,7 @@
  * background) — same as the legacy `TerminalShell` in `BookingForm`.
  */
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { CheckCircle2, Wind, XCircle } from "lucide-react";
 import { Button } from "../../ui/button";
 import {
@@ -50,6 +50,8 @@ import {
 } from "../../../state/bookingSession";
 import { isCoordinationFlow } from "../../../state/bookingDerived";
 import { scheduleDisplay, unitLabel } from "../../../state/bookingHelpers";
+import { liveBookingFromSession } from "../../../state/adminMockData";
+import { persistProtoBooking } from "../../../state/protoStore";
 
 const BRAND = "#ED017F";
 
@@ -69,6 +71,20 @@ export function BookingFlowConfirmation() {
       : isCoordinationFlow(session)
         ? "coordination"
         : "scheduled";
+
+  // Persist the completed booking to localStorage so the admin queue
+  // picks it up live without a page refresh.  Fires once when the
+  // booking reference is stamped (i.e. when the confirmation screen
+  // first renders for a successful outcome).
+  useEffect(() => {
+    if (variant !== "scheduled" && variant !== "coordination") return;
+    if (!session.reference) return;
+    const booking = liveBookingFromSession(session);
+    if (booking) persistProtoBooking(booking);
+    // Only fire when the reference appears — re-running on every session
+    // field change would produce duplicate writes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.reference]);
 
   const unit = unitLabel(session.unit_id);
   const schedule = scheduleDisplay(session);

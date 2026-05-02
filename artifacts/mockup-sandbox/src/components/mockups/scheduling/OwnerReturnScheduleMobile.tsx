@@ -25,7 +25,7 @@
  *   2. Thank-you  — confirmation panel
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowRight, CheckCircle2, Home, Sparkles } from "lucide-react";
 import {
   findNextAvailable,
@@ -36,6 +36,10 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "../booking-slots/customerSlotData";
+import {
+  getRolloutsVersion,
+  subscribeRollouts,
+} from "../../../state/adminMockData";
 import { AfternoonIcon, EveningIcon, MorningIcon } from "../booking-slots/TimeOfDayIcon";
 import { CustomerAvailableDays } from "../booking-slots/CustomerAvailableDays";
 import { NextAvailableCard } from "../booking-slots/NextAvailableCard";
@@ -76,9 +80,16 @@ export function OwnerReturnScheduleMobile() {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
+  const rolloutsVersion = useSyncExternalStore(
+    subscribeRollouts,
+    getRolloutsVersion,
+    getRolloutsVersion,
+  );
+
   const { rollout, days } = useMemo(
     () => resolveCustomerSlotData(SLOT_UNIT_ID, JOB_MINUTES),
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rolloutsVersion],
   );
   const visibleDays = useMemo(() => getVisibleServiceDays(days), [days]);
   const nextAvailable = useMemo(() => findNextAvailable(visibleDays), [visibleDays]);
