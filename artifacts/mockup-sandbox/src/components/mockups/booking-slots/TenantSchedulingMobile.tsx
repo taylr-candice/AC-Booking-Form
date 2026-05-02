@@ -553,19 +553,6 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
           </div>
         </div>
 
-        {/* Service details */}
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Service details
-          </div>
-          <div className="mt-2 text-[15px] font-bold text-slate-900">
-            {BOOKING_CONTEXT.service}
-          </div>
-          <div className="mt-0.5 text-[13px] text-slate-500">
-            {BOOKING_CONTEXT.detail}
-          </div>
-        </div>
-
         {/* Obligations list */}
         <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5">
           <div className="text-[13px] font-semibold text-slate-800">
