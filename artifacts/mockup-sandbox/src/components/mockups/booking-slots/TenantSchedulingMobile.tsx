@@ -335,24 +335,10 @@ export function TenantSchedulingMobile() {
           </div>
         )}
 
-        {/* Condensed service context chip */}
-        <div
-          className={`rounded-xl border border-slate-200 bg-slate-50 p-3 ${hasDates ? "mb-4" : "mt-4 mb-4"}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[12px] font-semibold text-slate-700">
-              {BOOKING_CONTEXT.service} · {BOOKING_CONTEXT.detail}
-            </div>
-            <div className="shrink-0 text-[11px] text-slate-400">
-              Ref {BOOKING_CONTEXT.ref}
-            </div>
-          </div>
-        </div>
-
         {/* Date / window picker */}
         {rollout === null || visibleDays.length === 0 ? (
           <div
-            className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
             data-testid="empty-no-slots-tenant"
           >
             <div className="text-[14px] font-semibold">No windows available yet</div>
@@ -453,21 +439,6 @@ export function TenantSchedulingMobile() {
                     <span>Please select a service window to continue.</span>
                   </div>
                 )}
-              </div>
-            )}
-
-            {hasUpcomingUnreleasedDays(rollout, visibleDays) && (
-              <div
-                className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3.5"
-                data-testid="section-more-dates-tenant"
-              >
-                <div className="text-[13px] font-semibold text-slate-900">
-                  Don't see a suitable day?
-                </div>
-                <div className="mt-0.5 text-[12px] text-slate-600">
-                  More windows are being confirmed. Contact your property
-                  manager to request a different date.
-                </div>
               </div>
             )}
 
