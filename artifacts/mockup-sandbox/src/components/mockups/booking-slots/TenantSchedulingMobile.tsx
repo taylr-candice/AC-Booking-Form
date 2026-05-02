@@ -571,7 +571,7 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
           Dear {BOOKING_CONTEXT.tenantFullName},
         </p>
 
-        {/* Legal obligation notice */}
+        {/* Legal obligation notice + authorisation — one unified card */}
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
           <p className="text-[13px] leading-relaxed text-amber-900">
             Under the{" "}
@@ -587,22 +587,21 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
             service for your property. You are required to ensure access is
             available for the duration of the service window.
           </p>
-        </div>
 
-        {/* Authorisation reference */}
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5">
-          <div className="flex items-start justify-between gap-3">
+          <div className="mt-3.5 border-t border-amber-200" />
+
+          <div className="mt-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700/70">
                 Authorisation
               </div>
-              <div className="mt-1.5 text-[13px] font-semibold text-slate-900">
+              <div className="mt-1.5 text-[13px] font-semibold text-amber-950">
                 {BOOKING_CONTEXT.bookerName}
               </div>
-              <div className="mt-0.5 text-[12px] text-slate-500">
+              <div className="mt-0.5 text-[12px] text-amber-800/70">
                 {BOOKING_CONTEXT.bookerCompany}
               </div>
-              <div className="mt-1 text-[11px] text-slate-400">
+              <div className="mt-1 text-[11px] text-amber-700/60">
                 Issued {BOOKING_CONTEXT.noticeDateStr} · Ref {BOOKING_CONTEXT.ref}
               </div>
             </div>
@@ -610,7 +609,7 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
               type="button"
               onClick={() => setLetterOpen(true)}
               data-testid="button-view-notice-letter"
-              className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] font-semibold transition hover:bg-slate-50"
+              className="shrink-0 rounded-lg border border-amber-300 bg-white/60 px-3 py-1.5 text-[12px] font-semibold transition hover:bg-white"
               style={{ color: BRAND }}
             >
               View letter
