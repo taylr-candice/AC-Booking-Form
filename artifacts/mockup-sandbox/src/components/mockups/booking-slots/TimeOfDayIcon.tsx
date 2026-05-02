@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Moon } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 
 /**
  * Custom and wrapped time-of-day icons for the customer slot picker.
@@ -8,9 +8,8 @@ import { Moon } from "lucide-react";
  *    arc resting on a straight horizon line, with two short side rays.
  *    No top ray, no diagonal rays, no directional arrow — clean and
  *    unambiguous at small sizes.
- *  - `AfternoonIcon` — solid filled circle (disc). Clearly distinct
- *    from the outline morning half-disc: a bright full sun high in the
- *    sky vs. the sun just cresting the horizon.
+ *  - `AfternoonIcon` — Lucide `Sun` (circle + 8 rays). Full sun high
+ *    in the sky, clearly distinct from the half-sun morning horizon.
  *  - `EveningIcon`   — Lucide `Moon` (crescent). Standard, universally
  *    recognisable, renders crisply at any size.
  *
@@ -72,17 +71,11 @@ export function AfternoonIcon({
   "aria-hidden": ariaHidden = true,
 }: IconProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      stroke="none"
+    <Sun
       className={className}
       style={style}
       aria-hidden={ariaHidden}
-    >
-      {/* Solid filled circle — full sun high in the sky. */}
-      <circle cx="12" cy="12" r="7" />
-    </svg>
+    />
   );
 }
 
