@@ -104,8 +104,15 @@ export function SlotsDesktop() {
     }
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
+  // True when the rollout exists but every day is still staged
+  // (openByAdmin: false). The customer can't pick a window yet but
+  // can proceed to checkout — Taylr notifies them via their provided
+  // email once dates are released.
+  const noDatesYet =
+    hasUpcomingUnreleasedDays(rollout, visibleDays) && visibleDays.length === 0;
+
   const canConfirm =
-    canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+    canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) &&
     !lockedByOther &&
     cancellationAck;
 
@@ -129,19 +136,18 @@ export function SlotsDesktop() {
             </div>
           </div>
 
-          {/* Top-of-page notification: explains the slot is a window
-              (not a fixed time), with an inline Change-access prompt
-              for be-there methods. Replaces the earlier be-there ack
-              checkbox so the same information becomes a piece of
-              guidance the customer reads up front, rather than a
-              term-to-agree-to checkbox above Confirm. */}
-          <SlotsAccessBanner
-            accessMethod={accessMethod}
-            leaveKeySub={leaveKeySub}
-            size="regular"
-            testIdSuffix="desktop"
-            onWhyWindows={() => setWhyWindowsOpen(true)}
-          />
+          {/* Top-of-page notification: only shown when there are actual
+              dates to pick from. When noDatesYet the customer has
+              nothing to select so the windows notice would be misleading. */}
+          {!noDatesYet && (
+            <SlotsAccessBanner
+              accessMethod={accessMethod}
+              leaveKeySub={leaveKeySub}
+              size="regular"
+              testIdSuffix="desktop"
+              onWhyWindows={() => setWhyWindowsOpen(true)}
+            />
+          )}
 
           <div className="flex-1">
             {!rollout && (
@@ -267,31 +273,32 @@ export function SlotsDesktop() {
                   </div>
                 )}
 
-                {/* "Don't see a suitable day?" — same two-variant logic
-                    as the mobile picker. Zero visible days → "Dates are
-                    on the way" panel; some visible days → footer note. */}
+                {/* "Dates pending" notice — same two-variant logic
+                    as the mobile picker. Zero visible days → prominent
+                    panel; user can still proceed to checkout. Some
+                    visible days → subtle footer note only. */}
                 {hasUpcomingUnreleasedDays(rollout, visibleDays) && (
                   visibleDays.length === 0 ? (
                     <div
-                      className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-5 text-center"
+                      className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-5"
                       data-testid="banner-dates-coming-soon-desktop"
                     >
                       <div className="text-base font-semibold text-sky-900">
                         Dates are on the way
                       </div>
                       <div className="mt-1.5 text-sm text-sky-800">
-                        We're finalising the service schedule for this
-                        building. Booking windows will open shortly —
-                        check back soon or register to be notified.
+                        We're still confirming the service schedule for
+                        this building. You can complete your booking now
+                        and we'll lock in your window as soon as dates
+                        are released.
                       </div>
-                      <button
-                        type="button"
-                        className="mt-3 text-sm font-semibold underline underline-offset-2 transition hover:opacity-80"
-                        style={{ color: BRAND }}
-                        data-testid="button-waitlist-desktop"
-                      >
-                        Notify me when dates open
-                      </button>
+                      <div className="mt-2 text-sm text-sky-700">
+                        We'll notify you at{" "}
+                        <span className="font-semibold">
+                          {session.contact_email || "the email address you provided"}
+                        </span>{" "}
+                        as soon as dates become available.
+                      </div>
                     </div>
                   ) : (
                     <div
@@ -305,14 +312,6 @@ export function SlotsDesktop() {
                         More service windows are being confirmed —
                         additional dates will open shortly.
                       </div>
-                      <button
-                        type="button"
-                        className="mt-2 text-sm font-semibold underline underline-offset-2 transition hover:opacity-80"
-                        style={{ color: BRAND }}
-                        data-testid="button-waitlist-desktop"
-                      >
-                        Notify me when new dates open
-                      </button>
                     </div>
                   )
                 )}
@@ -354,7 +353,7 @@ export function SlotsDesktop() {
                 without the ack and intercept the click in capture
                 phase to surface the invalid styling. */}
             {attemptedConfirm &&
-              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) &&
               !lockedByOther && (
               <div
                 className="mr-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-medium"
@@ -376,7 +375,7 @@ export function SlotsDesktop() {
               <button
                 type="button"
                 disabled={
-                  !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
+                  !canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) ||
                   !!lockedByOther
                 }
                 aria-disabled={!canConfirm}

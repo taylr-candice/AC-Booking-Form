@@ -83,20 +83,26 @@ export function getAccessSchedulingMode(
 }
 
 /**
- * Returns `true` only when all three scheduling requirements are met:
+ * Returns `true` only when all scheduling requirements are met.
+ *
+ * Normal case (noDatesYet = false):
  *  1. A service day has been selected.
  *  2. A service window has been selected.
  *  3. An access method has been confirmed.
  *
- * Flexible-access users must satisfy all three — they still consume
- * capacity in the selected window even though Taylr may later adjust
- * timing within the day for rollout coordination.
+ * No-dates-yet bypass (noDatesYet = true):
+ *  The rollout exists but every day is still staged (openByAdmin: false).
+ *  The customer cannot pick a window — they are placed on a pending list
+ *  and Taylr notifies them via email once dates are released. In this
+ *  case only the access method is required to proceed to checkout.
  */
 export function canContinueScheduling(
   selectedDay: string | null,
   selectedWindow: string | null,
   accessMethod: AccessMethod | null,
+  noDatesYet = false,
 ): boolean {
+  if (noDatesYet) return accessMethod !== null;
   return (
     selectedDay !== null &&
     selectedWindow !== null &&

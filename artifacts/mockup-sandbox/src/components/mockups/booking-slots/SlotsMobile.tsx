@@ -101,8 +101,15 @@ export function SlotsMobile() {
     }
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
+  // True when the rollout exists but every day is still staged
+  // (openByAdmin: false). The customer can't pick a window yet but
+  // can proceed to checkout — Taylr notifies them via their provided
+  // email once dates are released.
+  const noDatesYet =
+    hasUpcomingUnreleasedDays(rollout, visibleDays) && visibleDays.length === 0;
+
   const canConfirm =
-    canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+    canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) &&
     !lockedByOther &&
     cancellationAck;
 
@@ -129,17 +136,18 @@ export function SlotsMobile() {
 
       {/* Body */}
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
-        {/* Top-of-page notification: explains the slot is a window
-            (not a fixed time), with an inline Change-access prompt
-            for be-there methods. Replaces the earlier be-there ack
-            checkbox. */}
-        <SlotsAccessBanner
-          accessMethod={accessMethod}
-          leaveKeySub={leaveKeySub}
-          size="compact"
-          testIdSuffix="mobile"
-          onWhyWindows={() => setWhyWindowsOpen(true)}
-        />
+        {/* Top-of-page notification: only shown when there are actual
+            dates to pick from. When noDatesYet the customer has nothing
+            to select so the windows notice would be misleading. */}
+        {!noDatesYet && (
+          <SlotsAccessBanner
+            accessMethod={accessMethod}
+            leaveKeySub={leaveKeySub}
+            size="compact"
+            testIdSuffix="mobile"
+            onWhyWindows={() => setWhyWindowsOpen(true)}
+          />
+        )}
 
         {!rollout ? (
           <div
@@ -266,11 +274,11 @@ export function SlotsMobile() {
               </div>
             )}
 
-            {/* "Don't see a suitable day?" — appears when the rollout
-                has future staged days that aren't visible yet. Two
-                variants depending on whether any days are available:
-                  · zero visible days → prominent "Dates are on the way"
-                  · some visible days → subtle "more dates coming" footer */}
+            {/* "Dates pending" notice — shown when the rollout has future
+                staged days that aren't visible yet.
+                  · zero visible days → prominent panel; user can still
+                    proceed to checkout and Taylr notifies them via email
+                  · some visible days → subtle footer note only */}
             {hasUpcomingUnreleasedDays(rollout, visibleDays) && (
               visibleDays.length === 0 ? (
                 <div
@@ -281,18 +289,17 @@ export function SlotsMobile() {
                     Dates are on the way
                   </div>
                   <div className="mt-1 text-[12px] text-sky-800">
-                    We're finalising the service schedule for this
-                    building. Booking windows will open shortly — check
-                    back soon or get notified.
+                    We're still confirming the service schedule for this
+                    building. You can complete your booking now and we'll
+                    lock in your window as soon as dates are released.
                   </div>
-                  <button
-                    type="button"
-                    className="mt-3 text-[12px] font-semibold underline underline-offset-2 transition hover:opacity-80"
-                    style={{ color: BRAND }}
-                    data-testid="button-waitlist-mobile"
-                  >
-                    Notify me when dates open
-                  </button>
+                  <div className="mt-2 text-[12px] text-sky-700">
+                    We'll notify you at{" "}
+                    <span className="font-semibold">
+                      {session.contact_email || "the email address you provided"}
+                    </span>{" "}
+                    as soon as dates become available.
+                  </div>
                 </div>
               ) : (
                 <div
@@ -306,14 +313,6 @@ export function SlotsMobile() {
                     More service windows are being confirmed — additional
                     dates will open shortly.
                   </div>
-                  <button
-                    type="button"
-                    className="mt-2 text-[12px] font-semibold underline underline-offset-2 transition hover:opacity-80"
-                    style={{ color: BRAND }}
-                    data-testid="button-waitlist-mobile"
-                  >
-                    Notify me when new dates open
-                  </button>
                 </div>
               )
             )}
@@ -351,7 +350,7 @@ export function SlotsMobile() {
             when there's nothing to confirm yet (no slot picked, or
             the slot is already locked by another booking). */}
         {attemptedConfirm &&
-          !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+          !canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) &&
           !lockedByOther && (
           <div
             className="mb-3 flex items-start gap-2 rounded-xl border p-3 text-[12px] font-medium"
@@ -373,7 +372,7 @@ export function SlotsMobile() {
           <button
             type="button"
             disabled={
-              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
+              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) ||
               !!lockedByOther
             }
             aria-disabled={!canConfirm}

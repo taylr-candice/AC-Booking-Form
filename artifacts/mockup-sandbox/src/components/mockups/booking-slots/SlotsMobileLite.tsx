@@ -23,6 +23,7 @@ import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal"
 import {
   findNextAvailable,
   getVisibleWindowsForDay,
+  hasUpcomingUnreleasedDays,
   windowDisplayLabel,
   type CustomerSlot,
 } from "./customerSlotData";
@@ -94,8 +95,12 @@ export function SlotsMobileLite() {
     }
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
+  // True when the rollout exists but every day is still staged.
+  const noDatesYet =
+    hasUpcomingUnreleasedDays(rollout, visibleDays) && visibleDays.length === 0;
+
   const canConfirm =
-    canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+    canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) &&
     !lockedByOther &&
     cancellationAck;
 
@@ -120,16 +125,17 @@ export function SlotsMobileLite() {
       </div>
 
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
-        {/* Top-of-page notification: explains the slot is a window
-            (not a fixed time), with an inline Change-access prompt
-            for be-there methods. */}
-        <SlotsAccessBanner
-          accessMethod={accessMethod}
-          leaveKeySub={leaveKeySub}
-          size="compact"
-          testIdSuffix="mobile-lite"
-          onWhyWindows={() => setWhyWindowsOpen(true)}
-        />
+        {/* Top-of-page notification: only shown when there are actual
+            dates to pick from. */}
+        {!noDatesYet && (
+          <SlotsAccessBanner
+            accessMethod={accessMethod}
+            leaveKeySub={leaveKeySub}
+            size="compact"
+            testIdSuffix="mobile-lite"
+            onWhyWindows={() => setWhyWindowsOpen(true)}
+          />
+        )}
 
         {!rollout ? (
           <div
@@ -251,6 +257,48 @@ export function SlotsMobileLite() {
                 />
               </div>
             )}
+
+            {/* "Dates pending" notice — same two-variant logic as the
+                full pickers. Zero visible days → customer proceeds to
+                checkout and Taylr notifies them by email. Some visible
+                days → subtle footer note only. */}
+            {hasUpcomingUnreleasedDays(rollout, visibleDays) && (
+              visibleDays.length === 0 ? (
+                <div
+                  className="mt-2 rounded-xl border border-sky-200 bg-sky-50 p-4"
+                  data-testid="banner-dates-coming-soon-mobile-lite"
+                >
+                  <div className="text-[14px] font-semibold text-sky-900">
+                    Dates are on the way
+                  </div>
+                  <div className="mt-1 text-[12px] text-sky-800">
+                    We're still confirming the service schedule for this
+                    building. You can complete your booking now and we'll
+                    lock in your window as soon as dates are released.
+                  </div>
+                  <div className="mt-2 text-[12px] text-sky-700">
+                    We'll notify you at{" "}
+                    <span className="font-semibold">
+                      {session.contact_email || "the email address you provided"}
+                    </span>{" "}
+                    as soon as dates become available.
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3.5"
+                  data-testid="section-more-dates-mobile-lite"
+                >
+                  <div className="text-[13px] font-semibold text-slate-900">
+                    Don't see a suitable day?
+                  </div>
+                  <div className="mt-0.5 text-[12px] text-slate-600">
+                    More service windows are being confirmed — additional
+                    dates will open shortly.
+                  </div>
+                </div>
+              )
+            )}
           </>
         )}
       </div>
@@ -289,7 +337,7 @@ export function SlotsMobileLite() {
           <button
             type="button"
             disabled={
-              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
+              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) ||
               !!lockedByOther
             }
             aria-disabled={!canConfirm}
