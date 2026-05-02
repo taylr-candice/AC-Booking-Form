@@ -4,10 +4,11 @@ import { Moon, Sun } from "lucide-react";
 /**
  * Custom and wrapped time-of-day icons for the customer slot picker.
  *
- *  - `MorningIcon`   — half-sun sitting on the horizon: a semicircular
- *    arc resting on a straight horizon line, with two short side rays.
- *    No top ray, no diagonal rays, no directional arrow — clean and
- *    unambiguous at small sizes.
+ *  - `MorningIcon`   — half-sun sitting ON the horizon: arc base and
+ *    horizon share the same y so the sun visually rests on the line.
+ *    Two diagonal side rays (upper-left / upper-right) from Lucide
+ *    Sunrise, but with the top vertical ray and upward arrow removed.
+ *    No upward chevron / directional arrow.
  *  - `AfternoonIcon` — Lucide `Sun` (circle + 8 rays). Full sun high
  *    in the sky, clearly distinct from the half-sun morning horizon.
  *  - `EveningIcon`   — Lucide `Moon` (crescent). Standard, universally
@@ -54,12 +55,12 @@ export function MorningIcon({
       style={style}
       aria-hidden={ariaHidden}
     >
-      {/* Two short horizontal side rays at horizon level. */}
-      <path d="M2 18h2" />
-      <path d="M20 18h2" />
-      {/* Horizon line. */}
-      <path d="M22 22H2" />
-      {/* Top half of the sun sitting on the horizon. */}
+      {/* Diagonal side rays (upper-left / upper-right) — no top ray, no arrow. */}
+      <path d="M4.93 10.93l1.41 1.41" />
+      <path d="M19.07 10.93l-1.41 1.41" />
+      {/* Horizon at y=18, same level as arc base so the sun rests ON it. */}
+      <path d="M2 18h20" />
+      {/* Semicircle arc: base at y=18, bulges upward. */}
       <path d="M16 18a4 4 0 0 0-8 0" />
     </svg>
   );
