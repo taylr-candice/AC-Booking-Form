@@ -134,34 +134,34 @@ export function getLeaveKeySubOptions(
   const opts: LeaveKeySubOption[] = [
     {
       key: "with_someone",
-      label: "I'll leave a key with someone",
+      label: "With someone",
       subtitle: "E.g. neighbour, friend, family",
     },
   ];
   if (features.has_parcel_locker) {
     opts.push({
       key: "with_parcel_locker",
-      label: "I'll leave a key in parcel locker",
+      label: "Parcel locker",
       subtitle: "We'll send you instructions",
     });
   } else {
     opts.push({
       key: "with_taylr",
-      label: "I'll leave a key with Taylr",
+      label: "With Taylr",
       subtitle: "We'll arrange a time",
     });
   }
   if (features.has_building_manager) {
     opts.push({
       key: "with_building_manager",
-      label: "I'll leave a key with Building Management",
+      label: "With building management",
       subtitle: "Prior to scheduled window",
     });
   }
   if (features.has_concierge) {
     opts.push({
       key: "with_concierge",
-      label: "I'll leave a key with concierge",
+      label: "With concierge",
       subtitle: "Prior to scheduled window",
     });
   }
