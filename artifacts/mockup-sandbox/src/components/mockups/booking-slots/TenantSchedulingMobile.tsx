@@ -628,7 +628,7 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
         </div>
 
         <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
-          If you have concerns about this notice or the proposed service, please
+          If you have concerns about the proposed service, please
           contact {BOOKING_CONTEXT.bookerCompany} directly before proceeding.
         </p>
       </div>
