@@ -841,10 +841,6 @@ function SignatureSection({
   attemptedSubmit?: boolean;
 }) {
   const ack = useBookingSelector((s) => s.signature_acknowledged);
-  const name = useBookingSelector((s) => s.signature_name);
-  const contactFirst = useBookingSelector((s) => s.contact_first_name);
-  const contactLast = useBookingSelector((s) => s.contact_last_name);
-  const displayName = name || [contactFirst, contactLast].filter(Boolean).join(" ");
   const today = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 
   return (
@@ -858,7 +854,7 @@ function SignatureSection({
         <div className="bg-slate-50 px-6 py-4 text-[13px] leading-relaxed text-slate-600 border-b border-slate-200">
           {body}
         </div>
-        {/* Checkbox + name + date — same card, no visual gap */}
+        {/* Checkbox + date — same card, no visual gap */}
         <div className="px-6 py-5 space-y-5">
           <PinkAckCheckbox
             checked={ack}
@@ -870,20 +866,9 @@ function SignatureSection({
             testId="checkbox-signature"
             label="I have read and agree to the above."
           />
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Your full name (typed signature)</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => bookingActions.setSignature({ signature_name: e.target.value })}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date Signed</label>
-              <div className="flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">{today}</div>
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date Signed</label>
+            <div className="flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">{today}</div>
           </div>
         </div>
       </div>

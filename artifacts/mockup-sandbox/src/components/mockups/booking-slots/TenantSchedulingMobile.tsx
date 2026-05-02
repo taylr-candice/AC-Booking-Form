@@ -1234,11 +1234,6 @@ function SignatureSection({
   attemptedSubmit?: boolean;
 }) {
   const agreed = useBookingSelector((s) => s.signature_acknowledged);
-  const name = useBookingSelector((s) => s.signature_name);
-  const contactFirst = useBookingSelector((s) => s.contact_first_name);
-  const contactLast = useBookingSelector((s) => s.contact_last_name);
-  const displayName =
-    name || [contactFirst, contactLast].filter(Boolean).join(" ");
 
   return (
     <div className="mb-6">
@@ -1258,21 +1253,6 @@ function SignatureSection({
             testId="checkbox-signature"
             label="I have read and agree to the above"
           />
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-              Your full name (typed signature)
-            </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) =>
-                bookingActions.setSignature({ signature_name: e.target.value })
-              }
-              placeholder="e.g. Liam Carter"
-              data-testid="input-signature-name"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
-            />
-          </div>
           <div className="text-[11px] text-slate-400">
             Date signed:{" "}
             {new Date().toLocaleDateString("en-AU", {

@@ -40,8 +40,8 @@ export const OWNER_LIVE_OPTIONS: readonly AccessOption[] = [
  */
 export const TENANT_OPTIONS: readonly AccessOption[] = [
   { key: "owner_live_at_unit",   label: "I'll be there",     subtitle: "To let the technician into the property" },
-  { key: "owner_live_leave_key", label: "I'll leave a key", subtitle: "For Taylr to access using building / key-holder arrangements" },
-  { key: "agent_trade_key",      label: "Trade key via managing agent", subtitle: "Taylr collects and returns your property manager's trade key" },
+  { key: "owner_live_leave_key", label: "I'll leave a key", subtitle: "For Taylr to access" },
+  { key: "agent_trade_key",      label: "Agent trade key", subtitle: "Taylr will collect and return" },
 ];
 
 export const OWNER_LEASED_OPTIONS: readonly AccessOption[] = [
@@ -65,7 +65,7 @@ export const OWNER_VACANT_OPTIONS: readonly AccessOption[] = [
 export const AGENT_OPTIONS: readonly AccessOption[] = [
   { key: "agent_be_there",       label: "I'll be there",                         subtitle: "I'll meet the technician at the property" },
   { key: "agent_tenant_pending", label: "Tenants will provide access",           subtitle: "The tenant will let the technician in" },
-  { key: "agent_trade_key",      label: "Collect & return agent trade key",      subtitle: "We pick up & return your office trade key" },
+  { key: "agent_trade_key",      label: "Agent trade key",                       subtitle: "Taylr will collect and return" },
 ];
 
 export function getAccessOptions(
@@ -544,22 +544,21 @@ export function isStep5Valid(s: BookingState): boolean {
       );
     }
 
-    // All unattended sub-options require the access-authorisation signature.
-    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+    // All unattended sub-options require the access-authorisation checkbox.
+    return s.signature_acknowledged;
   }
 
   // Legacy parcel-locker access methods (no longer shown as top-level cards
   // but kept here so any stored state remains valid).
   if (isParcelLockerMethod(s.access_method)) {
-    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+    return s.signature_acknowledged;
   }
 
   if (isCollectReturnMethod(s.access_method)) {
     return (
       s.key_collection_location.trim().length > 0 &&
       s.return_method !== null &&
-      s.signature_acknowledged &&
-      s.signature_name.trim().length > 0
+      s.signature_acknowledged
     );
   }
 
@@ -573,7 +572,7 @@ export function isStep5Valid(s: BookingState): boolean {
         t.phone.trim().length > 0,
     );
     if (!allTenantsValid) return false;
-    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+    return s.signature_acknowledged;
   }
 
   if (isManagingAgentMethod(s.access_method)) {
@@ -581,7 +580,7 @@ export function isStep5Valid(s: BookingState): boolean {
   }
 
   if (isAgentTradeMethod(s.access_method)) {
-    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+    return s.signature_acknowledged;
   }
 
   // Be-there + at-unit + agent_tenant_self: no extra validation
@@ -598,8 +597,8 @@ export function isStep5Valid(s: BookingState): boolean {
  * Rules:
  *  - An access method from TENANT_OPTIONS must be selected.
  *  - Leave-key: sub-method required; "with_someone" needs key-holder name +
- *    phone; all unattended sub-options need a signature ack + typed name.
- *  - Agent trade key: signature ack + typed name required.
+ *    phone; all unattended sub-options need a signature ack.
+ *  - Agent trade key: signature ack required.
  *  - Be-there (owner_live_at_unit): no extra requirements.
  */
 export function isTenantAccessValid(s: BookingState): boolean {
@@ -615,11 +614,11 @@ export function isTenantAccessValid(s: BookingState): boolean {
         s.key_holder_phone.trim().length > 0
       );
     }
-    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+    return s.signature_acknowledged;
   }
 
   if (isAgentTradeMethod(access)) {
-    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+    return s.signature_acknowledged;
   }
 
   return true; // owner_live_at_unit — no extra requirements
