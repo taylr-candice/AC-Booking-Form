@@ -642,7 +642,7 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
           style={{ backgroundColor: BRAND }}
           onClick={onContinue}
         >
-          Confirm access &amp; select window
+          Confirm access &amp; pick a window
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
