@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  CheckCircle2,
   Eye,
   Info,
   Minus,
@@ -121,13 +122,13 @@ function OnFileView({
 
         {/* What's on file summary card */}
         <div
-          className="mb-4 rounded-xl border border-pink-200 bg-pink-50 p-4"
+          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"
           data-testid="card-on-file-summary-mobile"
         >
           <div className="flex items-start gap-2.5">
-            <Info className="h-4 w-4 mt-0.5 shrink-0 text-pink-600" />
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />
             <div className="flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-pink-900/80">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80">
                 We have on record
               </p>
               <p className="mt-1 text-[15px] font-semibold text-slate-900">
@@ -148,7 +149,7 @@ function OnFileView({
                   {brand} brand
                 </p>
               )}
-              <p className="mt-1 text-[12px] text-pink-900/80 leading-relaxed">
+              <p className="mt-1 text-[12px] text-emerald-900/80 leading-relaxed">
                 Based on prior services or building data for this unit.
               </p>
             </div>

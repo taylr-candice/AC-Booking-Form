@@ -3,6 +3,7 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
+  CheckCircle2,
   Eye,
   Info,
   Minus,
@@ -105,13 +106,13 @@ function OnFileView({
 
           {/* What's on file summary card */}
           <div
-            className="rounded-xl border border-pink-200 bg-pink-50 p-5 mb-5"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 mb-5"
             data-testid="card-on-file-summary-desktop"
           >
             <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-pink-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-pink-900/80">
+                <p className="text-[12px] font-semibold uppercase tracking-wide text-emerald-900/80">
                   We have on record
                 </p>
                 <p className="mt-1.5 text-[18px] font-semibold text-slate-900">
@@ -132,7 +133,7 @@ function OnFileView({
                     {brand} brand
                   </p>
                 )}
-                <p className="mt-1.5 text-[13px] text-pink-900/80 leading-relaxed">
+                <p className="mt-1.5 text-[13px] text-emerald-900/80 leading-relaxed">
                   Based on prior services or building data for this unit.
                 </p>
               </div>
