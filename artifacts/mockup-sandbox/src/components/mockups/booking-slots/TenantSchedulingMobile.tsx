@@ -185,22 +185,6 @@ function accessReminder(
   return null;
 }
 
-/** Dynamic terms checkbox label for the schedule screen. */
-function termsLabelFor(
-  method: AccessMethod | null,
-  leaveKeySub: LeaveKeySubMethod | null,
-): string {
-  if (isAgentTradeMethod(method)) {
-    return "I confirm my property manager's trade key arrangement will be in place and authorise Taylr to coordinate access on the service day.";
-  }
-  if (isLeaveKeyMethod(method)) {
-    if (leaveKeySub === "with_someone") {
-      return "I confirm my nominated key holder will be available for the full selected service window.";
-    }
-    return "I confirm the key access arrangement will be in place before the selected service window.";
-  }
-  return "I understand this is a window, not a set time, and I can ensure access is available for the full selected service window.";
-}
 
 // ─── Root component ──────────────────────────────────────────────────────────
 
@@ -436,7 +420,7 @@ export function TenantSchedulingMobile() {
                 invalid={attemptedConfirm && !termsAck}
                 errorText="Please tick to confirm before continuing."
                 testId="ack-tenant-terms"
-                label={termsLabelFor(accessMethod, leaveKeySub)}
+                label="I have read and accept the cancellation and rescheduling terms."
                 helper={
                   <button
                     type="button"
