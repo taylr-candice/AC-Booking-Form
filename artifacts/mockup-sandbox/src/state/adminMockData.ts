@@ -428,6 +428,23 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
   },
+  // Lakeside Towers — HAS a svc-ac rollout but every day is staged
+  // (openByAdmin: false, awaiting ops release). Seeds the "dates
+  // coming soon" state on the customer-side slot picker: the rollout
+  // is found so the amber "not open yet" banner doesn't appear, but
+  // visibleDays is empty because every slot is still in the ops queue.
+  // Distinct from Pyrmont (no rollout at all) — exercises a different
+  // UX branch.
+  {
+    id: "bldg-lakeside",
+    name: "Lakeside Towers",
+    addressLine1: "45 Lakeside Drive",
+    addressLine2: "Meadowbank NSW 2114",
+    acType: "split",
+    acBrand: "Panasonic",
+    outdoorPlacement: "in_property",
+    rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+  },
 ];
 
 // ─── Seeded units ───────────────────────────────────────────────────────────
@@ -638,6 +655,20 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     ac: { type: "split", brand: "", systems: 1, additional: 0 },
     agentId: null,
     buildingId: "bldg-pyrmont",
+  },
+
+  // ── Lakeside Towers (Meadowbank NSW) — rollout exists but every
+  // date is staged (openByAdmin: false). Use this unit in the booking
+  // flow to test the "Dates are on the way" empty state — the slot
+  // picker finds the rollout (no amber banner) but visibleDays is
+  // empty until ops releases the windows.
+  {
+    id: "u-lakeside-01",
+    addressLine1: "8 / 45 Lakeside Drive",
+    addressLine2: "Meadowbank NSW 2114",
+    ac: { type: "split", brand: "Panasonic", systems: 2, additional: 0 },
+    agentId: null,
+    buildingId: "bldg-lakeside",
   },
 ];
 
@@ -3688,6 +3719,30 @@ const ANZAC_WINDOW_DEFAULTS: RolloutWindowDefaults = {
   evening: { start: "17:30", end: "20:00" },
 };
 
+// Lakeside — all days staged: every window has openByAdmin: false so
+// the customer-side visibleDays array is empty (getVisibleServiceDays
+// filters them all out). This exercises the "Dates are on the way"
+// UX branch in SlotsMobile / SlotsDesktop, where the rollout IS found
+// but no windows are released to customers yet.
+const RL_LAKESIDE_DAYS: RolloutDay[] = [
+  makeTimeBudgetDay("2026-05-19", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-20", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-21", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-22", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-23", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-26", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-27", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-28", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-29", 0, 0, { morningOpen: false, afternoonOpen: false }),
+  makeTimeBudgetDay("2026-05-30", 0, 0, { morningOpen: false, afternoonOpen: false }),
+];
+
+const LAKESIDE_WINDOW_DEFAULTS: RolloutWindowDefaults = {
+  morning: { start: "08:00", end: "12:00" },
+  afternoon: { start: "12:30", end: "16:30" },
+  evening: { start: "17:00", end: "20:30" },
+};
+
 const SEEDED_ROLLOUTS: AdminRollout[] = [
   {
     id: "rl-ac-aspen",
@@ -3758,6 +3813,28 @@ const SEEDED_ROLLOUTS: AdminRollout[] = [
       thresholdPct: 80,
       unit: "windows",
       batchSize: 2,
+      audit: [],
+    },
+  },
+  // Lakeside — all days staged, none released. The customer-side slot
+  // picker finds this rollout (no amber "not open yet" banner) but
+  // visibleDays is empty, triggering the "Dates are on the way" panel.
+  // Select unit u-lakeside-01 in the booking flow to preview this state.
+  {
+    id: "rl-ac-lakeside",
+    serviceId: "svc-ac",
+    buildingId: "bldg-lakeside",
+    name: "Lakeside Towers — Phase 1",
+    startDate: "2026-05-19",
+    endDate: "2026-05-30",
+    capacityModel: "time_budget_per_window",
+    days: RL_LAKESIDE_DAYS,
+    windowDefaults: LAKESIDE_WINDOW_DEFAULTS,
+    releaseStrategy: {
+      mode: "manual_nudge",
+      thresholdPct: 100,
+      unit: "days",
+      batchSize: 1,
       audit: [],
     },
   },

@@ -1,10 +1,17 @@
 import { ArrowRight, Sparkles } from "lucide-react";
 
+import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 import {
   windowDisplayLabel,
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+
+function windowIcon(window: CustomerSlot["window"], cls: string) {
+  if (window === "morning") return <MorningIcon className={cls} />;
+  if (window === "afternoon") return <AfternoonIcon className={cls} />;
+  return <EveningIcon className={cls} />;
+}
 
 const BRAND = "#ED017F";
 
@@ -71,13 +78,16 @@ export function NextAvailableCard({
             Next available
           </div>
 
-          {/* Window · weekday day month — text only, no icon prefix */}
+          {/* [icon] Window · weekday day month */}
           <div
-            className={`mt-0.5 font-semibold text-slate-900 ${
+            className={`mt-0.5 flex items-center gap-1.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
+            <span style={{ color: BRAND }} aria-hidden>
+              {windowIcon(slot.window, isCompact ? "h-3.5 w-3.5" : "h-4 w-4")}
+            </span>
             {windowLabel} · {weekdayLong} {day.day} {monthTitle}
           </div>
 

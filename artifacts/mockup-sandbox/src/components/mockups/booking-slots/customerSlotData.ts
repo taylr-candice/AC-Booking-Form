@@ -245,6 +245,34 @@ export function windowDisplayLabel(window: CustomerSlot["window"]): string {
   return "Evening";
 }
 
+/**
+ * Returns true when the rollout has days with `openByAdmin: false`
+ * slots that are NOT yet visible to the customer (i.e. future days
+ * the ops team has staged but not yet released).
+ *
+ * Slot pickers use this to choose which variant of the
+ * "Don't see a suitable day?" section to show:
+ *   - visibleDays.length === 0  → "Dates are on the way" empty state
+ *   - visibleDays.length  > 0  → subtle footer note below the day picker
+ */
+export function hasUpcomingUnreleasedDays(
+  rollout: AdminRollout | null,
+  visibleDays: CustomerDay[],
+): boolean {
+  if (!rollout) return false;
+  const visibleDates = new Set(visibleDays.map((d) => d.date));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return rollout.days.some((d) => {
+    if (visibleDates.has(d.isoDate)) return false;
+    // Only future days count — past staged days are irrelevant to the customer.
+    const [y, mo, dy] = d.isoDate.split("-").map((s) => parseInt(s, 10));
+    const date = new Date(y, (mo ?? 1) - 1, dy ?? 1);
+    if (date < today) return false;
+    return !d.morning.openByAdmin || !d.afternoon.openByAdmin;
+  });
+}
+
 /** Short, human-friendly label for an access method, used by the
  *  slot picker's "Access: <label> · Change" recap line. Returns a
  *  generic "I'll be there" when access hasn't been picked yet so the

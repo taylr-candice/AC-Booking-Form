@@ -44,6 +44,7 @@ const UNITS = [
   { id: "u3", address: "3 / 4 Example Street", lot: "Lot 3", building: "The Example", suburb: "Bondi NSW 2026" },
   { id: "u4", address: "705 / 21 Bourke Street", lot: "Lot 705", building: "Bourke Tower", suburb: "Surry Hills NSW 2010" },
   { id: "u5", address: "18 / 142 Anzac Parade", lot: "Lot 18", building: "Anzac Gardens", suburb: "Kensington NSW 2033" },
+  { id: "u-lakeside-01", address: "8 / 45 Lakeside Drive", lot: "Lot 8", building: "Lakeside Towers", suburb: "Meadowbank NSW 2114" },
 ];
 
 function FieldError({ id, message }: { id: string; message: string | null }) {

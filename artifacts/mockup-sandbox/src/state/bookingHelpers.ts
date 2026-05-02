@@ -122,6 +122,7 @@ const DEMO_UNIT_LABELS: Readonly<Record<string, { line1: string; line2?: string 
   u3: { line1: "3 / 4 Example Street", line2: "Lot 3 · Bondi NSW 2026" },
   u4: { line1: "705 / 21 Bourke Street", line2: "Lot 705 · Surry Hills NSW 2010" },
   u5: { line1: "18 / 142 Anzac Parade", line2: "Lot 18 · Kensington NSW 2033" },
+  "u-lakeside-01": { line1: "8 / 45 Lakeside Drive", line2: "Lot 8 · Meadowbank NSW 2114" },
 };
 
 export function unitLabel(unit_id: string | null): { line1: string; line2?: string } {

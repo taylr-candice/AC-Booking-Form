@@ -24,6 +24,7 @@ import {
 import {
   findNextAvailable,
   getVisibleWindowsForDay,
+  hasUpcomingUnreleasedDays,
   windowDisplayLabel,
   type CustomerSlot,
 } from "./customerSlotData";
@@ -263,6 +264,58 @@ export function SlotsMobile() {
                   testIdSuffix="mobile"
                 />
               </div>
+            )}
+
+            {/* "Don't see a suitable day?" — appears when the rollout
+                has future staged days that aren't visible yet. Two
+                variants depending on whether any days are available:
+                  · zero visible days → prominent "Dates are on the way"
+                  · some visible days → subtle "more dates coming" footer */}
+            {hasUpcomingUnreleasedDays(rollout, visibleDays) && (
+              visibleDays.length === 0 ? (
+                <div
+                  className="mt-2 rounded-xl border border-sky-200 bg-sky-50 p-4"
+                  data-testid="banner-dates-coming-soon-mobile"
+                >
+                  <div className="text-[14px] font-semibold text-sky-900">
+                    Dates are on the way
+                  </div>
+                  <div className="mt-1 text-[12px] text-sky-800">
+                    We're finalising the service schedule for this
+                    building. Booking windows will open shortly — check
+                    back soon or get notified.
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-3 text-[12px] font-semibold underline underline-offset-2 transition hover:opacity-80"
+                    style={{ color: BRAND }}
+                    data-testid="button-waitlist-mobile"
+                  >
+                    Notify me when dates open
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3.5"
+                  data-testid="section-more-dates-mobile"
+                >
+                  <div className="text-[13px] font-semibold text-slate-900">
+                    Don't see a suitable day?
+                  </div>
+                  <div className="mt-0.5 text-[12px] text-slate-600">
+                    More service windows are being confirmed — additional
+                    dates will open shortly.
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-2 text-[12px] font-semibold underline underline-offset-2 transition hover:opacity-80"
+                    style={{ color: BRAND }}
+                    data-testid="button-waitlist-mobile"
+                  >
+                    Notify me when new dates open
+                  </button>
+                </div>
+              )
             )}
           </>
         )}
