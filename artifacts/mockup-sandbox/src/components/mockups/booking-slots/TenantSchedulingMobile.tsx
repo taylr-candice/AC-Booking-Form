@@ -1172,7 +1172,7 @@ function LeaveKeySubMethodSection({ unitId }: { unitId?: string | null }) {
                     selected ? "text-white/85" : "text-slate-500"
                   }`}
                 >
-                  {opt.subtitle}
+                  for Taylr to access
                 </span>
               </span>
               <CheckCircle2
