@@ -1248,12 +1248,8 @@ export const bookingActions = {
       // TENANT_SEED pattern.
       if (access_method) {
         if (LEAVE_KEY_ACCESS_METHODS.has(access_method)) {
-          // Default to "with_someone" — always present regardless of
-          // building features.  Provide a demo key-holder so the step
-          // is valid right away; the user can pick a different sub-option.
-          next.leave_key_sub_method = "with_someone";
-          next.key_holder_name = DEMO_KEY_HOLDER_NAME;
-          next.key_holder_phone = DEMO_KEY_HOLDER_PHONE;
+          // No default sub-option — user must explicitly choose how
+          // they'll leave the key.
         } else if (COLLECT_RETURN_ACCESS_METHODS.has(access_method)) {
           next.key_collection_location = DEMO_KEY_COLLECTION_LOCATION;
           next.return_method = "locker";
