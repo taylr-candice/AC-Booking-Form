@@ -972,10 +972,7 @@ function AccessNoticeBox() {
         Access is required
       </p>
       <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
-        Under the Residential Tenancies Act 2010 ({BOOKING_CONTEXT.state}), tenants are required to provide reasonable access to their rental property for the purpose of carrying out necessary repairs and maintenance.
-      </p>
-      <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
-        The landlord/managing agent of this property has arranged an essential air conditioning service. Access to the property is available for the duration of the service window.
+        If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
       </p>
     </div>
   );
