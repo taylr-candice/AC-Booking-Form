@@ -1,0 +1,82 @@
+Please update the existing “These are windows, not set times” notice.
+
+This is COPY + LAYOUT only.
+
+Do NOT change:
+- when this notice appears
+- access method logic
+- scheduling logic
+- capacity logic
+- payment logic
+- validation rules
+
+Keep the existing logic that already shows this notice for:
+- I’ll be there
+- I’ll leave a key with someone
+- owner/agent coordinating with tenant directly
+- any other current access option already wired to show this notice
+
+----------------------------------------
+UPDATE MAIN NOTICE COPY
+----------------------------------------
+
+Title:
+These are windows, not set times
+
+Body:
+We can’t confirm an exact arrival or finish time within the window you pick, so please make sure the property is available for the entire window.
+
+Add a small secondary link beneath the body:
+
+Why can’t I choose an exact time?
+
+----------------------------------------
+WHEN LINK IS CLICKED
+----------------------------------------
+
+Show a small inline expandable explanation.
+
+Do NOT use a modal or pop-up.
+
+Expanded copy:
+
+Title:
+Why we use service windows
+
+Body:
+This service is delivered as a building-wide rollout, with multiple apartments serviced on the same day.
+
+To coordinate the technician’s run efficiently, bookings are scheduled within set windows rather than exact appointment times.
+
+If being available for the full window doesn’t suit, you can change your access method and choose a flexible access option instead.
+
+----------------------------------------
+KEEP EXISTING ACCESS DISPLAY
+----------------------------------------
+
+Do not remove:
+
+Access: [selected access method]
+Change access method
+
+----------------------------------------
+DESIGN REQUIREMENTS
+----------------------------------------
+
+- Keep the main notice compact
+- Make the “Why can’t I choose an exact time?” link subtle and secondary
+- Expanded explanation should be short and easy to scan
+- Do not make it look like a warning or legal block
+- Do not use discount/pricing language
+- Do not imply exact times or custom scheduling are available
+
+----------------------------------------
+QA CHECK
+----------------------------------------
+
+Confirm:
+- notice still appears exactly where it currently appears
+- notice trigger logic has not changed
+- link appears beneath the notice body
+- clicking link expands the explanation inline
+- Change access method still works

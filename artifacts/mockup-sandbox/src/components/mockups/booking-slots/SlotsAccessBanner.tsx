@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Info } from "lucide-react";
 
 import { type AccessMethod, type LeaveKeySubMethod } from "../../../state/bookingSession";
@@ -45,6 +46,8 @@ export function SlotsAccessBanner({
   size: "compact" | "regular";
   testIdSuffix: "mobile" | "mobile-lite" | "desktop";
 }) {
+  const [whyExpanded, setWhyExpanded] = useState(false);
+
   const schedulingMode: AccessSchedulingMode = getAccessSchedulingMode(
     accessMethod,
     leaveKeySub,
@@ -57,8 +60,6 @@ export function SlotsAccessBanner({
   const bodySize = size === "compact" ? "text-[12px]" : "text-sm";
   const linkSize = size === "compact" ? "text-[11px]" : "text-xs";
 
-  // Split on paragraph breaks so multi-paragraph flexible-access body
-  // renders as two separate <p> elements.
   const bodyParagraphs = body.split("\n\n");
 
   return (
@@ -87,6 +88,38 @@ export function SlotsAccessBanner({
             </p>
           ))}
         </div>
+
+        {schedulingMode === "WINDOW_REQUIRED" && (
+          <div className={`mt-1.5 ${linkSize}`}>
+            <button
+              type="button"
+              data-testid={`button-why-windows-${testIdSuffix}`}
+              onClick={() => setWhyExpanded((v) => !v)}
+              className="text-slate-400 underline underline-offset-2 hover:text-slate-600 transition-colors"
+            >
+              {whyExpanded ? "Hide explanation" : "Why can't I choose an exact time?"}
+            </button>
+
+            {whyExpanded && (
+              <div
+                className={`mt-2 rounded-md border border-pink-100 bg-white px-3 py-2.5 leading-relaxed text-slate-600 ${bodySize}`}
+                data-testid={`panel-why-windows-${testIdSuffix}`}
+              >
+                <p className="font-semibold text-slate-800">Why we use service windows</p>
+                <p className="mt-1.5">
+                  This service is delivered as a building-wide rollout, with multiple apartments serviced on the same day.
+                </p>
+                <p className="mt-1.5">
+                  To coordinate the technician's run efficiently, bookings are scheduled within set windows rather than exact appointment times.
+                </p>
+                <p className="mt-1.5">
+                  If being available for the full window doesn't suit, you can change your access method and choose a flexible access option instead.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div
           className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 ${linkSize}`}
         >
