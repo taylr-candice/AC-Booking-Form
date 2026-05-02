@@ -20,6 +20,11 @@ import {
 } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
+  canContinueScheduling,
+  getAccessSchedulingMode,
+  getNextAvailableCtaLabel,
+} from "./accessSchedulingMode";
+import {
   findNextAvailable,
   getVisibleWindowsForDay,
   windowDisplayLabel,
@@ -56,6 +61,8 @@ export function SlotsDesktop() {
   const cancellationAck = session.cancellation_acknowledged;
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
+  const leaveKeySub = session.leave_key_sub_method;
+  const schedulingMode = getAccessSchedulingMode(accessMethod, leaveKeySub);
   // Timezone pill mirrors the city the building is in — a Canberra unit
   // shows "Canberra time", a Melbourne unit shows "Melbourne time", and
   // so on. Falls back to "Sydney" when no unit is known.
@@ -95,7 +102,9 @@ export function SlotsDesktop() {
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const canConfirm =
-    !!selectedSlotId && !lockedByOther && cancellationAck;
+    canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+    !lockedByOther &&
+    cancellationAck;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
@@ -125,6 +134,7 @@ export function SlotsDesktop() {
               term-to-agree-to checkbox above Confirm. */}
           <SlotsAccessBanner
             accessMethod={accessMethod}
+            leaveKeySub={leaveKeySub}
             size="regular"
             testIdSuffix="desktop"
           />
@@ -289,7 +299,9 @@ export function SlotsDesktop() {
             {/* See SlotsMobile.tsx for why we keep the button enabled
                 without the ack and intercept the click in capture
                 phase to surface the invalid styling. */}
-            {attemptedConfirm && !selectedSlotId && !lockedByOther && (
+            {attemptedConfirm &&
+              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+              !lockedByOther && (
               <div
                 className="mr-4 flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-medium"
                 style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
@@ -300,11 +312,7 @@ export function SlotsDesktop() {
             )}
             <span
               onClickCapture={(e) => {
-                if (!selectedSlotId && !lockedByOther) {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  setAttemptedConfirm(true);
-                } else if (!cancellationAck) {
+                if (!cancellationAck) {
                   e.stopPropagation();
                   e.preventDefault();
                   setAttemptedConfirm(true);
@@ -313,7 +321,11 @@ export function SlotsDesktop() {
             >
               <button
                 type="button"
-                disabled={!!lockedByOther}
+                disabled={
+                  !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
+                  !!lockedByOther
+                }
+                aria-disabled={String(!canConfirm)}
                 data-testid="button-continue-desktop"
                 className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
                 style={{ backgroundColor: BRAND }}

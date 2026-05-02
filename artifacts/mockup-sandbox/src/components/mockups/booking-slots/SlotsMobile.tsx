@@ -17,6 +17,11 @@ import {
 import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
+  canContinueScheduling,
+  getAccessSchedulingMode,
+  getNextAvailableCtaLabel,
+} from "./accessSchedulingMode";
+import {
   findNextAvailable,
   getVisibleWindowsForDay,
   windowDisplayLabel,
@@ -52,10 +57,12 @@ export function SlotsMobile() {
   const session = useBookingSession();
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
+  const leaveKeySub = session.leave_key_sub_method;
   // Cancellation ack moved here from Pay (Task #121). Reads/writes the
   // existing `cancellation_acknowledged` boolean on the session store —
   // single source of truth, unchanged across the rest of the flow.
   const cancellationAck = session.cancellation_acknowledged;
+  const schedulingMode = getAccessSchedulingMode(accessMethod, leaveKeySub);
 
   // Shared customer slot-picker wiring (Task #214): rollout
   // resolution, live-bookings subscription, past-date filtering, and
@@ -92,7 +99,9 @@ export function SlotsMobile() {
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const canConfirm =
-    !!selectedSlotId && !lockedByOther && cancellationAck;
+    canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+    !lockedByOther &&
+    cancellationAck;
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -123,6 +132,7 @@ export function SlotsMobile() {
             checkbox. */}
         <SlotsAccessBanner
           accessMethod={accessMethod}
+          leaveKeySub={leaveKeySub}
           size="compact"
           testIdSuffix="mobile"
         />
@@ -189,6 +199,7 @@ export function SlotsMobile() {
                   slot={nextAvailable.slot}
                   onPick={pickSlotOneTap}
                   size="compact"
+                  ctaLabel={getNextAvailableCtaLabel(schedulingMode)}
                   testIdSuffix="mobile"
                 />
               </div>
@@ -283,7 +294,9 @@ export function SlotsMobile() {
             flow doesn't advance. The button is only truly disabled
             when there's nothing to confirm yet (no slot picked, or
             the slot is already locked by another booking). */}
-        {attemptedConfirm && !selectedSlotId && !lockedByOther && (
+        {attemptedConfirm &&
+          !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+          !lockedByOther && (
           <div
             className="mb-3 flex items-start gap-2 rounded-xl border p-3 text-[12px] font-medium"
             style={{ color: ERROR_PURPLE, borderColor: ERROR_PURPLE, backgroundColor: "rgba(151,71,255,0.04)" }}
@@ -294,11 +307,7 @@ export function SlotsMobile() {
         )}
         <span
           onClickCapture={(e) => {
-            if (!selectedSlotId && !lockedByOther) {
-              e.stopPropagation();
-              e.preventDefault();
-              setAttemptedConfirm(true);
-            } else if (!cancellationAck) {
+            if (!cancellationAck) {
               e.stopPropagation();
               e.preventDefault();
               setAttemptedConfirm(true);
@@ -307,7 +316,11 @@ export function SlotsMobile() {
         >
           <button
             type="button"
-            disabled={!!lockedByOther}
+            disabled={
+              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
+              !!lockedByOther
+            }
+            aria-disabled={String(!canConfirm)}
             data-testid="button-continue-mobile"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: BRAND }}

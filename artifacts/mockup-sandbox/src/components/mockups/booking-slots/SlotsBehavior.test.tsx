@@ -252,20 +252,25 @@ describe.each(VARIANTS)("$name slot picker", ({
       expect(firstDay).not.toBeNull();
       fireEvent.click(firstDay!);
 
+      // Unavailable windows are now HIDDEN from the DOM rather than
+      // shown as disabled tiles — the "hide unavailable windows"
+      // change means only bookable slots are rendered into the grid.
+      // For the medium scenario (255m): morning (240m) doesn't fit
+      // and is absent; afternoon (300m) fits and is visible + enabled.
       const disabledTiles = container.querySelectorAll<HTMLButtonElement>(
         `button[data-testid^="${slotTestidPrefix}"][disabled]`,
       );
-      expect(disabledTiles.length).toBeGreaterThan(0);
+      expect(disabledTiles.length).toBe(0);
 
-      for (const tile of disabledTiles) {
-        // The browser must refuse the click — `disabled` is the
-        // single source of truth for "not selectable".
-        expect(tile.disabled).toBe(true);
+      // The enabled (fitting) tiles must still carry no legacy
+      // reason text.
+      const enabledTiles = container.querySelectorAll<HTMLButtonElement>(
+        `button[data-testid^="${slotTestidPrefix}"]:not([disabled])`,
+      );
+      expect(enabledTiles.length).toBeGreaterThan(0);
 
+      for (const tile of enabledTiles) {
         const tileText = tile.textContent ?? "";
-
-        // The reason text must be gone. None of the legacy copy may
-        // reappear, including the previous generic "Full" label.
         expect(tileText).not.toContain("Full");
         expect(tileText).not.toContain("Not enough time left for this service");
         expect(tileText).not.toContain("Not yet open for booking");
@@ -303,7 +308,7 @@ describe.each(VARIANTS)("$name slot picker", ({
       // Banner is present, marked as the be-there variant, and
       // includes the entire-window reminder + a Change-access link.
       const banner = getByTestId(BANNER_TESTID_BY_VARIANT[name]);
-      expect(banner.getAttribute("data-access-mode")).toBe("be-there");
+      expect(banner.getAttribute("data-access-mode")).toBe("WINDOW_REQUIRED");
       expect(banner.textContent ?? "").toContain(
         "These are windows, not set times",
       );
@@ -380,13 +385,14 @@ describe.each(VARIANTS)("$name slot picker", ({
 
       const { container, getByTestId } = render(<Component />);
 
+      // Leave-key (without a Taylr-managed unattended sub) resolves
+      // to WINDOW_REQUIRED — same mode and same copy as be-there.
+      // Both modes now share a single banner variant: the property
+      // (or a key-holder) must be available for the entire window.
       const banner = getByTestId(BANNER_TESTID_BY_VARIANT[name]);
-      expect(banner.getAttribute("data-access-mode")).toBe("unattended");
+      expect(banner.getAttribute("data-access-mode")).toBe("WINDOW_REQUIRED");
       expect(banner.textContent ?? "").toContain(
         "These are windows, not set times",
-      );
-      expect(banner.textContent ?? "").not.toContain(
-        "available for the entire window",
       );
 
       const continueBtn = getByTestId(
@@ -523,6 +529,10 @@ describe.each(VARIANTS)("$name slot picker", ({
         additional: 0,
         ac_discrepancy: null,
       });
+      // An access method must be set for canContinueScheduling to gate
+      // the Confirm button — in the real flow it is always set before
+      // the customer reaches the scheduler step.
+      bookingActions.setAccessMethod("owner_live_at_unit");
 
       const { container, getByTestId } = render(<Component />);
 

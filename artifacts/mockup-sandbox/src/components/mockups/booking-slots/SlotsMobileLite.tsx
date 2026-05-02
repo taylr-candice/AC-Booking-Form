@@ -14,6 +14,11 @@ import {
   useBookingSession,
 } from "../../../state/bookingSession";
 import { CANCELLATION_ACK_LABEL } from "../../../state/bookingHelpers";
+import {
+  canContinueScheduling,
+  getAccessSchedulingMode,
+  getNextAvailableCtaLabel,
+} from "./accessSchedulingMode";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
 import {
   findNextAvailable,
@@ -51,6 +56,8 @@ export function SlotsMobileLite() {
   const cancellationAck = session.cancellation_acknowledged;
   const jobMinutes = getBookingDurationMinutes(session);
   const accessMethod = session.access_method;
+  const leaveKeySub = session.leave_key_sub_method;
+  const schedulingMode = getAccessSchedulingMode(accessMethod, leaveKeySub);
 
   // Shared customer slot-picker wiring (Task #214): rollout
   // resolution, live-bookings subscription, past-date filtering, and
@@ -86,7 +93,9 @@ export function SlotsMobileLite() {
   }, [selectedDate, activeDay, setSelectedSlotId]);
 
   const canConfirm =
-    !!selectedSlotId && !lockedByOther && cancellationAck;
+    canContinueScheduling(selectedDate, selectedSlotId, accessMethod) &&
+    !lockedByOther &&
+    cancellationAck;
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -114,6 +123,7 @@ export function SlotsMobileLite() {
             for be-there methods. */}
         <SlotsAccessBanner
           accessMethod={accessMethod}
+          leaveKeySub={leaveKeySub}
           size="compact"
           testIdSuffix="mobile-lite"
         />
@@ -180,6 +190,7 @@ export function SlotsMobileLite() {
                   slot={nextAvailable.slot}
                   onPick={pickSlotOneTap}
                   size="compact"
+                  ctaLabel={getNextAvailableCtaLabel(schedulingMode)}
                   testIdSuffix="mobile-lite"
                 />
               </div>
@@ -274,12 +285,13 @@ export function SlotsMobileLite() {
         >
           <button
             type="button"
-            disabled={!selectedSlotId || !!lockedByOther}
-            aria-disabled={!canConfirm}
+            disabled={
+              !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
+              !!lockedByOther
+            }
+            aria-disabled={String(!canConfirm)}
             data-testid="button-continue-mobile"
-            className={`mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50 ${
-              canConfirm ? "" : "opacity-50"
-            }`}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
             style={{ backgroundColor: BRAND }}
           >
             Confirm

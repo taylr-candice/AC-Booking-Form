@@ -5,6 +5,7 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 
 const BRAND = "#ED017F";
 
@@ -14,26 +15,36 @@ function longWeekday(isoDate: string): string {
   return local.toLocaleDateString("en-AU", { weekday: "long" });
 }
 
+function windowIcon(window: CustomerSlot["window"], isCompact: boolean) {
+  const size = isCompact ? "h-3.5 w-3.5" : "h-4 w-4";
+  if (window === "morning") return <MorningIcon className={size} />;
+  if (window === "afternoon") return <AfternoonIcon className={size} />;
+  return <EveningIcon className={size} />;
+}
+
 /**
  * "Next available" shortcut card. Sits above the day picker.
  *
  * Layout:
- *   ★  Next available      ← small pink label          (line 1)
- *      Friday 2 May        ← bold black date            (line 2)
- *      Afternoon · 1pm–5pm ← grey window + time range  (line 3)
- *                                          [Book window →]
+ *   ★  Next available                         ← small pink label   (line 1)
+ *      [icon] Morning · Friday 2 May          ← window + date      (line 2)
+ *      7am–12pm                               ← time range         (line 3)
+ *                                [Book window →]
  */
 export function NextAvailableCard({
   day,
   slot,
   onPick,
   size = "compact",
+  ctaLabel = "Book window",
   testIdSuffix,
 }: {
   day: CustomerDay;
   slot: CustomerSlot;
   onPick: (iso: string, slotId: string) => void;
   size?: "compact" | "regular";
+  /** Label text for the book-this-window pill. Defaults to "Book window". */
+  ctaLabel?: string;
   testIdSuffix: string;
 }) {
   const isCompact = size === "compact";
@@ -68,24 +79,27 @@ export function NextAvailableCard({
             Next available
           </div>
 
-          {/* Bold date line */}
+          {/* [icon] Window · Weekday Day Month */}
           <div
-            className={`mt-0.5 font-semibold text-slate-900 ${
+            className={`mt-0.5 flex items-center gap-1.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            {weekdayLong} {day.day} {monthTitle}
+            <span style={{ color: BRAND }}>
+              {windowIcon(slot.window, isCompact)}
+            </span>
+            {windowLabel} · {weekdayLong} {day.day} {monthTitle}
           </div>
 
-          {/* Grey window + time range */}
+          {/* Time range only */}
           <div
             className={`text-slate-500 ${
               isCompact ? "text-[11px]" : "text-xs"
             }`}
             data-testid={`next-available-time-${testIdSuffix}`}
           >
-            {windowLabel} · {slot.timeLabel}
+            {slot.timeLabel}
           </div>
         </div>
 
@@ -99,7 +113,7 @@ export function NextAvailableCard({
           }`}
           style={{ backgroundColor: BRAND }}
         >
-          Book window
+          {ctaLabel}
           <ArrowRight className={isCompact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         </button>
       </div>

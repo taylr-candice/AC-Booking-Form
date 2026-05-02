@@ -1,0 +1,180 @@
+Please implement access-method-based scheduler messaging and logic for the set-date scheduler.
+
+----------------------------------------
+CONTEXT
+----------------------------------------
+
+This is a fixed building service rollout, not a flexible appointment system.
+
+All users must select:
+- a service day
+- a service window
+
+This is required because each window has limited technician capacity, e.g. morning may only allow 4 services and afternoon may only allow 4 services.
+
+However, the meaning of the selected window changes depending on the access method.
+
+For user-managed access, the selected window is the period the property/person must be available.
+
+For Taylr-managed flexible access, the selected window is used for capacity planning and preference, but Taylr may adjust the service within the same selected day to optimise the rollout.
+
+----------------------------------------
+ACCESS METHOD GROUPS
+----------------------------------------
+
+TAYLR-MANAGED FLEXIBLE ACCESS METHODS:
+- I'll leave a key in parcel locker
+- I'll leave a key with concierge
+- I'll leave a key with Taylr
+- I'll leave a key with Building Management
+- Collect & Return agent trade key
+- Collect & Return my key
+
+USER-MANAGED / WINDOW-SENSITIVE ACCESS METHODS:
+- I'll be home
+- I'll leave a key with someone
+- Any access method requiring a person to be present, waiting, or coordinating access outside Taylr’s control
+- "Other" access methods by default
+
+Important:
+“I’ll leave a key with someone” is window-sensitive because that person may need to be available or waiting to let the technician in.
+
+----------------------------------------
+REQUIRED BEHAVIOUR
+----------------------------------------
+
+1. Day selection is required for all users.
+
+2. Window selection is also required for all users.
+
+3. Do not allow continue/payment without:
+- selected day
+- selected window
+- selected access method
+
+4. Keep existing per-window capacity rules.
+- If a window is fully booked, hide it.
+- Do not allow any user to select a window without capacity.
+- Flexible access users still consume capacity in the selected window initially.
+
+5. For Taylr-managed flexible access orders, store a flag such as:
+- accessSchedulingMode = FLEXIBLE_TAYLR_MANAGED
+
+6. For user-managed/window-sensitive access orders, store:
+- accessSchedulingMode = WINDOW_REQUIRED
+
+7. For flexible access, optionally allow internal/admin reallocation later within the same selected day, but do not expose this as custom scheduling to the user.
+
+----------------------------------------
+DYNAMIC SCHEDULER COPY
+----------------------------------------
+
+Scheduler copy must change based on accessSchedulingMode.
+
+----------------------------------------
+CASE A — USER-MANAGED / WINDOW-SENSITIVE ACCESS
+----------------------------------------
+
+Use this when:
+- accessSchedulingMode = WINDOW_REQUIRED
+
+Next available CTA:
+Select next available window
+
+Schedule notice title:
+These are windows, not set times
+
+Schedule notice body:
+We can’t confirm an exact arrival or finish time within the window you pick, so please make sure the property is available for the entire window.
+
+Access display:
+Access: [selected access method]
+Change access method
+
+----------------------------------------
+CASE B — TAYLR-MANAGED FLEXIBLE ACCESS
+----------------------------------------
+
+Use this when:
+- accessSchedulingMode = FLEXIBLE_TAYLR_MANAGED
+
+Next available CTA:
+Select next available window
+
+Schedule notice title:
+Flexible access selected
+
+Schedule notice body:
+Please choose the service window that works best for your key/access arrangements. Because you’ve selected a Taylr-managed access option, you don’t need to be home during the window.
+
+Taylr may adjust the service timing within your selected service day to help coordinate the building rollout.
+
+Access display:
+Access: [selected access method]
+Change access method
+
+----------------------------------------
+ACCESS REASSURANCE COPY
+----------------------------------------
+
+Show near the access method selection area.
+
+Title:
+You don’t need to be home
+
+Body:
+If you can’t be home during the service, you can choose one of the secure access options above.
+
+Taylr coordinates access on the day, and a Taylr representative is onsite during the service rollout. Technicians are insured and police checked.
+
+Please ensure access is available to both the apartment and the air conditioning system itself.
+
+----------------------------------------
+IMPORTANT RULES
+----------------------------------------
+
+- Do not remove window selection.
+- Do not allow flexible access users to skip window selection.
+- Do not imply Taylr offers custom appointment times.
+- Do not imply users must be home.
+- Do not treat “I’ll leave a key with someone” as Taylr-managed flexible access.
+- Hide fully booked windows for all users.
+- Keep all existing capacity rules intact.
+
+----------------------------------------
+IMPLEMENTATION STRUCTURE
+----------------------------------------
+
+Use explicit logic, not buried UI-only conditions.
+
+Suggested constants:
+
+TAYLR_MANAGED_FLEXIBLE_ACCESS_METHODS = [
+  "I'll leave a key in parcel locker",
+  "I'll leave a key with concierge",
+  "I'll leave a key with Taylr",
+  "I'll leave a key with Building Management",
+  "Collect & Return agent trade key",
+  "Collect & Return my key"
+]
+
+Helpers:
+- isTaylrManagedFlexibleAccess(accessMethod)
+- getAccessSchedulingMode(accessMethod)
+- canContinueScheduling(selectedDay, selectedWindow, accessMethod)
+- getSchedulerNoticeCopy(accessSchedulingMode)
+- getNextAvailableCtaLabel(accessSchedulingMode)
+
+----------------------------------------
+TEST COVERAGE
+----------------------------------------
+
+Add/update tests to confirm:
+
+- All access methods require selected day + selected window + selected access method.
+- Taylr-managed flexible access uses flexible access copy.
+- User-managed/window-sensitive access uses standard window copy.
+- “I’ll leave a key with someone” uses standard window-required copy.
+- Fully booked windows remain hidden.
+- Flexible access users still consume selected window capacity.
+- Continue/payment is blocked if selected window is missing.
