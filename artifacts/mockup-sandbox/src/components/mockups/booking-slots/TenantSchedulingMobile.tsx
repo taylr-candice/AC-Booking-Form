@@ -106,7 +106,7 @@ const BOOKING_CONTEXT = {
   suburb: "Surry Hills NSW 2010",
   state: "NSW",
   service: "AC service",
-  detail: "1 × split system · approx. 45 min",
+  detail: "1 × split system",
   bookerName: "Marcus Holloway",
   bookerCompany: "City Edge Property Group",
   /**
