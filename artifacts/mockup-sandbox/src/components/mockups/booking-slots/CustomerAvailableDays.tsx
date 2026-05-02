@@ -187,7 +187,7 @@ export function CustomerAvailableDays({
               </div>
               {/* Sneak-peek glyph row — one icon per still-available
                   window (☀ morning / 🌤 afternoon / 🌙 evening). */}
-              <div className="mt-1.5 flex items-center gap-1.5">
+              <div className="mt-1.5 flex items-center gap-0.5">
                 {availableWindows.map((w) => (
                   <span key={w.id} className="sr-only">
                     {windowSrLabel(w.window)} available
