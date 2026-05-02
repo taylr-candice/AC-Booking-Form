@@ -4,6 +4,7 @@ import { LockerIcon } from "./LockerIcon";
 import { bookingActions, useBookingSelector, type AccessMethod, type PrimaryResidence } from "../../../state/bookingSession";
 import { DEMO_MANAGING_AGENCIES, isOtherAgency, getAccessOptions, isAgentTenantOption, isLeaveKeyMethod, isCollectReturnMethod, isManagingAgentMethod, isTenantMethod, infoNoteFor, infoNoteForLeaveKeySub, signatureVariantFor, isStep5Valid, useTenants, useBuildingFeatures, getLeaveKeySubOptions, isUnattendedLeaveKeySub, type AccessOption, type LeaveKeySubOption, type LeaveKeySubMethod } from "../../../state/accessMethodCatalog";
 import { PinkAckCheckbox } from "./PinkAckCheckbox";
+import { isTaylrManagedFlexibleAccess } from "../booking-slots/accessSchedulingMode";
 
 const BRAND = "#ED017F";
 const SELECTED_BG = "#7BC9A8";
@@ -51,6 +52,7 @@ export function AccessDesktop() {
 
             {(role === "agent" || (role === "owner" && residence)) && (
               <>
+                <AccessReassuranceBox />
                 <div className="space-y-3 mb-8">
                   {opts.map((o) => {
                     const isAgentTenantCard = role === "agent" && o.key === "agent_tenant_pending";
@@ -69,6 +71,7 @@ export function AccessDesktop() {
                   })}
                 </div>
 
+                {isTaylrManagedFlexibleAccess(access, leaveKeySub) && <FlexibleAccessSignal />}
                 {isAgentTenantOption(access) && (
                   <AgentTenantCoordinationSection access={access} />
                 )}
@@ -132,6 +135,41 @@ function RoleMissingBanner() {
     <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
       Please complete Step 1 (Property &amp; role) first — the access options depend on
       whether you're the owner or a managing agent.
+    </div>
+  );
+}
+
+function AccessReassuranceBox() {
+  return (
+    <div className="mb-6 rounded-2xl bg-slate-50 px-5 py-4">
+      <p className="text-[14px] font-semibold text-slate-900 leading-snug">
+        You don't need to be home
+      </p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
+        If you can't be home during the service, you can choose one of the access options below.
+      </p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
+        Taylr coordinates access on the day, and a Taylr representative is onsite during the service rollout.
+      </p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
+        Please ensure access is available to both the apartment and the air conditioning system itself.
+      </p>
+    </div>
+  );
+}
+
+function FlexibleAccessSignal() {
+  return (
+    <div className="mb-6 flex items-start gap-2.5 rounded-2xl bg-emerald-50 px-5 py-4">
+      <span className="mt-0.5 text-[15px] leading-none text-emerald-600">✔</span>
+      <div>
+        <p className="text-[13px] font-semibold text-emerald-800">
+          Flexible access selected
+        </p>
+        <p className="mt-0.5 text-[12px] leading-relaxed text-emerald-700">
+          You don't need to be home. Taylr will coordinate access on the day.
+        </p>
+      </div>
     </div>
   );
 }

@@ -27,19 +27,19 @@ export type AccessOption = {
 // sub-option under the "Leave Key" card when the building has a Taylr locker.
 
 export const OWNER_LIVE_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_live_at_unit",   label: "I'll be there",    subtitle: "To let the technician into the property" },
+  { key: "owner_live_at_unit",   label: "I'll be home",     subtitle: "You'll be at the property during the service" },
   { key: "owner_live_leave_key", label: "I'll leave a key", subtitle: "For Taylr to access" },
 ];
 
 export const OWNER_LEASED_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_leased_be_there",  label: "I'll be there",          subtitle: "To let the technician into the property" },
+  { key: "owner_leased_be_there",  label: "I'll be home",           subtitle: "You'll be at the property during the service" },
   { key: "owner_leased_tenant",    label: "Arrange with tenant(s)", subtitle: "I'll share their details" },
   { key: "owner_leased_agent",     label: "Arrange with Agent",     subtitle: "They'll coordinate access" },
   { key: "owner_leased_leave_key", label: "I'll leave a key",       subtitle: "For Taylr to access" },
 ];
 
 export const OWNER_VACANT_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_vacant_be_there",  label: "I'll be there",      subtitle: "To let the technician into the property" },
+  { key: "owner_vacant_be_there",  label: "I'll be home",       subtitle: "You'll be at the property during the service" },
   { key: "owner_vacant_agent",     label: "Arrange with Agent", subtitle: "They'll coordinate access" },
   { key: "owner_vacant_leave_key", label: "I'll leave a key",   subtitle: "For Taylr to access" },
 ];
@@ -50,9 +50,9 @@ export const OWNER_VACANT_OPTIONS: readonly AccessOption[] = [
 // neither sub-option is pre-selected, so the user must explicitly choose
 // before Step 5 becomes valid.
 export const AGENT_OPTIONS: readonly AccessOption[] = [
-  { key: "agent_be_there",       label: "I'll be there to provide access",       subtitle: "I'll meet the technician at the property" },
+  { key: "agent_be_there",       label: "I'll be there",                         subtitle: "I'll meet the technician at the property" },
   { key: "agent_tenant_pending", label: "Tenants will provide access",           subtitle: "The tenant will let the technician in" },
-  { key: "agent_trade_key",      label: "Collect & return our trade key",        subtitle: "We pick up & return your office trade key" },
+  { key: "agent_trade_key",      label: "Collect & return agent trade key",      subtitle: "We pick up & return your office trade key" },
 ];
 
 export function getAccessOptions(
@@ -134,34 +134,34 @@ export function getLeaveKeySubOptions(
   const opts: LeaveKeySubOption[] = [
     {
       key: "with_someone",
-      label: "With a 3rd party",
-      subtitle: "E.g. Neighbour, friend, family",
+      label: "I'll leave a key with someone",
+      subtitle: "E.g. neighbour, friend, family",
     },
   ];
   if (features.has_parcel_locker) {
     opts.push({
       key: "with_parcel_locker",
-      label: "Parcel Locker",
+      label: "I'll leave a key in parcel locker",
       subtitle: "We'll send you instructions",
     });
   } else {
     opts.push({
       key: "with_taylr",
-      label: "With Taylr",
+      label: "I'll leave a key with Taylr",
       subtitle: "We'll arrange a time",
     });
   }
   if (features.has_building_manager) {
     opts.push({
       key: "with_building_manager",
-      label: "With Building Management",
+      label: "I'll leave a key with Building Management",
       subtitle: "Prior to scheduled window",
     });
   }
   if (features.has_concierge) {
     opts.push({
       key: "with_concierge",
-      label: "With Concierge",
+      label: "I'll leave a key with concierge",
       subtitle: "Prior to scheduled window",
     });
   }

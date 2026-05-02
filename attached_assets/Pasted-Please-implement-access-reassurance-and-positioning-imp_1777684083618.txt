@@ -1,0 +1,116 @@
+Please implement access reassurance and positioning improvements in the scheduler.
+
+This step is COPY + LAYOUT ONLY.
+
+Do NOT change:
+- scheduling logic
+- access method logic
+- capacity logic
+- validation rules
+
+----------------------------------------
+OBJECTIVE
+----------------------------------------
+
+We want to reduce booking friction by making it clear that users do not need to be home for the service.
+
+Flexible access should feel:
+- normal
+- safe
+- easy
+
+Avoid language that could create concern or imply risk (e.g. insurance, police checks, security warnings).
+
+----------------------------------------
+1. ACCESS REASSURANCE SECTION
+----------------------------------------
+
+Add a visible section near the access method selection area.
+
+This should appear BEFORE or alongside the access options.
+
+----------------------------------------
+COPY
+----------------------------------------
+
+Title:
+You don’t need to be home
+
+Body:
+If you can’t be home during the service, you can choose one of the access options below.
+
+Taylr coordinates access on the day, and a Taylr representative is onsite during the service rollout.
+
+Please ensure access is available to both the apartment and the air conditioning system itself.
+
+----------------------------------------
+DESIGN REQUIREMENTS
+----------------------------------------
+
+- Keep this visually calm and premium (not a warning or legal block)
+- Do not make it look like terms & conditions
+- Use soft styling (light background or subtle separation)
+- Position it close to access selection so it influences the decision
+- Do not push it below the fold
+
+----------------------------------------
+2. FLEXIBLE ACCESS POSITIVE SIGNAL
+----------------------------------------
+
+When a user selects a Taylr-managed flexible access method, show a small confirmation indicator.
+
+----------------------------------------
+COPY
+----------------------------------------
+
+✔ Flexible access selected
+
+Helper text:
+You don’t need to be home. Taylr will coordinate access on the day.
+
+----------------------------------------
+BEHAVIOUR
+----------------------------------------
+
+- This should appear immediately after selecting a flexible access option
+- Keep it subtle (not a modal or interruption)
+- Do not change scheduling behaviour
+- Do not override the window selection flow
+
+----------------------------------------
+3. ACCESS LABEL CLEAN-UP
+----------------------------------------
+
+Ensure access labels feel consistent and intentional.
+
+Use first-person, simple phrasing:
+
+- I’ll be home
+- I’ll leave a key in parcel locker
+- I’ll leave a key with concierge
+- I’ll leave a key with Taylr
+- I’ll leave a key with Building Management
+- Collect & return agent trade key
+- Collect & return my key
+- I’ll leave a key with someone
+
+----------------------------------------
+4. IMPORTANT RULES
+----------------------------------------
+
+- Do not imply attendance is required
+- Do not introduce any risk-based or security-heavy language
+- Do not remove or alter window selection
+- Do not change any booking validation logic
+- Do not introduce new flows or redirects
+- Keep copy concise and easy to scan
+
+----------------------------------------
+5. TESTING / QA
+----------------------------------------
+
+Confirm:
+- reassurance section is visible and correctly placed
+- selecting flexible access shows confirmation indicator
+- selecting “I’ll be home” does NOT show flexible indicator
+- no changes to scheduling behaviour
