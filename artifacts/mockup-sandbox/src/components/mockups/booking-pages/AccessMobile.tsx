@@ -17,7 +17,7 @@ import {
   ConciergeBell,
   ChevronDown,
   Search,
-  LockOpen,
+
   UserCheck,
 } from "lucide-react";
 import { LockerIcon } from "./LockerIcon";
@@ -56,21 +56,6 @@ const SELECTED_BG = "#7BC9A8";
 const SELECTED_ACCENT = "#7BC9A8";
 const ERROR_PURPLE = "#9747FF";
 
-function accessFlexibility(key: AccessMethod): true | false | null {
-  if (
-    isLeaveKeyMethod(key) ||
-    isCollectReturnMethod(key) ||
-    isParcelLockerMethod(key) ||
-    key === "agent_trade_key"
-  ) return true;
-  if (
-    key === "owner_live_at_unit" ||
-    key === "owner_leased_be_there" ||
-    key === "owner_vacant_be_there" ||
-    key === "agent_be_there"
-  ) return false;
-  return null;
-}
 
 export function AccessMobile() {
   const session = useBookingSelector((s) => s);
@@ -113,7 +98,6 @@ export function AccessMobile() {
             <h2 className="text-[17px] font-bold text-slate-900 mb-3">
               How will the technician access the property?
             </h2>
-            <AccessTypeKey />
             <div className="space-y-3 mb-6">
               {opts.map((o) => {
                 // The agent's "Tenants will provide access" card represents
@@ -213,16 +197,8 @@ function AccessNoticeBox() {
       <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
         If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
       </p>
-      <span className="mt-3 flex items-center gap-1.5 text-[12px] font-medium" style={{ color: BRAND }}>
-        <LockOpen className="h-3 w-3" style={{ color: BRAND }} />
-        No one needs to be home
-      </span>
     </div>
   );
-}
-
-function AccessTypeKey() {
-  return null;
 }
 
 function PrimaryResidenceSection({
@@ -355,12 +331,6 @@ function AccessCard({
           : undefined
       }
     >
-      {accessFlexibility(option.key) === true && (
-        <LockOpen
-          className="absolute right-2.5 top-2 h-3 w-3"
-          style={{ color: selected ? "#ffffff" : BRAND }}
-        />
-      )}
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
           selected ? "bg-white" : "bg-slate-100 text-slate-700"
@@ -579,12 +549,6 @@ function LeaveKeySubMethodSection() {
               }`}
               style={selected ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG } : undefined}
             >
-              {isUnattendedLeaveKeySub(opt.key) && (
-                <LockOpen
-                  className="absolute right-2.5 top-2 h-3 w-3"
-                  style={{ color: selected ? "#ffffff" : BRAND }}
-                />
-              )}
               <span
                 className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
                   selected ? "bg-white" : "bg-slate-100 text-slate-700"

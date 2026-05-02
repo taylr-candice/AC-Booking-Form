@@ -38,7 +38,7 @@ import {
   HardHat,
   Info,
   KeyRound,
-  LockOpen,
+
   UserCheck,
   Users,
   Wind,
@@ -865,8 +865,6 @@ function AccessScreen({
         <h2 className="text-[17px] font-bold text-slate-900 mb-3">
           How will the technician access the property?
         </h2>
-        <AccessTypeKey />
-
         <div className="space-y-3 mb-6">
           {TENANT_OPTIONS.map((o) => (
             <AccessCard
@@ -1015,12 +1013,6 @@ function ThankYouScreen({
 // components in AccessMobile.tsx so the tenant access screen is pixel-level
 // identical to the owner flow.
 
-function accessFlexibility(key: AccessMethod): true | false | null {
-  if (isLeaveKeyMethod(key) || isParcelLockerMethod(key) || key === "agent_trade_key") return true;
-  if (key === "owner_live_at_unit") return false;
-  return null;
-}
-
 function AccessNoticeBox() {
   return (
     <div className="mb-4 rounded-2xl bg-slate-50 px-4 py-4">
@@ -1030,16 +1022,8 @@ function AccessNoticeBox() {
       <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
         If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
       </p>
-      <span className="mt-3 flex items-center gap-1.5 text-[12px] font-medium" style={{ color: BRAND }}>
-        <LockOpen className="h-3 w-3" style={{ color: BRAND }} />
-        No one needs to be home
-      </span>
     </div>
   );
-}
-
-function AccessTypeKey() {
-  return null;
 }
 
 function InfoBanner({ title, body }: { title: string; body: string }) {
@@ -1081,12 +1065,6 @@ function AccessCard({
           : undefined
       }
     >
-      {accessFlexibility(option.key) === true && (
-        <LockOpen
-          className="absolute right-2.5 top-2 h-3 w-3"
-          style={{ color: selected ? "#ffffff" : BRAND }}
-        />
-      )}
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
           selected ? "bg-white" : "bg-slate-100 text-slate-700"
@@ -1152,12 +1130,6 @@ function LeaveKeySubMethodSection({ unitId }: { unitId?: string | null }) {
                   : undefined
               }
             >
-              {isUnattendedLeaveKeySub(opt.key) && (
-                <LockOpen
-                  className="absolute right-2.5 top-2 h-3 w-3"
-                  style={{ color: selected ? "#ffffff" : BRAND }}
-                />
-              )}
               <span
                 className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
                   selected ? "bg-white" : "bg-slate-100 text-slate-700"
