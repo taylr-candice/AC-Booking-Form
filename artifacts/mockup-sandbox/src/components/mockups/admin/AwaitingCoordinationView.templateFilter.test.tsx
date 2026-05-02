@@ -140,7 +140,7 @@ function Harness({
   callTemplates?: ReadonlyArray<CallTemplate>;
 }) {
   const [filter, setFilter] = useState<
-    "all" | "awaiting_tenant" | "awaiting_agent"
+    "all" | "awaiting_tenant" | "awaiting_agent" | "awaiting_scheduling"
   >("all");
   const [buildingFilter, setBuildingFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -409,7 +409,7 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
   it("controlled mode: in-row pivot click and toolbar dropdown drive the same lifted state", () => {
     function ControlledHarness() {
       const [filter, setFilter] = useState<
-        "all" | "awaiting_tenant" | "awaiting_agent"
+        "all" | "awaiting_tenant" | "awaiting_agent" | "awaiting_scheduling"
       >("all");
       const [buildingFilter, setBuildingFilter] = useState("all");
       const [search, setSearch] = useState("");
@@ -507,7 +507,7 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
     let opened: string | null = null;
     function HarnessWithOpen() {
       const [filter, setFilter] = useState<
-        "all" | "awaiting_tenant" | "awaiting_agent"
+        "all" | "awaiting_tenant" | "awaiting_agent" | "awaiting_scheduling"
       >("all");
       const [buildingFilter, setBuildingFilter] = useState("all");
       const [search, setSearch] = useState("");
@@ -800,7 +800,7 @@ describe("AwaitingCoordinationView — template filter pivot", () => {
     // restored").
     function ReactiveCatalogHarness() {
       const [filter, setFilter] = useState<
-        "all" | "awaiting_tenant" | "awaiting_agent"
+        "all" | "awaiting_tenant" | "awaiting_agent" | "awaiting_scheduling"
       >("all");
       const [buildingFilter, setBuildingFilter] = useState("all");
       const [search, setSearch] = useState("");

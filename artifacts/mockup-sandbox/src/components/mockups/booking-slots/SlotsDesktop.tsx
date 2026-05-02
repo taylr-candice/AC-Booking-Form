@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
+  CalendarClock,
   CheckCircle2,
   Clock,
   Lock,
@@ -114,7 +115,7 @@ export function SlotsDesktop() {
   const canConfirm =
     canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) &&
     !lockedByOther &&
-    cancellationAck;
+    (noDatesYet || cancellationAck);
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
@@ -283,6 +284,9 @@ export function SlotsDesktop() {
                       className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-5"
                       data-testid="banner-dates-coming-soon-desktop"
                     >
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sky-100">
+                        <CalendarClock className="h-6 w-6 text-sky-400" />
+                      </div>
                       <div className="text-base font-semibold text-sky-900">
                         Dates are on the way
                       </div>
@@ -324,22 +328,24 @@ export function SlotsDesktop() {
               into the SlotsAccessBanner so it's an informational
               notification, not a checkbox the customer has to
               remember to tick. */}
-          <div className="mt-8 space-y-2">
-            <TermsAckRow
-              checked={cancellationAck}
-              onChange={(next) => {
-                bookingActions.setCancellationAcknowledged(next);
-                if (next) setAttemptedConfirm(false);
-              }}
-              label={CANCELLATION_ACK_LABEL}
-              onViewTerms={() => setTermsOpen(true)}
-              ackTestId="checkbox-cancellation-ack-desktop"
-              rowTestId="cancellation-ack-row-desktop"
-              viewTermsTestId="button-view-cancellation-terms-desktop"
-              invalid={attemptedConfirm && !cancellationAck}
-              errorText="Please confirm the cancellation policy to continue."
-            />
-          </div>
+          {!noDatesYet && (
+            <div className="mt-8 space-y-2">
+              <TermsAckRow
+                checked={cancellationAck}
+                onChange={(next) => {
+                  bookingActions.setCancellationAcknowledged(next);
+                  if (next) setAttemptedConfirm(false);
+                }}
+                label={CANCELLATION_ACK_LABEL}
+                onViewTerms={() => setTermsOpen(true)}
+                ackTestId="checkbox-cancellation-ack-desktop"
+                rowTestId="cancellation-ack-row-desktop"
+                viewTermsTestId="button-view-cancellation-terms-desktop"
+                invalid={attemptedConfirm && !cancellationAck}
+                errorText="Please confirm the cancellation policy to continue."
+              />
+            </div>
+          )}
 
           <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
             <button
@@ -365,6 +371,7 @@ export function SlotsDesktop() {
             )}
             <span
               onClickCapture={(e) => {
+                if (noDatesYet) return;
                 if (!cancellationAck) {
                   e.stopPropagation();
                   e.preventDefault();
@@ -382,6 +389,7 @@ export function SlotsDesktop() {
                 data-testid="button-continue-desktop"
                 className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
                 style={{ backgroundColor: BRAND }}
+                onClick={() => { if (noDatesYet) bookingActions.setBookedWithoutDates(true); }}
               >
                 Confirm
                 <ArrowRight className="h-4 w-4" />

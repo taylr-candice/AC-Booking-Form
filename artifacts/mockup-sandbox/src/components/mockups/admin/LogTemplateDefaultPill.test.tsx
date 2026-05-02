@@ -132,7 +132,7 @@ function renderDetail() {
   );
 }
 
-type BulkFilter = "all" | "awaiting_tenant" | "awaiting_agent";
+type BulkFilter = "all" | "awaiting_tenant" | "awaiting_agent" | "awaiting_scheduling";
 
 function BulkHarness() {
   const [filter, setFilter] = useState<BulkFilter>("all");

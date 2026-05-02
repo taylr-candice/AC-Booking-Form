@@ -179,7 +179,9 @@ function Harness({
   initialBuildingFilter?: string;
   initialSearch?: string;
 }) {
-  const [filter, setFilter] = useState<"all" | "awaiting_tenant" | "awaiting_agent">(
+  const [filter, setFilter] = useState<
+    "all" | "awaiting_tenant" | "awaiting_agent" | "awaiting_scheduling"
+  >(
     "all",
   );
   const [buildingFilter, setBuildingFilter] = useState(initialBuildingFilter);

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  CalendarClock,
   CheckCircle2,
   Lock,
 } from "lucide-react";
@@ -102,7 +103,7 @@ export function SlotsMobileLite() {
   const canConfirm =
     canContinueScheduling(selectedDate, selectedSlotId, accessMethod, noDatesYet) &&
     !lockedByOther &&
-    cancellationAck;
+    (noDatesYet || cancellationAck);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
@@ -268,6 +269,9 @@ export function SlotsMobileLite() {
                   className="mt-2 rounded-xl border border-sky-200 bg-sky-50 p-4"
                   data-testid="banner-dates-coming-soon-mobile-lite"
                 >
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sky-100">
+                    <CalendarClock className="h-6 w-6 text-sky-400" />
+                  </div>
                   <div className="text-[14px] font-semibold text-sky-900">
                     Dates are on the way
                   </div>
@@ -308,25 +312,28 @@ export function SlotsMobileLite() {
           SlotsAccessBanner so it's an informational notification,
           not a checkbox to remember to tick. */}
       <div className="border-t border-slate-100 bg-white px-5 py-3">
-        <TermsAckRow
-          checked={cancellationAck}
-          onChange={(next) => {
-            bookingActions.setCancellationAcknowledged(next);
-            if (next) setAttemptedConfirm(false);
-          }}
-          label={CANCELLATION_ACK_LABEL}
-          onViewTerms={() => setTermsOpen(true)}
-          ackTestId="checkbox-cancellation-ack-mobile-lite"
-          rowTestId="cancellation-ack-row-mobile-lite"
-          viewTermsTestId="button-view-cancellation-terms-mobile-lite"
-          invalid={attemptedConfirm && !cancellationAck}
-          errorText="Please confirm the cancellation policy to continue."
-        />
+        {!noDatesYet && (
+          <TermsAckRow
+            checked={cancellationAck}
+            onChange={(next) => {
+              bookingActions.setCancellationAcknowledged(next);
+              if (next) setAttemptedConfirm(false);
+            }}
+            label={CANCELLATION_ACK_LABEL}
+            onViewTerms={() => setTermsOpen(true)}
+            ackTestId="checkbox-cancellation-ack-mobile-lite"
+            rowTestId="cancellation-ack-row-mobile-lite"
+            viewTermsTestId="button-view-cancellation-terms-mobile-lite"
+            invalid={attemptedConfirm && !cancellationAck}
+            errorText="Please confirm the cancellation policy to continue."
+          />
+        )}
         {/* See SlotsMobile.tsx for why we keep the button enabled
             without the ack and intercept the click in capture phase
             to surface the invalid styling. */}
         <span
           onClickCapture={(e) => {
+            if (noDatesYet) return;
             if (!cancellationAck) {
               e.stopPropagation();
               e.preventDefault();
@@ -344,6 +351,7 @@ export function SlotsMobileLite() {
             data-testid="button-continue-mobile"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
             style={{ backgroundColor: BRAND }}
+            onClick={() => { if (noDatesYet) bookingActions.setBookedWithoutDates(true); }}
           >
             Confirm
             <ArrowRight className="h-4 w-4" />

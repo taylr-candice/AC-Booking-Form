@@ -46,10 +46,14 @@ const unknownAcUnit: AdminUnit = {
 
 describe("nextBookingId", () => {
   it("is one above the highest seeded numeric id", () => {
-    // SEEDED_BOOKINGS' highest id is bk-1042 today.
-    const seededMax = Math.max(
-      ...SEEDED_BOOKINGS.map((b) => parseInt(b.id.replace("bk-", ""), 10)),
-    );
+    // Only pure-numeric bk-NNN ids count; non-numeric slugs (e.g.
+    // bk-lakeside-01) are intentionally skipped by nextBookingId and
+    // must also be excluded from the test's own max computation.
+    const numericIds = SEEDED_BOOKINGS.map((b) => {
+      const m = /^bk-(\d+)$/.exec(b.id);
+      return m ? parseInt(m[1], 10) : null;
+    }).filter((n): n is number => n !== null);
+    const seededMax = Math.max(...numericIds);
     expect(nextBookingId(SEEDED_BOOKINGS)).toBe(`bk-${seededMax + 1}`);
   });
 
@@ -59,9 +63,11 @@ describe("nextBookingId", () => {
       id: "bk-live",
       isLive: true,
     };
-    const seededMax = Math.max(
-      ...SEEDED_BOOKINGS.map((b) => parseInt(b.id.replace("bk-", ""), 10)),
-    );
+    const numericIds = SEEDED_BOOKINGS.map((b) => {
+      const m = /^bk-(\d+)$/.exec(b.id);
+      return m ? parseInt(m[1], 10) : null;
+    }).filter((n): n is number => n !== null);
+    const seededMax = Math.max(...numericIds);
     expect(nextBookingId([liveRow, ...SEEDED_BOOKINGS])).toBe(
       `bk-${seededMax + 1}`,
     );

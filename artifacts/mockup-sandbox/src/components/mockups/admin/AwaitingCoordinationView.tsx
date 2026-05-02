@@ -30,6 +30,8 @@ import {
   X,
 } from "lucide-react";
 
+import { isTaylrManagedFlexibleAccess } from "../booking-slots/accessSchedulingMode";
+
 import {
   bookerAgencyName,
   CALL_TEMPLATE_CUSTOM_ID,
@@ -83,6 +85,7 @@ const FILTER_CHIPS: ReadonlyArray<{ key: Filter; label: string }> = [
   { key: "all", label: "All" },
   { key: "awaiting_tenant", label: "Awaiting tenant" },
   { key: "awaiting_agent", label: "Awaiting agent" },
+  { key: "awaiting_scheduling", label: "Awaiting scheduling" },
 ];
 
 /**
@@ -165,7 +168,9 @@ function CoordinatingWithCell({
       ? "Managing agent"
       : kind === "awaiting_tenant"
         ? "Tenant"
-        : "Unassigned";
+        : kind === "awaiting_scheduling"
+          ? "To schedule"
+          : "Unassigned";
 
   let detail: string;
   if (kind === "awaiting_tenant") {
@@ -189,6 +194,13 @@ function CoordinatingWithCell({
       ? SEEDED_AGENTS.find((a) => a.id === lookup.agentId)?.company ?? null
       : null;
     detail = agency ?? "Agency not on file";
+  } else if (kind === "awaiting_scheduling") {
+    // Derive presence requirement from the access method so admin
+    // can see at a glance whether they need to schedule around the
+    // owner being home ("Will be present") or whether access is
+    // independent of the owner's presence ("Flexible access").
+    const isFlexible = isTaylrManagedFlexibleAccess(booking.accessMethod, null);
+    detail = isFlexible ? "Flexible access" : "Will be present";
   } else {
     // No coordination bucket matched — surface the access method so
     // ops at least know why this row is here.
@@ -652,6 +664,9 @@ export function AwaitingCoordinationView({
         .length,
       awaiting_agent: base.filter(({ kind }) => kind === "awaiting_agent")
         .length,
+      awaiting_scheduling: base.filter(
+        ({ kind }) => kind === "awaiting_scheduling",
+      ).length,
     };
   })();
 

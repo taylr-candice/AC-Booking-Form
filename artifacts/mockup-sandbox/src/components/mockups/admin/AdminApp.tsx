@@ -292,7 +292,12 @@ function writeSearchToURL(value: string): void {
  *  values are accepted so a stale URL falls back to "all". */
 export function readCoordinationFilterFromURL(): "all" | CoordinationKind {
   const raw = readUrlParam(COORDINATION_FILTER_PARAM);
-  if (raw === "awaiting_agent" || raw === "awaiting_tenant") return raw;
+  if (
+    raw === "awaiting_agent" ||
+    raw === "awaiting_tenant" ||
+    raw === "awaiting_scheduling"
+  )
+    return raw;
   return "all";
 }
 

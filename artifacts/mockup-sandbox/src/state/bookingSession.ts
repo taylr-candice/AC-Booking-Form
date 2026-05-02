@@ -213,6 +213,11 @@ export type BookingState = {
   service_slot: string | null;
   // Step 5 — review & pay
   cancellation_acknowledged: boolean;
+  /** Set to `true` when the customer confirmed checkout while no service
+   *  dates were open for their building (noDatesYet state). Taylr will
+   *  contact them to lock in a window once dates are released. Surfaced
+   *  on the admin booking row as `datesUnavailableAtBooking`. */
+  booked_without_dates: boolean;
 
   // Terminal — set by `submitBooking()` after the user clicks Pay on
   // Step 5. The wrapper renders the confirmation screen instead of the
@@ -404,6 +409,7 @@ const INITIAL_STATE: BookingState = {
   service_date: null,
   service_slot: null,
   cancellation_acknowledged: false,
+  booked_without_dates: false,
   submitted: false,
   reference: null,
   return_to: null,
@@ -1348,6 +1354,10 @@ export const bookingActions = {
   // Step 5 — review & pay
   setCancellationAcknowledged(value: boolean) {
     setState((s) => ({ ...s, cancellation_acknowledged: value }));
+  },
+
+  setBookedWithoutDates(value: boolean) {
+    setState((s) => ({ ...s, booked_without_dates: value }));
   },
 
   /** Spec §9: mark the booking as successfully submitted and assign a

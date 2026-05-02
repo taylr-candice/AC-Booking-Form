@@ -360,6 +360,11 @@ export type AdminBooking = {
    *  matching audit trail entry lives on `serviceTimeline` so a chase
    *  is also visible in the per-booking history. */
   lastContactedAt: string | null;
+  /** True when the customer confirmed checkout while no service dates
+   *  were open for their building (noDatesYet state). Admin must contact
+   *  them to lock in a window once dates are released. Surfaced in the
+   *  Awaiting-coordination queue as the "Awaiting scheduling" category. */
+  datesUnavailableAtBooking?: boolean;
 };
 
 // ─── Seeded buildings ───────────────────────────────────────────────────────
@@ -667,6 +672,14 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     addressLine1: "8 / 45 Lakeside Drive",
     addressLine2: "Meadowbank NSW 2114",
     ac: { type: "split", brand: "Panasonic", systems: 2, additional: 0 },
+    agentId: null,
+    buildingId: "bldg-lakeside",
+  },
+  {
+    id: "u-lakeside-02",
+    addressLine1: "12 / 45 Lakeside Drive",
+    addressLine2: "Meadowbank NSW 2114",
+    ac: { type: "split", brand: "Panasonic", systems: 1, additional: 1 },
     agentId: null,
     buildingId: "bldg-lakeside",
   },
@@ -1056,6 +1069,79 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     // chased".
     lastContactedAt: "2026-04-28T11:00:00+10:00",
   },
+  {
+    // Owner booked while Lakeside Towers had no open dates yet.
+    // Access method is "be there" — owner plans to be present, so
+    // admin must schedule a window AND ensure they'll be home.
+    // Demonstrates the "Awaiting scheduling — Will be present" tag
+    // in the admin coordination queue.
+    id: "bk-lakeside-01",
+    unitId: "u-lakeside-01",
+    customerName: "Sophie Brennan",
+    customerEmail: "sophie.b@example.com",
+    customerPhone: "0412 884 217",
+    bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_at_unit",
+    tenants: [],
+    systems: 2,
+    additional: 0,
+    acType: "split",
+    discrepancy: null,
+    serviceDate: null,
+    serviceSlot: "to_be_coordinated",
+    paymentStatus: "pending",
+    serviceStatus: "scheduled",
+    totalAud: 358,
+    paymentTimeline: [
+      { status: "intent_created", label: "Payment intent created", at: "Apr 30 · 10:22", by: "System" },
+    ],
+    serviceTimeline: [
+      { status: "scheduled", label: "Dates unavailable at booking — to be scheduled", at: "Apr 30 · 10:22", by: "System" },
+    ],
+    notes: "Owner will be present on the day. No dates were open at the time of booking.",
+    rolloutId: "rl-ac-lakeside",
+    createdAt: "2026-04-30T10:22:00+10:00",
+    lastContactedAt: null,
+    datesUnavailableAtBooking: true,
+  },
+  {
+    // Same Lakeside building — but this owner chose a flexible access
+    // method (parcel locker). Admin just needs to schedule a window;
+    // owner does not need to be present. Demonstrates the
+    // "Awaiting scheduling — Flexible access" tag contrast.
+    id: "bk-lakeside-02",
+    unitId: "u-lakeside-02",
+    customerName: "Daniel Yuen",
+    customerEmail: "daniel.y@example.com",
+    customerPhone: "0451 007 330",
+    bookerRole: "owner",
+    bookerAgencyId: null,
+    bookerAgencyOtherName: "",
+    accessMethod: "owner_live_collect",
+    tenants: [],
+    systems: 1,
+    additional: 1,
+    acType: "split",
+    discrepancy: null,
+    serviceDate: null,
+    serviceSlot: "to_be_coordinated",
+    paymentStatus: "pending",
+    serviceStatus: "scheduled",
+    totalAud: 218,
+    paymentTimeline: [
+      { status: "intent_created", label: "Payment intent created", at: "Apr 30 · 11:05", by: "System" },
+    ],
+    serviceTimeline: [
+      { status: "scheduled", label: "Dates unavailable at booking — to be scheduled", at: "Apr 30 · 11:05", by: "System" },
+    ],
+    notes: "Flexible access — collect and return key. Owner does not need to be present.",
+    rolloutId: "rl-ac-lakeside",
+    createdAt: "2026-04-30T11:05:00+10:00",
+    lastContactedAt: null,
+    datesUnavailableAtBooking: true,
+  },
 ];
 
 // ─── Coordination kind ─────────────────────────────────────────────────────
@@ -1076,12 +1162,18 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
  * Derived from the booking's access method rather than stored on the
  * row, so seed data and the live session row can never drift.
  */
-export type CoordinationKind = "awaiting_agent" | "awaiting_tenant";
+export type CoordinationKind =
+  | "awaiting_agent"
+  | "awaiting_tenant"
+  /** Customer booked while no service dates were open. Admin needs to
+   *  call them to schedule once dates are released for their building. */
+  | "awaiting_scheduling";
 
 export function coordinationKindForBooking(
   b: AdminBooking,
 ): CoordinationKind | null {
   if (b.serviceSlot !== "to_be_coordinated") return null;
+  if (b.datesUnavailableAtBooking) return "awaiting_scheduling";
   if (b.accessMethod === "owner_leased_agent") return "awaiting_agent";
   if (
     b.accessMethod === "owner_leased_tenant" ||
@@ -1829,6 +1921,7 @@ export function liveBookingFromSession(
   }
 
   const isCoordination =
+    session.booked_without_dates ||
     session.access_method === "owner_leased_tenant" ||
     session.access_method === "owner_leased_agent" ||
     session.access_method === "agent_tenant_taylr";
@@ -1898,9 +1991,11 @@ export function liveBookingFromSession(
     serviceTimeline: [
       {
         status: "scheduled",
-        label: isCoordination
-          ? "Awaiting coordination"
-          : `Slot booked (${formatJobMinutesShort(durationMin)})`,
+        label: session.booked_without_dates
+          ? "Dates unavailable at booking — to be scheduled"
+          : isCoordination
+            ? "Awaiting coordination"
+            : `Slot booked (${formatJobMinutesShort(durationMin)})`,
         at: "Just now",
         by: "System",
       },
@@ -1908,6 +2003,7 @@ export function liveBookingFromSession(
     notes:
       "Live demo booking sourced from the customer's current session. Refresh the customer flow to update.",
     isLive: true,
+    datesUnavailableAtBooking: session.booked_without_dates ?? false,
     rolloutId: resolveLiveRolloutId(session.unit_id),
     createdAt: getOrInitLiveBookingCreatedAt(),
     // Live row is read-only in the admin shell (the customer flow owns
