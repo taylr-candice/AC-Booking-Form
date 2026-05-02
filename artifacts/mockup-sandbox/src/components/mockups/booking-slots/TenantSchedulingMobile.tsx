@@ -537,11 +537,6 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
 
       {/* Body */}
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
-        {/* Formal salutation */}
-        <p className="mt-5 text-[15px] font-semibold text-slate-900">
-          Dear {BOOKING_CONTEXT.tenantFullName},
-        </p>
-
         {/* Legal obligation notice + authorisation — one unified card */}
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
           <p className="text-[13px] leading-relaxed text-amber-900">
@@ -1020,7 +1015,10 @@ function AccessNoticeBox() {
         Access is required
       </p>
       <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
-        If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
+        Under the Residential Tenancies Act 2010 ({BOOKING_CONTEXT.state}), tenants are required to provide reasonable access to their rental property for the purpose of carrying out necessary repairs and maintenance.
+      </p>
+      <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
+        The landlord/managing agent of this property has arranged an essential air conditioning service. Access to the property is available for the duration of the service window.
       </p>
     </div>
   );
