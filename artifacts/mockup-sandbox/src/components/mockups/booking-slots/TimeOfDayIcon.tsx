@@ -1,14 +1,16 @@
 import type { CSSProperties } from "react";
-import { Sun, Moon } from "lucide-react";
+import { Moon } from "lucide-react";
 
 /**
  * Custom and wrapped time-of-day icons for the customer slot picker.
  *
- *  - `MorningIcon`   — custom half-sun on the horizon (outline, no arrow,
- *    no rays below the line). Lucide has no direct equivalent.
- *  - `AfternoonIcon` — Lucide `Sun` (full circle + 8 rays). Clearly
- *    distinct from the morning half-disc: full sun in the sky vs sun
- *    just cresting the horizon.
+ *  - `MorningIcon`   — half-sun sitting on the horizon: a semicircular
+ *    arc resting on a straight horizon line, with two short side rays.
+ *    No top ray, no diagonal rays, no directional arrow — clean and
+ *    unambiguous at small sizes.
+ *  - `AfternoonIcon` — solid filled circle (disc). Clearly distinct
+ *    from the outline morning half-disc: a bright full sun high in the
+ *    sky vs. the sun just cresting the horizon.
  *  - `EveningIcon`   — Lucide `Moon` (crescent). Standard, universally
  *    recognisable, renders crisply at any size.
  *
@@ -39,12 +41,7 @@ export function MorningIcon({
       style={style}
       aria-hidden={ariaHidden}
     >
-      {/* Short vertical ray from the top of the sun. */}
-      <path d="M12 5v3" />
-      {/* Two diagonal rays, upper-left and upper-right. */}
-      <path d="m4.93 10.93 1.41 1.41" />
-      <path d="m19.07 10.93-1.41 1.41" />
-      {/* Two horizontal side rays, level with the sun centre. */}
+      {/* Two short horizontal side rays at horizon level. */}
       <path d="M2 18h2" />
       <path d="M20 18h2" />
       {/* Horizon line. */}
@@ -61,18 +58,24 @@ export function AfternoonIcon({
   "aria-hidden": ariaHidden = true,
 }: IconProps) {
   return (
-    <Sun
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
       className={className}
       style={style}
       aria-hidden={ariaHidden}
-    />
+    >
+      {/* Solid filled circle — full sun high in the sky. */}
+      <circle cx="12" cy="12" r="7" />
+    </svg>
   );
 }
 
 export function EveningIcon({
   className,
   style,
-  "aria-hidden"  : ariaHidden = true,
+  "aria-hidden": ariaHidden = true,
 }: IconProps) {
   return (
     <Moon

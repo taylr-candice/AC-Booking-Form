@@ -5,6 +5,7 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+import { MorningIcon, AfternoonIcon, EveningIcon } from "./TimeOfDayIcon";
 
 const BRAND = "#ED017F";
 
@@ -14,14 +15,21 @@ function longWeekday(isoDate: string): string {
   return local.toLocaleDateString("en-AU", { weekday: "long" });
 }
 
+function WindowIcon({ window, compact }: { window: CustomerSlot["window"]; compact: boolean }) {
+  const cls = compact ? "inline-block h-3.5 w-3.5 align-[-2px]" : "inline-block h-4 w-4 align-[-2px]";
+  if (window === "morning") return <MorningIcon className={cls} />;
+  if (window === "afternoon") return <AfternoonIcon className={cls} />;
+  return <EveningIcon className={cls} />;
+}
+
 /**
  * "Next available" shortcut card. Sits above the day picker.
  *
  * Layout:
- *   ★  Next available      ← small pink label          (line 1)
- *      Friday 2 May        ← bold black date            (line 2)
- *      Afternoon · 1pm–5pm ← grey window + time range  (line 3)
- *                                          [Book window →]
+ *   ★  Next available                    ← small pink label     (line 1)
+ *      [☀] Afternoon · Friday 2 May      ← icon + window + date (line 2, bold)
+ *      1pm–5pm                           ← grey time range      (line 3)
+ *                            [Book window →]
  */
 export function NextAvailableCard({
   day,
@@ -71,24 +79,27 @@ export function NextAvailableCard({
             Next available
           </div>
 
-          {/* Bold date line */}
+          {/* [icon] Window · weekday day month */}
           <div
-            className={`mt-0.5 font-semibold text-slate-900 ${
+            className={`mt-0.5 flex items-center gap-1.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            {weekdayLong} {day.day} {monthTitle}
+            <WindowIcon window={slot.window} compact={isCompact} />
+            <span>
+              {windowLabel} · {weekdayLong} {day.day} {monthTitle}
+            </span>
           </div>
 
-          {/* Grey window + time range */}
+          {/* Grey time range */}
           <div
             className={`text-slate-500 ${
               isCompact ? "text-[11px]" : "text-xs"
             }`}
             data-testid={`next-available-time-${testIdSuffix}`}
           >
-            {windowLabel} · {slot.timeLabel}
+            {slot.timeLabel}
           </div>
         </div>
 

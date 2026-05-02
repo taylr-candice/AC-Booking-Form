@@ -27,7 +27,7 @@ export function AccessDesktop() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-4xl">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
@@ -51,38 +51,44 @@ export function AccessDesktop() {
             )}
 
             {(role === "agent" || (role === "owner" && residence)) && (
-              <>
-                <AccessReassuranceBox />
-                <div className="space-y-3 mb-8">
-                  {opts.map((o) => {
-                    const isAgentTenantCard = role === "agent" && o.key === "agent_tenant_pending";
-                    const selected = isAgentTenantCard ? isAgentTenantOption(access) : access === o.key;
-                    return (
-                      <AccessOptionCard
-                        key={o.key}
-                        option={o}
-                        selected={selected}
-                        onClick={() => {
-                          if (isAgentTenantCard && isAgentTenantOption(access)) return;
-                          bookingActions.setAccessMethod(o.key);
-                        }}
-                      />
-                    );
-                  })}
+              <div className="flex gap-8 items-start">
+                {/* Left column: access notice */}
+                <div className="w-72 shrink-0">
+                  <AccessNoticeBox />
                 </div>
 
-                {isTaylrManagedFlexibleAccess(access, leaveKeySub) && <FlexibleAccessSignal />}
-                {isAgentTenantOption(access) && (
-                  <AgentTenantCoordinationSection access={access} />
-                )}
-                {(() => { const n = infoNoteFor(access); return n ? <InfoBanner title={n.title} body={n.body} /> : null; })()}
-                {isLeaveKeyMethod(access) && <LeaveKeySubMethodSection />}
-                {isCollectReturnMethod(access) && <CollectReturnSection />}
-                {isManagingAgentMethod(access) && <ManagingAgencySection />}
-                {isTenantMethod(access) && <TenantsSection api={tenants} />}
-                {(() => { const s = signatureVariantFor(access, leaveKeySub); return s ? <SignatureSection title={s.title} body={s.body} attemptedSubmit={attemptedSubmit} /> : null; })()}
+                {/* Right column: access options + sub-sections */}
+                <div className="flex-1 min-w-0">
+                  <div className="space-y-3 mb-8">
+                    {opts.map((o) => {
+                      const isAgentTenantCard = role === "agent" && o.key === "agent_tenant_pending";
+                      const selected = isAgentTenantCard ? isAgentTenantOption(access) : access === o.key;
+                      return (
+                        <AccessOptionCard
+                          key={o.key}
+                          option={o}
+                          selected={selected}
+                          onClick={() => {
+                            if (isAgentTenantCard && isAgentTenantOption(access)) return;
+                            bookingActions.setAccessMethod(o.key);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
 
-              </>
+                  {isTaylrManagedFlexibleAccess(access, leaveKeySub) && <FlexibleAccessSignal />}
+                  {isAgentTenantOption(access) && (
+                    <AgentTenantCoordinationSection access={access} />
+                  )}
+                  {(() => { const n = infoNoteFor(access); return n ? <InfoBanner title={n.title} body={n.body} /> : null; })()}
+                  {isLeaveKeyMethod(access) && <LeaveKeySubMethodSection />}
+                  {isCollectReturnMethod(access) && <CollectReturnSection />}
+                  {isManagingAgentMethod(access) && <ManagingAgencySection />}
+                  {isTenantMethod(access) && <TenantsSection api={tenants} />}
+                  {(() => { const s = signatureVariantFor(access, leaveKeySub); return s ? <SignatureSection title={s.title} body={s.body} attemptedSubmit={attemptedSubmit} /> : null; })()}
+                </div>
+              </div>
             )}
           </div>
 
@@ -139,21 +145,58 @@ function RoleMissingBanner() {
   );
 }
 
-function AccessReassuranceBox() {
+function AccessNoticeBox() {
+  const [expanded, setExpanded] = useState(true);
+
+  if (!expanded) {
+    return (
+      <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-5 py-3">
+        <p className="text-[12px] leading-snug text-slate-600">
+          Access required · Flexible options available
+        </p>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="ml-3 shrink-0 text-[12px] font-semibold transition-opacity hover:opacity-70"
+          style={{ color: BRAND }}
+        >
+          Learn more
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="mb-6 rounded-2xl bg-slate-50 px-5 py-4">
-      <p className="text-[14px] font-semibold text-slate-900 leading-snug">
-        You don't need to be home
+    <div className="rounded-2xl bg-slate-50 px-5 py-5">
+      <p className="text-[14px] font-semibold leading-snug text-slate-900">
+        Access is required for this service
       </p>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
-        If you can't be home during the service, you can choose one of the access options below.
-      </p>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
-        Taylr coordinates access on the day, and a Taylr representative is onsite during the service rollout.
-      </p>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
-        Please ensure access is available to both the apartment and the air conditioning system itself.
-      </p>
+      <div className="mt-2.5 space-y-2">
+        <p className="text-[13px] leading-relaxed text-slate-500">
+          As this is a building-wide service rollout, technicians attend across set service windows. We can't confirm an exact arrival or finish time within the window you choose.
+        </p>
+        <p className="text-[13px] leading-relaxed text-slate-500">
+          Before selecting how you'll provide access, please review the options below.
+        </p>
+        <p className="text-[13px] leading-relaxed text-slate-500">
+          If being available for the full window doesn't suit, you can choose a flexible access option — such as leaving a key for Taylr to access the property. Taylr will coordinate access on the day, including key collection and return where required.
+        </p>
+        <p className="text-[13px] leading-relaxed text-slate-500">
+          Please ensure access is available to both the apartment and the air conditioning system itself.
+        </p>
+        <p className="text-[13px] leading-relaxed text-slate-500">
+          Taylr will arrange access to any outdoor AC units (condensers) located on common property, such as rooftops or basement areas.
+        </p>
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="text-[12px] font-medium text-slate-400 transition-colors hover:text-slate-600"
+        >
+          Hide details
+        </button>
+      </div>
     </div>
   );
 }

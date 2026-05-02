@@ -1,0 +1,132 @@
+Please update the access information section on the AC scheduler page.
+
+This is COPY + LAYOUT only.
+Do NOT change:
+- scheduling logic
+- capacity logic
+- payment logic
+- access method logic
+
+----------------------------------------
+GOAL
+----------------------------------------
+
+The access message needs to:
+- clearly state that access to the apartment is required
+- explain that this is a building-wide set-date rollout (not exact appointment times)
+- encourage users to review flexible access options before selecting “I’ll be home”
+- reassure users that Taylr coordinates access where possible
+- clarify responsibility for external/common area AC units
+- remain concise, calm, and easy to scan (not heavy or technical)
+
+----------------------------------------
+ACCESS NOTICE COPY
+----------------------------------------
+
+Use this exact copy:
+
+Title:
+Access is required for this service
+
+Body:
+As this is a building-wide service rollout, technicians attend across set service windows. We can’t confirm an exact arrival or finish time within the window you choose.
+
+Before selecting how you’ll provide access, please review the options below.
+
+If being available for the full window doesn’t suit, you can choose a flexible access option — such as leaving a key for Taylr to access the property. Taylr will coordinate access on the day, including key collection and return where required.
+
+Please ensure access is available to both the apartment and the air conditioning system itself.
+
+Taylr will arrange access to any outdoor AC units (condensers) located on common property, such as rooftops or basement areas.
+
+----------------------------------------
+COLLAPSIBLE BEHAVIOUR
+----------------------------------------
+
+Do NOT show this as a modal or pop-up.
+
+Display it as an inline notice/card near the access method selection area.
+
+Default behaviour:
+- Show the full notice expanded the first time the user reaches this section
+- Include a subtle “Hide details” action
+
+Collapsed state:
+Replace the full notice with a compact summary row:
+
+Access required · Flexible options available   Learn more
+
+Behaviour:
+- Clicking “Learn more” expands the full notice again
+- Keep this interaction smooth and non-disruptive
+
+----------------------------------------
+MOBILE VERSION
+----------------------------------------
+
+On mobile:
+- Display the notice above the access options
+- Keep spacing tight and efficient
+- Default to expanded on first view
+- Allow user to collapse using “Hide details”
+
+Collapsed state:
+- Single compact row
+- Maximum 1–2 lines
+- Must not push access options too far down the screen
+
+Avoid:
+- large icons
+- alert/warning styling
+- excessive vertical spacing
+
+----------------------------------------
+DESKTOP VERSION
+----------------------------------------
+
+On desktop:
+- If layout allows, position notice in a two-column layout:
+
+Left column:
+Access notice
+
+Right column:
+Access options
+
+- If not, place above access options but limit width so it does not feel like a large text block
+
+Behaviour:
+- Can remain expanded by default
+- Include “Hide details” / “Learn more” for consistency
+- Collapsed state should appear as a slim summary card:
+
+Access required · Flexible options available   Learn more
+
+----------------------------------------
+DESIGN REQUIREMENTS
+----------------------------------------
+
+- Keep styling calm and premium
+- Do not use warning or alert styling
+- Do not make it look like legal terms
+- Use soft background or subtle separation
+- Keep typography clean and readable
+- Maintain strong visual connection to access options
+
+----------------------------------------
+IMPORTANT RULES
+----------------------------------------
+
+- Do not use modal or pop-up
+- Do not block the user from continuing
+- Do not change access options
+- Do not change scheduling behaviour
+- Do not imply access is optional
+- Do not imply custom scheduling is available
+- Keep wording concise and easy to scan
+
+----------------------------------------
+CORE PRINCIPLE
+----------------------------------------
+
+Make access feel clear, manageable, and supported — not restrictive or complex.
