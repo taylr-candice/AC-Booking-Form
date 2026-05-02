@@ -29,6 +29,7 @@ import {
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
+import { WhyWindowsModal } from "./WhyWindowsModal";
 import { SlotsAccessNotesDisclosure } from "./SlotsAccessNotesDisclosure";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
@@ -51,6 +52,7 @@ type Slot = CustomerSlot;
 export function SlotsMobileLite() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [whyWindowsOpen, setWhyWindowsOpen] = useState(false);
   const [attemptedConfirm, setAttemptedConfirm] = useState(false);
   const session = useBookingSession();
   const cancellationAck = session.cancellation_acknowledged;
@@ -126,6 +128,7 @@ export function SlotsMobileLite() {
           leaveKeySub={leaveKeySub}
           size="compact"
           testIdSuffix="mobile-lite"
+          onWhyWindows={() => setWhyWindowsOpen(true)}
         />
 
         {!rollout ? (
@@ -301,6 +304,9 @@ export function SlotsMobileLite() {
       </div>
       {termsOpen && (
         <CancellationTermsModal mode="post_order" onClose={() => setTermsOpen(false)} />
+      )}
+      {whyWindowsOpen && (
+        <WhyWindowsModal onClose={() => setWhyWindowsOpen(false)} />
       )}
     </div>
   );

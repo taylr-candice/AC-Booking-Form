@@ -33,6 +33,7 @@ import {
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
+import { WhyWindowsModal } from "./WhyWindowsModal";
 import { SlotsAccessNotesDisclosure } from "./SlotsAccessNotesDisclosure";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
@@ -56,6 +57,7 @@ type Slot = CustomerSlot;
 export function SlotsDesktop() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [whyWindowsOpen, setWhyWindowsOpen] = useState(false);
   const [attemptedConfirm, setAttemptedConfirm] = useState(false);
   const session = useBookingSession();
   const cancellationAck = session.cancellation_acknowledged;
@@ -137,6 +139,7 @@ export function SlotsDesktop() {
             leaveKeySub={leaveKeySub}
             size="regular"
             testIdSuffix="desktop"
+            onWhyWindows={() => setWhyWindowsOpen(true)}
           />
 
           <div className="flex-1">
@@ -339,6 +342,9 @@ export function SlotsDesktop() {
       </div>
       {termsOpen && (
         <CancellationTermsModal mode="pre_order" onClose={() => setTermsOpen(false)} />
+      )}
+      {whyWindowsOpen && (
+        <WhyWindowsModal onClose={() => setWhyWindowsOpen(false)} />
       )}
     </div>
   );
