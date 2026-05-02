@@ -172,7 +172,7 @@ function AccessTypeKey() {
   return (
     <div className="mb-4 flex items-center gap-5 text-[11px] text-slate-500">
       <span className="flex items-center gap-1.5">
-        <LockOpen className="h-3 w-3 text-emerald-500" />
+        <LockOpen className="h-3 w-3" style={{ color: BRAND }} />
         No one needs to be home
       </span>
     </div>
@@ -277,7 +277,7 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       {accessFlexibility(option.key) === true && (
         <LockOpen
           className="absolute right-2.5 top-2 h-3 w-3"
-          style={{ color: selected ? "rgba(255,255,255,0.4)" : "#10b981" }}
+          style={{ color: selected ? "#ffffff" : BRAND }}
         />
       )}
       <span
@@ -429,7 +429,7 @@ function LeaveKeySubMethodSection() {
               {isUnattendedLeaveKeySub(opt.key) && (
                 <LockOpen
                   className="absolute right-2.5 top-2 h-3 w-3"
-                  style={{ color: selected ? "rgba(255,255,255,0.4)" : "#10b981" }}
+                  style={{ color: selected ? "#ffffff" : BRAND }}
                 />
               )}
               <span
