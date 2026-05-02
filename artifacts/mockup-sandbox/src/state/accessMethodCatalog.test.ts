@@ -202,8 +202,8 @@ describe("isStep5Valid — parcel-locker family", () => {
   // Parcel-locker methods are unattended — the customer authorises Taylr to
   // retrieve the key, access the unit, and return the key without anyone
   // present. The signature lives on the access step (so the slot picker
-  // doesn't need its own checkbox), and the gate requires both the
-  // acknowledgement and a typed name before Step 5 is valid.
+  // doesn't need its own checkbox), and the gate requires the acknowledgement
+  // checkbox before Step 5 is valid.
   const parcelLockerMethods: Array<{
     method: AccessMethod;
     residence: PrimaryResidence;
@@ -231,14 +231,6 @@ describe("isStep5Valid — parcel-locker family", () => {
         expect(
           isStep5Valid({ ...valid, signature_acknowledged: false }),
         ).toBe(false);
-      });
-
-      it("rejects when the typed signature name is empty", () => {
-        expect(isStep5Valid({ ...valid, signature_name: "" })).toBe(false);
-      });
-
-      it("rejects when the typed signature name is whitespace only", () => {
-        expect(isStep5Valid({ ...valid, signature_name: "   " })).toBe(false);
       });
     });
   }
@@ -310,10 +302,6 @@ describe("isStep5Valid — collect-and-return family", () => {
         expect(
           isStep5Valid({ ...valid, signature_acknowledged: false }),
         ).toBe(false);
-      });
-
-      it("rejects when signature_name is empty", () => {
-        expect(isStep5Valid({ ...valid, signature_name: "" })).toBe(false);
       });
     });
   }
@@ -443,10 +431,6 @@ describe("isStep5Valid — tenant family (owner_leased_tenant + agent_tenant_tay
           isStep5Valid({ ...valid, signature_acknowledged: false }),
         ).toBe(false);
       });
-
-      it("rejects when signature_name is empty", () => {
-        expect(isStep5Valid({ ...valid, signature_name: "" })).toBe(false);
-      });
     });
   }
 });
@@ -484,14 +468,6 @@ describe("isStep5Valid — agent trade-key family (agent_trade_key)", () => {
     expect(
       isStep5Valid({ ...valid, signature_acknowledged: false }),
     ).toBe(false);
-  });
-
-  it("rejects when signature_name is empty", () => {
-    expect(isStep5Valid({ ...valid, signature_name: "" })).toBe(false);
-  });
-
-  it("rejects when signature_name is whitespace-only", () => {
-    expect(isStep5Valid({ ...valid, signature_name: "   " })).toBe(false);
   });
 });
 

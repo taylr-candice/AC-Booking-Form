@@ -529,7 +529,10 @@ export function isStep5Valid(s: BookingState): boolean {
   // OWNER_VACANT_OPTIONS catalog but remains a valid stored-state method
   // (backward compat — existing sessions may still carry it).
   const isLegacyVacantCollect = s.access_method === "owner_vacant_collect";
-  if (!inOptions && !inAgentTenantPair && !isLegacyParcelLocker && !isLegacyVacantCollect) return false;
+  // `owner_live_collect` was also replaced (by the leave-key flow) but remains
+  // a valid stored-state method for backward compat.
+  const isLegacyLiveCollect = s.access_method === "owner_live_collect";
+  if (!inOptions && !inAgentTenantPair && !isLegacyParcelLocker && !isLegacyVacantCollect && !isLegacyLiveCollect) return false;
 
   // Layer C
   if (isLeaveKeyMethod(s.access_method)) {
