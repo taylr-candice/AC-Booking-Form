@@ -67,6 +67,7 @@ export function AccessDesktop() {
 
             {(role === "agent" || (role === "owner" && residence)) && (
               <div>
+                <AccessNoticeBox />
                 <AccessTypeKey />
                 <div className="space-y-3 mb-8">
                     {opts.map((o) => {
@@ -152,16 +153,25 @@ function RoleMissingBanner() {
   );
 }
 
+function AccessNoticeBox() {
+  return (
+    <div className="mb-4 rounded-2xl bg-slate-50 px-5 py-4">
+      <p className="text-[14px] font-semibold leading-snug text-slate-900">
+        Access is required
+      </p>
+      <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
+        If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
+      </p>
+    </div>
+  );
+}
+
 function AccessTypeKey() {
   return (
     <div className="mb-4 flex items-center gap-5 text-[11px] text-slate-500">
       <span className="flex items-center gap-1.5">
         <LockOpen className="h-3 w-3 text-emerald-500" />
         No one needs to be home
-      </span>
-      <span className="flex items-center gap-1.5">
-        <UserCheck className="h-3 w-3 text-slate-400" />
-        Attendance required
       </span>
     </div>
   );
