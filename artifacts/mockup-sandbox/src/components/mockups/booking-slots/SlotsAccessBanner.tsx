@@ -86,12 +86,12 @@ export function SlotsAccessBanner({
         </div>
 
         {schedulingMode === "WINDOW_REQUIRED" && (
-          <div className={`mt-1.5 ${linkSize}`}>
+          <div className={`mt-1.5 ${bodySize}`}>
             <button
               type="button"
               data-testid={`button-why-windows-${testIdSuffix}`}
               onClick={onWhyWindows}
-              className="text-slate-400 underline underline-offset-2 hover:text-slate-600 transition-colors"
+              className="text-slate-700 underline underline-offset-2 hover:text-slate-900 transition-colors"
             >
               Why can't I book a specific date/time?
             </button>
@@ -99,9 +99,9 @@ export function SlotsAccessBanner({
         )}
 
         <div
-          className={`mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 ${linkSize}`}
+          className={`mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 ${bodySize}`}
         >
-          <span className="text-slate-500">Can't wait the window?</span>
+          <span className="text-slate-700">Can't wait the window?</span>
           <button
             type="button"
             data-testid={`button-change-access-${testIdSuffix}`}
