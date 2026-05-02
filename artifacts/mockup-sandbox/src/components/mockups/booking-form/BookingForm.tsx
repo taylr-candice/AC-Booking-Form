@@ -8,8 +8,6 @@ import {
   Trash2,
   Info,
   Calendar as CalendarIcon,
-  Sun,
-  Moon,
   Wind,
   Home,
   Building2,
@@ -49,6 +47,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { bookingActions } from "@/state/bookingSession";
+import { MorningIcon, AfternoonIcon } from "@/components/mockups/booking-slots/TimeOfDayIcon";
 import { useLiveAcCaps } from "@/components/mockups/booking-pages/acStepShared";
 import {
   DEFAULT_AC_INDOOR_CAPS,
@@ -1383,7 +1382,7 @@ function Step5({ s, update }: { s: State; update: (p: Partial<State>) => void })
                 slot={g.morning}
                 selected={s.scheduleSlotId === g.morning?.id}
                 onSelect={() => g.morning && update({ scheduleSlotId: g.morning.id })}
-                icon={<Sun className="h-4 w-4" />}
+                icon={<MorningIcon className="h-4 w-4" />}
                 title="Morning"
                 hint="8am – 12pm"
               />
@@ -1391,7 +1390,7 @@ function Step5({ s, update }: { s: State; update: (p: Partial<State>) => void })
                 slot={g.afternoon}
                 selected={s.scheduleSlotId === g.afternoon?.id}
                 onSelect={() => g.afternoon && update({ scheduleSlotId: g.afternoon.id })}
-                icon={<Moon className="h-4 w-4" />}
+                icon={<AfternoonIcon className="h-4 w-4" />}
                 title="Afternoon"
                 hint="12pm – 5pm"
               />

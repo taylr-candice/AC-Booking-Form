@@ -16,6 +16,20 @@ import { Moon } from "lucide-react";
  *
  * All three honour `currentColor` so callers can tint via
  * `style.color` / `className` (drop-in Lucide compatible).
+ *
+ * ─── CONSUMER CHECKLIST ───────────────────────────────────────────────────
+ * Every place that renders a morning / afternoon icon MUST import from here.
+ * When adding a new slot view, add it to this list and use these icons.
+ *
+ *  ✓ CustomerAvailableDays.tsx  — sneak-peek glyphs on day picker cards
+ *  ✓ SlotsMobile.tsx            — window option cards (morning/afternoon/evening)
+ *  ✓ SlotsDesktop.tsx           — window option cards
+ *  ✓ SlotsMobileLite.tsx        — window option cards
+ *  ✓ BookingForm.tsx (Step 5)   — SlotChip morning / afternoon icons
+ *
+ * NOT in this list (intentional):
+ *  - NextAvailableCard.tsx      — headline shows text only, no icon prefix
+ * ──────────────────────────────────────────────────────────────────────────
  */
 
 type IconProps = {

@@ -5,7 +5,6 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
-import { MorningIcon, AfternoonIcon, EveningIcon } from "./TimeOfDayIcon";
 
 const BRAND = "#ED017F";
 
@@ -13,13 +12,6 @@ function longWeekday(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map((s) => parseInt(s, 10));
   const local = new Date(y, (m ?? 1) - 1, d ?? 1);
   return local.toLocaleDateString("en-AU", { weekday: "long" });
-}
-
-function WindowIcon({ window, compact }: { window: CustomerSlot["window"]; compact: boolean }) {
-  const cls = compact ? "inline-block h-3.5 w-3.5 align-[-2px]" : "inline-block h-4 w-4 align-[-2px]";
-  if (window === "morning") return <MorningIcon className={cls} />;
-  if (window === "afternoon") return <AfternoonIcon className={cls} />;
-  return <EveningIcon className={cls} />;
 }
 
 /**
@@ -79,17 +71,14 @@ export function NextAvailableCard({
             Next available
           </div>
 
-          {/* [icon] Window · weekday day month */}
+          {/* Window · weekday day month — text only, no icon prefix */}
           <div
-            className={`mt-0.5 flex items-center gap-1.5 font-semibold text-slate-900 ${
+            className={`mt-0.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            <WindowIcon window={slot.window} compact={isCompact} />
-            <span>
-              {windowLabel} · {weekdayLong} {day.day} {monthTitle}
-            </span>
+            {windowLabel} · {weekdayLong} {day.day} {monthTitle}
           </div>
 
           {/* Grey time range */}
