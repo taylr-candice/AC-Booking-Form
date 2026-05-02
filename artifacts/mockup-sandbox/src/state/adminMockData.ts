@@ -683,6 +683,18 @@ export const SEEDED_UNITS: readonly AdminUnit[] = [
     agentId: null,
     buildingId: "bldg-lakeside",
   },
+  // Unbooked Lakeside unit — select this in the booking flow to reach
+  // the slot picker with no released dates (the "Dates are on the way"
+  // panel). Unlike u-lakeside-01/02 which already have pending bookings,
+  // this unit has no booking so the customer flow is not blocked at Step 1.
+  {
+    id: "u-lakeside-03",
+    addressLine1: "15 / 45 Lakeside Drive",
+    addressLine2: "Meadowbank NSW 2114",
+    ac: { type: "split", brand: "Panasonic", systems: 2, additional: 0 },
+    agentId: null,
+    buildingId: "bldg-lakeside",
+  },
 ];
 
 // ─── Seeded agents ──────────────────────────────────────────────────────────
