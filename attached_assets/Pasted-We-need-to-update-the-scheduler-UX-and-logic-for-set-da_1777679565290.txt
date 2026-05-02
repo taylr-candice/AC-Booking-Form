@@ -1,0 +1,95 @@
+We need to update the scheduler UX and logic for set-date bulk service rollouts.
+
+Important context:
+This is NOT a single call-out booking service where users can request any day/time.
+
+For these building service rollouts, Taylr coordinates fixed service days/windows in advance with technicians so multiple units in the same building can be serviced on the same day. We cannot offer individual custom booking times or promise specific alternative dates to individual users.
+
+The scheduler should therefore only show confirmed available service days/windows.
+
+Please update the scheduler as follows:
+
+1. Hide unavailable / fully booked days
+- Do not show booked-out days as greyed out.
+- Only show days that still have at least one available window.
+- Users should not need to scroll past unavailable options.
+
+2. Hide unavailable / fully booked windows
+- Once a user selects a day, only show windows that still have capacity.
+- Do not show booked-out windows as disabled/greyed out.
+
+3. Add fallback option if available dates do not suit
+Below the available dates, add a small section:
+
+Heading:
+Don’t see a suitable day?
+
+Button/link:
+Join waitlist for another date
+
+This should NOT be framed as “request a time” or “request a booking”, because we cannot offer individual scheduling.
+
+4. Waitlist / interest capture flow
+When the user clicks “Join waitlist for another date”, show a simple interest form/modal.
+
+Copy:
+
+Title:
+Register interest for another service date
+
+Body:
+These are scheduled building service days. If enough residents request another day, we may release an additional service date for this building.
+
+Fields:
+- Preferred day(s) of the week
+- Preferred time of day: Morning / Afternoon / Evening / Any
+- Name
+- Email
+- Mobile
+- Unit number
+- Optional notes
+
+CTA:
+Submit interest
+
+Confirmation message:
+Thanks — we’ve registered your interest. If another service date is released for your building, we’ll let you know.
+
+5. Important behaviour
+- Joining the waitlist does not create a booking.
+- Joining the waitlist does not reserve a place.
+- Joining the waitlist does not guarantee another date will be added.
+- Do not send the user to payment from the waitlist flow.
+- The user should still be able to go back and choose one of the currently available dates.
+
+6. Wording rules
+Avoid:
+- “Request another time”
+- “Choose your preferred appointment”
+- “We’ll arrange a time for you”
+- “More dates coming soon”
+
+Use language like:
+- “Register interest”
+- “Join waitlist”
+- “If enough residents request another day…”
+- “We may release an additional service date…”
+
+7. Optional empty state
+If there are no available service days left, show:
+
+Title:
+No service dates currently available
+
+Body:
+This building service run is currently fully booked. You can join the waitlist and we’ll let you know if another service date is released.
+
+CTA:
+Join waitlist for another date
+
+8. Design requirements
+- Keep the scheduler clean and minimal.
+- Do not use a full calendar grid.
+- Do not show greyed-out unavailable dates or windows.
+- Keep the waitlist section visually secondary to the available booking options.
+- The primary path should remain: select available day → select available window → continue.

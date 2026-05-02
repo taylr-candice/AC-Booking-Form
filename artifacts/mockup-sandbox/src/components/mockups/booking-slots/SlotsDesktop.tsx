@@ -19,13 +19,24 @@ import {
   unitCity,
 } from "../../../state/bookingHelpers";
 import { CancellationTermsModal } from "../booking-pages/CancellationTermsModal";
-import { findNextAvailable, type CustomerSlot } from "./customerSlotData";
+import {
+  findNextAvailable,
+  getVisibleWindowsForDay,
+  windowDisplayLabel,
+  type CustomerSlot,
+} from "./customerSlotData";
 import { useCustomerSlotPicker } from "./useCustomerSlotPicker";
 import { TermsAckRow } from "./TermsAckRow";
 import { SlotsAccessBanner } from "./SlotsAccessBanner";
 import { SlotsAccessNotesDisclosure } from "./SlotsAccessNotesDisclosure";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
+
+function windowIcon(window: CustomerSlot["window"]): React.ReactNode {
+  if (window === "morning") return <MorningIcon className="h-4 w-4" />;
+  if (window === "afternoon") return <AfternoonIcon className="h-4 w-4" />;
+  return <EveningIcon className="h-4 w-4" />;
+}
 
 const BRAND = "#ED017F";
 const SELECTED_GREEN_BG = "#7BC9A8";
@@ -218,38 +229,17 @@ export function SlotsDesktop() {
                       Pick a window
                     </div>
                     <div className="grid grid-cols-3 gap-3">
-                      <DesktopSlotCard
-                        slot={activeDay.morning}
-                        icon={<MorningIcon className="h-4 w-4" />}
-                        label="Morning"
-                        hint={activeDay.morning.timeLabel}
-                        selected={selectedSlotId === activeDay.morning.id}
-                        onClick={() =>
-                          setSelectedSlotId(activeDay.morning.id)
-                        }
-                      />
-                      <DesktopSlotCard
-                        slot={activeDay.afternoon}
-                        icon={<AfternoonIcon className="h-4 w-4" />}
-                        label="Afternoon"
-                        hint={activeDay.afternoon.timeLabel}
-                        selected={selectedSlotId === activeDay.afternoon.id}
-                        onClick={() =>
-                          setSelectedSlotId(activeDay.afternoon.id)
-                        }
-                      />
-                      {activeDay.evening && (
+                      {getVisibleWindowsForDay(activeDay).map((slot) => (
                         <DesktopSlotCard
-                          slot={activeDay.evening}
-                          icon={<EveningIcon className="h-4 w-4" />}
-                          label="Evening"
-                          hint={activeDay.evening.timeLabel}
-                          selected={selectedSlotId === activeDay.evening.id}
-                          onClick={() =>
-                            setSelectedSlotId(activeDay.evening!.id)
-                          }
+                          key={slot.id}
+                          slot={slot}
+                          icon={windowIcon(slot.window)}
+                          label={windowDisplayLabel(slot.window)}
+                          hint={slot.timeLabel}
+                          selected={selectedSlotId === slot.id}
+                          onClick={() => setSelectedSlotId(slot.id)}
                         />
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}

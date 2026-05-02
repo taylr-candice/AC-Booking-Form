@@ -203,6 +203,31 @@ export function dayHasAvailable(day: CustomerDay): boolean {
   return dayWindows(day).some((s) => s.status === "available");
 }
 
+/**
+ * Returns only days that have at least one selectable window.
+ *
+ * Fully booked / unavailable days are omitted entirely so the
+ * customer only sees dates they can actually act on.
+ *
+ * Core principle: "Only show users what they can act on."
+ */
+export function getVisibleServiceDays(
+  days: ReadonlyArray<CustomerDay>,
+): CustomerDay[] {
+  return days.filter(dayHasAvailable);
+}
+
+/**
+ * Returns only the windows for a day that are still selectable
+ * (`status === "available"`). Fully booked / unavailable windows
+ * are omitted entirely so the customer only sees what they can pick.
+ *
+ * Core principle: "Only show users what they can act on."
+ */
+export function getVisibleWindowsForDay(day: CustomerDay): CustomerSlot[] {
+  return dayWindows(day).filter((s) => s.status === "available");
+}
+
 /** Soonest `(day, slot)` pair with `status === "available"`, or null. */
 export function findNextAvailable(
   days: ReadonlyArray<CustomerDay>,

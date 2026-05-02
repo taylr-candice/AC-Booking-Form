@@ -58,15 +58,12 @@ function windowSrLabel(window: CustomerSlot["window"]): string {
  * Customer-side day picker shared by `SlotsMobile`, `SlotsMobileLite`,
  * and `SlotsDesktop`.
  *
- * Design: instead of a generic full-month grid (which forces the
- * customer to scan rows of greyed-out cells), we render only the
- * future days in the rollout. Each card shows the weekday + date,
- * and — for available days — a "sneak peek" row of glyphs hinting at
- * which windows are still open (☀ morning, 🌤 afternoon, 🌙 evening).
- * Booked / fully-unavailable future days appear as muted cards with
- * no glyph row so the customer can see them passively but can't pick
- * them. Selected day fills with brand pink; today is ringed with the
- * soft brand tint.
+ * Design: only dates that have at least one available window are
+ * ever passed in (filtered upstream by `getVisibleServiceDays` in
+ * `useCustomerSlotPicker`). Each card shows the weekday + date and a
+ * "sneak peek" row of glyphs hinting at which windows are still open
+ * (☀ morning, 🌤 afternoon, 🌙 evening). The selected day fills with
+ * the brand green.
  *
  * Layout uses a horizontally-scrolling row on compact (mobile)
  * viewports — keeps the picker above the fold while still showing
@@ -135,45 +132,13 @@ export function CustomerAvailableDays({
     >
       <div ref={scrollerRef} className={containerClass}>
         {visibleDays.map((day) => {
-          const windows = dayWindows(day);
-          const availableWindows = windows.filter(
+          // All days arriving here have at least one available window
+          // (filtered upstream by getVisibleServiceDays). We only show
+          // the windows that are still open in the sneak-peek glyph row.
+          const availableWindows = dayWindows(day).filter(
             (w) => w.status === "available",
           );
-          const isAvailable = availableWindows.length > 0;
-          const isSelected = selectedDate === day.date && isAvailable;
-
-          // Booked / closed / fully-unavailable future day: muted card,
-          // no glyph row, not clickable. Rendered as a disabled
-          // <button> so the existing e2e contract (the booked day
-          // satisfies toBeDisabled() / `:not([disabled])` selectors)
-          // keeps holding while the visual stays a passive grey card.
-          if (!isAvailable) {
-            return (
-              <button
-                key={day.date}
-                type="button"
-                disabled
-                data-testid={`day-card-${day.date}`}
-                title="Booked"
-                aria-label={`${day.weekday} ${day.day} ${day.month} — booked`}
-                className={`${cardBase} ${cardSize} cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 ${isCompact ? "snap-start" : ""}`}
-              >
-                <div className={`${weekdaySize} font-medium uppercase tracking-wide`}>
-                  {day.weekday}
-                </div>
-                <div className={`${daySize} font-bold leading-tight`}>{day.day}</div>
-                <div className={`${monthSize} font-medium uppercase tracking-wide`}>
-                  {day.month}
-                </div>
-                <div
-                  className="mt-1 text-[10px] uppercase tracking-wide"
-                  aria-hidden="true"
-                >
-                  Booked
-                </div>
-              </button>
-            );
-          }
+          const isSelected = selectedDate === day.date;
 
           // Pink on the default white card; white when the day is
           // selected (green pill) so the glyph stays readable on the

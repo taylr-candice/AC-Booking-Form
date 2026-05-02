@@ -39,6 +39,7 @@ import {
 import {
   alreadyScheduledByOther,
   dayWindows,
+  getVisibleServiceDays,
   resolveCustomerSlotData,
   type CustomerDay,
   type CustomerSlotData,
@@ -93,8 +94,11 @@ export function useCustomerSlotPicker(
     return alreadyScheduledByOther(unitId);
   }, [unitId, liveBookingsVersion]);
 
+  // Filter out past dates first, then drop any remaining days that
+  // have no available windows — so the picker only ever surfaces dates
+  // and windows the customer can actually act on.
   const visibleDays = useMemo(
-    () => slotData.days.filter((d) => !isPastDate(d.date)),
+    () => getVisibleServiceDays(slotData.days.filter((d) => !isPastDate(d.date))),
     [slotData.days],
   );
 
