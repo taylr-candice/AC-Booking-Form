@@ -204,14 +204,14 @@ function AccessNoticeBox() {
 
 function FlexibleAccessSignal() {
   return (
-    <div className="mb-5 flex items-start gap-2.5 rounded-2xl bg-emerald-50 px-4 py-3.5">
-      <span className="mt-0.5 text-[15px] leading-none text-emerald-600">✔</span>
+    <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+      <span className="mt-0.5 text-[15px] leading-none text-emerald-500">✔</span>
       <div>
-        <p className="text-[13px] font-semibold text-emerald-800">
+        <p className="text-[13px] font-semibold text-slate-800">
           Flexible access selected
         </p>
-        <p className="mt-0.5 text-[12px] leading-relaxed text-emerald-700">
-          You don't need to be home. Taylr will coordinate access on the day.
+        <p className="mt-0.5 text-[12px] leading-relaxed text-slate-600">
+          You don't need to be home. Taylr will coordinate access on the day using your selected option.
         </p>
       </div>
     </div>
