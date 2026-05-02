@@ -33,12 +33,14 @@ import {
   ArrowRight,
   CheckCircle2,
   ConciergeBell,
+  FileText,
   Hand,
   HardHat,
   Info,
   KeyRound,
   Users,
   Wind,
+  X,
 } from "lucide-react";
 
 import {
@@ -99,11 +101,22 @@ const BOOKING_CONTEXT = {
   ref: "TLR-1038",
   unitAddress: "6 / 21 Bourke Street",
   suburb: "Surry Hills NSW 2010",
+  state: "NSW",
   service: "AC service",
   detail: "1 × split system · approx. 45 min",
   bookerName: "Marcus Holloway",
   bookerCompany: "City Edge Property Group",
+  /**
+   * In production, both name fields arrive via a one-time signed URL
+   * (magic link) that encodes the booking ID and tenant identity —
+   * no login required. The name is captured by the agent when they
+   * create the booking. The mockup hardcodes "Liam Carter" as a
+   * stand-in for the real data that would be decoded from the token.
+   */
   tenantName: "Liam",
+  tenantFullName: "Liam Carter",
+  /** Simulated notice date — in production this is the date the agent issued the notice. */
+  noticeDateStr: "2 May 2026",
 };
 
 /**
@@ -476,21 +489,29 @@ export function TenantSchedulingMobile() {
 }
 
 // ─── Screen: Intro ────────────────────────────────────────────────────────────
+//
+// Framed as a formal notice, not a cooperative request. The tenant is
+// required to provide access under the Residential Tenancies Act; the
+// agent has already signed the authorisation. A "View notice letter"
+// link surfaces the full signed letter in a bottom-sheet modal.
 
 function IntroScreen({ onContinue }: { onContinue: () => void }) {
+  const [letterOpen, setLetterOpen] = useState(false);
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
+      {/* Header */}
       <div className="flex-none border-b border-slate-100 px-5 pb-4 pt-5">
         <div className="flex items-start gap-3">
           <div
-            className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
             style={{ backgroundColor: "rgba(237,1,127,0.08)" }}
           >
-            <Wind className="h-4 w-4" style={{ color: BRAND }} />
+            <FileText className="h-4 w-4" style={{ color: BRAND }} />
           </div>
           <div>
-            <h1 className="text-[20px] font-bold leading-tight text-slate-900">
-              Service scheduling
+            <h1 className="text-[18px] font-bold leading-tight text-slate-900">
+              Access notice
             </h1>
             <p className="mt-0.5 text-[12px] text-slate-500">
               {BOOKING_CONTEXT.unitAddress} · {BOOKING_CONTEXT.suburb}
@@ -499,53 +520,83 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
         </div>
       </div>
 
+      {/* Body */}
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
-        <p className="mt-5 text-[14px] leading-relaxed text-slate-600">
-          Hi{" "}
-          <span className="font-semibold text-slate-800">
-            {BOOKING_CONTEXT.tenantName}
-          </span>
-          ,
-        </p>
-        <p className="mt-2 text-[14px] leading-relaxed text-slate-600">
-          Your property manager has arranged an AC service for your unit and
-          needs you to choose a service window that works for you.
+        {/* Formal salutation */}
+        <p className="mt-5 text-[15px] font-semibold text-slate-900">
+          Dear {BOOKING_CONTEXT.tenantFullName},
         </p>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        {/* Legal obligation notice */}
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+          <p className="text-[13px] leading-relaxed text-amber-900">
+            Under the{" "}
+            <span className="font-semibold">
+              Residential Tenancies Act 2010 ({BOOKING_CONTEXT.state})
+            </span>
+            , you are required to provide reasonable access to your rental
+            property for the purpose of carrying out necessary repairs and
+            maintenance.
+          </p>
+          <p className="mt-2 text-[13px] leading-relaxed text-amber-900">
+            Your managing agent has arranged an essential air conditioning
+            service for your property. You are required to ensure access is
+            available for the duration of the service window.
+          </p>
+        </div>
+
+        {/* Authorisation reference */}
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Authorisation
+              </div>
+              <div className="mt-1.5 text-[13px] font-semibold text-slate-900">
+                {BOOKING_CONTEXT.bookerName}
+              </div>
+              <div className="mt-0.5 text-[12px] text-slate-500">
+                {BOOKING_CONTEXT.bookerCompany}
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400">
+                Issued {BOOKING_CONTEXT.noticeDateStr} · Ref {BOOKING_CONTEXT.ref}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLetterOpen(true)}
+              data-testid="button-view-notice-letter"
+              className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] font-semibold transition hover:bg-slate-50"
+              style={{ color: BRAND }}
+            >
+              View letter
+            </button>
+          </div>
+        </div>
+
+        {/* Service details */}
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Service details
           </div>
-          <div className="mt-2 text-[16px] font-bold text-slate-900">
+          <div className="mt-2 text-[15px] font-bold text-slate-900">
             {BOOKING_CONTEXT.service}
           </div>
           <div className="mt-0.5 text-[13px] text-slate-500">
             {BOOKING_CONTEXT.detail}
           </div>
-          <div className="mt-3 border-t border-slate-200 pt-3">
-            <div className="text-[12px] text-slate-500">
-              Arranged by{" "}
-              <span className="font-semibold text-slate-700">
-                {BOOKING_CONTEXT.bookerName}
-              </span>
-              {" · "}
-              {BOOKING_CONTEXT.bookerCompany}
-            </div>
-            <div className="mt-0.5 text-[11px] text-slate-400">
-              Ref {BOOKING_CONTEXT.ref}
-            </div>
-          </div>
         </div>
 
+        {/* Obligations list */}
         <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-3.5">
           <div className="text-[13px] font-semibold text-slate-800">
-            What happens next
+            What you need to do
           </div>
           <ol className="mt-3 space-y-3">
             {[
-              "Tell us how you'll provide access to your unit",
-              "Pick a service window that suits you",
-              "We'll let your property manager know your preference",
+              "Confirm how the technician will access the property",
+              "Select a service window from the available dates",
+              "Ensure access is available for the full duration of that window",
             ].map((item, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span
@@ -561,8 +612,14 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
             ))}
           </ol>
         </div>
+
+        <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
+          If you have concerns about this notice or the proposed service, please
+          contact {BOOKING_CONTEXT.bookerCompany} directly before proceeding.
+        </p>
       </div>
 
+      {/* Docked CTA */}
       <div className="flex-none border-t border-slate-100 bg-white px-5 py-4">
         <button
           type="button"
@@ -571,9 +628,156 @@ function IntroScreen({ onContinue }: { onContinue: () => void }) {
           style={{ backgroundColor: BRAND }}
           onClick={onContinue}
         >
-          Get started
+          Confirm access &amp; select window
           <ArrowRight className="h-4 w-4" />
         </button>
+      </div>
+
+      {letterOpen && (
+        <NoticeLetterModal onClose={() => setLetterOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal: Notice letter ─────────────────────────────────────────────────────
+//
+// Full-screen bottom-sheet showing the signed notice letter that underpins
+// the access requirement. In production this would be a PDF or HTML
+// document generated from the booking record and signed by the agent.
+
+function NoticeLetterModal({ onClose }: { onClose: () => void }) {
+  const today = BOOKING_CONTEXT.noticeDateStr;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="mt-auto flex max-h-[92vh] flex-col rounded-t-2xl bg-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sheet handle + header */}
+        <div className="flex-none px-5 pb-3 pt-4">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200" />
+          <div className="flex items-center justify-between">
+            <h2 className="text-[16px] font-bold text-slate-900">
+              Notice letter
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="grid h-8 w-8 place-items-center rounded-full text-slate-400 hover:bg-slate-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Letter body */}
+        <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-8">
+          {/* Letterhead */}
+          <div className="mb-4 border-b border-slate-100 pb-4">
+            <div className="text-[13px] font-bold text-slate-900">
+              {BOOKING_CONTEXT.bookerCompany}
+            </div>
+            <div className="mt-0.5 text-[12px] text-slate-500">
+              On behalf of the property owner
+            </div>
+          </div>
+
+          <div className="space-y-1 text-[12px] text-slate-500">
+            <p>Date: {today}</p>
+            <p>Ref: {BOOKING_CONTEXT.ref}</p>
+          </div>
+
+          <p className="mt-4 text-[13px] font-semibold text-slate-900">
+            {BOOKING_CONTEXT.tenantFullName}
+          </p>
+          <p className="text-[13px] text-slate-700">
+            {BOOKING_CONTEXT.unitAddress}
+            <br />
+            {BOOKING_CONTEXT.suburb}
+          </p>
+
+          <div className="mt-5 space-y-3 text-[13px] leading-relaxed text-slate-700">
+            <p className="font-semibold uppercase tracking-wide text-[11px] text-slate-400">
+              Notice of required access for maintenance
+            </p>
+
+            <p>Dear {BOOKING_CONTEXT.tenantFullName},</p>
+
+            <p>
+              We write to provide formal notice that an essential air
+              conditioning maintenance service has been arranged for the
+              above property.
+            </p>
+
+            <p>
+              Under the{" "}
+              <span className="font-semibold text-slate-900">
+                Residential Tenancies Act 2010 ({BOOKING_CONTEXT.state}),
+                Section 49
+              </span>
+              , a landlord or their authorised agent may enter the premises
+              to carry out necessary repairs and maintenance, provided the
+              tenant is given reasonable notice. This service constitutes
+              essential maintenance of the property's air conditioning
+              system.
+            </p>
+
+            <p>
+              You are required to ensure that access to the property is
+              available during the service window you select using the link
+              accompanying this notice. Failure to provide access may
+              constitute a breach of your tenancy obligations and may result
+              in further action being taken by the managing agent.
+            </p>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[12px]">
+              <p className="font-semibold text-slate-800">Service details</p>
+              <p className="mt-1 text-slate-600">
+                Type: {BOOKING_CONTEXT.service} ({BOOKING_CONTEXT.detail})
+              </p>
+              <p className="text-slate-600">
+                Provider: Taylr Pty Ltd (licensed HVAC technicians)
+              </p>
+              <p className="text-slate-600">
+                Authorised by: {BOOKING_CONTEXT.bookerName},{" "}
+                {BOOKING_CONTEXT.bookerCompany}
+              </p>
+            </div>
+
+            <p>
+              If you have any concerns regarding this notice or the proposed
+              service, please contact our office directly before the service
+              date.
+            </p>
+
+            <div className="border-t border-slate-100 pt-4">
+              <p className="font-semibold text-slate-900">
+                {BOOKING_CONTEXT.bookerName}
+              </p>
+              <p className="text-slate-500">{BOOKING_CONTEXT.bookerCompany}</p>
+              <p className="mt-1 text-[11px] italic text-slate-400">
+                Electronically authorised — no physical signature required.
+                A copy of this notice has been retained on file.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Close button */}
+        <div className="flex-none border-t border-slate-100 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-full border border-slate-200 py-3 text-[14px] font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
