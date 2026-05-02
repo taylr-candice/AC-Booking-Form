@@ -213,19 +213,16 @@ function AccessNoticeBox() {
       <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
         If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
       </p>
-    </div>
-  );
-}
-
-function AccessTypeKey() {
-  return (
-    <div className="mb-4 flex items-center gap-5 text-[11px] text-slate-500">
-      <span className="flex items-center gap-1.5">
+      <span className="mt-3 flex items-center gap-1.5 text-[12px] font-medium" style={{ color: BRAND }}>
         <LockOpen className="h-3 w-3" style={{ color: BRAND }} />
         No one needs to be home
       </span>
     </div>
   );
+}
+
+function AccessTypeKey() {
+  return null;
 }
 
 function PrimaryResidenceSection({
