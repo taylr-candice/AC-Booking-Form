@@ -66,16 +66,9 @@ export function AccessDesktop() {
             )}
 
             {(role === "agent" || (role === "owner" && residence)) && (
-              <div className="flex gap-8 items-start">
-                {/* Left column: access notice */}
-                <div className="w-72 shrink-0">
-                  <AccessNoticeBox />
-                </div>
-
-                {/* Right column: access options + sub-sections */}
-                <div className="flex-1 min-w-0">
-                  <AccessTypeLegend />
-                  <div className="space-y-3 mb-8">
+              <div>
+                <AccessTypeKey />
+                <div className="space-y-3 mb-8">
                     {opts.map((o) => {
                       const isAgentTenantCard = role === "agent" && o.key === "agent_tenant_pending";
                       const selected = isAgentTenantCard ? isAgentTenantOption(access) : access === o.key;
@@ -102,7 +95,6 @@ export function AccessDesktop() {
                   {isManagingAgentMethod(access) && <ManagingAgencySection />}
                   {isTenantMethod(access) && <TenantsSection api={tenants} />}
                   {(() => { const s = signatureVariantFor(access, leaveKeySub); return s ? <SignatureSection title={s.title} body={s.body} attemptedSubmit={attemptedSubmit} /> : null; })()}
-                </div>
               </div>
             )}
           </div>
@@ -160,132 +152,17 @@ function RoleMissingBanner() {
   );
 }
 
-function AccessNoticeBox() {
+function AccessTypeKey() {
   return (
-    <div className="rounded-2xl bg-slate-50 px-5 py-4">
-      <p className="text-[14px] font-semibold leading-snug text-slate-900">
-        Access is required
-      </p>
-      <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
-        If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
-      </p>
-    </div>
-  );
-}
-
-function FlexibleBadge({ selected }: { selected: boolean }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-      style={
-        selected
-          ? { backgroundColor: "rgba(255,255,255,0.22)", color: "rgba(255,255,255,0.92)" }
-          : { backgroundColor: "rgba(16,185,129,0.12)", color: "#059669" }
-      }
-    >
-      <LockOpen className="h-2.5 w-2.5" />
-      Flexible
-    </span>
-  );
-}
-
-function AttendanceBadge({ selected }: { selected: boolean }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-      style={
-        selected
-          ? { backgroundColor: "rgba(255,255,255,0.22)", color: "rgba(255,255,255,0.92)" }
-          : { backgroundColor: "rgba(245,158,11,0.1)", color: "#d97706" }
-      }
-    >
-      <UserCheck className="h-2.5 w-2.5" />
-      Attended
-    </span>
-  );
-}
-
-function AccessTypeLegend() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mb-4 flex items-center gap-2 text-[11px] text-slate-500 transition-colors hover:text-slate-700"
-      >
-        <span
-          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
-          style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#059669" }}
-        >
-          <LockOpen className="h-2.5 w-2.5" />
-          Flexible
-        </span>
-        <span
-          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
-          style={{ backgroundColor: "rgba(245,158,11,0.1)", color: "#d97706" }}
-        >
-          <UserCheck className="h-2.5 w-2.5" />
-          Attended
-        </span>
-        <Info className="h-3.5 w-3.5 text-slate-400" />
-      </button>
-      {open && <AccessTypeLegendModal onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-function AccessTypeLegendModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="mb-5 text-[16px] font-bold text-slate-900">
-          Access types explained
-        </h3>
-        <div className="space-y-5">
-          <div className="flex gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50">
-              <LockOpen className="h-4 w-4 text-emerald-600" />
-            </span>
-            <div>
-              <p className="text-[13px] font-semibold text-slate-900">
-                Flexible access
-              </p>
-              <p className="mt-0.5 text-[12px] leading-relaxed text-slate-500">
-                No one needs to be home. Taylr coordinates access on your
-                behalf for the full service window using your chosen option.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50">
-              <UserCheck className="h-4 w-4 text-amber-600" />
-            </span>
-            <div>
-              <p className="text-[13px] font-semibold text-slate-900">
-                Attendance required
-              </p>
-              <p className="mt-0.5 text-[12px] leading-relaxed text-slate-500">
-                Someone needs to be present at the property for the full
-                service window to let the technician in.
-              </p>
-            </div>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-6 w-full rounded-full border border-slate-200 py-3 text-[14px] font-semibold text-slate-700 transition hover:bg-slate-50"
-        >
-          Got it
-        </button>
-      </div>
+    <div className="mb-4 flex items-center gap-5 text-[11px] text-slate-500">
+      <span className="flex items-center gap-1.5">
+        <LockOpen className="h-3 w-3 text-emerald-500" />
+        No one needs to be home
+      </span>
+      <span className="flex items-center gap-1.5">
+        <UserCheck className="h-3 w-3 text-slate-400" />
+        Attendance required
+      </span>
     </div>
   );
 }
@@ -376,7 +253,7 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
       onClick={onClick}
       data-testid={`card-access-${option.key}`}
       aria-pressed={selected}
-      className={`flex h-full w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition ${
+      className={`relative flex h-full w-full items-center gap-4 rounded-2xl border px-5 py-4 text-left transition ${
         selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
       }`}
       style={
@@ -385,6 +262,12 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
           : undefined
       }
     >
+      {accessFlexibility(option.key) === true && (
+        <LockOpen
+          className="absolute right-2.5 top-2 h-3 w-3"
+          style={{ color: selected ? "rgba(255,255,255,0.4)" : "#10b981" }}
+        />
+      )}
       <span
         className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${selected ? "bg-white" : "bg-slate-100 text-slate-700"}`}
         style={selected ? { color: SELECTED_ACCENT } : undefined}
@@ -406,15 +289,6 @@ function AccessOptionCard({ selected, onClick, option }: { selected: boolean; on
         >
           {option.subtitle}
         </span>
-        {(() => {
-          const f = accessFlexibility(option.key);
-          if (f === null) return null;
-          return (
-            <span className="mt-1.5">
-              {f ? <FlexibleBadge selected={selected} /> : <AttendanceBadge selected={selected} />}
-            </span>
-          );
-        })()}
       </span>
       <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
     </button>
@@ -535,11 +409,17 @@ function LeaveKeySubMethodSection() {
               key={opt.key}
               type="button"
               onClick={() => bookingActions.setLeaveKeySubMethod(opt.key)}
-              className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
+              className={`relative flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
                 selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
               }`}
               style={selected ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG } : undefined}
             >
+              {isUnattendedLeaveKeySub(opt.key) && (
+                <LockOpen
+                  className="absolute right-2.5 top-2 h-3 w-3"
+                  style={{ color: selected ? "rgba(255,255,255,0.4)" : "#10b981" }}
+                />
+              )}
               <span
                 className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${
                   selected ? "bg-white" : "bg-slate-100 text-slate-700"
@@ -554,11 +434,6 @@ function LeaveKeySubMethodSection() {
                 </span>
                 <span className={`mt-0.5 text-[12px] leading-snug ${selected ? "text-white/85" : "text-slate-500"}`}>
                   {opt.subtitle}
-                </span>
-                <span className="mt-1.5">
-                  {isUnattendedLeaveKeySub(opt.key)
-                    ? <FlexibleBadge selected={selected} />
-                    : <AttendanceBadge selected={selected} />}
                 </span>
               </span>
               <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
