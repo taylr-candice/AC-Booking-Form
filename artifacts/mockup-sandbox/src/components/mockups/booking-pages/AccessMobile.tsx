@@ -99,7 +99,7 @@ export function AccessMobile() {
         {(role === "agent" || (role === "owner" && residence)) && (
           <>
             <AccessNoticeBox />
-            <h2 className="text-[17px] font-bold text-slate-900 mb-3">
+            <h2 className="text-[14px] font-semibold text-[#ED017F] mb-3">
               How will the technician access the property?
             </h2>
             <div className="space-y-3 mb-6">
@@ -535,7 +535,7 @@ function LeaveKeySubMethodSection() {
 
   return (
     <div className="mb-6 space-y-4">
-      <h2 className="text-[17px] font-bold text-slate-900">
+      <h2 className="text-[14px] font-semibold text-[#ED017F]">
         How will you leave a key?
       </h2>
 

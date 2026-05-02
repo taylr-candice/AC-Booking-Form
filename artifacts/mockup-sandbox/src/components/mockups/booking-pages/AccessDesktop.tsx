@@ -56,7 +56,7 @@ export function AccessDesktop() {
             {(role === "agent" || (role === "owner" && residence)) && (
               <div>
                 <AccessNoticeBox />
-                <h2 className="text-[17px] font-bold text-slate-900 mb-3">
+                <h2 className="text-[14px] font-semibold text-[#ED017F] mb-3">
                   How will the technician access the property?
                 </h2>
                 <div className="space-y-3 mb-8">
@@ -379,7 +379,7 @@ function LeaveKeySubMethodSection() {
 
   return (
     <div className="mb-8 space-y-5">
-      <h2 className="text-[17px] font-bold text-slate-900">
+      <h2 className="text-[14px] font-semibold text-[#ED017F]">
         How will you leave a key?
       </h2>
 
