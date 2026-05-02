@@ -101,7 +101,6 @@ export function SlotsAccessBanner({
         <div
           className={`mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 ${bodySize}`}
         >
-          <span className="text-slate-900">Can't wait the window?</span>
           <button
             type="button"
             data-testid={`button-change-access-${testIdSuffix}`}
