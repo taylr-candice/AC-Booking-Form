@@ -769,6 +769,10 @@ function AccessScreen({
   const valid = isTenantAccessValid(session);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
+  useEffect(() => {
+    bookingActions.setAccessMethod(null);
+  }, []);
+
   // Resolve the signature variant; override for agent_trade_key so the
   // copy is written from the tenant's perspective, not the agent's.
   const signatureVariant = (() => {

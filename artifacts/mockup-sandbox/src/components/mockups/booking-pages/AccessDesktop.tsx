@@ -22,6 +22,10 @@ export function AccessDesktop() {
   const valid = isStep5Valid(session);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
+  useEffect(() => {
+    bookingActions.setAccessMethod(null);
+  }, []);
+
   const roleLabel = role === "owner" ? "Owner" : role === "agent" ? "Agent" : "—";
   const residenceLabel = residence === "live_in" ? "Live in" : residence === "leased_out" ? "Leased out" : residence === "vacant" ? "Vacant" : "—";
 

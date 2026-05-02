@@ -68,6 +68,10 @@ export function AccessMobile() {
   const valid = isStep5Valid(session);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
+  useEffect(() => {
+    bookingActions.setAccessMethod(null);
+  }, []);
+
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-white font-['Inter']">
       {/* Page header */}
