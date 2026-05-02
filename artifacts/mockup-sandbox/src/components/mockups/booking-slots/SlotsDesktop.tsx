@@ -325,7 +325,7 @@ export function SlotsDesktop() {
                   !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
                   !!lockedByOther
                 }
-                aria-disabled={String(!canConfirm)}
+                aria-disabled={!canConfirm}
                 data-testid="button-continue-desktop"
                 className="flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition disabled:opacity-50 hover:opacity-90"
                 style={{ backgroundColor: BRAND }}

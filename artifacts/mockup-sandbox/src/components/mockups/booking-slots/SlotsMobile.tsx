@@ -320,7 +320,7 @@ export function SlotsMobile() {
               !canContinueScheduling(selectedDate, selectedSlotId, accessMethod) ||
               !!lockedByOther
             }
-            aria-disabled={String(!canConfirm)}
+            aria-disabled={!canConfirm}
             data-testid="button-continue-mobile"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: BRAND }}

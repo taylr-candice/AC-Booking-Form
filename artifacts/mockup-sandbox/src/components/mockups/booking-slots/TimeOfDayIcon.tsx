@@ -1,15 +1,14 @@
 import type { CSSProperties } from "react";
-import { Moon } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 
 /**
  * Custom and wrapped time-of-day icons for the customer slot picker.
  *
- *  - `MorningIcon`   — custom half-sun on the horizon, two short side
- *    rays only (no upward arrow / vertical ray above the disc). Clearly
- *    "sun just rising" without the Lucide Sunrise arrow aesthetic.
- *  - `AfternoonIcon` — solid filled circle (no rays). Distinct from the
- *    morning half-disc: full sun high in the sky, rendered as a bold
- *    disc so it reads clearly at 16px.
+ *  - `MorningIcon`   — custom half-sun on the horizon (outline, no arrow,
+ *    no rays below the line). Lucide has no direct equivalent.
+ *  - `AfternoonIcon` — Lucide `Sun` (full circle + 8 rays). Clearly
+ *    distinct from the morning half-disc: full sun in the sky vs sun
+ *    just cresting the horizon.
  *  - `EveningIcon`   — Lucide `Moon` (crescent). Standard, universally
  *    recognisable, renders crisply at any size.
  *
@@ -40,7 +39,12 @@ export function MorningIcon({
       style={style}
       aria-hidden={ariaHidden}
     >
-      {/* Two short horizontal side rays — no upward arrow. */}
+      {/* Short vertical ray from the top of the sun. */}
+      <path d="M12 5v3" />
+      {/* Two diagonal rays, upper-left and upper-right. */}
+      <path d="m4.93 10.93 1.41 1.41" />
+      <path d="m19.07 10.93-1.41 1.41" />
+      {/* Two horizontal side rays, level with the sun centre. */}
       <path d="M2 18h2" />
       <path d="M20 18h2" />
       {/* Horizon line. */}
@@ -57,17 +61,11 @@ export function AfternoonIcon({
   "aria-hidden": ariaHidden = true,
 }: IconProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      stroke="none"
+    <Sun
       className={className}
       style={style}
       aria-hidden={ariaHidden}
-    >
-      {/* Solid filled circle — unambiguous "full sun in the sky". */}
-      <circle cx="12" cy="12" r="6" />
-    </svg>
+    />
   );
 }
 
