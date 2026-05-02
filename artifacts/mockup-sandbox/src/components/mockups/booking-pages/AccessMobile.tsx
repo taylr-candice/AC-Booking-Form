@@ -91,9 +91,6 @@ export function AccessMobile() {
           <h1 className="text-[26px] font-bold leading-tight text-slate-900">
             Access
           </h1>
-          <p className="mt-1 text-[14px] leading-snug text-slate-500">
-            How will the technician access the property?
-          </p>
         </div>
         <button
           type="button"
@@ -113,6 +110,9 @@ export function AccessMobile() {
         {(role === "agent" || (role === "owner" && residence)) && (
           <>
             <AccessNoticeBox />
+            <h2 className="text-[17px] font-bold text-slate-900 mb-3">
+              How will the technician access the property?
+            </h2>
             <AccessTypeKey />
             <div className="space-y-3 mb-6">
               {opts.map((o) => {

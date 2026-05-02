@@ -846,9 +846,6 @@ function AccessScreen({
           <h1 className="text-[26px] font-bold leading-tight text-slate-900">
             Access
           </h1>
-          <p className="mt-1 text-[14px] leading-snug text-slate-500">
-            How will the technician access the property?
-          </p>
         </div>
         <button
           type="button"
@@ -865,6 +862,9 @@ function AccessScreen({
       {/* Body */}
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
         <AccessNoticeBox />
+        <h2 className="text-[17px] font-bold text-slate-900 mb-3">
+          How will the technician access the property?
+        </h2>
         <AccessTypeKey />
 
         <div className="space-y-3 mb-6">

@@ -47,7 +47,6 @@ export function AccessDesktop() {
           
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-900">Access</h1>
-            <p className="mt-1 text-sm text-slate-500">How will the technician access the property to perform the service?</p>
           </div>
 
           <div className="flex-1">
@@ -68,6 +67,9 @@ export function AccessDesktop() {
             {(role === "agent" || (role === "owner" && residence)) && (
               <div>
                 <AccessNoticeBox />
+                <h2 className="text-[17px] font-bold text-slate-900 mb-3">
+                  How will the technician access the property?
+                </h2>
                 <AccessTypeKey />
                 <div className="space-y-3 mb-8">
                     {opts.map((o) => {
