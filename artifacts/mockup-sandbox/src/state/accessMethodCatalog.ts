@@ -27,19 +27,19 @@ export type AccessOption = {
 // sub-option under the "Leave Key" card when the building has a Taylr locker.
 
 export const OWNER_LIVE_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_live_at_unit",   label: "I'll be home",     subtitle: "To let the technician into the property" },
+  { key: "owner_live_at_unit",   label: "I'll be there",     subtitle: "To let the technician into the property" },
   { key: "owner_live_leave_key", label: "I'll leave a key", subtitle: "For Taylr to access" },
 ];
 
 export const OWNER_LEASED_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_leased_be_there",  label: "I'll be home",           subtitle: "To let the technician into the property" },
+  { key: "owner_leased_be_there",  label: "I'll be there",           subtitle: "To let the technician into the property" },
   { key: "owner_leased_tenant",    label: "Arrange with tenant(s)", subtitle: "I'll share their details" },
   { key: "owner_leased_agent",     label: "Arrange with Agent",     subtitle: "They'll coordinate access" },
   { key: "owner_leased_leave_key", label: "I'll leave a key",       subtitle: "For Taylr to access" },
 ];
 
 export const OWNER_VACANT_OPTIONS: readonly AccessOption[] = [
-  { key: "owner_vacant_be_there",  label: "I'll be home",       subtitle: "To let the technician into the property" },
+  { key: "owner_vacant_be_there",  label: "I'll be there",       subtitle: "To let the technician into the property" },
   { key: "owner_vacant_agent",     label: "Arrange with Agent", subtitle: "They'll coordinate access" },
   { key: "owner_vacant_leave_key", label: "I'll leave a key",   subtitle: "For Taylr to access" },
 ];
