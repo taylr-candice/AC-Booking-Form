@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Moon } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 
 /**
  * Custom and wrapped time-of-day icons for the customer slot picker.
@@ -8,9 +8,8 @@ import { Moon } from "lucide-react";
  *    (`m8 6 4-4 4 4`). All other paths kept: top vertical ray,
  *    upper-left / upper-right diagonals, left / right horizontal
  *    rays, horizon at y=22, arc at y=18. No V-shaped arrow.
- *  - `AfternoonIcon` — Solid filled circle. A clean, bold disc that
- *    reads as "high sun / midday" and is clearly distinct from the
- *    half-sun morning horizon and the crescent evening moon.
+ *  - `AfternoonIcon` — Lucide `Sun` (circle + 8 rays). Full sun high
+ *    in the sky, clearly distinct from the half-sun morning horizon.
  *  - `EveningIcon`   — Lucide `Moon` (crescent). Standard, universally
  *    recognisable, renders crisply at any size.
  *
@@ -26,7 +25,9 @@ import { Moon } from "lucide-react";
  *  ✓ SlotsDesktop.tsx           — window option cards
  *  ✓ SlotsMobileLite.tsx        — window option cards
  *  ✓ BookingForm.tsx (Step 5)   — SlotChip morning / afternoon icons
- *  ✓ NextAvailableCard.tsx      — headline icon prefix
+ *
+ * NOT in this list (intentional):
+ *  - NextAvailableCard.tsx      — headline shows text only, no icon prefix
  * ──────────────────────────────────────────────────────────────────────────
  */
 
@@ -78,18 +79,11 @@ export function AfternoonIcon({
   "aria-hidden": ariaHidden = true,
 }: IconProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      stroke="none"
+    <Sun
       className={className}
       style={style}
       aria-hidden={ariaHidden}
-    >
-      {/* Solid filled disc — clean midday sun, clearly distinct from
-          the half-sun morning horizon and the crescent evening moon. */}
-      <circle cx="12" cy="12" r="5" />
-    </svg>
+    />
   );
 }
 

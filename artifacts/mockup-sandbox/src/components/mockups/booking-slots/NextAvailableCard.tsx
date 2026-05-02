@@ -5,18 +5,6 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
-import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
-
-function windowIcon(
-  window: CustomerSlot["window"],
-  sizeClass: string,
-): React.ReactNode {
-  if (window === "morning")
-    return <MorningIcon className={sizeClass} />;
-  if (window === "afternoon")
-    return <AfternoonIcon className={sizeClass} />;
-  return <EveningIcon className={sizeClass} />;
-}
 
 const BRAND = "#ED017F";
 
@@ -83,19 +71,13 @@ export function NextAvailableCard({
             Next available
           </div>
 
-          {/* [icon] Window · weekday day month */}
+          {/* Window · weekday day month — text only, no icon prefix */}
           <div
-            className={`mt-0.5 flex items-center gap-1.5 font-semibold text-slate-900 ${
+            className={`mt-0.5 font-semibold text-slate-900 ${
               isCompact ? "text-[13px]" : "text-sm"
             }`}
             data-testid={`next-available-headline-${testIdSuffix}`}
           >
-            <span
-              className={`shrink-0 ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`}
-              style={{ color: BRAND, display: "inline-flex", alignItems: "center" }}
-            >
-              {windowIcon(slot.window, isCompact ? "h-3.5 w-3.5" : "h-4 w-4")}
-            </span>
             {windowLabel} · {weekdayLong} {day.day} {monthTitle}
           </div>
 
