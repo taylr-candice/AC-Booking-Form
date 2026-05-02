@@ -193,10 +193,7 @@ function AccessNoticeBox() {
         Access is required
       </p>
       <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
-        Choose how the technician will access your apartment.
-      </p>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
-        If you can't be home during the service window, you can choose a flexible access option — such as leaving a key — and Taylr will coordinate access for you.
+        If you can't be at the property to let the technician in, we have a range of flexible access options which Taylr can coordinate for you.
       </p>
     </div>
   );
