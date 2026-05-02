@@ -1,0 +1,69 @@
+Please simplify the access notice on the AC scheduler access page.
+
+This is COPY + LAYOUT only.
+
+Do NOT change:
+- access method logic
+- scheduling logic
+- capacity logic
+- payment logic
+- validation rules
+- access option behaviour
+
+----------------------------------------
+GOAL
+----------------------------------------
+
+The current access notice is too long and feels like a terms block.
+
+This screen should be simple, punchy, and easy to scan. Users should quickly understand:
+- access is required
+- they need to choose how access will be provided
+- if they can’t be home, flexible access options are available
+
+Detailed scheduling/window explanations already appear on the scheduling page, so do not repeat them here.
+
+----------------------------------------
+REPLACE CURRENT ACCESS NOTICE COPY
+----------------------------------------
+
+Replace the full expanded notice with this shorter version:
+
+Title:
+Access is required
+
+Body:
+Choose how the technician will access your apartment.
+
+If you can’t be home during the service window, you can choose a flexible access option — such as leaving a key — and Taylr will coordinate access for you.
+
+----------------------------------------
+LAYOUT
+----------------------------------------
+
+- Keep this as a small inline card above the access options
+- Do not use a modal or pop-up
+- Do not make it collapsible for now
+- Remove “Hide details” / “Learn more”
+- Keep the card compact so the access options remain visible without too much scrolling
+
+----------------------------------------
+DESIGN
+----------------------------------------
+
+- Calm, premium styling
+- Soft background is okay
+- Do not use alert/warning styling
+- Do not make it look like legal terms
+- Keep spacing tight and clean
+
+----------------------------------------
+IMPORTANT RULES
+----------------------------------------
+
+- Do not include the longer building-wide rollout explanation here
+- Do not include detailed key collection/return wording here
+- Do not include outdoor condenser/common property wording here
+- Do not imply access is optional
+- Do not imply custom scheduling is available
+- Keep the page focused on choosing an access method

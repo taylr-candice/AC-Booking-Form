@@ -146,57 +146,17 @@ function RoleMissingBanner() {
 }
 
 function AccessNoticeBox() {
-  const [expanded, setExpanded] = useState(true);
-
-  if (!expanded) {
-    return (
-      <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-5 py-3">
-        <p className="text-[12px] leading-snug text-slate-600">
-          Access required · Flexible options available
-        </p>
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="ml-3 shrink-0 text-[12px] font-semibold transition-opacity hover:opacity-70"
-          style={{ color: BRAND }}
-        >
-          Learn more
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-2xl bg-slate-50 px-5 py-5">
+    <div className="rounded-2xl bg-slate-50 px-5 py-4">
       <p className="text-[14px] font-semibold leading-snug text-slate-900">
-        Access is required for this service
+        Access is required
       </p>
-      <div className="mt-2.5 space-y-2">
-        <p className="text-[13px] leading-relaxed text-slate-500">
-          As this is a building-wide service rollout, technicians attend across set service windows. We can't confirm an exact arrival or finish time within the window you choose.
-        </p>
-        <p className="text-[13px] leading-relaxed text-slate-500">
-          Before selecting how you'll provide access, please review the options below.
-        </p>
-        <p className="text-[13px] leading-relaxed text-slate-500">
-          If being available for the full window doesn't suit, you can choose a flexible access option — such as leaving a key for Taylr to access the property. Taylr will coordinate access on the day, including key collection and return where required.
-        </p>
-        <p className="text-[13px] leading-relaxed text-slate-500">
-          Please ensure access is available to both the apartment and the air conditioning system itself.
-        </p>
-        <p className="text-[13px] leading-relaxed text-slate-500">
-          Taylr will arrange access to any outdoor AC units (condensers) located on common property, such as rooftops or basement areas.
-        </p>
-      </div>
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setExpanded(false)}
-          className="text-[12px] font-medium text-slate-400 transition-colors hover:text-slate-600"
-        >
-          Hide details
-        </button>
-      </div>
+      <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
+        Choose how the technician will access your apartment.
+      </p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
+        If you can't be home during the service window, you can choose a flexible access option — such as leaving a key — and Taylr will coordinate access for you.
+      </p>
     </div>
   );
 }
