@@ -4,11 +4,10 @@ import { Moon, Sun } from "lucide-react";
 /**
  * Custom and wrapped time-of-day icons for the customer slot picker.
  *
- *  - `MorningIcon`   — half-sun sitting ON the horizon: arc base and
- *    horizon share the same y so the sun visually rests on the line.
- *    Two diagonal side rays (upper-left / upper-right) from Lucide
- *    Sunrise, but with the top vertical ray and upward arrow removed.
- *    No upward chevron / directional arrow.
+ *  - `MorningIcon`   — Lucide Sunrise minus only the upward chevron
+ *    (`m8 6 4-4 4 4`). All other paths kept: top vertical ray,
+ *    upper-left / upper-right diagonals, left / right horizontal
+ *    rays, horizon at y=22, arc at y=18. No V-shaped arrow.
  *  - `AfternoonIcon` — Lucide `Sun` (circle + 8 rays). Full sun high
  *    in the sky, clearly distinct from the half-sun morning horizon.
  *  - `EveningIcon`   — Lucide `Moon` (crescent). Standard, universally
@@ -55,13 +54,21 @@ export function MorningIcon({
       style={style}
       aria-hidden={ariaHidden}
     >
-      {/* Diagonal side rays (upper-left / upper-right) — no top ray, no arrow. */}
+      {/* Top vertical ray (kept — only the V chevron is removed). */}
+      <path d="M12 2v8" />
+      {/* Upper-left diagonal ray. */}
       <path d="M4.93 10.93l1.41 1.41" />
+      {/* Upper-right diagonal ray. */}
       <path d="M19.07 10.93l-1.41 1.41" />
-      {/* Horizon at y=18, same level as arc base so the sun rests ON it. */}
-      <path d="M2 18h20" />
-      {/* Semicircle arc: base at y=18, bulges upward. */}
+      {/* Left horizontal side ray. */}
+      <path d="M2 18h2" />
+      {/* Right horizontal side ray. */}
+      <path d="M20 18h2" />
+      {/* Horizon line at y=22 (original Lucide position). */}
+      <path d="M22 22H2" />
+      {/* Semicircle arc at y=18 (standard Lucide Sunrise arc). */}
       <path d="M16 18a4 4 0 0 0-8 0" />
+      {/* Intentionally omitted: upward V-chevron "m8 6 4-4 4 4" */}
     </svg>
   );
 }
