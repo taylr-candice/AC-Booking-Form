@@ -374,11 +374,16 @@ export function TenantSchedulingMobile() {
               />
             )}
 
-            {nextAvailable && (
-              <div className="mt-4 mb-2 text-[18px] font-bold text-slate-900">
-                Choose a day
-              </div>
-            )}
+            {/* ── Step 1: Select Day ───────────────────────────────── */}
+            <div className={`flex items-center gap-2 mb-2 ${nextAvailable ? "mt-4" : ""}`}>
+              <span
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                style={{ backgroundColor: BRAND }}
+              >
+                1
+              </span>
+              <span className="text-[15px] font-bold text-slate-900">Select Day</span>
+            </div>
 
             <CustomerAvailableDays
               days={visibleDays}
@@ -391,10 +396,32 @@ export function TenantSchedulingMobile() {
               testIdSuffix="tenant"
             />
 
+            {attemptedConfirm && !selectedDate && (
+              <div
+                className="mt-2 flex items-center gap-2 rounded-xl border p-3 text-[12px] font-medium"
+                style={{
+                  color: ERROR_PURPLE,
+                  borderColor: ERROR_PURPLE,
+                  backgroundColor: "rgba(151,71,255,0.04)",
+                }}
+                data-testid="error-no-date-tenant"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Please select a day to continue.</span>
+              </div>
+            )}
+
+            {/* ── Step 2: Select Window — revealed once a day is chosen */}
             {activeDay && (
               <div className="mt-5">
-                <div className="mb-2 text-[18px] font-bold text-slate-900">
-                  Pick a window
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    2
+                  </span>
+                  <span className="text-[15px] font-bold text-slate-900">Select Window</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {getVisibleWindowsForDay(activeDay).map((slot) => (
@@ -409,6 +436,20 @@ export function TenantSchedulingMobile() {
                     />
                   ))}
                 </div>
+                {attemptedConfirm && !selectedSlotId && (
+                  <div
+                    className="mt-2 flex items-center gap-2 rounded-xl border p-3 text-[12px] font-medium"
+                    style={{
+                      color: ERROR_PURPLE,
+                      borderColor: ERROR_PURPLE,
+                      backgroundColor: "rgba(151,71,255,0.04)",
+                    }}
+                    data-testid="error-no-slot-tenant"
+                  >
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>Please select a service window to continue.</span>
+                  </div>
+                )}
               </div>
             )}
 
