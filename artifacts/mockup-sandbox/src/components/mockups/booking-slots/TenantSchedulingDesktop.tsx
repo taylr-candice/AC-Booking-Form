@@ -14,7 +14,7 @@
  *   Slot data      : live Bourke rollout (real Mon/Wed/Fri windows)
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowRight, CheckCircle2, Wind } from "lucide-react";
 import {
   findNextAvailable,
@@ -26,6 +26,10 @@ import {
   type CustomerDay,
   type CustomerSlot,
 } from "./customerSlotData";
+import {
+  getRolloutsVersion,
+  subscribeRollouts,
+} from "../../../state/adminMockData";
 import { AfternoonIcon, EveningIcon, MorningIcon } from "./TimeOfDayIcon";
 import { CustomerAvailableDays } from "./CustomerAvailableDays";
 import { NextAvailableCard } from "./NextAvailableCard";
@@ -65,9 +69,16 @@ export function TenantSchedulingDesktop() {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
+  const rolloutsVersion = useSyncExternalStore(
+    subscribeRollouts,
+    getRolloutsVersion,
+    getRolloutsVersion,
+  );
+
   const { rollout, days } = useMemo(
     () => resolveCustomerSlotData(REBOOK_UNIT_ID, JOB_MINUTES),
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rolloutsVersion],
   );
   const visibleDays = useMemo(() => getVisibleServiceDays(days), [days]);
   const nextAvailable = useMemo(() => findNextAvailable(visibleDays), [visibleDays]);
