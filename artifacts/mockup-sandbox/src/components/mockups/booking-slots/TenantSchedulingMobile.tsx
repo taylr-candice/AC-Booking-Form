@@ -859,7 +859,7 @@ function AccessScreen({
     if (access === "agent_trade_key") {
       return {
         title: "About the trade key option",
-        body: "Taylr will contact your property manager to arrange temporary use of their trade key. No one needs to be home during the service window — we'll confirm with you once access has been coordinated.",
+        body: "Taylr will contact your property manager to arrange temporary use of their trade key. No one needs to be home during the service window.",
       };
     }
     return infoNoteFor(access);
