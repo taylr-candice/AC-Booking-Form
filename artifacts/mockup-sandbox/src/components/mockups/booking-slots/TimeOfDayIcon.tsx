@@ -54,8 +54,8 @@ export function MorningIcon({
       style={style}
       aria-hidden={ariaHidden}
     >
-      {/* Top vertical ray (kept — only the V chevron is removed). */}
-      <path d="M12 2v8" />
+      {/* Top vertical ray — shortened to ~2 units, consistent with diagonals/side rays. */}
+      <path d="M12 8v2" />
       {/* Upper-left diagonal ray. */}
       <path d="M4.93 10.93l1.41 1.41" />
       {/* Upper-right diagonal ray. */}
