@@ -31,6 +31,19 @@ export const OWNER_LIVE_OPTIONS: readonly AccessOption[] = [
   { key: "owner_live_leave_key", label: "I'll leave a key", subtitle: "For Taylr to access" },
 ];
 
+/**
+ * Access options shown to a tenant scheduling a pre-paid service.
+ *
+ * Mirrors the live-in owner set, with one extra card: the tenant can
+ * request that Taylr collect and return a trade key from their managing
+ * agent, removing the need for anyone to be home.
+ */
+export const TENANT_OPTIONS: readonly AccessOption[] = [
+  { key: "owner_live_at_unit",   label: "I'll be there",     subtitle: "To let the technician into the property" },
+  { key: "owner_live_leave_key", label: "I'll leave a key", subtitle: "For Taylr to access using building / key-holder arrangements" },
+  { key: "agent_trade_key",      label: "Trade key via managing agent", subtitle: "Taylr collects and returns your property manager's trade key" },
+];
+
 export const OWNER_LEASED_OPTIONS: readonly AccessOption[] = [
   { key: "owner_leased_be_there",  label: "I'll be there",           subtitle: "To let the technician into the property" },
   { key: "owner_leased_tenant",    label: "Arrange with tenant(s)", subtitle: "I'll share their details" },
@@ -573,6 +586,43 @@ export function isStep5Valid(s: BookingState): boolean {
 
   // Be-there + at-unit + agent_tenant_self: no extra validation
   return true;
+}
+
+/**
+ * Validation gate for the tenant scheduling access step.
+ *
+ * Unlike `isStep5Valid` (which requires a role/residence pair and validates
+ * against `getAccessOptions`), this validates against `TENANT_OPTIONS`
+ * directly — no role or residence is required on the session.
+ *
+ * Rules:
+ *  - An access method from TENANT_OPTIONS must be selected.
+ *  - Leave-key: sub-method required; "with_someone" needs key-holder name +
+ *    phone; all unattended sub-options need a signature ack + typed name.
+ *  - Agent trade key: signature ack + typed name required.
+ *  - Be-there (owner_live_at_unit): no extra requirements.
+ */
+export function isTenantAccessValid(s: BookingState): boolean {
+  const access = s.access_method;
+  if (!access) return false;
+  if (!TENANT_OPTIONS.some((o) => o.key === access)) return false;
+
+  if (isLeaveKeyMethod(access)) {
+    if (!s.leave_key_sub_method) return false;
+    if (s.leave_key_sub_method === "with_someone") {
+      return (
+        s.key_holder_name.trim().length > 0 &&
+        s.key_holder_phone.trim().length > 0
+      );
+    }
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+  }
+
+  if (isAgentTradeMethod(access)) {
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
+  }
+
+  return true; // owner_live_at_unit — no extra requirements
 }
 
 // ─── Tenants hook (store-backed with stable React keys) ─────────────────────
