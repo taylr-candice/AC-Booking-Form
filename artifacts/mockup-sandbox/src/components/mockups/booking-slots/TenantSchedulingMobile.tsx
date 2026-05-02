@@ -363,15 +363,8 @@ export function TenantSchedulingMobile() {
               />
             )}
 
-            {/* ── Step 1: Select Day ───────────────────────────────── */}
-            <div className={`flex items-center gap-2 mb-2 ${nextAvailable ? "mt-4" : ""}`}>
-              <span
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                style={{ backgroundColor: BRAND }}
-              >
-                1
-              </span>
-              <span className="text-[15px] font-bold text-slate-900">Select Day</span>
+            <div className={`mb-2 text-[18px] font-bold text-slate-900 ${nextAvailable ? "mt-4" : ""}`}>
+              Choose a day
             </div>
 
             <CustomerAvailableDays
@@ -400,17 +393,10 @@ export function TenantSchedulingMobile() {
               </div>
             )}
 
-            {/* ── Step 2: Select Window — revealed once a day is chosen */}
             {activeDay && (
               <div className="mt-5">
-                <div className="flex items-center gap-2 mb-2">
-                  <span
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                    style={{ backgroundColor: BRAND }}
-                  >
-                    2
-                  </span>
-                  <span className="text-[15px] font-bold text-slate-900">Select Window</span>
+                <div className="mb-2 text-[18px] font-bold text-slate-900">
+                  Pick a window
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {getVisibleWindowsForDay(activeDay).map((slot) => (
