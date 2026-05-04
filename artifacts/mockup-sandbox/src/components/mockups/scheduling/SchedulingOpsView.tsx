@@ -40,6 +40,7 @@ import {
 } from "@/state/adminMockData";
 import {
   getProtoBookings,
+  persistProtoBooking,
   persistRolloutsToStore,
   subscribeProtoBookings,
 } from "@/state/protoStore";
@@ -113,10 +114,19 @@ export function SchedulingOpsView() {
     if (!booking) return;
 
     const patch = convertCoordinationToScheduledPatch(booking, { date, window });
+    const scheduledBooking = { ...booking, ...patch };
 
-    setBookings((prev) =>
-      prev.map((b) => (b.id === bookingId ? { ...b, ...patch } : b)),
-    );
+    // Persist the scheduled booking to the proto store so that the
+    // subscribeProtoBookings listener — which rebuilds local state from
+    // mergeBookings(SEEDED_BOOKINGS, getProtoBookings()) — always produces
+    // the scheduled version, even after subsequent bookings_changed events
+    // from other iframes (e.g. a customer completing their booking). Without
+    // this, any later broadcast would revert the booking to to_be_coordinated
+    // and allow double-consumption of rollout capacity.
+    persistProtoBooking(scheduledBooking);
+    // Note: persistProtoBooking fires subscribeProtoBookings listeners
+    // synchronously, which calls setBookings with the rebuilt (scheduled)
+    // state — no separate setBookings call needed here.
 
     if (booking.rolloutId) {
       const consumed = consumeBookingCapacity(
