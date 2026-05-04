@@ -74,7 +74,7 @@ export function PayDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">Review & pay</h1>
+            <h1 className="text-2xl font-['Roboto'] font-black" style={{ color: "#1C3144" }}>Review & pay</h1>
             <p className="mt-1.5 text-sm text-slate-500">
               Check everything looks right before payment
             </p>

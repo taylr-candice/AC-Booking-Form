@@ -265,7 +265,7 @@ export function UnitDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">Select the property</h1>
+            <h1 className="text-2xl font-['Roboto'] font-black" style={{ color: "#1C3144" }}>Select the property</h1>
             <p className="text-sm text-slate-500 mt-2">For which the service will take place</p>
           </div>
 
@@ -388,7 +388,7 @@ export function UnitDesktop() {
             {/* Progressive disclosure: role chooser appears once a property is picked. */}
             {selected && (
               <div className="mt-8">
-                <h2 className="text-[18px] font-semibold leading-tight text-slate-900">
+                <h2 className="text-[18px] font-['Roboto'] font-black leading-tight" style={{ color: "#1C3144" }}>
                   Your role
                 </h2>
                 <p className="mb-3 mt-1 text-[13px] text-slate-500">
@@ -416,7 +416,7 @@ export function UnitDesktop() {
                 {/* Progressive disclosure: residence type appears once Owner is selected */}
                 {role === "owner" && (
                   <div className="mt-6">
-                    <h2 className="text-[18px] font-semibold leading-tight text-slate-900">
+                    <h2 className="text-[18px] font-['Roboto'] font-black leading-tight" style={{ color: "#1C3144" }}>
                       The property is
                     </h2>
                     <div className="mt-3 grid grid-cols-3 gap-3">

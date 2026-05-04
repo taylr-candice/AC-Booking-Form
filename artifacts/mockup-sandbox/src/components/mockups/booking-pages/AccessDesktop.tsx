@@ -35,7 +35,7 @@ export function AccessDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">Access</h1>
+            <h1 className="text-2xl font-['Roboto'] font-black" style={{ color: "#1C3144" }}>Access</h1>
           </div>
 
           <div className="flex-1">

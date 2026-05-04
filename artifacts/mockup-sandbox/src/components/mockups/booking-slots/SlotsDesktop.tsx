@@ -123,7 +123,7 @@ export function SlotsDesktop() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           <div className="mb-6 flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Schedule your service</h1>
+              <h1 className="text-2xl font-['Roboto'] font-black" style={{ color: "#1C3144" }}>Schedule your service</h1>
               <p className="text-sm text-slate-500 mt-2">
                 Pick an arrival window that works for you.
               </p>

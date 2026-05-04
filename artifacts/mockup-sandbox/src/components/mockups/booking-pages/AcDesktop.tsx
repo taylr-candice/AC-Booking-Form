@@ -101,7 +101,7 @@ function OnFileView({
           {cameFromSlotPicker && <SlotPickerCallout />}
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-slate-900">Confirm the AC setup</h1>
+            <h1 className="text-2xl font-['Roboto'] font-black" style={{ color: "#1C3144" }}>Confirm the AC setup</h1>
           </div>
 
           {/* What's on file summary card */}
@@ -247,7 +247,7 @@ function FullConfigView({
 
           {!isUnsureMode && (
             <div className="mb-8">
-              <h1 className="text-2xl font-bold text-slate-900">{heading}</h1>
+              <h1 className="text-2xl font-['Roboto'] font-black" style={{ color: "#1C3144" }}>{heading}</h1>
               <p className="mt-2 text-sm text-slate-500">{intro}</p>
             </div>
           )}
