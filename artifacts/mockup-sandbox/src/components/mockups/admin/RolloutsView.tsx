@@ -18,7 +18,6 @@ import {
   formatRolloutDateRange,
   getRollouts,
   getServices,
-  persistRolloutsToStore,
   shouldNudgeManualRelease,
   type AdminBooking,
   type AdminBuilding,
@@ -26,6 +25,7 @@ import {
   type AdminVendor,
   type VendorServiceRate,
 } from "@/state/adminMockData";
+import { persistRolloutsToStore } from "@/state/protoStore";
 
 import { Card } from "./atoms";
 import { CreateRolloutWizard } from "./CreateRolloutWizard";
@@ -87,8 +87,7 @@ export function RolloutsView({
       serviceId: source.serviceId,
       capacityModel: source.capacityModel,
       defaultVendorId: source.defaultVendorId ?? null,
-      startDate: shiftDate(source.endDate, 1),
-      endDate: shiftDate(source.endDate, 14),
+      selectedDates: source.days.map((d) => shiftDate(d.isoDate, 14)),
       cycleLabel: source.name + " (copy)",
     });
   }

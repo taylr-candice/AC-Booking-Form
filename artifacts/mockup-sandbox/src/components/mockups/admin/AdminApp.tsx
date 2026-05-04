@@ -59,6 +59,8 @@ import {
   SEEDED_BUILDINGS,
   SEEDED_SERVICES,
   SEEDED_UNITS,
+  SEEDED_VENDORS,
+  SEEDED_VENDOR_RATES,
   setLiveBookingsSource,
   setLiveBuildingsSource,
   setLiveServiceCatalogueSource,
@@ -229,7 +231,6 @@ const VALID_BOOKINGS_STATUS_FILTERS: ReadonlySet<string> = new Set<string>([
   "all",
   // ServiceStatus
   "scheduled",
-  "on_site",
   "complete",
   "invoice_adjusted",
   "cancelled",
@@ -2304,6 +2305,8 @@ export function AdminApp() {
                 bookings={allBookings}
                 units={units}
                 agents={agents}
+                vendors={SEEDED_VENDORS}
+                vendorRates={SEEDED_VENDOR_RATES}
                 onBack={() => setSelectedBookingId(null)}
                 onUpdate={updateBooking}
                 onCancelBooking={cancelBooking}
@@ -2357,6 +2360,8 @@ export function AdminApp() {
                 bookings={allBookings}
                 units={units}
                 agents={agents}
+                vendors={SEEDED_VENDORS}
+                vendorRates={SEEDED_VENDOR_RATES}
                 onBack={() => returnToCoordinationListWithSource(selectedBookingId)}
                 onUpdate={updateBooking}
                 onCancelBooking={cancelBooking}
@@ -2408,6 +2413,8 @@ export function AdminApp() {
               <RolloutScheduleEditor
                 rolloutId={selectedRolloutId}
                 buildings={buildings}
+                vendors={SEEDED_VENDORS}
+                vendorRates={SEEDED_VENDOR_RATES}
                 refreshKey={rolloutsRefreshKey}
                 bumpRefreshKey={bumpRolloutsRefreshKey}
                 onBack={() =>
@@ -2418,11 +2425,12 @@ export function AdminApp() {
               <RolloutsView
                 buildings={buildings}
                 bookings={allBookings}
+                vendors={SEEDED_VENDORS}
+                vendorRates={SEEDED_VENDOR_RATES}
                 refreshKey={rolloutsRefreshKey}
-                onCreate={(input) => {
-                  const created = createRollout(input);
+                onCreated={(rollout) => {
                   bumpRolloutsRefreshKey();
-                  setSelectedRolloutId(created.id);
+                  setSelectedRolloutId(rollout.id);
                 }}
                 onOpen={(id) => setSelectedRolloutId(id)}
                 initialFocusedRowId={rolloutsFocusedRowSeed}

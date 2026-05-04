@@ -48,15 +48,19 @@ import {
   shouldNudgeManualRelease,
   stagedSlotsChrono,
   updateRolloutDay,
+  updateRolloutDayVendor,
+  updateRolloutDefaultVendor,
   updateRolloutSlot,
   type AdminBuilding,
   type AdminRollout,
+  type AdminVendor,
   type ReleaseAuditEvent,
   type ReleaseStrategy,
   type ReleaseStrategyMode,
   type ReleaseUnit,
   type RolloutDay,
   type RolloutSlot,
+  type VendorServiceRate,
   type WindowTimeRange,
 } from "@/state/adminMockData";
 
@@ -69,6 +73,8 @@ const SLOTS = "slots_per_window" as const;
 export function RolloutScheduleEditor({
   rolloutId,
   buildings,
+  vendors = [],
+  vendorRates = [],
   onBack,
   /** Bumped on every mutation so the editor re-reads the
    *  module-level rollouts store. */
@@ -77,6 +83,8 @@ export function RolloutScheduleEditor({
 }: {
   rolloutId: string;
   buildings: AdminBuilding[];
+  vendors?: readonly AdminVendor[];
+  vendorRates?: readonly VendorServiceRate[];
   onBack: () => void;
   refreshKey: number;
   bumpRefreshKey: () => void;
@@ -362,6 +370,83 @@ export function RolloutScheduleEditor({
             </div>
           </div>
         </div>
+
+        {vendors.length > 0 && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                Default vendor
+              </span>
+              <select
+                value={rollout.defaultVendorId ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value || null;
+                  applyAndRefresh(() => updateRolloutDefaultVendor(rollout!.id, val));
+                  setUndoToast({
+                    label: val
+                      ? `Default vendor set to ${vendors.find((v) => v.id === val)?.company ?? val}.`
+                      : "Default vendor cleared.",
+                    undo: () => {
+                      applyAndRefresh(() =>
+                        updateRolloutDefaultVendor(rollout!.id, rollout!.defaultVendorId ?? null),
+                      );
+                      setUndoToast(null);
+                    },
+                  });
+                }}
+                className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+              >
+                <option value="">— No vendor assigned —</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.company}
+                  </option>
+                ))}
+              </select>
+              {rollout.defaultVendorId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const vid = rollout!.defaultVendorId ?? null;
+                    for (const day of rollout!.days) {
+                      updateRolloutDayVendor(rollout!.id, day.isoDate, vid);
+                    }
+                    bumpRefreshKey();
+                    persistRolloutsToStore();
+                    setUndoToast({
+                      label: `Vendor assigned to all ${rollout!.days.length} days.`,
+                      undo: () => {
+                        for (const day of rollout!.days) {
+                          updateRolloutDayVendor(rollout!.id, day.isoDate, null);
+                        }
+                        bumpRefreshKey();
+                        persistRolloutsToStore();
+                        setUndoToast(null);
+                      },
+                    });
+                  }}
+                  className="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Assign to all days
+                </button>
+              )}
+            </div>
+            {rollout.defaultVendorId && (() => {
+              const rate = vendorRates.find(
+                (r) => r.vendorId === rollout!.defaultVendorId && r.serviceId === rollout!.serviceId,
+              );
+              return rate ? (
+                <div className="mt-1.5 text-[11px] text-slate-500">
+                  Wholesale rate: <strong className="text-slate-700">${rate.wholesalePriceAud.toFixed(2)}</strong> for this service
+                </div>
+              ) : (
+                <div className="mt-1.5 text-[11px] text-amber-600">
+                  No rate configured for this vendor × service combination.
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </Card>
 
       {shouldNudgeManualRelease(rollout) && (

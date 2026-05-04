@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import {
   ArrowDownNarrowWide,
   Clock,
+  Filter,
   Info,
   Mail,
   Phone,
@@ -913,6 +914,20 @@ export function AwaitingCoordinationView({
     clearSelection();
   }
 
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const coordActiveFilterCount = [
+    filter !== "all",
+    activeOutcomeFilter !== "all",
+    buildingFilter !== "all",
+    activeTemplateFilter !== null,
+  ].filter(Boolean).length;
+  function resetCoordFilters() {
+    onFilter("all");
+    setOutcomeFilter("all");
+    onBuildingFilter("all");
+    setTemplateFilter(null);
+  }
+
   // The selection column / bulk action bar is mounted whenever either
   // bulk handler is wired up — the same checkbox column drives both
   // the call and email affordances.
@@ -1044,9 +1059,9 @@ export function AwaitingCoordinationView({
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-1 items-center gap-2">
-          <div className="relative max-w-sm flex-1">
+      <div className="relative flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -1056,148 +1071,117 @@ export function AwaitingCoordinationView({
               className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
             />
           </div>
-          <select
-            value={buildingFilter}
-            onChange={(e) => onBuildingFilter(e.target.value)}
-            aria-label="Filter by building"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+          <button
+            type="button"
+            onClick={() => setFilterPanelOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50"
           >
-            <option value="all">All buildings</option>
-            {buildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          {/* "Template used" filter — mirror of the Bookings toolbar
-              dropdown. Pulls Call + Email options from the seeded +
-              admin-edited template catalogs threaded down from
-              AdminApp; selecting a template narrows the queue to
-              bookings whose service timeline references that
-              template by snapshot name (same matching rule the
-              Bookings list uses, via the shared
-              `matchesTemplateFilter`). Composes with the existing
-              waiting-on chip, building filter, search, and outcome
-              chip. The sentinel "All templates" value is the
-              toolbar's reset / clearable affordance. The picker
-              itself is the shared `TemplateFilterSelect` the
-              Bookings list also mounts, so the render gate (length
-              gate plus `activeFilterIsMissing`), synthetic missing
-              option, optgroup ordering, and encode/decode wiring
-              can never drift between the two toolbars (Task #220). */}
-          <TemplateFilterSelect
-            value={activeTemplateFilter}
-            onChange={setTemplateFilter}
-            callTemplates={callTemplates}
-            emailTemplates={emailTemplates}
-            activeFilterIsMissing={activeFilterIsMissing}
-            testIdPrefix="coordination-filter-template"
-          />
-        </div>
-        <div
-          className="flex flex-wrap items-center gap-1.5"
-          data-testid="awaiting-coordination-waiting-filter"
-        >
-          {FILTER_CHIPS.map((chip) => {
-            const active = filter === chip.key;
-            const count = waitingOnCounts[chip.key];
-            // Mute + disable chips with nothing in their queue so the
-            // non-empty buckets stand out at a glance — same treatment
-            // as the outcome chips above. The "All" chip is never
-            // muted; it always represents the visible total, so the
-            // toolbar still has a sensible "reset" affordance even
-            // when every specific bucket is empty.
-            const isEmpty = chip.key !== "all" && count === 0;
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => onFilter(chip.key)}
-                data-testid={`chip-waiting-${chip.key}`}
-                aria-pressed={active}
-                disabled={isEmpty}
-                className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
-                  active
-                    ? "text-white"
-                    : isEmpty
-                      ? "cursor-not-allowed bg-white text-slate-400 opacity-50 ring-1 ring-slate-100"
-                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-                }`}
-                style={active ? { backgroundColor: BRAND } : undefined}
-              >
-                {chip.label}{" "}
-                <span
-                  className={
-                    active
-                      ? "text-white/80"
-                      : isEmpty
-                        ? "text-slate-400"
-                        : "text-slate-500"
-                  }
-                  data-testid={`chip-waiting-${chip.key}-count`}
-                >
-                  ({count})
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Outcome chip row — narrows the queue by the most recent
-          call/email outcome on each row, so a team lead can pull up
-          (say) "everyone we left a voicemail for" in one click and
-          decide who to ring next. Composes with the waiting-on chip,
-          building filter, and search above. */}
-      <div
-        className="flex flex-wrap items-center gap-1.5"
-        data-testid="awaiting-coordination-outcome-filter"
-      >
-        <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-          Last attempt
-        </span>
-        {OUTCOME_FILTER_CHIPS.map((chip) => {
-          const active = activeOutcomeFilter === chip.key;
-          const count = outcomeCounts[chip.key];
-          // Mute + disable chips with nothing in their queue so the
-          // non-empty buckets stand out at a glance. The "Any outcome"
-          // chip is never muted — it always represents the visible
-          // total, even when that total is zero, so the toolbar still
-          // has a sensible "reset" affordance.
-          const isEmpty = chip.key !== "all" && count === 0;
-          return (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => setOutcomeFilter(chip.key)}
-              data-testid={`chip-outcome-${chip.key}`}
-              aria-pressed={active}
-              disabled={isEmpty}
-              className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
-                active
-                  ? "text-white"
-                  : isEmpty
-                    ? "cursor-not-allowed bg-white text-slate-400 opacity-50 ring-1 ring-slate-100"
-                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-              }`}
-              style={active ? { backgroundColor: BRAND } : undefined}
-            >
-              {chip.label}{" "}
+            <Filter className="h-4 w-4" />
+            Filters
+            {coordActiveFilterCount > 0 && (
               <span
-                className={
-                  active
-                    ? "text-white/80"
-                    : isEmpty
-                      ? "text-slate-400"
-                      : "text-slate-500"
-                }
-                data-testid={`chip-outcome-${chip.key}-count`}
+                className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+                style={{ backgroundColor: BRAND }}
               >
-                ({count})
+                {coordActiveFilterCount}
               </span>
-            </button>
-          );
-        })}
+            )}
+          </button>
+        </div>
+        {filterPanelOpen && (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">Waiting on</div>
+                <div className="flex flex-col gap-0.5" data-testid="awaiting-coordination-waiting-filter">
+                  {FILTER_CHIPS.map((chip) => {
+                    const active = filter === chip.key;
+                    const count = waitingOnCounts[chip.key];
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => onFilter(chip.key)}
+                        data-testid={`chip-waiting-${chip.key}`}
+                        aria-pressed={active}
+                        className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${active ? "text-white" : "text-slate-700 hover:bg-slate-50"}`}
+                        style={active ? { backgroundColor: BRAND } : undefined}
+                      >
+                        {chip.label}
+                        <span className={`ml-1 ${active ? "text-white/70" : "text-slate-400"}`} data-testid={`chip-waiting-${chip.key}-count`}>
+                          ({count})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">Last attempt</div>
+                <div className="flex flex-col gap-0.5" data-testid="awaiting-coordination-outcome-filter">
+                  {OUTCOME_FILTER_CHIPS.map((chip) => {
+                    const active = activeOutcomeFilter === chip.key;
+                    const count = outcomeCounts[chip.key];
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => setOutcomeFilter(chip.key)}
+                        data-testid={`chip-outcome-${chip.key}`}
+                        aria-pressed={active}
+                        className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${active ? "text-white" : "text-slate-700 hover:bg-slate-50"}`}
+                        style={active ? { backgroundColor: BRAND } : undefined}
+                      >
+                        {chip.label}
+                        <span className={`ml-1 ${active ? "text-white/70" : "text-slate-400"}`} data-testid={`chip-outcome-${chip.key}-count`}>
+                          ({count})
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Building</span>
+                  <select
+                    value={buildingFilter}
+                    onChange={(e) => onBuildingFilter(e.target.value)}
+                    aria-label="Filter by building"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                  >
+                    <option value="all">All buildings</option>
+                    {buildings.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">Template used</div>
+                <TemplateFilterSelect
+                  value={activeTemplateFilter}
+                  onChange={setTemplateFilter}
+                  callTemplates={callTemplates}
+                  emailTemplates={emailTemplates}
+                  activeFilterIsMissing={activeFilterIsMissing}
+                  testIdPrefix="coordination-filter-template"
+                />
+              </div>
+            </div>
+            {coordActiveFilterCount > 0 && (
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={resetCoordFilters}
+                  className="text-[12px] text-slate-500 transition hover:text-slate-700"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {activeTemplateFilter !== null && (

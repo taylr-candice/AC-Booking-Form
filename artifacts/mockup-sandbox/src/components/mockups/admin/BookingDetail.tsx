@@ -46,16 +46,20 @@ import {
   getRolloutById,
   latestCoordinationAttempt,
   requiresTenantCoordination,
+  resolveEffectiveVendor,
+  resolveMargin,
   SERVICE_STATUS_FLOW,
   type AdminAgent,
   type AdminBooking,
   type AdminUnit,
+  type AdminVendor,
   type CallTemplate,
   type CoordinationContact,
   type EmailTemplate,
   type ServiceStatus,
   type TemplateUsageTrendPoint,
   type TimelineEntry,
+  type VendorServiceRate,
 } from "@/state/adminMockData";
 
 import { Card, Field } from "./atoms";
@@ -107,6 +111,8 @@ export function BookingDetail({
   onPivotToBookingsFilteredByTemplate,
   emailTemplates = EMAIL_TEMPLATES,
   callTemplates = CALL_TEMPLATES,
+  vendors,
+  vendorRates,
 }: {
   bookingId: string;
   bookings: AdminBooking[];
@@ -230,6 +236,12 @@ export function BookingDetail({
    *  editing or removing a template never rewrites historical
    *  entries. */
   callTemplates?: ReadonlyArray<CallTemplate>;
+  /** Vendor catalog + rate table for the resolved-vendor display and
+   *  booking-level override picker. Both optional so callers that
+   *  don't yet thread vendor data stay valid — the card is omitted
+   *  rather than rendered with placeholder data. */
+  vendors?: readonly AdminVendor[];
+  vendorRates?: readonly VendorServiceRate[];
 }) {
   const booking = bookings.find((b) => b.id === bookingId);
   const [notes, setNotes] = useState(booking?.notes ?? "");
@@ -658,6 +670,86 @@ export function BookingDetail({
             <AcDiscrepancyBlock booking={booking} unit={unit} />
           </Card>
 
+          {vendors && vendors.length > 0 && (() => {
+            const rollout = getRolloutById(booking.rolloutId);
+            const resolved = resolveEffectiveVendor(booking, rollout ?? null, vendors);
+            const margin = vendorRates
+              ? resolveMargin(booking, rollout ?? null, vendors, vendorRates)
+              : null;
+            const TIER_LABELS: Record<"booking" | "day" | "rollout", string> = {
+              booking: "booking override",
+              day: "day override",
+              rollout: "rollout default",
+            };
+            return (
+              <Card title="Vendor">
+                {resolved ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-semibold text-slate-900">
+                        {resolved.vendor.company}
+                      </span>
+                      <span
+                        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+                      >
+                        {TIER_LABELS[resolved.tier]}
+                      </span>
+                    </div>
+                    {margin && (
+                      <div className="grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-3 text-center">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500">Customer pays</div>
+                          <div className="text-[13px] font-semibold text-slate-900">${margin.customerPrice.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500">Wholesale</div>
+                          <div className="text-[13px] font-semibold text-slate-700">${margin.wholesaleCost.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500">Margin</div>
+                          <div
+                            className="text-[13px] font-semibold"
+                            style={{ color: margin.marginAud >= 0 ? "#16A34A" : "#DC2626" }}
+                          >
+                            ${margin.marginAud.toFixed(2)}{" "}
+                            <span className="text-[11px] font-medium">
+                              ({margin.marginPct.toFixed(0)}%)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-[12px] text-slate-500">No vendor assigned to this booking or its rollout.</div>
+                )}
+                {!booking.isLive && (
+                  <div className="mt-3 border-t border-slate-100 pt-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                        Override vendor for this booking
+                      </span>
+                      <select
+                        value={booking.vendorId ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value || undefined;
+                          onUpdate(booking.id, { vendorId: val });
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                      >
+                        <option value="">— Inherit from rollout —</option>
+                        {vendors.map((v) => (
+                          <option key={v.id} value={v.id}>{v.company}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
+
           <Card title="Notes">
             <textarea
               value={notes}
@@ -931,8 +1023,6 @@ function nextStatusLabel(s: ServiceStatus): string {
   switch (s) {
     case "scheduled":
       return "Scheduled";
-    case "on_site":
-      return "On site";
     case "complete":
       return "Complete";
     case "invoice_adjusted":

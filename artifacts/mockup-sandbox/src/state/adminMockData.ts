@@ -220,14 +220,12 @@ export type PaymentStatus = "paid" | "pending" | "refund_pending" | "refunded";
  */
 export type ServiceStatus =
   | "scheduled"
-  | "on_site"
   | "complete"
   | "invoice_adjusted"
   | "cancelled";
 
 export const SERVICE_STATUS_FLOW: readonly ServiceStatus[] = [
   "scheduled",
-  "on_site",
   "complete",
   "invoice_adjusted",
 ];
@@ -831,14 +829,14 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     serviceDate: "2026-04-30",
     serviceSlot: "afternoon",
     paymentStatus: "paid",
-    serviceStatus: "on_site",
+    serviceStatus: "complete",
     totalAud: 537,
     paymentTimeline: [
       { status: "paid", label: "Card charged · $537.00", at: "Apr 25 · 19:02", by: "System" },
     ],
     serviceTimeline: [
       { status: "scheduled", label: "Slot booked · 30 Apr · Afternoon", at: "Apr 25 · 19:02", by: "System" },
-      { status: "on_site", label: "Arrived on site", at: "Apr 28 · 12:40", by: "Mia (admin)" },
+      { status: "complete", label: "Service complete", at: "Apr 30 · 15:20", by: "Tech (Yusuf)" },
     ],
     notes: "Customer reported 3 systems but we have 2 on record. Confirm head count on arrival.",
     rolloutId: "rl-ac-marine",
@@ -863,14 +861,14 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     serviceDate: "2026-04-30",
     serviceSlot: "morning",
     paymentStatus: "paid",
-    serviceStatus: "on_site",
+    serviceStatus: "complete",
     totalAud: 358,
     paymentTimeline: [
       { status: "paid", label: "Card charged · $358.00", at: "Apr 24 · 14:11", by: "System" },
     ],
     serviceTimeline: [
       { status: "scheduled", label: "Slot booked · 30 Apr · Morning", at: "Apr 24 · 14:11", by: "System" },
-      { status: "on_site", label: "Arrived at unit", at: "Apr 28 · 09:05", by: "Tech (Yusuf)" },
+      { status: "complete", label: "Service complete", at: "Apr 30 · 11:45", by: "Tech (Sam)" },
     ],
     notes: "Tenant authorised by agent. Concierge to provide trade key.",
     rolloutId: null,
@@ -1006,7 +1004,6 @@ export const SEEDED_BOOKINGS: readonly AdminBooking[] = [
     ],
     serviceTimeline: [
       { status: "scheduled", label: "Slot booked · 22 Apr · Afternoon", at: "Apr 18 · 13:00", by: "System" },
-      { status: "on_site", label: "Arrived at unit", at: "Apr 22 · 13:08", by: "Tech (Sam)" },
       { status: "complete", label: "Service complete · report sent", at: "Apr 22 · 14:45", by: "Tech (Sam)" },
     ],
     notes: "Filter replacement on system 2 — billed separately (see invoice adjustment).",
@@ -2162,17 +2159,11 @@ export function requiresTenantCoordination(b: AdminBooking): boolean {
 
 export function bookingDurationMinutes(b: AdminBooking): number {
   if (b.acType === "unsure") return UNSURE_FALLBACK_MINUTES;
-  // Pull the per-AC-type rule + per-unit placement from the live
-  // catalogue / live buildings + units. Both helpers default to the
-  // legacy 45 / 15 / no-overhead numbers when the catalogue / live
-  // sources haven't been registered (canvas-isolated mode, vitest),
-  // so the existing tests stay green.
+  // 45 min per system (1 indoor + 1 outdoor) + 15 min per additional
+  // indoor unit. Outdoor condenser placement is not tracked as a time
+  // modifier — only service duration counts.
   const rule = getServiceRuleForAcType(b.acType);
-  const placement = getEffectivePlacementForUnit(b.unitId);
-  const base = b.systems * rule.baseMinutes + b.additional * rule.addonMinutes;
-  const overhead =
-    placement.kind === "rooftop" ? placement.overheadMinutes * b.systems : 0;
-  return base + overhead;
+  return b.systems * rule.baseMinutes + b.additional * rule.addonMinutes;
 }
 
 /**
@@ -4412,7 +4403,6 @@ export function priorServiceStatusFromTimeline(
     if (status === "rescheduled") continue;
     if (
       status === "scheduled" ||
-      status === "on_site" ||
       status === "complete" ||
       status === "invoice_adjusted"
     ) {
@@ -4539,8 +4529,12 @@ export function createRollout(input: {
   serviceId: string;
   buildingId: string;
   name: string;
-  startDate: string;
-  endDate: string;
+  /** Explicit list of specific ISO dates for this rollout. When provided,
+   *  startDate/endDate are derived from the list and range enumeration is
+   *  skipped — supports non-consecutive, hand-picked dates. */
+  dates?: string[];
+  startDate?: string;
+  endDate?: string;
   capacityModel: ServiceCapacityModel;
   defaultSlotCount?: number;
   defaultVendorId?: string;
@@ -4548,7 +4542,12 @@ export function createRollout(input: {
   windowDefaults?: Partial<RolloutWindowDefaults>;
 }): AdminRollout {
   const id = `rl-${Math.random().toString(36).slice(2, 8)}`;
-  const days: RolloutDay[] = enumerateDates(input.startDate, input.endDate).map(
+  const sortedDates = input.dates
+    ? [...input.dates].sort()
+    : enumerateDates(input.startDate!, input.endDate!);
+  const derivedStart = sortedDates[0] ?? input.startDate ?? "";
+  const derivedEnd = sortedDates[sortedDates.length - 1] ?? input.endDate ?? "";
+  const days: RolloutDay[] = sortedDates.map(
     (iso) =>
       input.capacityModel === "slots_per_window"
         ? makeSlotCountDay(iso, input.defaultSlotCount ?? 6, 0, 0, {
@@ -4561,8 +4560,8 @@ export function createRollout(input: {
     serviceId: input.serviceId,
     buildingId: input.buildingId,
     name: input.name,
-    startDate: input.startDate,
-    endDate: input.endDate,
+    startDate: derivedStart,
+    endDate: derivedEnd,
     capacityModel: input.capacityModel,
     ...(input.defaultVendorId ? { defaultVendorId: input.defaultVendorId } : {}),
     days,

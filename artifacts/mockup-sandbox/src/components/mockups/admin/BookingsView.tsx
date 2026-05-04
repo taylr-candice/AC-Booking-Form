@@ -5,7 +5,7 @@
  * `AdminApp` shell to mount `BookingDetail`.
  */
 
-import { Info, Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
+import { Filter, Info, Plus, RotateCcw, Search, TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -221,6 +221,22 @@ export function BookingsView({
   const [attemptSort, setAttemptSort] = useState<
     "default" | "stalest_first" | "freshest_first"
   >("default");
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const activeFilterCount = [
+    statusFilter !== "all",
+    buildingFilter !== "all",
+    attemptSort !== "default",
+    activeTemplateFilter !== null,
+    !paymentMode && showCancelled,
+  ].filter(Boolean).length;
+  function resetFilters() {
+    onStatusFilter("all");
+    onBuildingFilter("all");
+    setAttemptSort("default");
+    setTemplateFilter(null);
+    setShowCancelled(false);
+  }
+
   // Source-row highlight: mirrors the `focusedTemplateId` pattern in
   // Call/EmailTemplatesView — persistent BRAND_SOFT tint + one-shot
   // pulse so the landing row is unmistakable on a long filtered list.
@@ -264,7 +280,6 @@ export function BookingsView({
     : [
         { key: "all", label: "All statuses" },
         { key: "scheduled", label: "Scheduled" },
-        { key: "on_site", label: "On site" },
         { key: "complete", label: "Complete" },
         { key: "cancelled", label: "Cancelled" },
       ];
@@ -434,9 +449,9 @@ export function BookingsView({
         onAcknowledge={onAcknowledgeSupersede}
       />
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-1 items-center gap-2">
-          <div className="relative max-w-sm flex-1">
+      <div className="relative flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -446,141 +461,131 @@ export function BookingsView({
               className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-[13px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
             />
           </div>
-          <select
-            value={buildingFilter}
-            onChange={(e) => onBuildingFilter(e.target.value)}
-            aria-label="Filter by building"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+          <button
+            type="button"
+            onClick={() => setFilterPanelOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50"
           >
-            <option value="all">All buildings</option>
-            {buildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          {/* "Last attempt" sort. Lives next to the building filter
-              (rather than amongst the status chips) so it reads as a
-              modifier on the *order* of rows, not the *set* of rows
-              shown. Default keeps the upstream order intact so admins
-              who never engage with the control see no behaviour
-              change. */}
-          <select
-            value={attemptSort}
-            onChange={(e) =>
-              setAttemptSort(
-                e.target.value as "default" | "stalest_first" | "freshest_first",
-              )
-            }
-            aria-label="Sort by last attempt"
-            data-testid="bookings-sort-last-attempt"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
-          >
-            <option value="default">Sort: default</option>
-            <option value="stalest_first">Last attempt: stalest first</option>
-            <option value="freshest_first">Last attempt: freshest first</option>
-          </select>
-          {/* "Template used" filter. Pulls Call + Email options from
-              the seeded + admin-edited template catalogs threaded down
-              from AdminApp; selecting a template narrows the table to
-              bookings whose service timeline references that template
-              by snapshot name (same matching rule as the per-template
-              usage popover). Composes with the existing status,
-              building, and search filters. The sentinel "All
-              templates" value is the toolbar's reset / clearable
-              affordance — admins flip back to it to drop the lens.
-              The picker itself is the shared `TemplateFilterSelect`
-              the Awaiting-coordination queue also mounts, so the
-              render gate, synthetic missing option, optgroup
-              ordering, and encode/decode wiring can never drift
-              between the two toolbars (Task #220). The per-view
-              testid prefix keeps `BookingsView.templateFilter.test.tsx`
-              selectors unchanged. */}
-          <TemplateFilterSelect
-            value={activeTemplateFilter}
-            onChange={setTemplateFilter}
-            callTemplates={callTemplateOptions}
-            emailTemplates={emailTemplateOptions}
-            activeFilterIsMissing={activeFilterIsMissing}
-            testIdPrefix="bookings-filter-template"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {!paymentMode && (
-            <>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[12px] font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">
-                <input
-                  type="checkbox"
-                  checked={showCancelled}
-                  onChange={(e) => setShowCancelled(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-pink-600"
-                />
-                Show cancelled
-              </label>
-              <button
-                type="button"
-                onClick={onNewBooking}
-                className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-semibold text-white transition hover:brightness-110"
+            <Filter className="h-4 w-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span
+                className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
                 style={{ backgroundColor: BRAND }}
               >
-                <Plus className="h-3.5 w-3.5" />
-                New booking
-              </button>
-            </>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {!paymentMode && (
+            <button
+              type="button"
+              onClick={onNewBooking}
+              className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-[13px] font-semibold text-white transition hover:brightness-110"
+              style={{ backgroundColor: BRAND }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New booking
+            </button>
           )}
-          {filterChips.map((chip) => {
-            const active = statusFilter === chip.key;
-            const count = chipCounts[chip.key] ?? 0;
-            // Mute + disable chips with nothing in their bucket so the
-            // non-empty queues stand out at a glance — same treatment
-            // as the Awaiting-coordination toolbar. The "All" chip is
-            // never muted; it always represents the visible total, so
-            // the toolbar still has a sensible "reset" affordance even
-            // when every specific bucket is empty.
-            //
-            // `isEmpty` takes precedence over `active` for styling:
-            // an already-selected chip whose bucket later drains
-            // (e.g. after changing the search or building filter)
-            // should drop into the muted treatment rather than stay
-            // in its brand-coloured "active" pill — otherwise the
-            // toolbar would lie about which buckets currently hold
-            // rows. The chip is `disabled` either way, so this only
-            // affects the visual.
-            const isEmpty = chip.key !== "all" && count === 0;
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => onStatusFilter(chip.key)}
-                data-testid={`chip-bookings-${chip.key}`}
-                aria-pressed={active}
-                disabled={isEmpty}
-                className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
-                  isEmpty
-                    ? "cursor-not-allowed bg-white text-slate-400 opacity-50 ring-1 ring-slate-100"
-                    : active
-                      ? "text-white"
-                      : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-                }`}
-                style={!isEmpty && active ? { backgroundColor: BRAND } : undefined}
-              >
-                {chip.label}{" "}
-                <span
-                  className={
-                    isEmpty
-                      ? "text-slate-400"
-                      : active
-                        ? "text-white/80"
-                        : "text-slate-500"
-                  }
-                  data-testid={`chip-bookings-${chip.key}-count`}
-                >
-                  ({count})
-                </span>
-              </button>
-            );
-          })}
         </div>
+        {filterPanelOpen && (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                  {paymentMode ? "Payment status" : "Service status"}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {filterChips.map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => onStatusFilter(chip.key)}
+                      data-testid={`chip-bookings-${chip.key}`}
+                      aria-pressed={statusFilter === chip.key}
+                      className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${statusFilter === chip.key ? "text-white" : "text-slate-700 hover:bg-slate-50"}`}
+                      style={statusFilter === chip.key ? { backgroundColor: BRAND } : undefined}
+                    >
+                      {chip.label}
+                      <span
+                        className={`ml-1 ${statusFilter === chip.key ? "text-white/70" : "text-slate-400"}`}
+                        data-testid={`chip-bookings-${chip.key}-count`}
+                      >
+                        ({chipCounts[chip.key] ?? 0})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Building</span>
+                  <select
+                    value={buildingFilter}
+                    onChange={(e) => onBuildingFilter(e.target.value)}
+                    aria-label="Filter by building"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                  >
+                    <option value="all">All buildings</option>
+                    {buildings.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Sort</span>
+                  <select
+                    value={attemptSort}
+                    onChange={(e) =>
+                      setAttemptSort(e.target.value as "default" | "stalest_first" | "freshest_first")
+                    }
+                    aria-label="Sort by last attempt"
+                    data-testid="bookings-sort-last-attempt"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-900 focus:border-slate-400 focus:outline-none"
+                  >
+                    <option value="default">Default order</option>
+                    <option value="stalest_first">Last attempt: stalest first</option>
+                    <option value="freshest_first">Last attempt: freshest first</option>
+                  </select>
+                </label>
+                <div>
+                  <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">Template used</div>
+                  <TemplateFilterSelect
+                    value={activeTemplateFilter}
+                    onChange={setTemplateFilter}
+                    callTemplates={callTemplateOptions}
+                    emailTemplates={emailTemplateOptions}
+                    activeFilterIsMissing={activeFilterIsMissing}
+                    testIdPrefix="bookings-filter-template"
+                  />
+                </div>
+                {!paymentMode && (
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={showCancelled}
+                      onChange={(e) => setShowCancelled(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-pink-600"
+                    />
+                    Show cancelled bookings
+                  </label>
+                )}
+              </div>
+            </div>
+            {activeFilterCount > 0 && (
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-[12px] text-slate-500 transition hover:text-slate-700"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {activeTemplateFilter !== null && (

@@ -39,8 +39,7 @@ type WizardState = {
   serviceName: string;
   // Step 2
   cycleLabel: string;
-  startDate: string;
-  endDate: string;
+  selectedDates: string[];
   // Step 3
   windowMorning: boolean;
   windowAfternoon: boolean;
@@ -69,19 +68,12 @@ function defaultState(
   services: { id: string; name: string }[],
   prefill?: Partial<WizardState>,
 ): WizardState {
-  const today = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const startDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-  const end = new Date(today);
-  end.setDate(end.getDate() + 13);
-  const endDate = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
   return {
     buildingId: prefill?.buildingId ?? buildings[0]?.id ?? "",
     serviceId: prefill?.serviceId ?? services[0]?.id ?? "",
     serviceName: prefill?.serviceName ?? services[0]?.name ?? "",
     cycleLabel: prefill?.cycleLabel ?? "",
-    startDate: prefill?.startDate ?? startDate,
-    endDate: prefill?.endDate ?? endDate,
+    selectedDates: prefill?.selectedDates ?? [],
     windowMorning: prefill?.windowMorning ?? true,
     windowAfternoon: prefill?.windowAfternoon ?? true,
     windowEvening: prefill?.windowEvening ?? false,
@@ -144,9 +136,7 @@ export function CreateRolloutWizard({
       if (dup) return "A rollout for this service + building already exists.";
     }
     if (step === 2) {
-      if (!state.cycleLabel.trim() && !state.startDate) return "Enter a start date.";
-      if (!state.startDate || !state.endDate) return "Enter a date range.";
-      if (state.startDate > state.endDate) return "End date must be on or after start.";
+      if (state.selectedDates.length === 0) return "Select at least one date on the calendar.";
     }
     if (step === 3) {
       if (!state.windowMorning && !state.windowAfternoon && !state.windowEvening)
@@ -187,8 +177,7 @@ export function CreateRolloutWizard({
       serviceId: state.serviceId,
       buildingId: state.buildingId,
       name: label,
-      startDate: state.startDate,
-      endDate: state.endDate,
+      dates: state.selectedDates,
       capacityModel: state.capacityModel,
       defaultSlotCount: state.capacityModel === "slots_per_window" ? state.defaultSlotCount : undefined,
       defaultVendorId: state.defaultVendorId ?? undefined,
@@ -400,7 +389,7 @@ function Step2CycleLabel({
     <div className="flex flex-col gap-5">
       <StepHeader
         title="Cycle label & dates"
-        subtitle="Give this rollout a human name and set the date range."
+        subtitle="Give this rollout a name and pick specific service dates — they don't have to be consecutive."
       />
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1">
@@ -418,62 +407,159 @@ function Step2CycleLabel({
             Defaults to "{state.serviceName} · {state.buildingId}" if left blank.
           </span>
         </label>
-        <div className="grid grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-              Start date
-            </span>
-            <input
-              type="date"
-              value={state.startDate}
-              onChange={(e) => onChange({ startDate: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-[13px] text-slate-800 focus:border-slate-400 focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-              End date
-            </span>
-            <input
-              type="date"
-              value={state.endDate}
-              onChange={(e) => onChange({ endDate: e.target.value })}
-              className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-[13px] text-slate-800 focus:border-slate-400 focus:outline-none"
-            />
-          </label>
+
+        <div>
+          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+            Service dates
+          </span>
+          <p className="mb-3 mt-0.5 text-[12px] text-slate-400">
+            Click any date to add or remove it. Dates don't need to be consecutive.
+          </p>
+          <MonthCalendar
+            selectedDates={state.selectedDates}
+            onToggle={(iso) => {
+              const next = state.selectedDates.includes(iso)
+                ? state.selectedDates.filter((d) => d !== iso)
+                : [...state.selectedDates, iso].sort();
+              onChange({ selectedDates: next });
+            }}
+          />
         </div>
-        {state.startDate && state.endDate && state.startDate <= state.endDate && (
-          <div
-            className="rounded-lg p-3 text-[12px] font-medium"
-            style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
-          >
-            {countDays(state.startDate, state.endDate)} days in range
-            {" · "}
-            {countWeekdays(state.startDate, state.endDate)} weekdays
-          </div>
+
+        {state.selectedDates.length > 0 && (
+          <>
+            <div
+              className="rounded-lg p-3 text-[12px] font-medium"
+              style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
+            >
+              {state.selectedDates.length} date{state.selectedDates.length !== 1 ? "s" : ""} selected
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {state.selectedDates.map((iso) => (
+                <span
+                  key={iso}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700"
+                >
+                  {new Date(iso).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange({ selectedDates: state.selectedDates.filter((d) => d !== iso) });
+                    }}
+                    className="ml-0.5 text-slate-400 hover:text-slate-700"
+                    aria-label={`Remove ${iso}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function countDays(start: string, end: string): number {
-  const a = new Date(start);
-  const b = new Date(end);
-  return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
-}
+// ─── Month Calendar ────────────────────────────────────────────────────────────
 
-function countWeekdays(start: string, end: string): number {
-  const a = new Date(start);
-  const b = new Date(end);
-  let count = 0;
-  const cur = new Date(a);
-  while (cur <= b) {
-    const dow = cur.getDay();
-    if (dow !== 0 && dow !== 6) count++;
-    cur.setDate(cur.getDate() + 1);
+function MonthCalendar({
+  selectedDates,
+  onToggle,
+}: {
+  selectedDates: string[];
+  onToggle: (iso: string) => void;
+}) {
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
+  const [calYear, setCalYear] = useState(today.getFullYear());
+  const [calMonth, setCalMonth] = useState(today.getMonth());
+  const selectedSet = new Set(selectedDates);
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay = new Date(calYear, calMonth + 1, 0);
+  const startDow = firstDay.getDay();
+
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    cells.push(
+      `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+    );
   }
-  return count;
+
+  const monthLabel = firstDay.toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+
+  function prevMonth(e: React.MouseEvent) {
+    e.preventDefault();
+    if (calMonth === 0) { setCalYear((y) => y - 1); setCalMonth(11); }
+    else setCalMonth((m) => m - 1);
+  }
+  function nextMonth(e: React.MouseEvent) {
+    e.preventDefault();
+    if (calMonth === 11) { setCalYear((y) => y + 1); setCalMonth(0); }
+    else setCalMonth((m) => m + 1);
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={prevMonth}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
+        <span className="text-[13px] font-semibold text-slate-900">{monthLabel}</span>
+        <button
+          type="button"
+          onClick={nextMonth}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
+          aria-label="Next month"
+        >
+          ›
+        </button>
+      </div>
+      <div className="mb-1 grid grid-cols-7">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          <div key={d} className="py-1 text-center text-[10px] font-medium text-slate-400">
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((iso, i) => {
+          if (!iso) return <div key={`e-${i}`} />;
+          const isPast = iso < todayIso;
+          const isSelected = selectedSet.has(iso);
+          const isWknd = new Date(iso).getDay() === 0 || new Date(iso).getDay() === 6;
+          return (
+            <button
+              key={iso}
+              type="button"
+              disabled={isPast}
+              onClick={() => onToggle(iso)}
+              className={`h-8 rounded text-[12px] font-medium transition ${
+                isSelected
+                  ? "text-white"
+                  : isPast
+                    ? "cursor-not-allowed text-slate-200"
+                    : isWknd
+                      ? "text-slate-400 hover:bg-slate-100"
+                      : "text-slate-700 hover:bg-slate-100"
+              }`}
+              style={isSelected ? { backgroundColor: BRAND } : undefined}
+              title={iso}
+            >
+              {parseInt(iso.slice(-2), 10)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ─── Step 3: Windows ─────────────────────────────────────────────────────────
@@ -903,7 +989,14 @@ function Step7Review({
         <Row label="Name" value={label} />
         <Row label="Building" value={building?.name ?? state.buildingId} />
         <Row label="Service" value={service?.name ?? state.serviceId} />
-        <Row label="Date range" value={`${state.startDate} → ${state.endDate} (${countDays(state.startDate, state.endDate)} days)`} />
+        <Row
+          label="Dates"
+          value={
+            state.selectedDates.length === 0
+              ? "No dates selected"
+              : `${state.selectedDates.length} date${state.selectedDates.length !== 1 ? "s" : ""}: ${state.selectedDates[0]}${state.selectedDates.length > 1 ? ` → ${state.selectedDates[state.selectedDates.length - 1]}` : ""}`
+          }
+        />
         <Row label="Windows" value={windows.join(" · ") || "None"} />
         <Row
           label="Capacity"
