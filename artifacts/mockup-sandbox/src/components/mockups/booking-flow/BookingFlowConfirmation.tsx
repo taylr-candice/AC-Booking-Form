@@ -279,7 +279,7 @@ export function BookingFlowConfirmation() {
   }
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-slate-50 font-['Inter']">
+    <div className="h-full w-full overflow-y-auto bg-slate-50 font-['Roboto']">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2">

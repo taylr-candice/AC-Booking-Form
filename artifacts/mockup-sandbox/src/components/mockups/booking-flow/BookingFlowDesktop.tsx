@@ -174,14 +174,14 @@ export function BookingFlowDesktop() {
   // cancelled / unit_unavailable).
   if (submitted || paymentCancelled || unitUnavailable) {
     return (
-      <div className="h-screen w-screen overflow-hidden bg-slate-50 font-['Inter']">
+      <div className="h-screen w-screen overflow-hidden bg-slate-50 font-['Roboto']">
         <BookingFlowConfirmation />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Inter']">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-50 font-['Roboto']">
       {/* Top stepper bar */}
       <div className="flex h-12 shrink-0 items-center justify-center border-b border-slate-200/50 bg-slate-50 px-6">
         <div className="flex items-center">

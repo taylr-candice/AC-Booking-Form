@@ -30,7 +30,7 @@ export function AccessDesktop() {
   const residenceLabel = residence === "live_in" ? "Live in" : residence === "leased_out" ? "Leased out" : residence === "vacant" ? "Vacant" : "—";
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8 font-['Inter'] flex justify-center overflow-y-auto">
+    <div className="min-h-screen bg-slate-50 p-8 font-['Roboto'] flex justify-center overflow-y-auto">
       <div className="w-full max-w-4xl">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-8 md:p-10 flex flex-col">
           
