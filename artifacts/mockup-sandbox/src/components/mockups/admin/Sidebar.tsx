@@ -17,6 +17,7 @@ import {
   Snowflake,
   Users,
   Wrench,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const NAV_ITEMS: ReadonlyArray<{ id: ViewId; label: string; icon: LucideIcon }> 
   { id: "payments", label: "Payments", icon: CreditCard },
   { id: "awaiting_coordination", label: "Awaiting coordination", icon: Clock },
   { id: "rollouts", label: "Rollouts", icon: CalendarRange },
+  { id: "maintenance_calendar", label: "Maintenance calendar", icon: CalendarClock },
   { id: "buildings", label: "Buildings", icon: Building2 },
   { id: "units", label: "Units", icon: Home },
   { id: "services", label: "Services", icon: Wrench },

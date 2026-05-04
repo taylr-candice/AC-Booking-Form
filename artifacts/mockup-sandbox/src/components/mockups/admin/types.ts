@@ -7,6 +7,7 @@ export type ViewId =
   | "payments"
   | "awaiting_coordination"
   | "rollouts"
+  | "maintenance_calendar"
   | "buildings"
   | "units"
   | "services"

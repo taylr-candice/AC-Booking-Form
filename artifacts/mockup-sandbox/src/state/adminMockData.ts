@@ -106,6 +106,14 @@ export type AdminBuilding = {
   /** Suburb + state + postcode, e.g. "Greenway ACT 2900". */
   addressLine2: string;
   /**
+   * ISO date when Taylr first took on this building as a client.
+   * Used as the due-date anchor for any service that has never had
+   * a completed rollout — the first service cycle is counted from
+   * registration, not from "today". Optional so older fixture data
+   * compiles without change; the calendar falls back to a default.
+   */
+  registeredAt?: string;
+  /**
    * Authoritative AC type for the building (Task #110). Required —
    * Taylr only opens a rollout once the building's AC fit-out is
    * known, so every building in this list has been confirmed to be
@@ -203,6 +211,23 @@ export type VendorServiceRate = {
   serviceId: string;
   wholesalePriceAud: number;
 };
+
+/**
+ * Top-level grouping for the service catalogue, used by the
+ * Maintenance Calendar to bucket services into HVAC / Plumbing /
+ * Electrical sections.
+ */
+export type ServiceCategory = {
+  id: string;
+  /** Display name shown in the calendar section header (e.g. "HVAC"). */
+  name: string;
+};
+
+export const SEEDED_CATEGORIES: readonly ServiceCategory[] = [
+  { id: "cat-hvac", name: "HVAC" },
+  { id: "cat-plumbing", name: "Plumbing" },
+  { id: "cat-electrical", name: "Electrical" },
+];
 
 export type PaymentStatus = "paid" | "pending" | "refund_pending" | "refunded";
 /**
@@ -411,6 +436,7 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     acBrand: "Daikin",
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+    registeredAt: "2022-03-15",
   },
   {
     id: "bldg-marine",
@@ -421,6 +447,7 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     acBrand: "Mitsubishi",
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+    registeredAt: "2021-09-01",
   },
   {
     id: "bldg-bourke",
@@ -431,6 +458,7 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     acBrand: "Fujitsu",
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+    registeredAt: "2022-07-20",
   },
   {
     id: "bldg-anzac",
@@ -441,6 +469,7 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     acBrand: "Panasonic",
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+    registeredAt: "2023-01-10",
   },
   // Pyrmont — intentionally has NO svc-ac rollout. Seeds the
   // "we haven't opened bookings on this building yet" empty state for
@@ -457,6 +486,7 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     acBrand: "LG",
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+    registeredAt: "2023-06-01",
   },
   // Lakeside Towers — HAS a svc-ac rollout but every day is staged
   // (openByAdmin: false, awaiting ops release). Seeds the "dates
@@ -474,6 +504,7 @@ export const SEEDED_BUILDINGS: readonly AdminBuilding[] = [
     acBrand: "Panasonic",
     outdoorPlacement: "in_property",
     rooftopOverheadMinutes: DEFAULT_ROOFTOP_OVERHEAD_MINUTES,
+    registeredAt: "2022-11-15",
   },
 ];
 
@@ -3429,6 +3460,19 @@ export type AdminService = {
   id: string;
   name: string;
   /**
+   * Service category this entry belongs to (HVAC, Plumbing, etc.).
+   * Drives the Maintenance Calendar's grouped view. Optional so
+   * legacy entries without a category remain valid.
+   */
+  categoryId?: string;
+  /**
+   * How often (in months) this service must be repeated per building.
+   * Used by the Maintenance Calendar to project due dates forward
+   * from the last completed rollout (or building registration date).
+   * `12` = annual, `6` = semi-annual. Optional for legacy entries.
+   */
+  cycleMonths?: number;
+  /**
    * The AC type this catalogue entry's rule applies to (Task #182).
    * `split` and `ducted` entries drive the per-system / per-extra
    * duration math for AC bookings. `null` is used for "other"
@@ -3504,6 +3548,8 @@ export const SEEDED_SERVICES: AdminService[] = [
     maxQty: 5,
     additionalIndoorMaxQty: 6,
     defaultJobMinutes: 45,
+    categoryId: "cat-hvac",
+    cycleMonths: 12,
   },
   {
     id: "svc-ac-ducted",
@@ -3517,6 +3563,86 @@ export const SEEDED_SERVICES: AdminService[] = [
     maxQty: 5,
     additionalIndoorMaxQty: 8,
     defaultJobMinutes: 45,
+    categoryId: "cat-hvac",
+    cycleMonths: 12,
+  },
+  // ── Additional HVAC services ────────────────────────────────────────
+  {
+    id: "svc-ventilation",
+    name: "Ventilation check",
+    acTypeKey: null,
+    baseMinutes: 30,
+    addonLabel: "additional duct zone",
+    addonMinutes: 10,
+    priceAud: 99,
+    addonPriceAud: 25,
+    maxQty: 5,
+    defaultJobMinutes: 30,
+    appliesToNote: "Ducted & split systems",
+    categoryId: "cat-hvac",
+    cycleMonths: 12,
+  },
+  {
+    id: "svc-extraction",
+    name: "Extraction fan service",
+    acTypeKey: null,
+    baseMinutes: 20,
+    addonLabel: "additional fan",
+    addonMinutes: 10,
+    priceAud: 79,
+    addonPriceAud: 20,
+    maxQty: 8,
+    defaultJobMinutes: 20,
+    appliesToNote: "Bathroom & kitchen extraction fans",
+    categoryId: "cat-hvac",
+    cycleMonths: 12,
+  },
+  // ── Plumbing services ───────────────────────────────────────────────
+  {
+    id: "svc-plumbing",
+    name: "Plumbing health check",
+    acTypeKey: null,
+    baseMinutes: 45,
+    addonLabel: "additional fixture",
+    addonMinutes: 10,
+    priceAud: 149,
+    addonPriceAud: 30,
+    maxQty: 10,
+    defaultJobMinutes: 45,
+    appliesToNote: "Full plumbing inspection",
+    categoryId: "cat-plumbing",
+    cycleMonths: 12,
+  },
+  {
+    id: "svc-dishwashing",
+    name: "Dishwashing machine service",
+    acTypeKey: null,
+    baseMinutes: 30,
+    addonLabel: "additional appliance",
+    addonMinutes: 15,
+    priceAud: 89,
+    addonPriceAud: 25,
+    maxQty: 3,
+    defaultJobMinutes: 30,
+    appliesToNote: "Built-in dishwashers",
+    categoryId: "cat-plumbing",
+    cycleMonths: 12,
+  },
+  // ── Electrical services ─────────────────────────────────────────────
+  {
+    id: "svc-smoke",
+    name: "Smoke detector test & battery",
+    acTypeKey: null,
+    baseMinutes: 15,
+    addonLabel: "additional detector",
+    addonMinutes: 5,
+    priceAud: 49,
+    addonPriceAud: 15,
+    maxQty: 20,
+    defaultJobMinutes: 15,
+    appliesToNote: "All hardwired & 9V detectors",
+    categoryId: "cat-electrical",
+    cycleMonths: 12,
   },
 ];
 
@@ -5508,5 +5634,165 @@ export function getVendorRate(
   vendorRates: readonly VendorServiceRate[],
 ): number | null {
   return vendorRates.find((r) => r.vendorId === vendorId && r.serviceId === serviceId)?.wholesalePriceAud ?? null;
+}
+
+// ─── Maintenance Calendar helpers ────────────────────────────────────────────
+
+/** Status of a building × service obligation for a given calendar month. */
+export type CalendarObligationStatus =
+  | "due"        // anniversary falls this month, no rollout created yet
+  | "overdue"    // anniversary has passed, no rollout created
+  | "scheduled"  // a rollout exists covering this cycle
+  | "not_yet_due";
+
+/** One cell in the Maintenance Calendar grid: a building × service pair
+ *  with the computed obligation status for the selected year. */
+export type CalendarObligation = {
+  buildingId: string;
+  serviceId: string;
+  categoryId: string;
+  /** 0-indexed month (0 = Jan, 11 = Dec) when this obligation falls due. */
+  dueMonth: number;
+  dueYear: number;
+  dueDate: Date;
+  status: CalendarObligationStatus;
+  /** Most recent completed rollout for this building × service (or null). */
+  lastRollout: AdminRollout | null;
+  /** The rollout that satisfies this cycle (non-null when status is
+   *  "scheduled"). */
+  scheduledRollout: AdminRollout | null;
+};
+
+/**
+ * Calculate the next due date for a building × service pair.
+ *
+ * Strategy:
+ *  1. Find the most recent rollout whose `endDate` is before today
+ *     (that rollout is "completed" from a scheduling perspective).
+ *  2. Use its `endDate` as the cycle anchor.
+ *  3. Fall back to `building.registeredAt` when no completed rollout exists.
+ *  4. Add `service.cycleMonths` to arrive at the next due date.
+ */
+export function getNextDueDate(
+  buildingId: string,
+  serviceId: string,
+  rollouts: readonly AdminRollout[],
+  buildings: readonly AdminBuilding[],
+  services: readonly AdminService[],
+): Date {
+  const building = buildings.find((b) => b.id === buildingId);
+  const service = services.find((s) => s.id === serviceId);
+  const cycleMonths = service?.cycleMonths ?? 12;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const relevant = rollouts.filter(
+    (r) => r.buildingId === buildingId && r.serviceId === serviceId,
+  );
+  const completed = relevant
+    .filter((r) => new Date(r.endDate) < today)
+    .sort((a, b) => b.endDate.localeCompare(a.endDate));
+  const lastCompleted = completed[0] ?? null;
+
+  const anchorStr =
+    lastCompleted?.endDate ?? building?.registeredAt ?? "2022-01-01";
+  const anchor = new Date(anchorStr);
+  anchor.setHours(0, 0, 0, 0);
+
+  const due = new Date(anchor);
+  due.setMonth(due.getMonth() + cycleMonths);
+  return due;
+}
+
+/**
+ * Compute the full set of obligation records for the Maintenance
+ * Calendar grid for a given year.
+ *
+ * Only services with both `categoryId` and `cycleMonths` set are
+ * included. For each building × service pair the function advances
+ * the due date by `cycleMonths` until the candidate falls within
+ * (or after) the target year, then checks whether a rollout already
+ * covers that cycle. It skips the pair entirely if the next due date
+ * is beyond the selected year.
+ */
+export function getCalendarObligations(
+  year: number,
+  buildings: readonly AdminBuilding[],
+  services: readonly AdminService[],
+  rollouts: readonly AdminRollout[],
+): CalendarObligation[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year + 1, 0, 1);
+  const obligations: CalendarObligation[] = [];
+
+  for (const building of buildings) {
+    for (const service of services) {
+      if (!service.categoryId || !service.cycleMonths) continue;
+
+      const cycleMonths = service.cycleMonths;
+      const relevant = rollouts.filter(
+        (r) => r.buildingId === building.id && r.serviceId === service.id,
+      );
+
+      const completed = relevant
+        .filter((r) => new Date(r.endDate) < today)
+        .sort((a, b) => b.endDate.localeCompare(a.endDate));
+      const lastCompleted = completed[0] ?? null;
+
+      const anchorStr =
+        lastCompleted?.endDate ?? building.registeredAt ?? "2022-01-01";
+      const anchor = new Date(anchorStr);
+      anchor.setHours(0, 0, 0, 0);
+
+      // Advance from anchor by cycleMonths until we reach or pass the year
+      let candidate = new Date(anchor);
+      candidate.setMonth(candidate.getMonth() + cycleMonths);
+
+      while (candidate < yearStart) {
+        const next = new Date(candidate);
+        next.setMonth(next.getMonth() + cycleMonths);
+        candidate = next;
+      }
+
+      // Skip if the candidate overshoots the target year
+      if (candidate >= yearEnd) continue;
+
+      // Determine whether a rollout already covers this cycle.
+      // "Scheduled" means a rollout exists that starts after the anchor
+      // and whose startDate is on or before the candidate due date.
+      const scheduledRollout =
+        relevant.find((r) => {
+          const start = new Date(r.startDate);
+          start.setHours(0, 0, 0, 0);
+          return start > anchor && start <= candidate;
+        }) ?? null;
+
+      let status: CalendarObligationStatus;
+      if (scheduledRollout) {
+        status = "scheduled";
+      } else if (candidate < today) {
+        status = "overdue";
+      } else {
+        status = "due";
+      }
+
+      obligations.push({
+        buildingId: building.id,
+        serviceId: service.id,
+        categoryId: service.categoryId,
+        dueMonth: candidate.getMonth(),
+        dueYear: year,
+        dueDate: candidate,
+        status,
+        lastRollout: lastCompleted,
+        scheduledRollout,
+      });
+    }
+  }
+
+  return obligations;
 }
 

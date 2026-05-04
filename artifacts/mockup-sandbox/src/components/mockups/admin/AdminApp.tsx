@@ -92,6 +92,7 @@ import {
 } from "@/state/protoStore";
 
 import { AgentsView } from "./AgentsView";
+import { MaintenanceCalendar } from "./MaintenanceCalendar";
 import {
   AwaitingCoordinationView,
   OUTCOME_FILTER_VALUES,
@@ -452,6 +453,7 @@ const VALID_VIEW_IDS: ReadonlySet<ViewId> = new Set(
     payments: true,
     awaiting_coordination: true,
     rollouts: true,
+    maintenance_calendar: true,
     buildings: true,
     units: true,
     services: true,
@@ -2440,6 +2442,24 @@ export function AdminApp() {
               />
             )
           ) : null}
+
+          {view === "maintenance_calendar" && (
+            <MaintenanceCalendar
+              buildings={buildings}
+              services={services}
+              refreshKey={rolloutsRefreshKey}
+              onCreateRollout={(buildingId, serviceId) => {
+                setView("rollouts");
+                // Open the rollout creation UI with the selected
+                // building/service pre-populated. The RolloutsView
+                // wizard picks up the URL param on mount.
+                const url = new URL(window.location.href);
+                url.searchParams.set("new_rollout_building", buildingId);
+                url.searchParams.set("new_rollout_service", serviceId);
+                window.history.replaceState(window.history.state, "", url.toString());
+              }}
+            />
+          )}
 
           {view === "buildings" ? (
             selectedBuildingId ? (
