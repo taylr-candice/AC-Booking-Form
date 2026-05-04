@@ -818,7 +818,7 @@ function AccessScreen({
       {/* Body */}
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 pb-6">
         <AccessNoticeBox />
-        <h2 className="text-[14px] font-semibold text-[#ED017F] mb-3">
+        <h2 className="text-[14px] font-semibold text-slate-900 mb-3">
           How will the technician access the property?
         </h2>
         <div className="space-y-3 mb-6">
@@ -1063,7 +1063,7 @@ function LeaveKeySubMethodSection({ unitId }: { unitId?: string | null }) {
 
   return (
     <div className="mb-6 space-y-4">
-      <h2 className="text-[14px] font-semibold text-[#ED017F]">
+      <h2 className="text-[14px] font-semibold text-slate-900">
         How will you leave a key?
       </h2>
 
