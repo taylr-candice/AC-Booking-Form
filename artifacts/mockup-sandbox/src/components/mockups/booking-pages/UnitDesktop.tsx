@@ -715,43 +715,46 @@ function RoleCard({
       onClick={onClick}
       data-testid={`card-role-${id}`}
       aria-pressed={selected}
-      className={`relative flex h-full flex-col items-start gap-2 rounded-xl border p-4 text-left transition ${
-        selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
+      className={`relative flex h-full flex-col items-start gap-3 rounded-xl border p-5 text-left transition ${
+        selected ? "" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
       }`}
       style={
         selected
-          ? {
-              borderColor: SELECTED_ACCENT,
-              backgroundColor: SELECTED_BG,
-            }
+          ? { borderColor: SELECTED_ACCENT, backgroundColor: SELECTED_BG }
           : undefined
       }
     >
+      {/* Icon — small and unobtrusive */}
       <span
-        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-          selected ? "bg-white" : "bg-slate-100 text-slate-700"
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
+          selected ? "bg-white/30" : "bg-slate-100"
         }`}
-        style={selected ? { color: SELECTED_ACCENT } : undefined}
+        style={selected ? { color: "#ffffff" } : { color: SELECTED_ACCENT }}
       >
-        {icon}
+        <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       </span>
-      <span
-        className={`text-[14px] font-semibold leading-tight ${
-          selected ? "text-white" : "text-slate-900"
-        }`}
-      >
-        {title}
+
+      {/* Text */}
+      <span className="flex flex-col gap-1">
+        <span
+          className={`text-[16px] font-semibold leading-tight ${
+            selected ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {title}
+        </span>
+        <span
+          className={`text-[13px] leading-snug ${
+            selected ? "text-white/90" : "text-slate-500"
+          }`}
+        >
+          {description}
+        </span>
       </span>
-      <span
-        className={`text-[12px] leading-snug ${
-          selected ? "text-white/85" : "text-slate-500"
-        }`}
-      >
-        {description}
-      </span>
+
       {selected && (
         <CheckCircle2
-          className="absolute right-3 top-3 h-5 w-5"
+          className="absolute right-3 top-3 h-4 w-4"
           style={{ color: "#ffffff" }}
         />
       )}
@@ -779,8 +782,8 @@ function ResidenceCard({
       type="button"
       onClick={onClick}
       data-testid={`card-residence-${id}`}
-      className={`relative flex w-full items-center gap-3 rounded-xl border p-4 text-left transition ${
-        selected ? "" : "border-slate-200 bg-white hover:border-slate-300"
+      className={`relative flex w-full flex-col items-start gap-3 rounded-xl border p-5 text-left transition ${
+        selected ? "" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
       }`}
       style={
         selected
@@ -788,31 +791,38 @@ function ResidenceCard({
           : undefined
       }
     >
+      {/* Icon — small and unobtrusive */}
       <span
-        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-          selected ? "bg-white" : "bg-slate-100 text-slate-700"
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
+          selected ? "bg-white/30" : "bg-slate-100"
         }`}
-        style={selected ? { color: SELECTED_ACCENT } : undefined}
+        style={selected ? { color: "#ffffff" } : { color: SELECTED_ACCENT }}
       >
-        {icon}
+        <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       </span>
-      <span className="flex min-w-0 flex-1 flex-col">
+
+      {/* Text */}
+      <span className="flex flex-col gap-1">
         <span
-          className={`text-[14px] font-semibold leading-tight ${
+          className={`text-[15px] font-semibold leading-tight ${
             selected ? "text-white" : "text-slate-900"
           }`}
         >
           {title}
         </span>
         <span
-          className={`mt-0.5 text-[12px] leading-snug ${
-            selected ? "text-white/85" : "text-slate-500"
+          className={`text-[13px] leading-snug ${
+            selected ? "text-white/90" : "text-slate-500"
           }`}
         >
           {subtitle}
         </span>
       </span>
-      <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: selected ? "#ffffff" : "transparent" }} />
+
+      <CheckCircle2
+        className="absolute right-3 top-3 h-4 w-4"
+        style={{ color: selected ? "#ffffff" : "transparent" }}
+      />
     </button>
   );
 }
