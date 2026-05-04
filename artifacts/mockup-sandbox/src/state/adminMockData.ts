@@ -181,6 +181,29 @@ export type AdminAgent = {
   company: string;
 };
 
+/**
+ * A vendor / subcontractor Taylr assigns to carry out services.
+ * Vendors are assigned at three levels: rollout default → day override
+ * → booking override (most specific wins).
+ */
+export type AdminVendor = {
+  id: string;
+  company: string;
+  contactName: string;
+  email: string;
+  phone: string;
+};
+
+/**
+ * Wholesale rate a vendor charges Taylr for a given service.
+ * Margin = customer price − wholesale cost.
+ */
+export type VendorServiceRate = {
+  vendorId: string;
+  serviceId: string;
+  wholesalePriceAud: number;
+};
+
 export type PaymentStatus = "paid" | "pending" | "refund_pending" | "refunded";
 /**
  * Service-side lifecycle of a booking.
@@ -365,6 +388,10 @@ export type AdminBooking = {
    *  them to lock in a window once dates are released. Surfaced in the
    *  Awaiting-coordination queue as the "Awaiting scheduling" category. */
   datesUnavailableAtBooking?: boolean;
+  /** Booking-level vendor override. When set, overrides both the
+   *  rollout's `defaultVendorId` and any day-level `vendorId`. Used
+   *  for stragglers or individual reassignments. */
+  vendorId?: string;
 };
 
 // ─── Seeded buildings ───────────────────────────────────────────────────────
@@ -703,6 +730,49 @@ export const SEEDED_AGENTS: readonly AdminAgent[] = [
   { id: "ag-001", company: "Vantage Strata Management" },
   { id: "ag-002", company: "City Edge Property Group" },
   { id: "ag-003", company: "Capital Realty & Co." },
+];
+
+// ─── Seeded vendors ──────────────────────────────────────────────────────────
+
+export const SEEDED_VENDORS: readonly AdminVendor[] = [
+  {
+    id: "vendor-cooltech",
+    company: "CoolTech Services",
+    contactName: "James Nguyen",
+    email: "james@cooltech.com.au",
+    phone: "0412 300 111",
+  },
+  {
+    id: "vendor-airpro",
+    company: "AirPro HVAC",
+    contactName: "Petra Kowalski",
+    email: "petra@airprohvac.com.au",
+    phone: "0423 450 222",
+  },
+  {
+    id: "vendor-climate",
+    company: "ClimatePro Solutions",
+    contactName: "Daniel Ferraro",
+    email: "daniel@climatepro.com.au",
+    phone: "0438 610 333",
+  },
+];
+
+/**
+ * Wholesale rates per vendor per service. Rates intentionally vary so
+ * the margin display is interesting: CoolTech is cheapest (best margin),
+ * AirPro is mid-range, ClimatePro is premium (lower margin).
+ */
+export const SEEDED_VENDOR_RATES: readonly VendorServiceRate[] = [
+  // CoolTech — lowest wholesale, highest margin for Taylr
+  { vendorId: "vendor-cooltech", serviceId: "svc-ac", wholesalePriceAud: 110 },
+  { vendorId: "vendor-cooltech", serviceId: "svc-ac-ducted", wholesalePriceAud: 120 },
+  // AirPro — mid-range wholesale
+  { vendorId: "vendor-airpro", serviceId: "svc-ac", wholesalePriceAud: 130 },
+  { vendorId: "vendor-airpro", serviceId: "svc-ac-ducted", wholesalePriceAud: 140 },
+  // ClimatePro — premium wholesale, lowest margin
+  { vendorId: "vendor-climate", serviceId: "svc-ac", wholesalePriceAud: 148 },
+  { vendorId: "vendor-climate", serviceId: "svc-ac-ducted", wholesalePriceAud: 158 },
 ];
 
 // ─── Seeded bookings ───────────────────────────────────────────────────────
@@ -3505,6 +3575,10 @@ export type RolloutDay = {
   /** Optional evening window. Most days don't have one — admins
    *  opt-in per day for evening capacity. */
   evening?: RolloutSlot;
+  /** Day-level vendor override. When set, overrides the rollout's
+   *  `defaultVendorId` for all bookings on this day unless a booking-
+   *  level override is also present. */
+  vendorId?: string;
 };
 
 /** Time range for one of a rollout's three default windows. Strings
@@ -3577,6 +3651,9 @@ export type AdminRollout = {
   startDate: string;
   endDate: string;
   capacityModel: ServiceCapacityModel;
+  /** Rollout-level default vendor. Inherited by all days unless a
+   *  day-level or booking-level override is present. */
+  defaultVendorId?: string;
   /** Pre-seeded day rows — one per ISO date in the rollout's range
    *  (admins can't add days outside the range; they can only toggle
    *  the existing rows on/off). */
@@ -4466,6 +4543,9 @@ export function createRollout(input: {
   endDate: string;
   capacityModel: ServiceCapacityModel;
   defaultSlotCount?: number;
+  defaultVendorId?: string;
+  releaseStrategy?: Partial<Omit<ReleaseStrategy, "audit">>;
+  windowDefaults?: Partial<RolloutWindowDefaults>;
 }): AdminRollout {
   const id = `rl-${Math.random().toString(36).slice(2, 8)}`;
   const days: RolloutDay[] = enumerateDates(input.startDate, input.endDate).map(
@@ -4484,22 +4564,54 @@ export function createRollout(input: {
     startDate: input.startDate,
     endDate: input.endDate,
     capacityModel: input.capacityModel,
+    ...(input.defaultVendorId ? { defaultVendorId: input.defaultVendorId } : {}),
     days,
     windowDefaults: {
-      morning: { ...SEED_WINDOW_DEFAULTS.morning },
-      afternoon: { ...SEED_WINDOW_DEFAULTS.afternoon },
-      evening: { ...SEED_WINDOW_DEFAULTS.evening },
+      morning: { ...(input.windowDefaults?.morning ?? SEED_WINDOW_DEFAULTS.morning) },
+      afternoon: { ...(input.windowDefaults?.afternoon ?? SEED_WINDOW_DEFAULTS.afternoon) },
+      evening: { ...(input.windowDefaults?.evening ?? SEED_WINDOW_DEFAULTS.evening) },
     },
     releaseStrategy: {
-      mode: DEFAULT_RELEASE_STRATEGY.mode,
-      thresholdPct: DEFAULT_RELEASE_STRATEGY.thresholdPct,
-      unit: DEFAULT_RELEASE_STRATEGY.unit,
-      batchSize: DEFAULT_RELEASE_STRATEGY.batchSize,
+      mode: input.releaseStrategy?.mode ?? DEFAULT_RELEASE_STRATEGY.mode,
+      thresholdPct: input.releaseStrategy?.thresholdPct ?? DEFAULT_RELEASE_STRATEGY.thresholdPct,
+      unit: input.releaseStrategy?.unit ?? DEFAULT_RELEASE_STRATEGY.unit,
+      batchSize: input.releaseStrategy?.batchSize ?? DEFAULT_RELEASE_STRATEGY.batchSize,
       audit: [],
     },
   };
   rollouts = [...rollouts, rollout];
   return rollout;
+}
+
+/** Update the default vendor for a rollout. Pass `null` to clear it. */
+export function updateRolloutDefaultVendor(
+  rolloutId: string,
+  vendorId: string | null,
+): void {
+  rollouts = rollouts.map((r) => {
+    if (r.id !== rolloutId) return r;
+    const { defaultVendorId: _omit, ...rest } = r;
+    return vendorId ? { ...rest, defaultVendorId: vendorId } : rest as AdminRollout;
+  });
+}
+
+/** Update (or clear) the vendor for a single rollout day. */
+export function updateRolloutDayVendor(
+  rolloutId: string,
+  isoDate: string,
+  vendorId: string | null,
+): void {
+  rollouts = rollouts.map((r) => {
+    if (r.id !== rolloutId) return r;
+    return {
+      ...r,
+      days: r.days.map((d) => {
+        if (d.isoDate !== isoDate) return d;
+        const { vendorId: _omit, ...rest } = d;
+        return vendorId ? { ...rest, vendorId } : rest as RolloutDay;
+      }),
+    };
+  });
 }
 
 export function updateRolloutDay(
@@ -5317,5 +5429,85 @@ export function applyBulkLogEmail(
       serviceTimeline: [...b.serviceTimeline, entry],
     };
   });
+}
+
+// ─── Vendor helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Cascade through booking → day → rollout to find the assigned vendor.
+ * Returns the vendor object when found, or `null` when no vendor is set
+ * at any level or the id doesn't match any entry in `vendors`.
+ *
+ * Also returns the tier that resolved it so the UI can show a provenance
+ * note ("Set on this booking" / "Set on this date" / "Rollout default").
+ */
+export function resolveEffectiveVendor(
+  booking: AdminBooking,
+  rollout: AdminRollout | null,
+  vendors: readonly AdminVendor[],
+): { vendor: AdminVendor; tier: "booking" | "day" | "rollout" } | null {
+  // 1. Booking-level override wins first
+  if (booking.vendorId) {
+    const v = vendors.find((v) => v.id === booking.vendorId);
+    if (v) return { vendor: v, tier: "booking" };
+  }
+  if (!rollout) return null;
+  // 2. Day-level override (find the day matching this booking's date)
+  if (booking.serviceDate) {
+    const day = rollout.days.find((d) => d.isoDate === booking.serviceDate);
+    if (day?.vendorId) {
+      const v = vendors.find((v) => v.id === day.vendorId);
+      if (v) return { vendor: v, tier: "day" };
+    }
+  }
+  // 3. Rollout default
+  if (rollout.defaultVendorId) {
+    const v = vendors.find((v) => v.id === rollout.defaultVendorId);
+    if (v) return { vendor: v, tier: "rollout" };
+  }
+  return null;
+}
+
+/**
+ * Resolve the margin for a booking given the effective vendor and rates.
+ * Returns null when no vendor is set or no rate exists for that vendor×service.
+ */
+export function resolveMargin(
+  booking: AdminBooking,
+  rollout: AdminRollout | null,
+  vendors: readonly AdminVendor[],
+  vendorRates: readonly VendorServiceRate[],
+): {
+  customerPrice: number;
+  wholesaleCost: number;
+  marginAud: number;
+  marginPct: number;
+  vendor: AdminVendor;
+} | null {
+  const resolved = resolveEffectiveVendor(booking, rollout, vendors);
+  if (!resolved) return null;
+  const serviceId = rollout?.serviceId ?? null;
+  if (!serviceId) return null;
+  const rate = vendorRates.find(
+    (r) => r.vendorId === resolved.vendor.id && r.serviceId === serviceId,
+  );
+  if (!rate) return null;
+  const customerPrice = booking.totalAud;
+  const wholesaleCost = rate.wholesalePriceAud;
+  const marginAud = customerPrice - wholesaleCost;
+  const marginPct = customerPrice > 0 ? (marginAud / customerPrice) * 100 : 0;
+  return { customerPrice, wholesaleCost, marginAud, marginPct, vendor: resolved.vendor };
+}
+
+/**
+ * Look up a vendor's wholesale rate for a given service.
+ * Returns null when no rate is configured.
+ */
+export function getVendorRate(
+  vendorId: string,
+  serviceId: string,
+  vendorRates: readonly VendorServiceRate[],
+): number | null {
+  return vendorRates.find((r) => r.vendorId === vendorId && r.serviceId === serviceId)?.wholesalePriceAud ?? null;
 }
 

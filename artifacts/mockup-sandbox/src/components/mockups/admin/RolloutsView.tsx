@@ -10,31 +10,39 @@
  * open windows, # of bookings) — destructive edits live in the editor.
  */
 
-import { AlertTriangle, CalendarRange, Plus } from "lucide-react";
+import { AlertTriangle, CalendarRange, Copy, Plus, Truck } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
+  createRollout,
   formatRolloutDateRange,
   getRollouts,
   getServices,
+  persistRolloutsToStore,
   shouldNudgeManualRelease,
   type AdminBooking,
   type AdminBuilding,
   type AdminRollout,
-  type ServiceCapacityModel,
+  type AdminVendor,
+  type VendorServiceRate,
 } from "@/state/adminMockData";
 
-import { Card, FormField } from "./atoms";
+import { Card } from "./atoms";
+import { CreateRolloutWizard } from "./CreateRolloutWizard";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 import {
   useFocusedRowHighlight,
   type FocusedRowProps,
 } from "./useFocusedRowHighlight";
 
+type WizardPrefill = Parameters<typeof CreateRolloutWizard>[0]["prefill"];
+
 export function RolloutsView({
   buildings,
   bookings,
-  onCreate,
+  vendors,
+  vendorRates,
+  onCreated,
   onOpen,
   /** Bumped on every create so the list refreshes from the
    *  module-level store. */
@@ -44,50 +52,46 @@ export function RolloutsView({
 }: {
   buildings: AdminBuilding[];
   bookings: AdminBooking[];
-  onCreate: (input: {
-    serviceId: string;
-    buildingId: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    capacityModel: ServiceCapacityModel;
-    defaultSlotCount?: number;
-  }) => void;
+  vendors: readonly AdminVendor[];
+  vendorRates: readonly VendorServiceRate[];
+  onCreated: (rollout: AdminRollout) => void;
   onOpen: (rolloutId: string) => void;
   refreshKey: number;
-  /** One-shot seed for the source-row highlight: id of the rollout
-   *  the admin pivoted FROM (e.g. via the `RolloutScheduleEditor`'s
-   *  "Back to rollouts" button). Mirrors the `initialFocusedRowId`
-   *  prop on {@link BookingsView} / {@link AwaitingCoordinationView}
-   *  so a pivot back into the rollouts list keeps the same
-   *  source-row highlight + scroll-into-view behaviour the other
-   *  list views have. Applied on first paint (BRAND_SOFT tint +
-   *  pulse + scroll-into-view), dismissed on first interaction,
-   *  then cleared via {@link onFocusedRowConsumed} so re-renders
-   *  never re-apply it. Optional. */
   initialFocusedRowId?: string | null;
-  /** Fires once after RolloutsView consumes
-   *  {@link initialFocusedRowId} so the parent can clear its seed
-   *  slot. Mirrors the BookingsView / AwaitingCoordinationView
-   *  callback. */
   onFocusedRowConsumed?: () => void;
 }) {
   const rollouts = useMemo(() => getRollouts(), [refreshKey]);
   const services = getServices();
-  const [showCreate, setShowCreate] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardPrefill, setWizardPrefill] = useState<WizardPrefill>(undefined);
 
-  // Source-row highlight (Task #190): mirror of the same machinery
-  // in {@link BookingsView} / {@link AwaitingCoordinationView} so an
-  // admin pivoting back into this list (via the
-  // RolloutScheduleEditor "Back to rollouts" button) lands on a
-  // visibly highlighted source row instead of losing their place.
-  // The full state-machine (seed, scroll, pulse-clear, dismiss-on-
-  // interaction) lives in `useFocusedRowHighlight` so this view, the
-  // bookings list, and the awaiting-coordination queue can't drift.
   const { focusedRowProps } = useFocusedRowHighlight<HTMLButtonElement>({
     initialFocusedRowId,
     onFocusedRowConsumed,
   });
+
+  function openWizard(prefill?: WizardPrefill) {
+    setWizardPrefill(prefill);
+    setShowWizard(true);
+  }
+
+  function handleDuplicate(source: AdminRollout) {
+    // Shift dates by 14 days and pre-fill the wizard
+    const shiftDate = (iso: string, days: number) => {
+      const d = new Date(iso);
+      d.setDate(d.getDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+    openWizard({
+      buildingId: source.buildingId,
+      serviceId: source.serviceId,
+      capacityModel: source.capacityModel,
+      defaultVendorId: source.defaultVendorId ?? null,
+      startDate: shiftDate(source.endDate, 1),
+      endDate: shiftDate(source.endDate, 14),
+      cycleLabel: source.name + " (copy)",
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -98,29 +102,14 @@ export function RolloutsView({
         </div>
         <button
           type="button"
-          onClick={() => setShowCreate((v) => !v)}
+          onClick={() => openWizard()}
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
           style={{ backgroundColor: BRAND }}
         >
           <Plus className="h-3.5 w-3.5" />
-          {showCreate ? "Cancel" : "New rollout"}
+          New rollout
         </button>
       </div>
-
-      {showCreate && (
-        <Card title="New rollout" subtitle="Pick a service, a building, and capacity rules.">
-          <CreateRolloutForm
-            buildings={buildings}
-            services={services}
-            existing={rollouts}
-            onCancel={() => setShowCreate(false)}
-            onCreate={(input) => {
-              onCreate(input);
-              setShowCreate(false);
-            }}
-          />
-        </Card>
-      )}
 
       <Card>
         {rollouts.length === 0 ? (
@@ -136,7 +125,9 @@ export function RolloutsView({
                   rollout={r}
                   buildings={buildings}
                   bookings={bookings}
+                  vendors={vendors}
                   onOpen={() => onOpen(r.id)}
+                  onDuplicate={() => handleDuplicate(r)}
                   focusProps={focusedRowProps(r.id)}
                 />
               </li>
@@ -144,6 +135,22 @@ export function RolloutsView({
           </ol>
         )}
       </Card>
+
+      {showWizard && (
+        <CreateRolloutWizard
+          buildings={buildings}
+          services={services}
+          existing={rollouts}
+          vendors={vendors}
+          vendorRates={vendorRates}
+          prefill={wizardPrefill}
+          onCreated={(rollout) => {
+            setShowWizard(false);
+            onCreated(rollout);
+          }}
+          onCancel={() => setShowWizard(false)}
+        />
+      )}
     </div>
   );
 }
@@ -152,16 +159,17 @@ function RolloutListRow({
   rollout,
   buildings,
   bookings,
+  vendors,
   onOpen,
+  onDuplicate,
   focusProps,
 }: {
   rollout: AdminRollout;
   buildings: AdminBuilding[];
   bookings: AdminBooking[];
+  vendors: readonly AdminVendor[];
   onOpen: () => void;
-  /** Source-row highlight props from {@link useFocusedRowHighlight}.
-   *  The parent owns the hook (so a single state machine drives every
-   *  row in the list) and hands per-row props down here. */
+  onDuplicate: () => void;
   focusProps: FocusedRowProps<HTMLButtonElement>;
 }) {
   const building = buildings.find((b) => b.id === rollout.buildingId);
@@ -182,228 +190,78 @@ function RolloutListRow({
     rollout.capacityModel === "slots_per_window"
       ? "Slots per window"
       : "Time budget per window";
+  const defaultVendor = rollout.defaultVendorId
+    ? vendors.find((v) => v.id === rollout.defaultVendorId)
+    : null;
+
   return (
-    <button
-      type="button"
-      ref={focusProps.ref}
-      onClick={onOpen}
-      data-testid={`rollouts-row-${rollout.id}`}
-      data-focused={focusProps["data-focused"]}
-      data-pulsing={focusProps["data-pulsing"]}
-      className={`flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50${focusProps.pulseClassName}`}
-      style={focusProps.style}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <CalendarRange className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
-          <div className="truncate text-[14px] font-semibold text-slate-900">
-            {rollout.name}
+    <div className="group flex items-center gap-2">
+      <button
+        type="button"
+        ref={focusProps.ref}
+        onClick={onOpen}
+        data-testid={`rollouts-row-${rollout.id}`}
+        data-focused={focusProps["data-focused"]}
+        data-pulsing={focusProps["data-pulsing"]}
+        className={`flex flex-1 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-slate-300 hover:bg-slate-50${focusProps.pulseClassName}`}
+        style={focusProps.style}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <CalendarRange className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
+            <div className="truncate text-[14px] font-semibold text-slate-900">
+              {rollout.name}
+            </div>
+          </div>
+          <div className="mt-0.5 text-[12px] text-slate-500">
+            {building ? building.name : rollout.buildingId} ·{" "}
+            {formatRolloutDateRange({
+              from: rollout.startDate,
+              to: rollout.endDate,
+            })}{" "}
+            · {modeLabel}
           </div>
         </div>
-        <div className="mt-0.5 text-[12px] text-slate-500">
-          {building ? building.name : rollout.buildingId} ·{" "}
-          {formatRolloutDateRange({
-            from: rollout.startDate,
-            to: rollout.endDate,
-          })}{" "}
-          · {modeLabel}
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {shouldNudgeManualRelease(rollout) && (
-          <span
-            data-testid={`rollouts-row-${rollout.id}-nudge-badge`}
-            className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800"
-            title="Released windows are at 80%+. Release the next batch when ready."
-          >
-            <AlertTriangle className="h-3 w-3" />
-            Release nudge
+        <div className="flex shrink-0 items-center gap-2">
+          {shouldNudgeManualRelease(rollout) && (
+            <span
+              data-testid={`rollouts-row-${rollout.id}-nudge-badge`}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800"
+              title="Released windows are at 80%+. Release the next batch when ready."
+            >
+              <AlertTriangle className="h-3 w-3" />
+              Release nudge
+            </span>
+          )}
+          {defaultVendor && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600"
+              title={`Default vendor: ${defaultVendor.company}`}
+            >
+              <Truck className="h-3 w-3" />
+              {defaultVendor.company}
+            </span>
+          )}
+          <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+            {openWindows}/{totalWindows} windows open
           </span>
-        )}
-        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-          {openWindows}/{totalWindows} windows open
-        </span>
-        <span
-          className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
-          style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
-        >
-          {bookingsHere} booking{bookingsHere === 1 ? "" : "s"}
-        </span>
-      </div>
-    </button>
-  );
-}
-
-// ─── Create rollout form ───────────────────────────────────────────────────
-
-function CreateRolloutForm({
-  buildings,
-  services,
-  existing,
-  onCancel,
-  onCreate,
-}: {
-  buildings: AdminBuilding[];
-  services: { id: string; name: string }[];
-  existing: AdminRollout[];
-  onCancel: () => void;
-  onCreate: (input: {
-    serviceId: string;
-    buildingId: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    capacityModel: ServiceCapacityModel;
-    defaultSlotCount?: number;
-  }) => void;
-}) {
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [buildingId, setBuildingId] = useState(buildings[0]?.id ?? "");
-  const [name, setName] = useState("");
-  const [startDate, setStartDate] = useState("2026-05-01");
-  const [endDate, setEndDate] = useState("2026-05-15");
-  const [capacityModel, setCapacityModel] =
-    useState<ServiceCapacityModel>("time_budget_per_window");
-  const [defaultSlotCount, setDefaultSlotCount] = useState(6);
-  const [error, setError] = useState<string | null>(null);
-
-  function submit() {
-    if (!serviceId || !buildingId) {
-      setError("Pick a service and a building.");
-      return;
-    }
-    if (startDate > endDate) {
-      setError("End date must be on or after the start date.");
-      return;
-    }
-    if (existing.some((r) => r.serviceId === serviceId && r.buildingId === buildingId)) {
-      setError(
-        "A rollout for that service + building already exists. Open it from the list instead.",
-      );
-      return;
-    }
-    const building = buildings.find((b) => b.id === buildingId);
-    const service = services.find((s) => s.id === serviceId);
-    const finalName =
-      name.trim() ||
-      `${service?.name ?? "Service"} · ${building?.name ?? "Building"}`;
-    onCreate({
-      serviceId,
-      buildingId,
-      name: finalName,
-      startDate,
-      endDate,
-      capacityModel,
-      defaultSlotCount:
-        capacityModel === "slots_per_window" ? defaultSlotCount : undefined,
-    });
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Service">
-          <select
-            value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
+          <span
+            className="rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
           >
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Building">
-          <select
-            value={buildingId}
-            onChange={(e) => setBuildingId(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
-          >
-            {buildings.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Display name (optional)">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Phase 2 — May rollout"
-            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800 placeholder:text-slate-400"
-          />
-        </FormField>
-        <FormField label="Capacity model">
-          <select
-            value={capacityModel}
-            onChange={(e) =>
-              setCapacityModel(e.target.value as ServiceCapacityModel)
-            }
-            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
-          >
-            <option value="time_budget_per_window">Time budget per window</option>
-            <option value="slots_per_window">Slots per window</option>
-          </select>
-        </FormField>
-        <FormField label="Start date">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
-          />
-        </FormField>
-        <FormField label="End date">
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
-          />
-        </FormField>
-        {capacityModel === "slots_per_window" && (
-          <FormField label="Default slots per window">
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={defaultSlotCount}
-              onChange={(e) =>
-                setDefaultSlotCount(
-                  Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1)),
-                )
-              }
-              className="w-full rounded-lg border border-slate-200 bg-white p-2 text-[13px] text-slate-800"
-            />
-          </FormField>
-        )}
-      </div>
-      {error && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[12px] text-amber-800">
-          {error}
+            {bookingsHere} booking{bookingsHere === 1 ? "" : "s"}
+          </span>
         </div>
-      )}
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition hover:brightness-110"
-          style={{ backgroundColor: BRAND }}
-        >
-          Create rollout
-        </button>
-      </div>
+      </button>
+      <button
+        type="button"
+        onClick={onDuplicate}
+        className="shrink-0 rounded-lg border border-slate-200 bg-white p-2 text-slate-400 opacity-0 transition hover:border-slate-300 hover:text-slate-700 group-hover:opacity-100"
+        title="Duplicate rollout (pre-fills wizard)"
+        aria-label="Duplicate rollout"
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
