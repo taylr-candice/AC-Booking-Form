@@ -727,9 +727,8 @@ function RoleCard({
       {/* Icon — small and unobtrusive */}
       <span
         className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
-          selected ? "bg-white/30" : "bg-slate-100"
+          selected ? "bg-white/30 text-white" : "bg-slate-100 text-slate-500"
         }`}
-        style={selected ? { color: "#ffffff" } : { color: SELECTED_ACCENT }}
       >
         <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       </span>
@@ -794,9 +793,8 @@ function ResidenceCard({
       {/* Icon — small and unobtrusive */}
       <span
         className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
-          selected ? "bg-white/30" : "bg-slate-100"
+          selected ? "bg-white/30 text-white" : "bg-slate-100 text-slate-500"
         }`}
-        style={selected ? { color: "#ffffff" } : { color: SELECTED_ACCENT }}
       >
         <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       </span>
