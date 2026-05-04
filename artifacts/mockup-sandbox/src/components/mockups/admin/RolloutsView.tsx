@@ -11,7 +11,7 @@
  */
 
 import { AlertTriangle, CalendarRange, Copy, Plus, Truck } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   createRollout,
@@ -49,6 +49,10 @@ export function RolloutsView({
   refreshKey,
   initialFocusedRowId,
   onFocusedRowConsumed,
+  /** When set, the wizard opens immediately with this prefill on first render.
+   *  Call onWizardPrefillConsumed once consumed so the parent can clear it. */
+  initialWizardPrefill,
+  onWizardPrefillConsumed,
 }: {
   buildings: AdminBuilding[];
   bookings: AdminBooking[];
@@ -59,11 +63,22 @@ export function RolloutsView({
   refreshKey: number;
   initialFocusedRowId?: string | null;
   onFocusedRowConsumed?: () => void;
+  initialWizardPrefill?: WizardPrefill | null;
+  onWizardPrefillConsumed?: () => void;
 }) {
   const rollouts = useMemo(() => getRollouts(), [refreshKey]);
   const services = getServices();
   const [showWizard, setShowWizard] = useState(false);
   const [wizardPrefill, setWizardPrefill] = useState<WizardPrefill>(undefined);
+
+  useEffect(() => {
+    if (initialWizardPrefill) {
+      openWizard(initialWizardPrefill);
+      onWizardPrefillConsumed?.();
+    }
+    // intentionally only runs when the prefill identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialWizardPrefill]);
 
   const { focusedRowProps } = useFocusedRowHighlight<HTMLButtonElement>({
     initialFocusedRowId,

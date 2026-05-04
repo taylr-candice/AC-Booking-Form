@@ -221,7 +221,7 @@ export function BookingsView({
   const [attemptSort, setAttemptSort] = useState<
     "default" | "stalest_first" | "freshest_first"
   >("default");
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const activeFilterCount = [
     statusFilter !== "all",
     buildingFilter !== "all",
@@ -280,6 +280,7 @@ export function BookingsView({
     : [
         { key: "all", label: "All statuses" },
         { key: "scheduled", label: "Scheduled" },
+        { key: "on_site", label: "On site" },
         { key: "complete", label: "Complete" },
         { key: "cancelled", label: "Cancelled" },
       ];
@@ -497,25 +498,31 @@ export function BookingsView({
                   {paymentMode ? "Payment status" : "Service status"}
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  {filterChips.map((chip) => (
-                    <button
-                      key={chip.key}
-                      type="button"
-                      onClick={() => onStatusFilter(chip.key)}
-                      data-testid={`chip-bookings-${chip.key}`}
-                      aria-pressed={statusFilter === chip.key}
-                      className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${statusFilter === chip.key ? "text-white" : "text-slate-700 hover:bg-slate-50"}`}
-                      style={statusFilter === chip.key ? { backgroundColor: BRAND } : undefined}
-                    >
-                      {chip.label}
-                      <span
-                        className={`ml-1 ${statusFilter === chip.key ? "text-white/70" : "text-slate-400"}`}
-                        data-testid={`chip-bookings-${chip.key}-count`}
+                  {filterChips.map((chip) => {
+                    const count = chipCounts[chip.key] ?? 0;
+                    const isEmpty = chip.key !== "all" && count === 0;
+                    const isActive = statusFilter === chip.key && !isEmpty;
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => onStatusFilter(chip.key)}
+                        disabled={isEmpty}
+                        data-testid={`chip-bookings-${chip.key}`}
+                        aria-pressed={statusFilter === chip.key}
+                        className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${isActive ? "text-white" : isEmpty ? "cursor-not-allowed opacity-50 text-slate-400 ring-1 ring-slate-100" : "text-slate-700 hover:bg-slate-50"}`}
+                        style={isActive ? { backgroundColor: BRAND } : undefined}
                       >
-                        ({chipCounts[chip.key] ?? 0})
-                      </span>
-                    </button>
-                  ))}
+                        {chip.label}
+                        <span
+                          className={`ml-1 ${isActive ? "text-white/70" : "text-slate-400"}`}
+                          data-testid={`chip-bookings-${chip.key}-count`}
+                        >
+                          ({count})
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="flex flex-col gap-3">

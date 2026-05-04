@@ -1006,6 +1006,12 @@ export function AdminApp() {
   // queued up at once (the sidebar nav clears both).
   const [rolloutsFocusedRowSeed, setRolloutsFocusedRowSeed] =
     useState<string | null>(null);
+  // One-shot prefill for the rollout wizard, set when the user clicks
+  // "Create rollout for this cycle" from the Maintenance Calendar.
+  const [rolloutWizardPrefill, setRolloutWizardPrefill] = useState<{
+    buildingId: string;
+    serviceId: string;
+  } | null>(null);
   // One-shot seed: id of the building the admin pivoted FROM, so
   // BuildingsView can highlight the source row on first paint after
   // a BuildingDetail → BuildingsView "Back to buildings" pivot.
@@ -2439,6 +2445,8 @@ export function AdminApp() {
                 onFocusedRowConsumed={() =>
                   setRolloutsFocusedRowSeed(null)
                 }
+                initialWizardPrefill={rolloutWizardPrefill}
+                onWizardPrefillConsumed={() => setRolloutWizardPrefill(null)}
               />
             )
           ) : null}
@@ -2449,14 +2457,8 @@ export function AdminApp() {
               services={services}
               refreshKey={rolloutsRefreshKey}
               onCreateRollout={(buildingId, serviceId) => {
+                setRolloutWizardPrefill({ buildingId, serviceId });
                 setView("rollouts");
-                // Open the rollout creation UI with the selected
-                // building/service pre-populated. The RolloutsView
-                // wizard picks up the URL param on mount.
-                const url = new URL(window.location.href);
-                url.searchParams.set("new_rollout_building", buildingId);
-                url.searchParams.set("new_rollout_service", serviceId);
-                window.history.replaceState(window.history.state, "", url.toString());
               }}
             />
           )}

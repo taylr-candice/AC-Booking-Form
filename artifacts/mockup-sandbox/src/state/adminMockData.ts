@@ -245,6 +245,7 @@ export type PaymentStatus = "paid" | "pending" | "refund_pending" | "refunded";
  */
 export type ServiceStatus =
   | "scheduled"
+  | "on_site"
   | "complete"
   | "invoice_adjusted"
   | "cancelled";
@@ -5745,8 +5746,12 @@ export function getCalendarObligations(
         (r) => r.buildingId === building.id && r.serviceId === service.id,
       );
 
+      // Only rollouts that ended before the start of the viewed year count
+      // as cycle anchors. This makes the calendar year-relative: navigating
+      // to a past or future year always projects obligations from the right
+      // baseline rather than from today.
       const completed = relevant
-        .filter((r) => new Date(r.endDate) < today)
+        .filter((r) => new Date(r.endDate) < yearStart)
         .sort((a, b) => b.endDate.localeCompare(a.endDate));
       const lastCompleted = completed[0] ?? null;
 
@@ -5774,15 +5779,18 @@ export function getCalendarObligations(
       while (candidate < yearEnd) {
         const thisCycleAnchor = new Date(cycleAnchor);
 
-        // A rollout "covers" this cycle if its startDate falls after the
-        // cycle's anchor date. We intentionally do NOT cap at the due date
-        // so that ops can create a rollout after the nominal due date and
-        // still have the calendar reflect it as scheduled.
+        // The next cycle starts at candidate + cycleMonths. A rollout
+        // "covers" this cycle if its startDate falls strictly after
+        // thisCycleAnchor and strictly before the next cycle's start —
+        // preventing a far-future rollout from falsely satisfying an
+        // earlier cycle it doesn't belong to.
+        const nextCycleStart = new Date(candidate);
+        nextCycleStart.setMonth(nextCycleStart.getMonth() + cycleMonths);
         const scheduledRollout =
           relevant.find((r) => {
             const start = new Date(r.startDate);
             start.setHours(0, 0, 0, 0);
-            return start > thisCycleAnchor;
+            return start > thisCycleAnchor && start < nextCycleStart;
           }) ?? null;
 
         let status: CalendarObligationStatus;

@@ -142,22 +142,32 @@ export function MaintenanceCalendar({
     return m;
   }, [obligations]);
 
-  // Per-month, per-category: count of due+overdue buildings (for conflict badge)
-  // Stored with building names for tooltip copy.
+  // Per-month, per-category: count of due+overdue BUILDINGS (not obligations).
+  // A building with multiple services in the same category counts only once.
   const conflictMap = useMemo(() => {
-    const m = new Map<string, { count: number; buildingNames: string[] }>();
+    const rawMap = new Map<
+      string,
+      { buildingIds: Set<string>; buildingNames: string[] }
+    >();
     for (const obl of obligations) {
       if (obl.status !== "due" && obl.status !== "overdue") continue;
       const key = `${obl.categoryId}:${obl.dueMonth}`;
-      const building = buildings.find((b) => b.id === obl.buildingId);
-      const existing = m.get(key) ?? { count: 0, buildingNames: [] };
-      existing.count += 1;
-      if (building && !existing.buildingNames.includes(building.name)) {
-        existing.buildingNames.push(building.name);
+      if (!rawMap.has(key)) {
+        rawMap.set(key, { buildingIds: new Set(), buildingNames: [] });
       }
-      m.set(key, existing);
+      const entry = rawMap.get(key)!;
+      if (!entry.buildingIds.has(obl.buildingId)) {
+        entry.buildingIds.add(obl.buildingId);
+        const building = buildings.find((b) => b.id === obl.buildingId);
+        if (building) entry.buildingNames.push(building.name);
+      }
     }
-    return m;
+    return new Map(
+      Array.from(rawMap.entries()).map(([key, { buildingIds, buildingNames }]) => [
+        key,
+        { count: buildingIds.size, buildingNames },
+      ]),
+    );
   }, [obligations, buildings]);
 
   // Per-month total due/overdue count across all categories (column header badge)

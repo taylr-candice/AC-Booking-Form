@@ -60,6 +60,7 @@ export function ServiceChip({ status }: { status: ServiceStatus }) {
     { label: string; bg: string; fg: string; strike?: boolean }
   > = {
     scheduled: { label: "Scheduled", bg: "#E2E8F0", fg: "#334155" },
+    on_site: { label: "On site", bg: "#DBEAFE", fg: "#1E40AF" },
     complete: { label: "Complete", bg: "#DCFCE7", fg: "#166534" },
     invoice_adjusted: { label: "Invoice adjusted", bg: "#FEF3C7", fg: "#92400E" },
     cancelled: { label: "Cancelled", bg: "#F1F5F9", fg: "#64748B", strike: true },

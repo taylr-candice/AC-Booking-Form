@@ -914,7 +914,7 @@ export function AwaitingCoordinationView({
     clearSelection();
   }
 
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const coordActiveFilterCount = [
     filter !== "all",
     activeOutcomeFilter !== "all",
@@ -1097,18 +1097,21 @@ export function AwaitingCoordinationView({
                   {FILTER_CHIPS.map((chip) => {
                     const active = filter === chip.key;
                     const count = waitingOnCounts[chip.key];
+                    const isEmpty = chip.key !== "all" && count === 0;
+                    const isActive = active && !isEmpty;
                     return (
                       <button
                         key={chip.key}
                         type="button"
                         onClick={() => onFilter(chip.key)}
+                        disabled={isEmpty}
                         data-testid={`chip-waiting-${chip.key}`}
                         aria-pressed={active}
-                        className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${active ? "text-white" : "text-slate-700 hover:bg-slate-50"}`}
-                        style={active ? { backgroundColor: BRAND } : undefined}
+                        className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${isActive ? "text-white" : isEmpty ? "cursor-not-allowed opacity-50 text-slate-400 ring-1 ring-slate-100" : "text-slate-700 hover:bg-slate-50"}`}
+                        style={isActive ? { backgroundColor: BRAND } : undefined}
                       >
                         {chip.label}
-                        <span className={`ml-1 ${active ? "text-white/70" : "text-slate-400"}`} data-testid={`chip-waiting-${chip.key}-count`}>
+                        <span className={`ml-1 ${isActive ? "text-white/70" : "text-slate-400"}`} data-testid={`chip-waiting-${chip.key}-count`}>
                           ({count})
                         </span>
                       </button>
@@ -1122,18 +1125,21 @@ export function AwaitingCoordinationView({
                   {OUTCOME_FILTER_CHIPS.map((chip) => {
                     const active = activeOutcomeFilter === chip.key;
                     const count = outcomeCounts[chip.key];
+                    const isEmpty = chip.key !== "all" && count === 0;
+                    const isActive = active && !isEmpty;
                     return (
                       <button
                         key={chip.key}
                         type="button"
                         onClick={() => setOutcomeFilter(chip.key)}
+                        disabled={isEmpty}
                         data-testid={`chip-outcome-${chip.key}`}
                         aria-pressed={active}
-                        className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${active ? "text-white" : "text-slate-700 hover:bg-slate-50"}`}
-                        style={active ? { backgroundColor: BRAND } : undefined}
+                        className={`rounded px-2 py-1.5 text-left text-[12px] font-medium transition ${isActive ? "text-white" : isEmpty ? "cursor-not-allowed opacity-50 text-slate-400 ring-1 ring-slate-100" : "text-slate-700 hover:bg-slate-50"}`}
+                        style={isActive ? { backgroundColor: BRAND } : undefined}
                       >
                         {chip.label}
-                        <span className={`ml-1 ${active ? "text-white/70" : "text-slate-400"}`} data-testid={`chip-outcome-${chip.key}-count`}>
+                        <span className={`ml-1 ${isActive ? "text-white/70" : "text-slate-400"}`} data-testid={`chip-outcome-${chip.key}-count`}>
                           ({count})
                         </span>
                       </button>
