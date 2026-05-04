@@ -547,21 +547,22 @@ export function isStep5Valid(s: BookingState): boolean {
       );
     }
 
-    // All unattended sub-options require the access-authorisation checkbox.
-    return s.signature_acknowledged;
+    // All unattended sub-options require the access-authorisation checkbox + name.
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
   }
 
   // Legacy parcel-locker access methods (no longer shown as top-level cards
   // but kept here so any stored state remains valid).
   if (isParcelLockerMethod(s.access_method)) {
-    return s.signature_acknowledged;
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
   }
 
   if (isCollectReturnMethod(s.access_method)) {
     return (
       s.key_collection_location.trim().length > 0 &&
       s.return_method !== null &&
-      s.signature_acknowledged
+      s.signature_acknowledged &&
+      s.signature_name.trim().length > 0
     );
   }
 
@@ -575,7 +576,7 @@ export function isStep5Valid(s: BookingState): boolean {
         t.phone.trim().length > 0,
     );
     if (!allTenantsValid) return false;
-    return s.signature_acknowledged;
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
   }
 
   if (isManagingAgentMethod(s.access_method)) {
@@ -583,7 +584,7 @@ export function isStep5Valid(s: BookingState): boolean {
   }
 
   if (isAgentTradeMethod(s.access_method)) {
-    return s.signature_acknowledged;
+    return s.signature_acknowledged && s.signature_name.trim().length > 0;
   }
 
   // Be-there + at-unit + agent_tenant_self: no extra validation

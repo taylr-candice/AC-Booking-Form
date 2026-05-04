@@ -809,7 +809,9 @@ function SignatureSection({
   attemptedSubmit?: boolean;
 }) {
   const ack = useBookingSelector((s) => s.signature_acknowledged);
+  const sigName = useBookingSelector((s) => s.signature_name);
   const today = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  const nameEmpty = sigName.trim().length === 0;
 
   return (
     <div className="mb-8">
@@ -822,7 +824,7 @@ function SignatureSection({
         <div className="bg-slate-50 px-6 py-4 text-[13px] leading-relaxed text-slate-600 border-b border-slate-200">
           {body}
         </div>
-        {/* Checkbox + date — same card, no visual gap */}
+        {/* Agree checkbox + typed signature + date — same card, no visual gap */}
         <div className="px-6 py-5 space-y-5">
           <PinkAckCheckbox
             checked={ack}
@@ -834,6 +836,34 @@ function SignatureSection({
             testId="checkbox-signature"
             label="I have read and agree to the above."
           />
+          {/* Typed-name signature field */}
+          <div className="space-y-1.5">
+            <label
+              htmlFor="sig-name-desktop"
+              className="text-[11px] font-medium uppercase tracking-wide text-slate-500"
+            >
+              Full name (typed signature)
+            </label>
+            <input
+              id="sig-name-desktop"
+              type="text"
+              autoComplete="name"
+              data-testid="input-sig-name"
+              placeholder="Your full legal name"
+              value={sigName}
+              onChange={(e) =>
+                bookingActions.setSignature({ signature_name: e.target.value })
+              }
+              className={`w-full rounded-lg border px-3 py-2.5 text-sm font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 outline-none transition ${
+                attemptedSubmit && nameEmpty
+                  ? "border-red-400 bg-red-50 focus:ring-2 focus:ring-red-300"
+                  : "border-slate-200 bg-white focus:border-[#ED017F] focus:ring-2 focus:ring-pink-200"
+              }`}
+            />
+            {attemptedSubmit && nameEmpty && (
+              <p className="text-[12px] text-red-500">Please enter your full name to sign.</p>
+            )}
+          </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Date Signed</label>
             <div className="flex h-[42px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500">{today}</div>
