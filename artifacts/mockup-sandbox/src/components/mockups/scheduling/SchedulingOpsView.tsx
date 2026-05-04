@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, X } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { AwaitingCoordinationView } from "../admin/AwaitingCoordinationView";
 import type { OutcomeFilter } from "../admin/AwaitingCoordinationView";
 import { SchedulingModal } from "../admin/SchedulingModal";
@@ -75,15 +75,18 @@ export function SchedulingOpsView() {
     null,
   );
 
-  const [toast, setToast] = useState<{
-    message: string;
-    variant: "success" | "info";
-  } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function showToast(message: string, variant: "success" | "info" = "success") {
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  function showToast(message: string) {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ message, variant });
+    setToast(message);
     toastTimerRef.current = setTimeout(() => setToast(null), 4000);
   }
 
@@ -155,7 +158,6 @@ export function SchedulingOpsView() {
     });
     showToast(
       `Scheduled ${booking.customerName ?? "booking"} · ${shortDate} · ${windowLabel}`,
-      "success",
     );
   }
 
@@ -178,25 +180,13 @@ export function SchedulingOpsView() {
       />
 
       {schedulingBooking && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="relative w-full max-w-2xl mx-4 rounded-2xl overflow-hidden shadow-2xl bg-white">
-            <button
-              type="button"
-              onClick={() => setSchedulingBookingId(null)}
-              className="absolute top-4 right-4 z-10 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <SchedulingModal
-              booking={schedulingBooking}
-              units={Array.from(SEEDED_UNITS)}
-              mode="schedule"
-              onCancel={() => setSchedulingBookingId(null)}
-              onConfirm={handleScheduleConfirm}
-            />
-          </div>
-        </div>
+        <SchedulingModal
+          booking={schedulingBooking}
+          units={Array.from(SEEDED_UNITS)}
+          mode="schedule"
+          onCancel={() => setSchedulingBookingId(null)}
+          onConfirm={handleScheduleConfirm}
+        />
       )}
 
       {toast && (
@@ -205,7 +195,7 @@ export function SchedulingOpsView() {
           style={{ backgroundColor: BRAND }}
         >
           <CheckCircle2 className="h-4 w-4 shrink-0" />
-          {toast.message}
+          {toast}
         </div>
       )}
     </div>
