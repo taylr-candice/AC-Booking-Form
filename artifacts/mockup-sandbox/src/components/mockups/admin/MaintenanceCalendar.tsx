@@ -170,15 +170,21 @@ export function MaintenanceCalendar({
     );
   }, [obligations, buildings]);
 
-  // Per-month total due/overdue count across all categories (column header badge)
+  // Per-month unique-building count for due/overdue obligations (column header
+  // badge). A building that has multiple services due in the same month is
+  // counted once — the badge answers "how many buildings need attention?" not
+  // "how many obligation records exist?".
   const monthDueCounts = useMemo(() => {
-    const counts = Array(12).fill(0) as number[];
+    const buildingsByMonth: Set<string>[] = Array.from(
+      { length: 12 },
+      () => new Set<string>(),
+    );
     for (const obl of obligations) {
       if (obl.status === "due" || obl.status === "overdue") {
-        counts[obl.dueMonth]++;
+        buildingsByMonth[obl.dueMonth].add(obl.buildingId);
       }
     }
-    return counts;
+    return buildingsByMonth.map((s) => s.size);
   }, [obligations]);
 
   const hasAnyConflict = Array.from(conflictMap.values()).some(

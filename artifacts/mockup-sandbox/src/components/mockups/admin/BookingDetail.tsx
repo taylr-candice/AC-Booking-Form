@@ -1023,6 +1023,8 @@ function nextStatusLabel(s: ServiceStatus): string {
   switch (s) {
     case "scheduled":
       return "Scheduled";
+    case "on_site":
+      return "On site";
     case "complete":
       return "Complete";
     case "invoice_adjusted":

@@ -2191,11 +2191,16 @@ export function requiresTenantCoordination(b: AdminBooking): boolean {
 
 export function bookingDurationMinutes(b: AdminBooking): number {
   if (b.acType === "unsure") return UNSURE_FALLBACK_MINUTES;
-  // 45 min per system (1 indoor + 1 outdoor) + 15 min per additional
-  // indoor unit. Outdoor condenser placement is not tracked as a time
-  // modifier — only service duration counts.
   const rule = getServiceRuleForAcType(b.acType);
-  return b.systems * rule.baseMinutes + b.additional * rule.addonMinutes;
+  const base = b.systems * rule.baseMinutes + b.additional * rule.addonMinutes;
+  // Add per-system rooftop overhead when the unit's effective placement is
+  // rooftop (unit override wins over building default). Mirrors the same
+  // calculation in getBookingDurationMinutes (bookingDerived) so the admin
+  // slot cell and schedule exports stay in sync with the customer flow.
+  const ctx = getEffectivePlacementForUnit(b.unitId);
+  return ctx.kind === "rooftop"
+    ? base + b.systems * ctx.overheadMinutes
+    : base;
 }
 
 /**
@@ -5679,10 +5684,9 @@ export function getNextDueDate(
   serviceId: string,
   rollouts: readonly AdminRollout[],
   buildings: readonly AdminBuilding[],
-  services: readonly AdminService[],
 ): Date {
   const building = buildings.find((b) => b.id === buildingId);
-  const service = services.find((s) => s.id === serviceId);
+  const service = getLiveServiceCatalogue().find((s) => s.id === serviceId);
   const cycleMonths = service?.cycleMonths ?? 12;
 
   const today = new Date();
@@ -5746,12 +5750,13 @@ export function getCalendarObligations(
         (r) => r.buildingId === building.id && r.serviceId === service.id,
       );
 
-      // Only rollouts that ended before the start of the viewed year count
-      // as cycle anchors. This makes the calendar year-relative: navigating
-      // to a past or future year always projects obligations from the right
-      // baseline rather than from today.
+      // Rollouts that ended before the close of the viewed year count as
+      // cycle anchors. Using yearEnd (rather than yearStart) ensures a
+      // rollout completed inside the viewed year is treated as the true
+      // most-recent anchor for that cycle, giving correct due dates and
+      // accurate "last rollout" detail in the side panel.
       const completed = relevant
-        .filter((r) => new Date(r.endDate) < yearStart)
+        .filter((r) => new Date(r.endDate) < yearEnd)
         .sort((a, b) => b.endDate.localeCompare(a.endDate));
       const lastCompleted = completed[0] ?? null;
 
