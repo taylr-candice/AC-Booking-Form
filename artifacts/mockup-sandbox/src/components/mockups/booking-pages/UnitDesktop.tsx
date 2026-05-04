@@ -659,14 +659,7 @@ export function UnitDesktop() {
             )}
           </div>
 
-          <div className="mt-12 pt-6 border-t border-slate-100 flex items-center justify-between">
-            <button
-              type="button"
-              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-              data-testid="button-back-desktop"
-            >
-              ← Back
-            </button>
+          <div className="mt-12 pt-6 border-t border-slate-100 flex items-center justify-end">
             <span
               onClickCapture={(e) => {
                 if (!canContinue) {
