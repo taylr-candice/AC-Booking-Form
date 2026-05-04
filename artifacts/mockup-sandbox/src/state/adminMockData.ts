@@ -5710,11 +5710,19 @@ export function getNextDueDate(
  * Calendar grid for a given year.
  *
  * Only services with both `categoryId` and `cycleMonths` set are
- * included. For each building × service pair the function advances
- * the due date by `cycleMonths` until the candidate falls within
- * (or after) the target year, then checks whether a rollout already
- * covers that cycle. It skips the pair entirely if the next due date
- * is beyond the selected year.
+ * included. For each building × service pair the function:
+ *
+ *  1. Computes the cycle anchor — the last completed rollout's `endDate`,
+ *     falling back to `building.registeredAt` when no rollout exists yet.
+ *  2. Advances the anchor by `cycleMonths` repeatedly until all due-date
+ *     candidates within the target year have been identified. Supports
+ *     sub-annual cycles (e.g. `cycleMonths: 6`) by emitting one obligation
+ *     per in-year candidate rather than stopping at the first.
+ *  3. For each candidate, checks whether a rollout exists that was created
+ *     for this cycle. "Scheduled" is intentionally broad: any rollout with
+ *     `startDate > cycleAnchor` is accepted — this covers the common case
+ *     where ops creates the rollout after the nominal due date but before
+ *     the period expires.
  */
 export function getCalendarObligations(
   year: number,
@@ -5744,52 +5752,66 @@ export function getCalendarObligations(
 
       const anchorStr =
         lastCompleted?.endDate ?? building.registeredAt ?? "2022-01-01";
-      const anchor = new Date(anchorStr);
-      anchor.setHours(0, 0, 0, 0);
+      const globalAnchor = new Date(anchorStr);
+      globalAnchor.setHours(0, 0, 0, 0);
 
-      // Advance from anchor by cycleMonths until we reach or pass the year
-      let candidate = new Date(anchor);
+      // Walk forward from globalAnchor in cycleMonths steps, tracking the
+      // per-cycle anchor (the start of each individual cycle window). We
+      // emit an obligation for every candidate that lands inside the year.
+      let cycleAnchor = new Date(globalAnchor);
+      let candidate = new Date(globalAnchor);
       candidate.setMonth(candidate.getMonth() + cycleMonths);
 
+      // Fast-forward past cycles that end before the year starts
       while (candidate < yearStart) {
+        cycleAnchor = new Date(candidate);
         const next = new Date(candidate);
         next.setMonth(next.getMonth() + cycleMonths);
         candidate = next;
       }
 
-      // Skip if the candidate overshoots the target year
-      if (candidate >= yearEnd) continue;
+      // Emit one obligation per in-year candidate (supports cycleMonths < 12)
+      while (candidate < yearEnd) {
+        const thisCycleAnchor = new Date(cycleAnchor);
 
-      // Determine whether a rollout already covers this cycle.
-      // "Scheduled" means a rollout exists that starts after the anchor
-      // and whose startDate is on or before the candidate due date.
-      const scheduledRollout =
-        relevant.find((r) => {
-          const start = new Date(r.startDate);
-          start.setHours(0, 0, 0, 0);
-          return start > anchor && start <= candidate;
-        }) ?? null;
+        // A rollout "covers" this cycle if its startDate falls after the
+        // cycle's anchor date. We intentionally do NOT cap at the due date
+        // so that ops can create a rollout after the nominal due date and
+        // still have the calendar reflect it as scheduled.
+        const scheduledRollout =
+          relevant.find((r) => {
+            const start = new Date(r.startDate);
+            start.setHours(0, 0, 0, 0);
+            return start > thisCycleAnchor;
+          }) ?? null;
 
-      let status: CalendarObligationStatus;
-      if (scheduledRollout) {
-        status = "scheduled";
-      } else if (candidate < today) {
-        status = "overdue";
-      } else {
-        status = "due";
+        let status: CalendarObligationStatus;
+        if (scheduledRollout) {
+          status = "scheduled";
+        } else if (candidate < today) {
+          status = "overdue";
+        } else {
+          status = "due";
+        }
+
+        obligations.push({
+          buildingId: building.id,
+          serviceId: service.id,
+          categoryId: service.categoryId,
+          dueMonth: candidate.getMonth(),
+          dueYear: year,
+          dueDate: new Date(candidate),
+          status,
+          lastRollout: lastCompleted,
+          scheduledRollout,
+        });
+
+        // Advance to the next cycle
+        cycleAnchor = new Date(candidate);
+        const next = new Date(candidate);
+        next.setMonth(next.getMonth() + cycleMonths);
+        candidate = next;
       }
-
-      obligations.push({
-        buildingId: building.id,
-        serviceId: service.id,
-        categoryId: service.categoryId,
-        dueMonth: candidate.getMonth(),
-        dueYear: year,
-        dueDate: candidate,
-        status,
-        lastRollout: lastCompleted,
-        scheduledRollout,
-      });
     }
   }
 

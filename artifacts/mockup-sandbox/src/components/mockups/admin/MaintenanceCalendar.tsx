@@ -21,10 +21,10 @@ import {
   getRollouts,
   SEEDED_CATEGORIES,
   type AdminBuilding,
+  type AdminRollout,
   type AdminService,
   type CalendarObligation,
   type CalendarObligationStatus,
-  type ServiceCategory,
 } from "@/state/adminMockData";
 import { BRAND, BRAND_DEEP, BRAND_SOFT } from "./theme";
 
@@ -37,6 +37,8 @@ type SelectedCell = CalendarObligation & {
   buildingName: string;
   serviceName: string;
   categoryName: string;
+  /** All rollouts for this building × service pair (for the history panel). */
+  allRolloutsForPair: AdminRollout[];
 };
 
 const STATUS_STYLES: Record<CalendarObligationStatus, {
@@ -105,11 +107,15 @@ export function MaintenanceCalendar({
     const building = buildings.find((b) => b.id === obl.buildingId);
     const service = services.find((s) => s.id === obl.serviceId);
     const category = SEEDED_CATEGORIES.find((c) => c.id === obl.categoryId);
+    const allRolloutsForPair = rollouts.filter(
+      (r) => r.buildingId === obl.buildingId && r.serviceId === obl.serviceId,
+    );
     setSelectedCell({
       ...obl,
       buildingName: building?.name ?? obl.buildingId,
       serviceName: service?.name ?? obl.serviceId,
       categoryName: category?.name ?? obl.categoryId,
+      allRolloutsForPair,
     });
   }
 
@@ -123,30 +129,38 @@ export function MaintenanceCalendar({
     })).filter((g) => g.services.length > 0);
   }, [services]);
 
-  // Obligation lookup: buildingId + serviceId + month → obligation
+  // Obligation lookup: buildingId + serviceId + month → obligation list
+  // (a pair can have >1 obligations in a year for sub-annual cycles)
   const oblMap = useMemo(() => {
-    const m = new Map<string, CalendarObligation>();
+    const m = new Map<string, CalendarObligation[]>();
     for (const obl of obligations) {
-      m.set(`${obl.buildingId}:${obl.serviceId}:${obl.dueMonth}`, obl);
-    }
-    return m;
-  }, [obligations]);
-
-  // Per-month, per-category: count of due+overdue buildings (for conflict badge)
-  const conflictMap = useMemo(() => {
-    const m = new Map<string, { count: number; buildings: string[] }>();
-    for (const obl of obligations) {
-      if (obl.status !== "due" && obl.status !== "overdue") continue;
-      const key = `${obl.categoryId}:${obl.dueMonth}`;
-      const existing = m.get(key) ?? { count: 0, buildings: [] };
-      existing.count += 1;
-      existing.buildings.push(obl.buildingId);
+      const key = `${obl.buildingId}:${obl.serviceId}:${obl.dueMonth}`;
+      const existing = m.get(key) ?? [];
+      existing.push(obl);
       m.set(key, existing);
     }
     return m;
   }, [obligations]);
 
-  // Per-month total due/overdue count across all categories (for column header badge)
+  // Per-month, per-category: count of due+overdue buildings (for conflict badge)
+  // Stored with building names for tooltip copy.
+  const conflictMap = useMemo(() => {
+    const m = new Map<string, { count: number; buildingNames: string[] }>();
+    for (const obl of obligations) {
+      if (obl.status !== "due" && obl.status !== "overdue") continue;
+      const key = `${obl.categoryId}:${obl.dueMonth}`;
+      const building = buildings.find((b) => b.id === obl.buildingId);
+      const existing = m.get(key) ?? { count: 0, buildingNames: [] };
+      existing.count += 1;
+      if (building && !existing.buildingNames.includes(building.name)) {
+        existing.buildingNames.push(building.name);
+      }
+      m.set(key, existing);
+    }
+    return m;
+  }, [obligations, buildings]);
+
+  // Per-month total due/overdue count across all categories (column header badge)
   const monthDueCounts = useMemo(() => {
     const counts = Array(12).fill(0) as number[];
     for (const obl of obligations) {
@@ -157,14 +171,16 @@ export function MaintenanceCalendar({
     return counts;
   }, [obligations]);
 
+  const hasAnyConflict = Array.from(conflictMap.values()).some(
+    (v) => v.count >= 3,
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <div className="text-[13px] text-slate-500">
-            Service obligation schedule across all buildings and categories
-          </div>
+        <div className="text-[13px] text-slate-500">
+          Service obligation schedule across all buildings and categories
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -193,20 +209,20 @@ export function MaintenanceCalendar({
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-600">
         {(["due", "overdue", "scheduled"] as CalendarObligationStatus[]).map((s) => (
           <span key={s} className="flex items-center gap-1.5">
-            <span
-              className={`inline-block h-2.5 w-2.5 rounded-full ${STATUS_STYLES[s].dot}`}
-            />
+            <span className={`inline-block h-2.5 w-2.5 rounded-full ${STATUS_STYLES[s].dot}`} />
             {STATUS_STYLES[s].label}
           </span>
         ))}
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-200" />
-          Not yet due / no obligation
+          No obligation this year
         </span>
-        <span className="flex items-center gap-1.5 text-amber-700">
-          <AlertTriangle className="h-3 w-3" />
-          Conflict (3+ buildings due same month)
-        </span>
+        {hasAnyConflict && (
+          <span className="flex items-center gap-1.5 text-amber-700">
+            <AlertTriangle className="h-3 w-3" />
+            Conflict badge — 3+ buildings due same month in that category
+          </span>
+        )}
       </div>
 
       {/* Grid */}
@@ -219,7 +235,7 @@ export function MaintenanceCalendar({
             ))}
           </colgroup>
 
-          {/* Sticky column header row */}
+          {/* Global month header row */}
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
               <th className="sticky left-0 z-10 bg-slate-50 px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-slate-500">
@@ -236,7 +252,7 @@ export function MaintenanceCalendar({
                       <span
                         className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
                         style={{ backgroundColor: BRAND_SOFT, color: BRAND_DEEP }}
-                        title={`${monthDueCounts[i]} obligations due in ${month}`}
+                        title={`${monthDueCounts[i]} obligation${monthDueCounts[i] === 1 ? "" : "s"} due in ${month}`}
                       >
                         {monthDueCounts[i]}
                       </span>
@@ -251,16 +267,22 @@ export function MaintenanceCalendar({
             {categorisedServices.map(({ category, services: catServices }) => {
               const isCollapsed = collapsedCategories.has(category.id);
 
+              // Find which months have a conflict for this category
+              const categoryConflictMonths = MONTHS.map((_, monthIdx) => {
+                const conflict = conflictMap.get(`${category.id}:${monthIdx}`);
+                return conflict && conflict.count >= 3 ? conflict : null;
+              });
+              const categoryHasConflict = categoryConflictMonths.some(Boolean);
+
               return [
-                // Category section header
+                // ── Category section header ─────────────────────────────────
+                // Spans the label column + individual month cells so we can
+                // place per-month conflict badges scoped to this category.
                 <tr
                   key={`cat-${category.id}`}
                   className="border-b border-slate-100 bg-slate-50"
                 >
-                  <td
-                    colSpan={13}
-                    className="sticky left-0 px-4 py-1.5"
-                  >
+                  <td className="sticky left-0 z-10 bg-slate-50 px-4 py-1.5">
                     <button
                       type="button"
                       onClick={() => toggleCategory(category.id)}
@@ -277,9 +299,30 @@ export function MaintenanceCalendar({
                       </span>
                     </button>
                   </td>
+
+                  {/* Per-month conflict badge — scoped to this category */}
+                  {MONTHS.map((_, monthIdx) => {
+                    const conflict = categoryConflictMonths[monthIdx];
+                    return (
+                      <td
+                        key={monthIdx}
+                        className="px-1 py-1.5 text-center"
+                      >
+                        {conflict && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold text-amber-700"
+                            title={`${conflict.count} due: ${conflict.buildingNames.join(", ")}`}
+                          >
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                            {conflict.count}
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>,
 
-                // Building × service rows (hidden when collapsed)
+                // ── Building × service rows ─────────────────────────────────
                 ...(!isCollapsed
                   ? catServices.flatMap((service) =>
                       buildings.map((building) => {
@@ -288,9 +331,7 @@ export function MaintenanceCalendar({
                           return oblMap.get(key) ?? null;
                         });
 
-                        // Skip the row entirely if this building has no
-                        // obligation for this service in this year
-                        const hasAny = cells.some((c) => c !== null);
+                        const hasAny = cells.some((c) => c !== null && c.length > 0);
                         if (!hasAny) return null;
 
                         return (
@@ -299,52 +340,44 @@ export function MaintenanceCalendar({
                             className="border-b border-slate-100 hover:bg-slate-50"
                           >
                             <td className="sticky left-0 z-10 bg-white px-4 py-2 group-hover:bg-slate-50">
-                              <div className="text-[12px] font-medium text-slate-900 truncate max-w-[9rem]" title={building.name}>
+                              <div
+                                className="truncate max-w-[9rem] text-[12px] font-medium text-slate-900"
+                                title={building.name}
+                              >
                                 {building.name}
                               </div>
-                              <div className="text-[10px] text-slate-400 truncate max-w-[9rem]">
+                              <div className="truncate max-w-[9rem] text-[10px] text-slate-400">
                                 {service.name}
                               </div>
                             </td>
-                            {cells.map((obl, monthIdx) => {
-                              if (!obl) {
+                            {cells.map((oblList, monthIdx) => {
+                              if (!oblList || oblList.length === 0) {
                                 return (
-                                  <td
-                                    key={monthIdx}
-                                    className="px-1 py-2 text-center"
-                                  >
+                                  <td key={monthIdx} className="px-1 py-2 text-center">
                                     <span className="inline-block h-1 w-1 rounded-full bg-slate-200" />
                                   </td>
                                 );
                               }
 
-                              const style = STATUS_STYLES[obl.status];
-                              const conflict = conflictMap.get(
-                                `${category.id}:${monthIdx}`,
-                              );
-                              const hasConflict =
-                                (conflict?.count ?? 0) >= 3 &&
-                                (obl.status === "due" || obl.status === "overdue");
-
+                              // Multiple obligations can share a month (sub-annual)
                               return (
-                                <td
-                                  key={monthIdx}
-                                  className="px-1 py-2 text-center"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCellClick(obl)}
-                                    className={`relative inline-flex min-w-[2.5rem] items-center justify-center rounded px-1.5 py-1 text-[10px] font-semibold transition hover:brightness-95 ${style.cell}`}
-                                    title={`${building.name} · ${service.name} · ${style.label}`}
-                                  >
-                                    {style.label || "·"}
-                                    {hasConflict && (
-                                      <AlertTriangle
-                                        className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 text-amber-500"
-                                        aria-label="Scheduling conflict"
-                                      />
-                                    )}
-                                  </button>
+                                <td key={monthIdx} className="px-1 py-2 text-center">
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    {oblList.map((obl, oblIdx) => {
+                                      const style = STATUS_STYLES[obl.status];
+                                      return (
+                                        <button
+                                          key={oblIdx}
+                                          type="button"
+                                          onClick={() => handleCellClick(obl)}
+                                          className={`inline-flex min-w-[2.5rem] items-center justify-center rounded px-1.5 py-1 text-[10px] font-semibold transition hover:brightness-95 ${style.cell}`}
+                                          title={`${building.name} · ${service.name} · ${style.label} · due ${obl.dueDate.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}`}
+                                        >
+                                          {style.label || "·"}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </td>
                               );
                             })}
@@ -370,35 +403,6 @@ export function MaintenanceCalendar({
           </div>
         )}
       </div>
-
-      {/* Conflict summary strip */}
-      {Array.from(conflictMap.entries()).some(([, v]) => v.count >= 3) && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-amber-900">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Scheduling conflicts detected
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {Array.from(conflictMap.entries())
-              .filter(([, v]) => v.count >= 3)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([key, val]) => {
-                const [catId, monthStr] = key.split(":");
-                const cat = SEEDED_CATEGORIES.find((c) => c.id === catId);
-                const month = MONTHS[parseInt(monthStr ?? "0", 10)] ?? "";
-                return (
-                  <span
-                    key={key}
-                    className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[11px] font-medium text-amber-800"
-                    title={`Buildings: ${val.buildings.join(", ")}`}
-                  >
-                    {cat?.name ?? catId} · {month} — {val.count} due
-                  </span>
-                );
-              })}
-          </div>
-        </div>
-      )}
 
       {/* Cell detail side panel */}
       {selectedCell && (
@@ -434,10 +438,12 @@ function CellDetailPanel({
     month: "long",
     year: "numeric",
   });
-  const lastRolloutStr = cell.lastRollout
-    ? `${cell.lastRollout.name} · ended ${cell.lastRollout.endDate}`
-    : "No prior rollout";
   const anchor = cell.lastRollout?.endDate ?? building?.registeredAt ?? "—";
+
+  // Chronological rollout history (newest first)
+  const sortedHistory = [...cell.allRolloutsForPair].sort((a, b) =>
+    b.endDate.localeCompare(a.endDate),
+  );
 
   return (
     <div className="fixed inset-0 z-40 flex items-start justify-end" onClick={onClose}>
@@ -475,17 +481,61 @@ function CellDetailPanel({
             <DetailRow label="Building" value={cell.buildingName} />
             <DetailRow label="Category" value={cell.categoryName} />
             <DetailRow label="Service" value={cell.serviceName} />
-            <DetailRow label="Anchor date" value={anchor} note="Last rollout end or registration date" />
-            <DetailRow label="Due date" value={dueDateStr} />
             <DetailRow
-              label="Last rollout"
-              value={lastRolloutStr}
+              label="Cycle anchor"
+              value={anchor}
+              note="Last completed rollout end date, or building registration date"
             />
+            <DetailRow label="Due date" value={dueDateStr} />
             {cell.scheduledRollout && (
               <DetailRow
                 label="Scheduled rollout"
-                value={`${cell.scheduledRollout.name} · starts ${cell.scheduledRollout.startDate}`}
+                value={`${cell.scheduledRollout.name}`}
+                note={`Starts ${cell.scheduledRollout.startDate} · ends ${cell.scheduledRollout.endDate}`}
               />
+            )}
+          </div>
+
+          {/* Service history — all rollouts for this building × service */}
+          <div className="border-t border-slate-100 pt-4">
+            <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+              Service history
+              {sortedHistory.length > 0
+                ? ` · ${sortedHistory.length} rollout${sortedHistory.length === 1 ? "" : "s"}`
+                : ""}
+            </div>
+            {sortedHistory.length === 0 ? (
+              <p className="text-[11px] text-slate-400">
+                No prior rollouts for this building and service.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {sortedHistory.map((r) => {
+                  const isPast = new Date(r.endDate) < new Date();
+                  return (
+                    <div
+                      key={r.id}
+                      className={`rounded-md border px-3 py-2 ${
+                        isPast
+                          ? "border-slate-100 bg-slate-50"
+                          : "border-emerald-100 bg-emerald-50"
+                      }`}
+                    >
+                      <div className="text-[11px] font-semibold text-slate-800 truncate">
+                        {r.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {r.startDate} → {r.endDate}
+                        {!isPast && (
+                          <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
+                            active / upcoming
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 
@@ -494,9 +544,7 @@ function CellDetailPanel({
             <div className="border-t border-slate-100 pt-4">
               <button
                 type="button"
-                onClick={() =>
-                  onCreateRollout(cell.buildingId, cell.serviceId)
-                }
+                onClick={() => onCreateRollout(cell.buildingId, cell.serviceId)}
                 className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold text-white transition hover:brightness-110"
                 style={{ backgroundColor: BRAND }}
               >
@@ -529,9 +577,7 @@ function DetailRow({
         {label}
       </div>
       <div className="mt-0.5 text-[12px] font-medium text-slate-800">{value}</div>
-      {note && (
-        <div className="mt-0.5 text-[10px] text-slate-400">{note}</div>
-      )}
+      {note && <div className="mt-0.5 text-[10px] text-slate-400">{note}</div>}
     </div>
   );
 }
