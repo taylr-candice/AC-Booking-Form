@@ -129,6 +129,7 @@ export function canContinueStep1(
     BookingState,
     | "unit_id"
     | "role"
+    | "primary_residence"
     | "agency_id"
     | "agency_other_name"
     | "contact_first_name"
@@ -138,6 +139,7 @@ export function canContinueStep1(
   >,
 ): boolean {
   if (!s.unit_id || !s.role) return false;
+  if (s.role === "owner" && !s.primary_residence) return false;
   if (validateRequired(s.contact_first_name, "First name")) return false;
   if (validateRequired(s.contact_last_name, "Last name")) return false;
   if (validateEmail(s.contact_email)) return false;

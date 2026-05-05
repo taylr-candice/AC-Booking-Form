@@ -197,6 +197,7 @@ export function UnitDesktop() {
   const canContinue = canContinueStep1({
     unit_id: selectedId,
     role,
+    primary_residence: residence,
     agency_id: agencyId,
     agency_other_name: agencyOtherName,
     contact_first_name: firstName,
