@@ -51,6 +51,7 @@ const validContact = {
 const ownerComplete = {
   unit_id: "u1",
   role: "owner" as const,
+  primary_residence: "live_in" as const,
   agency_id: null,
   agency_other_name: "",
   ...validContact,

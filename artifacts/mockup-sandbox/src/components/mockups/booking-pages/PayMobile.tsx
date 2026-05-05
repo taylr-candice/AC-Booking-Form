@@ -24,9 +24,7 @@ import {
 } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
-  resolveOtherServiceQuantities,
 } from "../../../state/bookingDerived";
-import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
   agencyDisplayName,
@@ -67,9 +65,6 @@ export function PayMobile() {
   const isCoordination = isCoordinationFlow(session);
   const isAgent = session.role === "agent";
   const unit = unitLabel(session.unit_id);
-  const otherServices = resolveOtherServiceQuantities(
-    session.other_service_quantities ?? {},
-  );
 
   // If role changes away from agent while invoice is selected, clear the selection.
   useEffect(() => {
@@ -197,18 +192,6 @@ export function PayMobile() {
                 </span>
               )}
             </SummaryItem>
-            {otherServices.length > 0 && (
-              <div className="space-y-3 border-t border-slate-100 pt-3">
-                {otherServices.map(({ rule, qty }) => (
-                  <PayOtherServiceRow
-                    key={rule.id}
-                    rule={rule}
-                    qty={qty}
-                    variant="mobile"
-                  />
-                ))}
-              </div>
-            )}
           </div>
           <div className="border-t border-pink-200 bg-pink-50/40 px-4 py-3 flex items-center justify-between">
             <div>

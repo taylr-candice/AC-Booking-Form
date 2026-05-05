@@ -28,14 +28,12 @@ import {
   ERROR_PURPLE,
   formatSystemsIncludes,
   type KnownType,
-  OtherServicesSection,
   PriceBlock,
   SYSTEM_PRICE,
   UnsureMergedCard,
   UnsurePriceReassurance,
   useAcOnFileSync,
   useAcStep,
-  useSelectedOtherServices,
 } from "./acStepShared";
 
 export function AcDesktop() {
@@ -85,7 +83,6 @@ function OnFileView({
   cameFromSlotPicker: boolean;
 }) {
   useAcOnFileSync(recorded);
-  const selectedOtherServices = useSelectedOtherServices();
 
   const knownType: KnownType = recorded.type;
   const sysWord = knownType === "ducted" ? "ducted system" : "split system";
@@ -140,18 +137,12 @@ function OnFileView({
             </div>
           </div>
 
-          {/* Task #186: customer-side Service catalogue toggles */}
-          <div className="mb-4">
-            <OtherServicesSection variant="desktop" />
-          </div>
-
           {/* Price block */}
           <PriceBlock
             systems={recorded.systems}
             additional={recorded.additional}
             knownType={knownType}
             variant="desktop"
-            otherServices={selectedOtherServices}
           />
 
           {/* Update affordance */}
@@ -205,7 +196,6 @@ function FullConfigView({
   recorded: AcRecord | null;
 }) {
   const ac = useAcStep({ unitId, mode, acTypeFromUnit, recorded });
-  const selectedOtherServices = useSelectedOtherServices();
   const [attemptedContinue, setAttemptedContinue] = useState(false);
   const {
     override,
@@ -480,13 +470,11 @@ function FullConfigView({
                 type, because the customer told us they're unsure. */}
             {!needsTypePick && (
               <div className="mt-6 space-y-5">
-                <OtherServicesSection variant="desktop" />
                 <PriceBlock
                   systems={displaySystems}
                   additional={displayAdditional}
                   knownType={override === "unsure" ? null : knownType}
                   variant="desktop"
-                  otherServices={selectedOtherServices}
                 />
                 {override === "unsure" && (
                   <UnsurePriceReassurance variant="desktop" />

@@ -4,9 +4,7 @@ import { AfternoonIcon, EveningIcon, MorningIcon } from "../booking-slots/TimeOf
 import { bookingActions, useBookingSelector } from "../../../state/bookingSession";
 import {
   isCoordinationFlow,
-  resolveOtherServiceQuantities,
 } from "../../../state/bookingDerived";
-import { PayOtherServiceRow } from "./payOtherServiceRow";
 import {
   acSummary,
   agencyDisplayName,
@@ -51,9 +49,6 @@ export function PayDesktop() {
   const total = computeBookingTotal(session);
   const isCoordination = isCoordinationFlow(session);
   const unit = unitLabel(session.unit_id);
-  const otherServices = resolveOtherServiceQuantities(
-    session.other_service_quantities ?? {},
-  );
 
   // Owners (non-agents) only have one option, so we auto-treat
   // pay_now as selected and don't render the choice cards. Agents
@@ -126,14 +121,6 @@ export function PayDesktop() {
                     </span>
                   )
                 } />
-                {otherServices.map(({ rule, qty }) => (
-                  <PayOtherServiceRow
-                    key={rule.id}
-                    rule={rule}
-                    qty={qty}
-                    variant="desktop"
-                  />
-                ))}
               </div>
             </div>
 
